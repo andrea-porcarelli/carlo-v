@@ -13,6 +13,7 @@
             </li>
             @if ($role === 'admin')
                 @include('backoffice.components.nav-bar-item', ['route' => 'dashboard', 'icon' => 'fa-home', 'label' => 'Dashboard']))
+                @include('backoffice.components.nav-bar-restaurant')
                 @include('backoffice.components.nav-bar-supplier')
                 <li>
                     <a href="{{ url('backoffice/log-viewer') }}" target="_blank">

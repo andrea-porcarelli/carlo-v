@@ -14,13 +14,6 @@ class Utils
     {
         return 'Sito Test';
     }
-    public static  function company_id() : string
-    {
-        return 1;
-    }
-    public static function upload_path() : string {
-        return storage_path() . '/app/public';
-    }
 
     public static function queryLog($models, $print = false, $return  = false) {
         Log::info($models->toSql());
@@ -60,6 +53,11 @@ class Utils
 
     public static function data_long(string $data = null) : string {
         return isset($data) ? Carbon::parse($data)->format('d/m/Y H:i') : '';
+    }
+
+    public static function data_text(string $data = null) : string {
+        Carbon::setLocale('it');
+        return isset($data) ? Carbon::parse($data)->isoFormat('D MMMM YYYY') : '';
     }
 
     public static function data_extra_long(string $data = null) : string {

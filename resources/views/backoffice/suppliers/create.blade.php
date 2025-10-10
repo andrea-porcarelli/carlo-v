@@ -1,9 +1,9 @@
-@extends('backoffice.layout')
+@extends('backoffice.layout', ['title' => 'Crea fornitore',])
 
 @section('breadcrumb')
     @include('backoffice.components.breadcrumb', [
-        'title' => 'Crea fornitore',
-        'level_1' => ['label' => 'Fornitori', 'href' => route('suppliers')],
+
+        'level_1' => ['label' => 'Fornitori', 'href' => route('suppliers.index')],
         'level_2' => ['label' => 'Crea fornitore'],
     ])
 @endsection

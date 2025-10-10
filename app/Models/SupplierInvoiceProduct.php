@@ -17,6 +17,7 @@ class SupplierInvoiceProduct extends LogsModel
     public $fillable = [
         'supplier_invoice_id',
         'product_name',
+        'price',
         'quantity',
         'iva',
         'price',

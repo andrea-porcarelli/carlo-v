@@ -2,11 +2,11 @@
 
 namespace App\Repositories;
 
-use App\Interfaces\SupplierOrderProductInterface;
+use App\Interfaces\SupplierInvoiceProductInterface;
 use App\Models\SupplierInvoiceProduct;
 use Illuminate\Database\Eloquent\Builder;
 
-class SupplierOrderProductRepository extends CrudRepository implements SupplierOrderProductInterface
+class SupplierInvoiceProductRepository extends CrudRepository implements SupplierInvoiceProductInterface
 {
 
     public function __construct(SupplierInvoiceProduct $model)

@@ -17,6 +17,10 @@ class Supplier extends Model
         'company_name',
         'fiscal_code',
         'vat_number',
+        'phone',
+        'email',
+        'sdi',
+        'pec',
         'address',
         'number',
         'zip_code',
@@ -27,6 +31,16 @@ class Supplier extends Model
 
     public function invoices(): HasMany {
         return $this->hasMany(SupplierInvoice::class);
+    }
+
+    public function getExtendedNameAttribute(): string
+    {
+        return $this->company_name . '<br /><small>' . $this->vat_number . ' | ' . $this->fiscal_code. ' <br />' . $this->full_address . '</small>';
+    }
+
+    public function getFullAddressAttribute(): string
+    {
+        return $this->address . ' ' . $this->number . ', ' . $this->zip_code . ' ' . $this->city . ' (' . $this->province .  ')';
     }
 
 }

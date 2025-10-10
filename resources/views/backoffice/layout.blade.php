@@ -18,5 +18,7 @@
 
 {{--@include('backoffice.components.modals')--}}
 @include('backoffice.components.footer')
+@livewireScripts
+
 </body>
 </html>

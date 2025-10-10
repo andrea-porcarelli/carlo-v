@@ -1,4 +1,4 @@
-<li class="{{ (Request::is('backoffice/suppliers*')) ? 'active' : '' }}">
+<li class="{{ (Request::is('backoffice/suppliers*') || Request::is('backoffice/invoices*')) ? 'active' : '' }}">
     <a href="#">
         <i class="fas fa-shipping-fast"></i>
         <span class="nav-label">Fornitori</span>
@@ -6,18 +6,13 @@
     </a>
     <ul class="nav nav-second-level collapse">
         <li class="{{ (Request::is('backoffice/suppliers')) ? 'active' : '' }}">
-            <a href="{{ route('suppliers') }}">
+            <a href="{{ route('suppliers.index') }}">
                 <i class="fas fa-box-open"></i> Gestione
             </a>
         </li>
-        <li class="{{ (Request::is('backoffice/suppliers/orders*')) ? 'active' : '' }}">
-            <a href="{{ route('suppliers.orders') }}">
-                <i class="fas fa-shopping-cart"></i> Ordini
-            </a>
-        </li>
-        <li class="{{ (Request::is('backoffice/suppliers/invoices*')) ? 'active' : '' }}">
-            <a href="{{ route('suppliers.invoices') }}">
-                <i class="fas fa-file-alt"></i> Fatture
+        <li class="{{ (Request::is('backoffice/invoices*')) ? 'active' : '' }}">
+            <a href="{{ route('invoices.index') }}">
+                <i class="fas fa-file-alt"></i> Ordini / Fatture
             </a>
         </li>
     </ul>

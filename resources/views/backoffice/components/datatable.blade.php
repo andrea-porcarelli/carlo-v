@@ -1,6 +1,6 @@
 <div class="actions">
     @if (in_array('edit', $options))
-        <a href="{{ route( ($path ?? $model) . '.show', $item->id) }}" title="Modifica">
+        <a href="{{ route( ($route ?? $model) . '.show', $item->id) }}" title="Modifica">
             <button class="btn  btn-xs btn-info white">
                 <span class="fa fa-edit"></span>
             </button>
@@ -20,7 +20,7 @@
         <button
             class="btn btn-xs {{ (!$item->is_active) ? 'btn-danger' : 'btn-success' }} btn-status"
             title="{{ (!$item->is_active) ? 'Attiva' : 'Disattiva' }}"
-            data-model="{{ $route ?? ($path ?? $model) }}"
+            data-model="{{ str_replace('.', '/', $route) }}"
             data-id="{{ $item->id }}"
         >
             <span class="fa {{ (!$item->is_active) ? 'fa-times' : 'fa-check' }}"></span>

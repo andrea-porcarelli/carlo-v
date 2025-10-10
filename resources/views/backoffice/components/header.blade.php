@@ -30,5 +30,6 @@
     <link href="{{ asset('/backoffice/css/plugins/blueimp/css/blueimp-gallery.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
     @yield('custom-css')
+    @livewireStyles
 </head>
 <body>

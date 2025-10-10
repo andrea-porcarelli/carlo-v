@@ -1,5 +1,3 @@
-
-window.amazonScannerSessions = window.amazonScannerSessions || {};
 const sweetConfirm = (text, callback, willClose) => {
     swal(
         {
@@ -504,11 +502,6 @@ const removeDropzone = () => {
     }
 };
 
-const logs = () => {
-    ajax({ path: "logs/get", method: "get" }).then((response) => {
-        $(".logs").html(response);
-    });
-};
 
 const loadSwitch = (container) => {
     let elems = Array.prototype.slice.call(
@@ -522,23 +515,15 @@ const loadSwitch = (container) => {
     });
 };
 
-const changeStatusObject = (el) => {
-    const elementId = el.data("id");
-    const model = el.data("model");
-    ajax({ path: `/${model}/${elementId}/status`, method: "post" }).then(
-        () => {
+const change_status = (btn) => {
+    const elementId = btn.data("id");
+    const model = btn.data("model");
+    ajax({ path: `/backoffice/${model}/${elementId}/status`, method: "PUT" }).then(() => {
             reloadTable();
         }
     );
 };
 
-const dashboard = () => {
-    const data = App.serialize('.load-dashboard');
-    console.log(data)
-    App.ajax({path: `/dashboard_ajax`, method: 'post', data: { ...data.data }}).then(response => {
-        $('.dashboard-report').html(response.html)
-    });
-}
 
 const success = (button) => {
     button.parent().parent().append(`<div class="col-xs-12 m-t-sm"><div class="alert alert-success"><span class="fa fa-check-circle text-info"></span><div class='text-info'>Operazione effettuata con successo</div></div></div>`)
@@ -571,21 +556,45 @@ const update_or_create = (button, method, form_name, endpoint, redirect, callbac
         console.log(errors)
         $(form_name).find('.overlay').remove();
         App.renderErrors(errors, form)
-        App.sweet(errors.responseJSON.message);
+        App.sweet(errors.responseJSON.message, 'Errore');
     })
 }
 
 const initDropzone = (class_name, callback, acceptedFiles = '.pdf', uploadMultiple = false, maxFiles = 1) => {
     $(`.${class_name}`).dropzone({
-        uploadMultiple,
+        uploadMultiple: false,
         maxFiles,
         acceptedFiles,
+        parallelUploads: 1, // MA processa solo 1 file alla volta
+        autoProcessQueue: true,
         init: function () {
+            let processedFiles = 0;
+            let totalFiles = 0;
+
+            this.on("addedfiles", function(files) {
+                totalFiles += files.length;
+            });
             this.on("error", function (file, errorMessage) {
                 App.sweet(errorMessage.file ?? errorMessage.message);
                 this.removeFile(file);
-            }).on("complete", function (file, message) {
-                callback(file, message, this);
+            })
+            this.on('success', function (file, response) {
+                processedFiles++;
+                callback(file, response, this);
+            });
+            this.on('sending', function (file) {
+                $(`.${class_name}`).parent().prepend(
+                    '<div class="overlay"><span>Attendi... Caricamento in corso</span></div>'
+                );
+            });
+
+            this.on('queuecomplete', function () {
+                $(`.${class_name}`).parent().find(`.overlay`).remove();
+                $('.btn-create, .btn-edit').prop('disabled', false);
+                // Notifica finale
+                if (processedFiles > 0) {
+                    App.sweet(`${processedFiles} fatture processate con successo!`);
+                }
             });
         },
     });
@@ -606,15 +615,6 @@ const append_form = (parameters) => {
     $(`.form-element`).append(`<input type="hidden" name="${parameters.name}" value="${JSON.stringify(parameters.file).replace(/[\/\(\)\']/g, "\\$&")}" />`);
 }
 
-const filter_elements = (query, container, element) => {
-    $(container).find(element).each(function () {
-        if ($(this).text().toLowerCase().trim().indexOf(query.toLowerCase()) === -1) {
-            $(this).hide();
-        } else {
-            $(this).show();
-        }
-    });
-}
 
 const delete_media = (e) => {
     App.sweetConfirm("Sei sicuro di voler rimuovere questo file?", () => {
@@ -666,20 +666,6 @@ const date_range_picker = (parameters) => {
     });
 }
 
-const plus_minus = (e) =>  {
-    const $button = e;
-    const $input = $button.closest('.plus-minus-quantity').find("input.quantity-input");
-    $input.val((i, v) => Math.max(0, +v + 1 * $button.data('multi')));
-}
-
-const open_modal = (e) =>  {
-    const modal = $(`#${e.data('modal')}`);
-    const path = e.data('route');
-    App.ajax({ path , method: 'get' }).then(response => {
-        modal.find('.modal-body').html(response.html)
-        modal.modal('show');
-    })
-}
 const selectChoice = (parameters) => {
     const select = document.getElementById(parameters.id);
     const choices = new Choices(select, {
@@ -734,303 +720,11 @@ const selectChoice = (parameters) => {
     });
 }
 
-const open_scan_barcode = (e) => {
-    const product_id = e.data("id");
-    const modal = $("#scan-qr-code");
-
-    // Store scanner instance globally
-    let html5QrcodeScanner = null;
-
-    // Initialize alert manager for this scanner session
-    const alertManager = {
-        activeAlerts: new Map(),
-        cooldownPeriod: 10000, // 10 seconds
-        baseDisplayDuration: 3000, // 3 seconds base display time
-
-        showAlert(message, type) {
-            const now = Date.now();
-            const alertKey = `${type}:${message}`;
-
-            // Check if this alert is already active
-            if (this.activeAlerts.has(alertKey)) {
-                const alertData = this.activeAlerts.get(alertKey);
-
-                // Check if in cooldown period
-                if (now - alertData.lastShown < this.cooldownPeriod) {
-                    // Extend the life of existing alert if still visible
-                    if (alertData.element && alertData.element.is(':visible')) {
-                        // Clear existing timeout
-                        if (alertData.timeout) {
-                            clearTimeout(alertData.timeout);
-                        }
-
-                        // Flash effect to show it's been triggered again
-                        alertData.element.css('opacity', '0.7').animate({opacity: 1}, 200);
-
-                        // Set new timeout
-                        alertData.timeout = setTimeout(() => {
-                            alertData.element.fadeOut(() => {
-                                alertData.element.remove();
-                                this.activeAlerts.delete(alertKey);
-                            });
-                        }, this.baseDisplayDuration);
-
-                        // Update last shown time
-                        alertData.lastShown = now;
-                    }
-                    return; // Don't create new alert
-                }
-            }
-
-            // Create new alert
-            const alertClass = type === 'success' ? 'alert-success' :
-                type === 'warning' ? 'alert-warning' : 'alert-info';
-
-            const alertElement = $(`
-				<div class="scanner-alert ${alertClass}">
-					<i class="fa fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
-					${message}
-				</div>
-			`);
-
-            // Add to container below camera
-            let alertContainer = $('.scanner-alerts-container');
-            if (alertContainer.length === 0) {
-                // Create container if it doesn't exist
-                alertContainer = $('<div class="scanner-alerts-container"></div>');
-                $('#reader').after(alertContainer);
-            }
-
-            alertContainer.append(alertElement);
-            alertElement.fadeIn(200);
-
-            // Set timeout for removal
-            const timeout = setTimeout(() => {
-                alertElement.fadeOut(() => {
-                    alertElement.remove();
-                    this.activeAlerts.delete(alertKey);
-                });
-            }, this.baseDisplayDuration);
-
-            // Store alert data
-            this.activeAlerts.set(alertKey, {
-                element: alertElement,
-                lastShown: now,
-                timeout: timeout
-            });
-        },
-
-        clearAll() {
-            // Clear all active alerts and timeouts
-            this.activeAlerts.forEach((alertData) => {
-                if (alertData.timeout) {
-                    clearTimeout(alertData.timeout);
-                }
-                if (alertData.element) {
-                    alertData.element.remove();
-                }
-            });
-            this.activeAlerts.clear();
-        }
-    };
-
-    // Make alertManager accessible to nested functions
-    window.currentAlertManager = alertManager;
-
-    // Initialize or get the scannedCodes array for this specific event
-    window.amazonScannerSessions[product_id] = window.amazonScannerSessions[product_id] || [];
-
-    // Get existing values and populate the event-specific array
-    const existingSerials = $(`.activity-product-${product_id}`).val();
-    if (existingSerials) {
-        window.amazonScannerSessions[product_id] = existingSerials.split(',').filter(s => s.trim());
-    } else {
-        window.amazonScannerSessions[product_id] = [];
-    }
-
-    // Use local reference for convenience
-    let scannedCodes = window.amazonScannerSessions[product_id];
-
-    // Create enhanced modal content with integrated header and alert container
-    const modalContent = `
-		<div class="scanner-container">
-			<div class="scanner-body">
-				<div id="reader" class="scanner-reader"></div>
-
-				<!-- Alert container positioned below camera -->
-				<div class="scanner-alerts-container"></div>
-
-				<div class="scanned-list-container">
-					<div class="scanned-list-header">
-						<h6><i class="fa fa-list"></i> Seriali Scansionati:</h6>
-					</div>
-					<div class="scanned-list" id="scanned-list-${product_id}">
-						${renderScannedList(scannedCodes, product_id)}
-					</div>
-				</div>
-			</div>
-		</div>
-	`;
-
-    // Create custom header to replace modal's default header
-    const customHeader = `
-		<div class="scanner-modal-header">
-			<div class="scanner-header-content">
-				<h5 class="scanner-title">
-					<i class="fa fa-qrcode"></i> Scanner QR CODE
-				</h5>
-			</div>
-			<button type="button" class="close" data-dismiss="modal">
-				<span aria-hidden="true">&times;</span>
-			</button>
-		</div>
-	`;
-
-    // Hide default modal header and replace with custom one
-    modal.find('.modal-header').hide();
-
-    // Remove any existing custom header before adding new one
-    modal.find('.scanner-modal-header').remove();
-
-    // Add the new custom header
-    modal.find('.modal-content').prepend(customHeader);
-    modal.find(".modal-body").empty().html(modalContent);
-    modal.modal("show");
-
-    // Initialize scanner with delay
-    setTimeout(() => {
-        html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader",
-            {
-                fps: 10,
-                qrbox: { width: 200, height: 200 },
-                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-                aspectRatio: 1.0,
-                showTorchButtonIfSupported: true
-            },
-            false
-        );
-
-        html5QrcodeScanner.render(onScanSuccess, onScanError);
-    }, 300);
-
-    // Success callback
-    function onScanSuccess(decodedText) {
-        // Get the current array for this event
-        const currentCodes = window.amazonScannerSessions[product_id] || [];
-
-        // Check for duplicates in this event's array
-        if (currentCodes.includes(decodedText)) {
-            alertManager.showAlert('Seriale già scansionato!', 'warning');
-            return;
-        }
-
-        // Add to this event's array
-        currentCodes.push(decodedText);
-        window.amazonScannerSessions[product_id] = currentCodes;
-
-        updateScannedList(currentCodes, product_id);
-        updateFields(currentCodes, product_id);
-
-        // Success feedback
-        alertManager.showAlert('Seriale aggiunto con successo!', 'success');
-    }
-
-    // Error callback
-    function onScanError(errorMessage) {
-        // Silent fail for continuous scanning
-    }
-
-    // Modal cleanup on close
-    modal.on('hidden.bs.modal', function() {
-        if (html5QrcodeScanner) {
-            html5QrcodeScanner.clear();
-        }
-        // Clear all alerts and timeouts
-        alertManager.clearAll();
-        // DON'T delete the event-specific scanner data
-        // Let it persist so deleted serials stay deleted
-        modal.find(".modal-body").empty();
-        modal.off('hidden.bs.modal');
-        // Clean up global reference
-        window.currentAlertManager = null;
-    });
-};
-
-
-// Helper function to render scanned list
-function renderScannedList(codes, event_id) {
-    if (codes.length === 0) {
-        return '<div class="empty-list">Nessun seriale scansionato</div>';
-    }
-
-    let html = '<ul class="scanned-items-list">';
-    codes.forEach((code, index) => {
-        html += `
-			<li class="scanned-item" data-index="${index}">
-				<span class="serial-code">
-					<i class="fa fa-barcode"></i> ${code}
-				</span>
-				<button type="button" class="btn btn-xs btn-danger remove-serial"
-						onclick="removeSerial('${event_id}', ${index})">
-					<i class="fa fa-trash"></i>
-				</button>
-			</li>
-		`;
-    });
-    html += '</ul>';
-    return html;
-}
-
-// Update the list display
-function updateScannedList(codes, event_id) {
-    $(`#scanned-list-${event_id}`).html(renderScannedList(codes, event_id));
-    $('.scanned-count').text(codes.length);
-}
-
-// Update input fields
-function updateFields(codes, event_id) {
-    // Update serial input (comma-separated)
-    $(`.activity-product-${event_id}`).val(codes.join(','));
-}
-
-// Remove serial from list
-window.removeSerial = function(event_id, index) {
-    // Get current codes from input
-    const existingSerials = $(`.activity-product-${event_id}`).val();
-    let scannedCodes = existingSerials ? existingSerials.split(',').filter(s => s.trim()) : [];
-
-    // Remove the item
-    scannedCodes.splice(index, 1);
-
-    // Update the event-specific scanner array if it exists
-    if (window.amazonScannerSessions && window.amazonScannerSessions[event_id]) {
-        window.amazonScannerSessions[event_id] = scannedCodes;
-    }
-
-    // Update everything
-    updateScannedList(scannedCodes, event_id);
-    updateFields(scannedCodes, event_id);
-
-    // Use the alert manager if available (when modal is open)
-    if (window.currentAlertManager) {
-        window.currentAlertManager.showAlert('Seriale rimosso', 'info');
-    }
-};
-
-
 
 const openAddDynamicModal = (el, callback) => {
     const modal = $("#dynamic-modal");
-    const model = el.data("model");
-    const objectId = el.data("id");
-    const route = el.data("route");
-    let params = { path: `/${model}/create`, method: "get" };
-    if (typeof objectId !== "undefined") {
-        params = { path: `/${model}/${objectId}`, method: "get" };
-    }if (typeof route !== "undefined") {
-        params = { path: `/${route}`, method: "get" };
-    }
+    const path = el.data('path');
+    let params = { path, method: "get" };
     App.ajax(params).then((response) => {
         modal.find(".modal-body").html(response.html);
         modal.modal("show");
@@ -1049,10 +743,19 @@ const format_price = (value, decimals = 2) => {
     }) + ' €';
 }
 
+const update_or_create_element = (btn) => {
+    let method = 'POST';
+    const route = btn.data('route');
+    const id = btn.data('id');
+    if (id !== undefined) {
+        method = 'PUT';
+    }
+    update_or_create(btn, method, '.update-or-create-element', `/backoffice/${route}${id !== undefined ? `/${id}` : ''}`, `/backoffice/${route}`)
+}
 const init = () => {
 
     $(document).on("click", ".btn-status", function () {
-        changeStatusObject($(this));
+        change_status($(this));
     });
 
     $(document).on("datatable", function (e, parameters) {
@@ -1091,44 +794,10 @@ const init = () => {
         }
     );
 
-    if ($(".logs").length > 0) {
-        logs();
-        $(".reload-logs").on("click", function () {
-            logs();
-        });
-    }
-
-    if ($(".dashboard-report").length > 0) {
-        dashboard();
-        $(".load-dashboard-ajax").on("click", function () {
-            dashboard();
-        });
-    }
 
     $(document).on("keyup blur", ".is_number", function () {
         const text = $(this);
         text.val(text.val().toString().replace(/,/g, "."));
-    });
-
-    $(document).on('click', '.quantity-right-plus', function() {
-        const input = $(this).parent().parent().find('.input-number');
-        const max = input.data('max');
-        const quantity = parseInt(input.val());
-        if (quantity < max) {
-            $(this).parent().parent().find('.input-number').val(quantity + 1);
-        }
-    });
-
-    $(document).on('click', '.quantity-left-minus', function(e){
-        const input = $(this).parent().parent().find('.input-number');
-        const quantity = parseInt(input.val());
-        if(quantity > 0){
-            $(this).parent().parent().find('.input-number').val(quantity - 1);
-        }
-    });
-
-    $(document).on("filter_elements",  function (e, parameters) {
-        filter_elements(parameters.query, parameters.container, parameters.element)
     });
 
     $(document).on("upload",  function (e, parameters) {
@@ -1151,15 +820,13 @@ const init = () => {
         delete_media($(this))
     });
 
-    $(document).on('click', '.plus-minus-button', function () {
-        plus_minus($(this))
-    })
-    $(document).on('click', '.btn-open-modal', function () {
-        open_modal($(this))
-    })
     $(document).on("selectChoice", function (e, parameters) {
         selectChoice(parameters)
     });
+
+    $(document).on('click', '.btn-update-or-create-element', function () {
+        update_or_create_element($(this));
+    })
 };
 
 
@@ -1181,7 +848,6 @@ const App = {
     clearForm,
     update_or_create,
     sweetInput,
-    open_scan_barcode,
     openAddDynamicModal,
     format_price
 };

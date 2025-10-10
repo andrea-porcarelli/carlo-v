@@ -1,7 +1,6 @@
-@extends('backoffice.layout')
+@extends('backoffice.layout', ['title' => 'Fornitori',])
 @section('breadcrumb')
     @include('backoffice.components.breadcrumb', [
-        'title' => 'Fornitori',
         'level_1' => ['label' => 'Fornitori'],
     ])
 @endsection
