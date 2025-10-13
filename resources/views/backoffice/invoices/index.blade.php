@@ -28,7 +28,8 @@
                                         <th class="all">N* fattura </th>
                                         <th class="all">Importo </th>
                                         <th class="all">Data </th>
-                                        <th class="all">Prodotti importati</th>
+                                        <th class="all">Prodotti</th>
+                                        <th class="all">Da mappare / Mappati / Importati</th>
                                     </tr>
                                     </thead>
                                     <tfoot>
@@ -39,7 +40,8 @@
                                         <th class="all">N* fattura </th>
                                         <th class="all">Importo </th>
                                         <th class="all">Data </th>
-                                        <th class="all">Prodotti importati</th>
+                                        <th class="all">Prodotti</th>
+                                        <th class="all">Da mappare / Mappati / Importati</th>
                                     </tr>
                                     </tfoot>
                                 </table>
@@ -66,6 +68,7 @@
                         {data: 'amount'},
                         {data: 'invoice_date'},
                         {data: 'products', class: 'text-center'},
+                        {data: 'mapping', class: 'text-center'},
                     ],
                     order: [[1, 'desc']],
                     dataForm: ['mixed'],

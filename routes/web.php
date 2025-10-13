@@ -35,7 +35,10 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/datatable', [InvoiceController::class, 'datatable'])->name('invoices.datatable');
             Route::get('/import', [InvoiceController::class, 'import_form'])->name('invoices.import');
             Route::post('/import', [InvoiceController::class, 'import_invoice']);
+            Route::get('/{id}/mapping-products', [InvoiceController::class, 'mapping_products'])->name('invoices.mapping_products');
+            Route::post('/{id}/store-mapping-products', [InvoiceController::class, 'store_mapping_products']);
         });
+
         Route::resource('invoices', InvoiceController::class);
 
         Route::group(['prefix' => '/restaurant', 'as' => 'restaurant.'], function() {

@@ -4,6 +4,7 @@ namespace App\Models;
 
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class SupplierInvoiceProduct extends LogsModel
 {
@@ -19,6 +20,7 @@ class SupplierInvoiceProduct extends LogsModel
         'product_name',
         'price',
         'quantity',
+        'ignore_mapping',
         'iva',
         'price',
     ];
@@ -28,8 +30,20 @@ class SupplierInvoiceProduct extends LogsModel
         return $this->belongsTo(SupplierInvoice::class);
     }
 
-    public function product() : BelongsTo
+    public function material() : HasOneThrough
     {
-        return $this->belongsTo(Product::class);
+        return $this->hasOneThrough(
+            Material::class,           // Modello finale
+            MappingProduct::class,     // Modello intermedio
+            'product_name', // Foreign key su mapping_products
+            'id',                      // Foreign key su materials
+            'product_name',                      // Local key su supplier_invoice_products
+            'material_id'              // Local key su mapping_products
+        );
+    }
+
+    public function stock() : BelongsTo
+    {
+        return $this->belongsTo(MaterialStock::class, 'id', 'supplier_invoice_product_id');
     }
 }

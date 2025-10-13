@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class MaterialStock extends Model
+class MappingProduct extends Model
 {
 
     /**
@@ -15,15 +15,10 @@ class MaterialStock extends Model
      */
     public $fillable = [
         'material_id',
-        'supplier_invoice_product_id',
-        'stock',
+        'product_name',
     ];
 
-    public function material() : BelongsTo {
+    public function material(): BelongsTo {
         return $this->belongsTo(Material::class);
     }
-    public function supplier_invoice_product() : BelongsTo {
-        return $this->belongsTo(SupplierInvoiceProduct::class);
-    }
-
 }

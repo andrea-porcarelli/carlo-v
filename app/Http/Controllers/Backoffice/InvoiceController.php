@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Backoffice;
 use App\Facades\Utils;
 use App\Interfaces\SupplierInterface;
 use App\Interfaces\SupplierInvoiceInterface;
+use App\Models\MappingProduct;
+use App\Models\Material;
+use App\Models\MaterialStock;
 use App\Models\Supplier;
 use App\Models\SupplierInvoice;
 use App\Models\SupplierInvoiceProduct;
@@ -13,6 +16,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class InvoiceController extends BaseController
@@ -41,7 +45,7 @@ class InvoiceController extends BaseController
             $filters = $request->get('filters') ?? [];
 
             $elements = $this->interface->filters($filters);
-            return $this->editColumns(datatables()->of($elements), $this->name, ['edit'])
+            return $this->editColumns(datatables()->of($elements), $this->name, ['edit', 'mapping-product'])
                 ->addColumn('supplier_name', function ($item) {
                    return $item->supplier->extended_name;
                 })
@@ -56,6 +60,9 @@ class InvoiceController extends BaseController
                 })
                 ->addColumn('products', function ($item) {
                    return $item->products_count;
+                })
+                ->addColumn('mapping', function ($item) {
+                   return $item->products()->whereDoesntHave('material')->where('ignore_mapping', 0)->count() . ' / ' . $item->products()->whereHas('material')->count() . ' / ' . $item->products()->whereHas('stock')->count();
                 })
                 ->rawColumns(['invoice_number', 'supplier_name'])
                 ->toJson();
@@ -104,6 +111,73 @@ class InvoiceController extends BaseController
         } catch (\Exception $e) {
             DB::rollBack();
             return $this->error(['message' => "Errore durante l'importazione della fattura: " . $e->getMessage()]);
+        }
+    }
+
+    public function mapping_products(int $id) : View
+    {
+        $invoice = SupplierInvoice::findOrFail($id);
+
+        $supplierInvoiceProducts = $invoice->products()
+            ->whereDoesntHave('material')
+            ->where('ignore_mapping', 0)
+            ->orderBy('id')
+            ->get();
+
+        $materials = Material::orderBy('label')->get();
+
+        return view('backoffice.invoices.map-products', compact(
+            'invoice',
+            'supplierInvoiceProducts',
+            'materials'
+        ));
+    }
+
+    public function store_mapping_products(Request $request, $invoiceId)
+    {
+
+        $request->validate([
+            'mappings' => 'required|array',
+            'mappings.*' => [
+                'nullable',
+                Rule::in([0]),
+                function ($attribute, $value, $fail) {
+                    if ($value != 0 && !Material::where('id', $value)->exists()) {
+                        $fail("Il materiale selezionato non esiste.");
+                    }
+                }
+            ]
+        ]);
+
+        $invoice = $this->interface->find($invoiceId);
+        $mappings = $request->input('mappings', []);
+
+        DB::beginTransaction();
+
+        try {
+            foreach ($mappings as $productId => $materialId) {
+                $product = $invoice->products()->find($productId);
+                if ($materialId === '0') {
+                    $product->update(['ignore_mapping' => 1]);
+                } else {
+                    if (!$product) {
+                        continue;
+                    }
+                    if ($materialId) {
+                        MappingProduct::create([
+                            'material_id' => $materialId,
+                            'product_name' => $product->product_name, // Variazione (può essere positiva o negativa)
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
+
+            return $this->success();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
         }
     }
 
@@ -225,4 +299,5 @@ class InvoiceController extends BaseController
 
         return $count;
     }
+
 }

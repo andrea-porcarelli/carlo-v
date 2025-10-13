@@ -26,56 +26,16 @@
             <span class="fa {{ (!$item->is_active) ? 'fa-times' : 'fa-check' }}"></span>
         </button>
     @endif
-
-    @if (in_array('order', $options))
-        <button
-            class="btn btn-xs btn-info white sort-row"
-            title="Ordina"
-            data-id="{{ $item->id }}"
-        >
-            <i class="fas fa-sort"></i>
-        </button>
-    @endif
-    @if (in_array('impersonate', $options) && $item->id !== Auth::id() && $role === 'admin' && $item->is_active)
-        <a href="{{ route('impersonate', $item->id) }}">
-            <button
-                class="btn btn-xs"
-                title="Impersonifica utente"
-                data-id="{{ $item->id }}"
-            >
-                <i class="fas fa-user-secret"></i>
-            </button>
-        </a>
-    @endif
-    @if (in_array('invoice', $options))
-        <button
-            class="btn btn-primary btn-xs btn-show-invoices"
-            title="Mostra fatture"
-            data-id="{{ $item->id }}"
-        >
-            <i class="fas fa-file-invoice-dollar"></i>
-        </button>
-    @endif
-    @if (in_array('code', $options))
-        @if ($item->has_warehouse)
-            <button
-                class="btn btn-primary btn-xs btn-load-code"
-                title="Genera codici prodotti"
-                data-id="{{ $item->id }}"
-            >
-                <i class="fas fa-barcode"></i>
-            </button>
-        @endif
-    @endif
-    @if (in_array('invoices', $options))
-        @if ($item->has_warehouse)
-            <button
-                class="btn btn-primary btn-xs btn-product-invoices"
-                title="Visualizza fatture di acquisto"
-                data-id="{{ $item->id }}"
-            >
-                <i class="fas fa-file-pdf"></i>
-            </button>
+    @if (in_array('mapping-product', $options))
+        @if ($item->products()->whereDoesntHave('material')->count() > 0)
+            <a href="{{ route('invoices.mapping_products', $item->id) }}">
+                <button
+                    class="btn btn-primary btn-xs"
+                    title="Associa prodotti agli ingredienti"
+                >
+                    <i class="fas fa-seedling"></i>
+                </button>
+            </a>
         @endif
     @endif
 </div>
