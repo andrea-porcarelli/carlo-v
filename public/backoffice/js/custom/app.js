@@ -375,7 +375,8 @@ const datatable = (params) => {
                     previous: "&nbsp;",
                     next: "&nbsp;",
                 },
-            }
+            },
+            drawCallback: params.drawCallback,
         });
     }
 

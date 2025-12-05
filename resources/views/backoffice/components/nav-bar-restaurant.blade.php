@@ -5,9 +5,14 @@
         <i class="far fa-arrow-alt-circle-down"></i>
     </a>
     <ul class="nav nav-second-level collapse">
-        <li class="{{ (Request::is('backoffice/suppliers')) ? 'active' : '' }}">
-            <a href="{{ route('suppliers.index') }}">
-                <i class="fas fa-store"></i> Vendite
+        <li class="{{ (Request::is('backoffice/restaurant/sales*')) ? 'active' : '' }}">
+            <a href="{{ route('restaurant.sales.index') }}">
+                <i class="fas fa-cash-register"></i> Vendite
+            </a>
+        </li>
+        <li class="{{ (Request::is('backoffice/restaurant/sales/tables*')) ? 'active' : '' }}">
+            <a href="{{ route('restaurant.sales.tables') }}">
+                <i class="fas fa-cash-register"></i> Tavoli occupati
             </a>
         </li>
         <li class="{{ (Request::is('backoffice/restaurant/dishes')) ? 'active' : '' }}">

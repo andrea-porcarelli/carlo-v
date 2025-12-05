@@ -15,6 +15,7 @@
                 @include('backoffice.components.nav-bar-item', ['route' => 'dashboard', 'icon' => 'fa-home', 'label' => 'Dashboard']))
                 @include('backoffice.components.nav-bar-restaurant')
                 @include('backoffice.components.nav-bar-supplier')
+                @include('backoffice.components.nav-bar-item', ['route' => 'users.index', 'icon' => 'fa-users', 'label' => 'Utenti'])
                 <li>
                     <a href="{{ url('backoffice/log-viewer') }}" target="_blank">
                         <i class="fa fa-cogs"></i>
@@ -22,7 +23,7 @@
                     </a>
                 </li>
             @else
-                @include('components.nav-bar-item', ['route' => 'technician.events', 'icon' => 'fa-cogs', 'label' => 'Attività di oggi'])
+                @include('backoffice.components.nav-bar-item', ['route' => 'technician.events', 'icon' => 'fa-cogs', 'label' => 'Attività di oggi'])
             @endif
 
         </ul>

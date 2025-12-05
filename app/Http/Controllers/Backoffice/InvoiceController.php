@@ -44,6 +44,9 @@ class InvoiceController extends BaseController
         try {
             $filters = $request->get('filters') ?? [];
 
+            // Associa material_stocks ai prodotti delle fatture mappate
+            $this->associateMaterialStocks();
+
             $elements = $this->interface->filters($filters);
             return $this->editColumns(datatables()->of($elements), $this->name, ['edit', 'mapping-product'])
                 ->addColumn('supplier_name', function ($item) {
@@ -298,6 +301,41 @@ class InvoiceController extends BaseController
         }
 
         return $count;
+    }
+
+    /**
+     * Associa automaticamente i material_stocks ai prodotti delle fatture
+     * in base ai mapping già esistenti nella tabella mapping_products
+     */
+    private function associateMaterialStocks(): void
+    {
+        // Recupera tutti i prodotti delle fatture che hanno un mapping material ma non hanno ancora uno stock
+        $productsToAssociate = SupplierInvoiceProduct::whereHas('material')
+            ->whereDoesntHave('stock')
+            ->get();
+
+        foreach ($productsToAssociate as $product) {
+            // Recupera il material_id tramite la relazione material
+            $material = $product->material;
+
+            if ($material) {
+                // Crea il record MaterialStock
+                $materialStock = MaterialStock::firstOrCreate([
+                    'supplier_invoice_product_id' => $product->id,
+                ], [
+                    'material_id' => $material->id,
+                    'stock' => $product->quantity,
+                ]);
+
+                // Se il MaterialStock è stato appena creato, aggiorna lo stock del Material
+                if ($materialStock->wasRecentlyCreated) {
+                    $materialModel = Material::find($material->id);
+                    if ($materialModel) {
+                        $materialModel->increment('stock', $product->quantity);
+                    }
+                }
+            }
+        }
     }
 
 }

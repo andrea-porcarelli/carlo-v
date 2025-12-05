@@ -8,13 +8,40 @@ use App\Http\Controllers\Backoffice\DashboardController;
 use App\Http\Controllers\Backoffice\LoginController;
 use App\Http\Controllers\Backoffice\MaterialController;
 use App\Http\Controllers\Backoffice\PrinterController;
+use App\Http\Controllers\Backoffice\SalesController;
 use App\Http\Controllers\Backoffice\SupplierController;
+use App\Http\Controllers\Backoffice\TableOrderLogController;
 use App\Http\Controllers\Backoffice\UploadController;
+use App\Http\Controllers\Backoffice\UserController;
 use App\Http\Controllers\Frontoffice\AppController;
+use App\Http\Controllers\Frontoffice\OperatorAuthController;
+use App\Http\Controllers\Frontoffice\TableOrderController;
 use Illuminate\Support\Facades\Route;
 
 
 Route::get('/',[AppController::class, 'index'])->name('app');
+
+// API Routes for Operator Authentication
+Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function() {
+    Route::get('/', [OperatorAuthController::class, 'getOperators'])->name('list');
+    Route::post('/verify-password', [OperatorAuthController::class, 'verifyPassword'])->name('verifyPassword');
+    Route::post('/verify-token', [OperatorAuthController::class, 'verifyToken'])->name('verifyToken');
+});
+
+// API Routes for Table Management
+Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
+    Route::get('/', [TableOrderController::class, 'getTables'])->name('index');
+    Route::get('/{table}', [TableOrderController::class, 'getTable'])->name('show');
+    Route::post('/{table}/open', [TableOrderController::class, 'openTable'])->name('open');
+    Route::post('/{table}/items', [TableOrderController::class, 'addItem'])->name('addItem');
+    Route::put('/items/{item}/quantity', [TableOrderController::class, 'updateItemQuantity'])->name('updateItemQuantity');
+    Route::delete('/items/{item}', [TableOrderController::class, 'removeItem'])->name('removeItem');
+    Route::post('/{table}/clear', [TableOrderController::class, 'clearTable'])->name('clear');
+    Route::post('/{table}/pay', [TableOrderController::class, 'payTable'])->name('pay');
+    Route::post('/save', [TableOrderController::class, 'saveTable'])->name('save');
+    Route::post('/add-batch', [TableOrderController::class, 'addTables'])->name('addBatch');
+    Route::delete('/{table}', [TableOrderController::class, 'deleteTable'])->name('delete');
+});
 
 Route::group(['prefix' => '/backoffice'], function() {
     Route::get('/login',[LoginController::class, 'index'])->name('login');
@@ -25,6 +52,17 @@ Route::group(['prefix' => '/backoffice'], function() {
 
         Route::post('/upload', [UploadController::class, 'start'])->name('upload');
         Route::get('/index', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Users Management
+        Route::group(['prefix' => '/users', 'as' => 'users.'], function() {
+            Route::get('/', [UserController::class, 'index'])->name('index');
+            Route::get('/datatable', [UserController::class, 'datatable'])->name('datatable');
+            Route::get('/create', [UserController::class, 'create'])->name('create');
+            Route::post('/', [UserController::class, 'store'])->name('store');
+            Route::get('/{id}', [UserController::class, 'show'])->name('show');
+            Route::put('/{id}', [UserController::class, 'edit'])->name('edit');
+            Route::delete('/{id}', [UserController::class, 'destroy'])->name('destroy');
+        });
 
         Route::group(['prefix' => '/suppliers'], function() {
             Route::get('/datatable', [SupplierController::class, 'datatable'])->name('suppliers.datatable');
@@ -42,6 +80,14 @@ Route::group(['prefix' => '/backoffice'], function() {
         Route::resource('invoices', InvoiceController::class);
 
         Route::group(['prefix' => '/restaurant', 'as' => 'restaurant.'], function() {
+            Route::group(['prefix' => '/sales', 'as' => 'sales.'], function() {
+                Route::get('/', [SalesController::class, 'index'])->name('index');
+                Route::get('/datatable', [SalesController::class, 'datatable'])->name('datatable');
+                Route::get('/tables', [SalesController::class, 'tables'])->name('tables');
+                Route::get('/datatable-tables', [SalesController::class, 'datatable_tables'])->name('datatable.tables');
+                Route::get('/{id}', [SalesController::class, 'show'])->name('show');
+                Route::post('/export', [SalesController::class, 'export'])->name('export');
+            });
             Route::group(['prefix' => '/printers', 'as' => 'printers.'], function() {
                 Route::get('/', [PrinterController::class, 'index'])->name('index');
                 Route::get('/datatable', [PrinterController::class, 'datatable'])->name('datatable');
@@ -85,6 +131,15 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::put('/{id}', [DishController::class, 'edit']);
                 Route::put('/{id}/status', [DishController::class, 'status']);
             });
+        });
+
+        // Table Order Logs
+        Route::group(['prefix' => '/logs', 'as' => 'backoffice.logs.'], function() {
+            Route::get('/table-orders', [TableOrderLogController::class, 'index'])->name('table-orders');
+            Route::get('/table-order/{tableOrder}', [TableOrderLogController::class, 'show'])->name('table-order');
+            Route::get('/user/{user}', [TableOrderLogController::class, 'userLogs'])->name('user');
+            Route::get('/export', [TableOrderLogController::class, 'export'])->name('export');
+            Route::get('/activity-summary', [TableOrderLogController::class, 'activitySummary'])->name('activity-summary');
         });
     });
 });
