@@ -44,7 +44,7 @@
                                 'col' => 6,
                                 'required' => true,
                                 'options' => $roles,
-                                'selected' => $user->role
+                                'value' => $user->role
                             ])
                         </div>
 
