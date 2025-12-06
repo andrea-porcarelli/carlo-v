@@ -160,7 +160,7 @@ class UserController extends BaseController
     public function show($id): View
     {
         $user = User::findOrFail($id);
-        $roles = Utils::map_key((new User())->roles());
+        $roles = Utils::key_value((new User())->roles());
         return view('backoffice.' . $this->name . '.edit', compact('user', 'roles'));
     }
 
