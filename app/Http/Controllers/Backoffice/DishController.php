@@ -70,7 +70,6 @@ class DishController extends BaseController
 
     public function store(StoreDishRequest $request) : JsonResponse {
         try {
-
             $ingredients = json_decode($request->get('materials'), true);
             $allergens = json_decode($request->get('allergens'), true);
             $ingredients_with_quantity = collect($ingredients)->filter(fn($ingredient) => $ingredient['quantity'] > 0);

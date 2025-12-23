@@ -25,6 +25,24 @@
                 <!-- Left Panel - Menu (30%) -->
                 <div class="col-left">
                     @livewire('dish-selector')
+
+                    <!-- Temporary Cart -->
+                    <div id="temporaryCart" style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px; border: 2px solid #dc3545;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h6 style="margin: 0; color: #dc3545; font-weight: 700;">
+                                <i class="fas fa-shopping-cart me-2"></i>ORDINE IN PREPARAZIONE
+                            </h6>
+                            <button id="clearCart" class="btn btn-sm" style="background: #6c757d; color: white; border: none; padding: 4px 8px;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        <div id="cartItems" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px;">
+                            <!-- Cart items will be added here -->
+                        </div>
+                        <button id="confirmCart" class="btn-red" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600;">
+                            <i class="fas fa-check me-2"></i>CONFERMA ORDINE
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Center - Dining Area (60%) -->
@@ -87,6 +105,24 @@
                             </h3>
                             <div id="modifyMenuContainer">
                                 @livewire('dish-selector')
+                            </div>
+
+                            <!-- Temporary Cart in Modify View -->
+                            <div id="temporaryCartModify" style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px; border: 2px solid #dc3545;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <h6 style="margin: 0; color: #dc3545; font-weight: 700;">
+                                        <i class="fas fa-shopping-cart me-2"></i>ORDINE IN PREPARAZIONE
+                                    </h6>
+                                    <button id="clearCartModify" class="btn btn-sm" style="background: #6c757d; color: white; border: none; padding: 4px 8px;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                                <div id="cartItemsModify" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px;">
+                                    <!-- Cart items will be added here -->
+                                </div>
+                                <button id="confirmCartModify" class="btn-red" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600;">
+                                    <i class="fas fa-check me-2"></i>CONFERMA ORDINE
+                                </button>
                             </div>
                         </div>
 

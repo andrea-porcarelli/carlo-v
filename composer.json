@@ -14,6 +14,7 @@
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^3.6",
+        "mike42/escpos-php": "*",
         "opcodesio/log-viewer": "^3.19",
         "spatie/laravel-activitylog": "^4.10",
         "taocomp/php-e-invoice-it": "^0.2.1",

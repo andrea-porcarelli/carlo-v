@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Facades\Utils;
 use App\Models\Category;
 use App\Models\Dish;
 use Livewire\Component;
@@ -53,7 +54,6 @@ class DishSelector extends Component
         if ($this->search) {
             $query->where('label', 'like', '%' . $this->search . '%');
         }
-
         $this->dishes = $query->orderBy('label')->get();
     }
 

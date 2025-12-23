@@ -20,6 +20,12 @@ services:
       DB_USERNAME: root
       DB_PASSWORD: password123
       REDIS_HOST: carlov_redis
+    # Permette al container di accedere alla rete dell'host per stampanti POS
+    # Opzione 1: Usa network_mode host (decommenta SOLO se hai problemi di connessione)
+    # network_mode: "host"
+    # Opzione 2: Usa extra_hosts per mappare hostname (opzionale)
+#    extra_hosts:
+#       - "stampante-cucina:192.168.8.200"
     depends_on:
       - mysql
       - carlov_redis
@@ -27,6 +33,8 @@ services:
 
   mysql:
     image: mysql:8.0
+    ports:
+        - "3309:3306"
     environment:
       MYSQL_DATABASE: carlov
       MYSQL_ROOT_PASSWORD: password123

@@ -21,6 +21,7 @@ class Dish extends Model
         'is_active',
         'label',
         'price',
+        'description',
     ];
 
     public function category() : BelongsTo {

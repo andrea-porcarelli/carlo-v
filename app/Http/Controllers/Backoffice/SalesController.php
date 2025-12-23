@@ -28,7 +28,7 @@ class SalesController extends BaseController
      */
     public function index(): View
     {
-        return view('backoffice.' . $this->name . '.index');
+        return view('backoffice.sales.index');
     }
 
     /**
@@ -108,7 +108,7 @@ class SalesController extends BaseController
         $loggerService = new TableOrderLoggerService();
         $logs = $loggerService->getLogsForOrder($id);
 
-        return view('backoffice.' . $this->name . '.show', compact('sale', 'logs'));
+        return view('backoffice.sales.show', compact('sale', 'logs'));
     }
 
     /**
@@ -122,7 +122,7 @@ class SalesController extends BaseController
 
     public function tables(): View
     {
-        return view('backoffice.' . $this->name . '.tables');
+        return view('backoffice.sales.tables');
     }
 
     /**

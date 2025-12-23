@@ -49,6 +49,11 @@ $(document).ready(function() {
 
     // Close modify overlay
     $('#closeModifyBtn').click(function() {
+        // Clear temporary cart when closing modify overlay
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.temporaryCart = [];
+            tableOrdersManager.updateCartDisplay();
+        }
         $('#modifyOrderOverlay').fadeOut(300);
     });
 

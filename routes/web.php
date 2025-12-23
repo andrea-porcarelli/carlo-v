@@ -34,6 +34,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::get('/{table}', [TableOrderController::class, 'getTable'])->name('show');
     Route::post('/{table}/open', [TableOrderController::class, 'openTable'])->name('open');
     Route::post('/{table}/items', [TableOrderController::class, 'addItem'])->name('addItem');
+    Route::post('/{table}/items-multiple', [TableOrderController::class, 'addMultipleItems'])->name('addMultipleItems');
     Route::put('/items/{item}/quantity', [TableOrderController::class, 'updateItemQuantity'])->name('updateItemQuantity');
     Route::delete('/items/{item}', [TableOrderController::class, 'removeItem'])->name('removeItem');
     Route::post('/{table}/clear', [TableOrderController::class, 'clearTable'])->name('clear');

@@ -143,9 +143,8 @@ class InvoiceController extends BaseController
             'mappings' => 'required|array',
             'mappings.*' => [
                 'nullable',
-                Rule::in([0]),
                 function ($attribute, $value, $fail) {
-                    if ($value != 0 && !Material::where('id', $value)->exists()) {
+                    if ($value !== null && $value != 0 && !Material::where('id', $value)->exists()) {
                         $fail("Il materiale selezionato non esiste.");
                     }
                 }

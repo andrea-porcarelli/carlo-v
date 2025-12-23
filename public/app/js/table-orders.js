@@ -9,6 +9,7 @@ class TableOrdersManager {
         this.currentTable = null;
         this.currentProduct = null;
         this.apiBase = '/api/tables';
+        this.temporaryCart = []; // Temporary cart for multiple items
 
         this.init();
     }
@@ -61,6 +62,17 @@ class TableOrdersManager {
 
         // Add product
         this.getElement('addProductBtn')?.addEventListener('click', () => this.addProductToTable());
+
+        // Add to cart button
+        this.getElement('addToCartBtn')?.addEventListener('click', () => this.addToCart());
+
+        // Cart buttons
+        document.getElementById('confirmCart')?.addEventListener('click', () => this.confirmCart());
+        document.getElementById('clearCart')?.addEventListener('click', () => this.clearTemporaryCart());
+
+        // Cart buttons for modify overlay
+        document.getElementById('confirmCartModify')?.addEventListener('click', () => this.confirmCart());
+        document.getElementById('clearCartModify')?.addEventListener('click', () => this.clearTemporaryCart());
     }
 
     /**
@@ -198,6 +210,12 @@ class TableOrdersManager {
      * Select a table
      */
     async selectTable(tableId, skipCoversRequest = false) {
+        // Clear temporary cart when changing tables
+        if (this.currentTable && this.currentTable.table.id !== tableId) {
+            this.temporaryCart = [];
+            this.updateCartDisplay();
+        }
+
         try {
             const response = await fetch(`${this.apiBase}/${tableId}`);
             const result = await response.json();
@@ -985,6 +1003,227 @@ class TableOrdersManager {
         setInterval(() => {
             this.updateTimers();
         }, 60000); // 60 seconds
+    }
+
+    /**
+     * Add product to temporary cart
+     */
+    addToCart() {
+        if (!this.currentTable || !this.currentProduct) return;
+
+        const quantityElement = this.getElement('productQuantity');
+        const notesElement = this.getElement('productNotes');
+        const extrasContainer = this.getElement('extrasContainer');
+        const removalsContainer = this.getElement('removalsContainer');
+
+        // Gather data
+        const extras = {};
+        const removals = [];
+
+        // Get extras
+        const checkedExtras = extrasContainer?.querySelectorAll('input[type="checkbox"]:checked') || [];
+        checkedExtras.forEach(checkbox => {
+            const name = checkbox.dataset.name;
+            const price = parseFloat(checkbox.value);
+            extras[name] = price;
+        });
+
+        // Get removals
+        const checkedRemovals = removalsContainer?.querySelectorAll('input[type="checkbox"]:checked') || [];
+        checkedRemovals.forEach(checkbox => {
+            removals.push(checkbox.dataset.name);
+        });
+
+        // Create cart item
+        const cartItem = {
+            dish_id: this.currentProduct.id,
+            dish_name: this.currentProduct.name,
+            dish_price: this.currentProduct.price,
+            quantity: parseInt(quantityElement?.value || 1),
+            notes: notesElement?.value || null,
+            extras: Object.keys(extras).length > 0 ? extras : null,
+            removals: removals.length > 0 ? removals : null,
+        };
+
+        // Calculate item total
+        let itemTotal = parseFloat(this.currentProduct.price);
+        Object.values(extras).forEach(price => {
+            itemTotal += price;
+        });
+        itemTotal *= cartItem.quantity;
+        cartItem.total = itemTotal;
+
+        // Add to cart
+        this.temporaryCart.push(cartItem);
+
+        // Show notification
+        this.showNotification(`${cartItem.dish_name} aggiunto al carrello`);
+
+        // Update cart display
+        this.updateCartDisplay();
+
+        // Close modal
+        this.closeProductModal();
+    }
+
+    /**
+     * Update cart display
+     */
+    updateCartDisplay() {
+        // Update both cart displays (main and modify overlay)
+        this.updateSingleCartDisplay('temporaryCart', 'cartItems');
+        this.updateSingleCartDisplay('temporaryCartModify', 'cartItemsModify');
+    }
+
+    /**
+     * Update a single cart display
+     */
+    updateSingleCartDisplay(cartContainerId, cartItemsContainerId) {
+        const cartContainer = document.getElementById(cartContainerId);
+        const cartItemsContainer = document.getElementById(cartItemsContainerId);
+
+        if (!cartContainer || !cartItemsContainer) return;
+
+        if (this.temporaryCart.length === 0) {
+            cartContainer.style.display = 'none';
+            return;
+        }
+
+        cartContainer.style.display = 'block';
+
+        // Render cart items
+        cartItemsContainer.innerHTML = this.temporaryCart.map((item, index) => {
+            let extrasHtml = '';
+            if (item.extras && Object.keys(item.extras).length > 0) {
+                extrasHtml = '<div style="font-size: 0.8rem; color: #28a745;">' +
+                    Object.entries(item.extras).map(([name, price]) =>
+                        `<span>+ ${name} (€${parseFloat(price).toFixed(2)})</span>`
+                    ).join(', ') +
+                    '</div>';
+            }
+
+            let removalsHtml = '';
+            if (item.removals && item.removals.length > 0) {
+                removalsHtml = '<div style="font-size: 0.8rem; color: #dc3545;">' +
+                    item.removals.map(removal => `<span>- ${removal}</span>`).join(', ') +
+                    '</div>';
+            }
+
+            let notesHtml = '';
+            if (item.notes) {
+                notesHtml = `<div style="font-size: 0.8rem; color: #6c757d; font-style: italic;">${item.notes}</div>`;
+            }
+
+            return `
+                <div style="background: white; padding: 8px; margin-bottom: 8px; border-radius: 4px; border: 1px solid #dee2e6;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <strong style="font-size: 0.9rem;">${item.quantity}x ${item.dish_name}</strong>
+                            ${notesHtml}
+                            ${extrasHtml}
+                            ${removalsHtml}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-weight: 600; color: #dc3545;">€${item.total.toFixed(2)}</span>
+                            <button onclick="tableOrdersManager.removeFromCart(${index})"
+                                    style="background: #dc3545; border: none; color: white; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.8rem;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Remove item from cart
+     */
+    removeFromCart(index) {
+        this.temporaryCart.splice(index, 1);
+        this.updateCartDisplay();
+        this.showNotification('Prodotto rimosso dal carrello');
+    }
+
+    /**
+     * Clear temporary cart
+     */
+    clearTemporaryCart() {
+        if (!confirm('Vuoi svuotare il carrello?')) return;
+        this.temporaryCart = [];
+        this.updateCartDisplay();
+        this.showNotification('Carrello svuotato');
+    }
+
+    /**
+     * Confirm cart and add all items to order
+     */
+    async confirmCart() {
+        if (!this.currentTable) {
+            this.showNotification('Seleziona prima un tavolo', 'error');
+            return;
+        }
+
+        if (this.temporaryCart.length === 0) {
+            this.showNotification('Il carrello è vuoto', 'error');
+            return;
+        }
+
+        // Request operator authentication
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+        } catch (error) {
+            console.log('Authentication cancelled');
+            return;
+        }
+
+        try {
+            // Prepare items data
+            const items = this.temporaryCart.map(item => ({
+                dish_id: item.dish_id,
+                quantity: item.quantity,
+                notes: item.notes,
+                extras: item.extras,
+                removals: item.removals,
+            }));
+
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/items-multiple`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content
+                },
+                body: JSON.stringify({
+                    items: items,
+                    operator_token: auth.token
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification(result.message);
+                // Clear cart
+                this.temporaryCart = [];
+                this.updateCartDisplay();
+                // Reload table details
+                await this.selectTable(this.currentTable.table.id);
+                // Reload tables to update status
+                await this.loadTables();
+                // Update modify overlay if open
+                const modifyOverlay = document.getElementById('modifyOrderOverlay');
+                if (modifyOverlay && modifyOverlay.style.display === 'block') {
+                    this.updateModifyReceiptItems();
+                }
+            } else {
+                this.showNotification(result.message || 'Errore nell\'aggiunta dei prodotti', 'error');
+            }
+        } catch (error) {
+            console.error('Error confirming cart:', error);
+            this.showNotification('Errore nell\'aggiunta dei prodotti', 'error');
+        }
     }
 }
 

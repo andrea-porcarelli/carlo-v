@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Frontoffice;
 
 use App\Http\Controllers\Controller;
+use App\Interfaces\PrinterServiceInterface;
 use App\Models\Dish;
 use App\Models\OrderItem;
 use App\Models\RestaurantTable;
@@ -17,10 +18,12 @@ use Illuminate\Support\Facades\Log;
 class TableOrderController extends Controller
 {
     protected TableOrderLoggerService $logger;
+    protected PrinterServiceInterface $printerService;
 
-    public function __construct(TableOrderLoggerService $logger)
+    public function __construct(TableOrderLoggerService $logger, PrinterServiceInterface $printerService)
     {
         $this->logger = $logger;
+        $this->printerService = $printerService;
     }
 
     /**
@@ -149,6 +152,107 @@ class TableOrderController extends Controller
     }
 
     /**
+     * Add multiple items to table order
+     */
+    public function addMultipleItems(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.dish_id' => 'required|exists:dishes,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.notes' => 'nullable|string',
+            'items.*.extras' => 'nullable|array',
+            'items.*.removals' => 'nullable|array',
+            'operator_token' => 'required|string',
+        ]);
+
+        // Verify operator token
+        $operatorId = $this->verifyOperatorToken($validated['operator_token']);
+        if (!$operatorId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token operatore non valido',
+            ], 401);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Get or create active order for this table
+            $order = $table->activeOrder;
+            $orderCreated = false;
+            if (!$order) {
+                $order = TableOrder::create([
+                    'restaurant_table_id' => $table->id,
+                    'covers' => 1,
+                    'status' => 'open',
+                    'waiter_id' => $operatorId,
+                ]);
+
+                $table->update(['status' => 'occupied']);
+                $this->logger->logCreateOrder($order, $operatorId);
+                $orderCreated = true;
+            }
+
+            $addedItems = [];
+            foreach ($validated['items'] as $itemData) {
+                $dish = Dish::findOrFail($itemData['dish_id']);
+
+                $item = OrderItem::create([
+                    'table_order_id' => $order->id,
+                    'dish_id' => $dish->id,
+                    'added_by' => $operatorId,
+                    'quantity' => $itemData['quantity'],
+                    'unit_price' => $dish->price,
+                    'notes' => $itemData['notes'] ?? null,
+                    'extras' => $itemData['extras'] ?? null,
+                    'removals' => $itemData['removals'] ?? null,
+                ]);
+
+                $this->logger->logAddItem($item, $operatorId);
+                $addedItems[] = $item;
+            }
+
+            DB::commit();
+
+            // Stampa gli articoli aggiunti sulla stampante POS
+            try {
+                // Reload items with relationships
+                $itemIds = collect($addedItems)->pluck('id');
+                $itemsWithRelations = OrderItem::with('dish.category.printer')
+                    ->whereIn('id', $itemIds)
+                    ->get();
+                $this->printerService->printOrderItems($order, $itemsWithRelations, 'add');
+            } catch (\Exception $e) {
+                Log::warning('Errore durante la stampa POS multipla', [
+                    'table_order_id' => $order->id,
+                    'items_count' => count($addedItems),
+                    'error' => $e->getMessage()
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => count($addedItems) . ' prodotti aggiunti con successo',
+                'data' => [
+                    'items_count' => count($addedItems),
+                    'order' => [
+                        'id' => $order->id,
+                        'total_amount' => $order->fresh()->total_amount,
+                    ],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error adding multiple items to table: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore nell\'aggiunta dei prodotti',
+            ], 500);
+        }
+    }
+
+    /**
      * Add item to table order
      */
     public function addItem(Request $request, RestaurantTable $table): JsonResponse
@@ -216,6 +320,20 @@ class TableOrderController extends Controller
             $this->logger->logAddItem($item, $operatorId);
 
             DB::commit();
+
+            // Stampa l'articolo aggiunto sulla stampante POS
+            // Eseguita dopo il commit per non bloccare l'operazione in caso di errore di stampa
+            try {
+                $item->load('dish.category.printer');
+                $this->printerService->printOrderItems($order, collect([$item]), 'add');
+            } catch (\Exception $e) {
+                // Log l'errore ma non fallire la richiesta
+                Log::warning('Errore durante la stampa POS', [
+                    'item_id' => $item->id,
+                    'table_order_id' => $order->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
@@ -333,6 +451,20 @@ class TableOrderController extends Controller
             $this->logger->logUpdateItem($item, $dataBefore, $operatorId);
 
             DB::commit();
+
+            // Stampa la modifica sulla stampante POS
+            // Eseguita dopo il commit per non bloccare l'operazione in caso di errore di stampa
+            try {
+                $item->load('dish.category.printer');
+                $this->printerService->printOrderItems($order, collect([$item]), 'update');
+            } catch (\Exception $e) {
+                // Log l'errore ma non fallire la richiesta
+                Log::warning('Errore durante la stampa POS per modifica', [
+                    'item_id' => $item->id,
+                    'table_order_id' => $order->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
