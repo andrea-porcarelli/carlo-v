@@ -3,6 +3,8 @@
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
+use Monolog\Handler\TelegramBotHandler;
+use Monolog\Formatter\LineFormatter;
 use Monolog\Processor\PsrLogMessageProcessor;
 
 return [
@@ -125,6 +127,22 @@ return [
 
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
+        ],
+
+        'telegram' => [
+            'driver' => 'monolog',
+            'level' => 'warning',
+            'handler' => TelegramBotHandler::class,
+            'handler_with' => [
+                'apiKey' => env('TELEGRAM_BOT_TOKEN'),
+                'channel' => env('TELEGRAM_CHAT_ID'),
+                'parseMode' => 'HTML',
+            ],
+            'formatter' => LineFormatter::class,
+            'formatter_with' => [
+                'format' => '%message%',
+                'allowInlineLineBreaks' => true,
+            ],
         ],
 
     ],

@@ -16,6 +16,11 @@
                 @include('backoffice.components.nav-bar-restaurant')
                 @include('backoffice.components.nav-bar-supplier')
                 @include('backoffice.components.nav-bar-item', ['route' => 'users.index', 'icon' => 'fa-users', 'label' => 'Utenti'])
+                <li class="{{ (Request::is('backoffice/restaurant/settings*')) ? 'active' : '' }}">
+                    <a href="{{ route('restaurant.settings.index') }}">
+                        <i class="fas fa-cog"></i> Settaggi
+                    </a>
+                </li>
                 <li>
                     <a href="{{ url('backoffice/log-viewer') }}" target="_blank">
                         <i class="fa fa-cogs"></i>

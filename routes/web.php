@@ -10,6 +10,7 @@ use App\Http\Controllers\Backoffice\MaterialController;
 use App\Http\Controllers\Backoffice\PrinterController;
 use App\Http\Controllers\Backoffice\SalesController;
 use App\Http\Controllers\Backoffice\StockController;
+use App\Http\Controllers\Backoffice\SettingController;
 use App\Http\Controllers\Backoffice\SupplierController;
 use App\Http\Controllers\Backoffice\PrintLogController;
 use App\Http\Controllers\Backoffice\TableOrderLogController;
@@ -126,6 +127,10 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::group(['prefix' => '/stock', 'as' => 'stock.'], function() {
                 Route::get('/', [StockController::class, 'index'])->name('index');
                 Route::post('/{material}/threshold', [StockController::class, 'updateThreshold'])->name('update-threshold');
+            });
+            Route::group(['prefix' => '/settings', 'as' => 'settings.'], function() {
+                Route::get('/', [SettingController::class, 'index'])->name('index');
+                Route::post('/', [SettingController::class, 'store']);
             });
             Route::group(['prefix' => '/allergens', 'as' => 'allergens.'], function() {
                 Route::get('/', [AllergenController::class, 'index'])->name('index');

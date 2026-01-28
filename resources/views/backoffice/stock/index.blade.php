@@ -71,7 +71,11 @@
                                     @forelse($stocks as $stock)
                                         <tr class="{{ $stock['is_low'] ? 'danger' : '' }}">
                                             <td>{{ $stock['material']->id }}</td>
-                                            <td>{{ $stock['material']->label }}</td>
+                                            <td>
+                                                <a href="{{ route('restaurant.materials.show', $stock['material']->id ) }}" target="_blank">
+                                                {{ $stock['material']->label }}
+                                                </a>
+                                            </td>
                                             <td class="text-center">{{ $stock['material']->stock_type_label }}</td>
                                             <td class="text-right">{{ number_format($stock['imported'], 2, ',', '.') }}</td>
                                             <td class="text-right">{{ number_format($stock['consumed'], 2, ',', '.') }}</td>
