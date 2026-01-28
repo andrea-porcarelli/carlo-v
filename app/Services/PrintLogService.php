@@ -176,7 +176,6 @@ class PrintLogService
 
         $html = '<div class="print-receipt print-preconto">';
         $html .= '<div class="print-header">';
-        $html .= '<div class="preconto-title">*** PRE-CONTO ***</div>';
         $html .= '<div class="table-info">TAVOLO ' . $tableNumber . '</div>';
         $html .= '<div class="covers-info">' . $coversText . '</div>';
         $html .= '<div class="datetime">' . now()->format('d/m/Y H:i:s') . '</div>';
@@ -240,7 +239,8 @@ class PrintLogService
             $html .= '</div>';
         }
 
-        $html .= '<div class="print-footer-note">*** NON FISCALE ***</div>';
+        $html .= '<div class="print-footer-note">Misuraca S.R.L. </div>';
+        $html .= '<div class="print-footer-note">*** DOCUMENTO NON FISCALE ***</div>';
 
         $html .= '</div>';
 
