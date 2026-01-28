@@ -714,6 +714,12 @@ class PrinterService implements PrinterServiceInterface
             // Inizializza la stampante
             $printer->initialize();
 
+            // Intestazione
+            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $printer->setEmphasis(true);
+            $printer->setTextSize(2, 2);
+
+
             // Numero del tavolo
             $covers = $tableOrder->covers ?? 0;
             $coversText = $covers == 0 ? 'BEVANDE' : $covers . ' coperti';
@@ -736,6 +742,14 @@ class PrinterService implements PrinterServiceInterface
             // Linea separatrice
             $printer->text(str_repeat('-', 48) . "\n");
 
+
+            $printer->setEmphasis(true);
+            // Coperto (se applicabile)
+            if ($tableOrder->hasCoverCharge()) {
+                $coverChargeTotal = number_format($tableOrder->getCoverChargeAmount(), 2, ',', '.');
+                $coverChargePerPerson = number_format($tableOrder->getCoverChargePerPerson(), 2, ',', '.');
+                $printer->text(str_pad("Coperto ($covers x $coverChargePerPerson)", 38) . str_pad($coverChargeTotal, 10, ' ', STR_PAD_LEFT) . "\n");
+            }
             // Stampa gli articoli
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
             foreach ($tableOrder->items as $item) {
@@ -744,7 +758,6 @@ class PrinterService implements PrinterServiceInterface
                 $subtotal = number_format($item->subtotal, 2, ',', '.');
 
                 // Nome e prezzo
-                $printer->setEmphasis(true);
                 $line = str_pad("$quantity x $dishName", 38) . str_pad("$subtotal", 10, ' ', STR_PAD_LEFT);
                 $printer->text($line . "\n");
                 $printer->setEmphasis(false);
@@ -770,13 +783,6 @@ class PrinterService implements PrinterServiceInterface
                 }
             }
 
-            // Coperto (se applicabile)
-            if ($tableOrder->hasCoverCharge()) {
-                $coverChargeTotal = number_format($tableOrder->getCoverChargeAmount(), 2, ',', '.');
-                $coverChargePerPerson = number_format($tableOrder->getCoverChargePerPerson(), 2, ',', '.');
-                $printer->text(str_pad("Coperto ($covers x $coverChargePerPerson)", 38) . str_pad($coverChargeTotal, 10, ' ', STR_PAD_LEFT) . "\n");
-            }
-
             // Linea separatrice
             $printer->text(str_repeat('-', 48) . "\n");
 
@@ -794,11 +800,9 @@ class PrinterService implements PrinterServiceInterface
             if ($splitCount && $splitCount > 1) {
                 $perPerson = $tableOrder->total_amount / $splitCount;
                 $perPersonFormatted = number_format($perPerson, 2, ',', '.');
-
-                $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
-                $printer->text(str_repeat('=', 48) . "\n");
+                $printer->text(str_repeat('-', 48) . "\n");
                 $printer->setEmphasis(true);
-                $printer->setTextSize(2, 1);
+                $printer->setTextSize(1, 1);
                 $printer->text("DIVISO PER $splitCount PERSONE\n");
                 $printer->setTextSize(1, 1);
                 $printer->text("EUR $perPersonFormatted a persona\n");
@@ -810,7 +814,7 @@ class PrinterService implements PrinterServiceInterface
 
             // Nota finale
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
-            $printer->text("*** Misuraca S.R.L. ***\n");
+            $printer->text("Misuraca S.R.L. \n");
             $printer->text("*** DOCUMENTO NON FISCALE ***\n");
 
             $printer->feed(2);
