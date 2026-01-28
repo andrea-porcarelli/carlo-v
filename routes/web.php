@@ -9,6 +9,7 @@ use App\Http\Controllers\Backoffice\LoginController;
 use App\Http\Controllers\Backoffice\MaterialController;
 use App\Http\Controllers\Backoffice\PrinterController;
 use App\Http\Controllers\Backoffice\SalesController;
+use App\Http\Controllers\Backoffice\StockController;
 use App\Http\Controllers\Backoffice\SupplierController;
 use App\Http\Controllers\Backoffice\PrintLogController;
 use App\Http\Controllers\Backoffice\TableOrderLogController;
@@ -120,6 +121,11 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::post('/', [MaterialController::class, 'store']);
                 Route::get('/{id}', [MaterialController::class, 'show'])->name('show');
                 Route::put('/{id}', [MaterialController::class, 'edit']);
+                Route::post('/{id}/stock', [MaterialController::class, 'storeStock'])->name('store-stock');
+            });
+            Route::group(['prefix' => '/stock', 'as' => 'stock.'], function() {
+                Route::get('/', [StockController::class, 'index'])->name('index');
+                Route::post('/{material}/threshold', [StockController::class, 'updateThreshold'])->name('update-threshold');
             });
             Route::group(['prefix' => '/allergens', 'as' => 'allergens.'], function() {
                 Route::get('/', [AllergenController::class, 'index'])->name('index');
@@ -148,6 +154,7 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/print/{printLog}/preview', [PrintLogController::class, 'preview'])->name('print-preview');
             Route::post('/print/{printLog}/reprint', [PrintLogController::class, 'reprint'])->name('print-reprint');
             Route::post('/print-history', [PrintLogController::class, 'printHistory'])->name('print-history');
+            Route::post('/print-logs-filtered', [PrintLogController::class, 'printLogsFiltered'])->name('print-logs-filtered');
             Route::get('/user/{user}', [TableOrderLogController::class, 'userLogs'])->name('user');
             Route::get('/export', [TableOrderLogController::class, 'export'])->name('export');
             Route::get('/activity-summary', [TableOrderLogController::class, 'activitySummary'])->name('activity-summary');

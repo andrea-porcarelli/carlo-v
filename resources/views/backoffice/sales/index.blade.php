@@ -69,11 +69,12 @@
                                     'class' => 'table_number',
                                     'type' => 'number'
                                 ])
-                                @include('backoffice.components.form.button', [
-                                    'col' => 2,
-                                    'label' => 'Cerca',
-                                    'class' => 'btn-find'
-                                ])
+                                <div class="col-xs-12 col-sm-3" style="display:flex; gap: 5px">
+                                    <button type="button" class="btn btn-info btn-find">Cerca</button>
+                                    <button type="button" class="btn btn-warning" id="btnPrintLogs">
+                                        <i class="fa fa-print"></i> Stampa Log
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="col-lg-12 mt-3">
@@ -112,6 +113,121 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Logs Modal -->
+    <div class="modal fade" id="printLogsModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header" style="background: #f0ad4e; color: white;">
+                    <h4 class="modal-title">
+                        <i class="fa fa-print"></i> Stampa Log Operazioni
+                    </h4>
+                    <button type="button" class="close" data-dismiss="modal" style="color: white; opacity: 1;">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="printLogsForm">
+                        <div class="row">
+                            <!-- Operatore -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><i class="fa fa-user"></i> Operatore</label>
+                                    <select name="user_id" id="logUserSelect" class="form-control">
+                                        <option value="">Tutti gli operatori</option>
+                                        @php
+                                            $users = \App\Models\User::orderBy('name')->get();
+                                        @endphp
+                                        @foreach($users as $user)
+                                            <option value="{{ $user->id }}">{{ $user->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Tavolo -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><i class="fa fa-chair"></i> Numero Tavolo</label>
+                                    <input type="number" name="table_number" id="logTableNumber" class="form-control" placeholder="Lascia vuoto per tutti">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- Data Da -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><i class="fa fa-calendar"></i> Data Da</label>
+                                    <input type="date" name="date_from" id="logDateFrom" class="form-control" value="{{ date('Y-m-d') }}">
+                                </div>
+                            </div>
+
+                            <!-- Data A -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label><i class="fa fa-calendar"></i> Data A</label>
+                                    <input type="date" name="date_to" id="logDateTo" class="form-control" value="{{ date('Y-m-d') }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Categorie Log -->
+                        <div class="form-group">
+                            <label style="font-weight: bold;"><i class="fa fa-filter"></i> Tipologia di Log</label>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <label class="checkbox-inline" style="margin-right: 20px;">
+                                        <input type="checkbox" name="log_categories[]" value="all" id="logCategoryAll" checked>
+                                        <strong>Tutte le categorie</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                @php
+                                    $categories = \App\Models\TableOrderLog::getAvailableCategories();
+                                @endphp
+                                @foreach($categories as $key => $label)
+                                    <div class="col-md-3">
+                                        <label class="checkbox-inline">
+                                            <input type="checkbox" name="log_categories[]" value="{{ $key }}" class="log-category-checkbox">
+                                            {{ $label }}
+                                        </label>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Stampante -->
+                        <div class="form-group">
+                            <label style="font-weight: bold;"><i class="fa fa-print"></i> Stampante</label>
+                            <select name="printer_id" id="logPrinterSelect" class="form-control" required>
+                                <option value="">-- Seleziona stampante --</option>
+                                @php
+                                    $printers = \App\Models\Printer::where('is_active', true)->orderBy('label')->get();
+                                @endphp
+                                @foreach($printers as $printer)
+                                    <option value="{{ $printer->id }}">{{ $printer->label }} ({{ $printer->ip }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">
+                        <i class="fa fa-times"></i> Annulla
+                    </button>
+                    <button type="button" class="btn btn-warning" id="btnConfirmPrintLogs">
+                        <i class="fa fa-print"></i> Stampa
+                    </button>
                 </div>
             </div>
         </div>
@@ -164,6 +280,103 @@
 
                 dataTable = $('.datatable_table').DataTable();
             }, 500);
+
+            // Open print logs modal
+            $('#btnPrintLogs').on('click', function() {
+                // Pre-fill dates from search filters if set
+                const dateFrom = $('.date_from').val();
+                const dateTo = $('.date_to').val();
+                const tableNumber = $('.table_number').val();
+
+                if (dateFrom) $('#logDateFrom').val(dateFrom);
+                if (dateTo) $('#logDateTo').val(dateTo);
+                if (tableNumber) $('#logTableNumber').val(tableNumber);
+
+                $('#printLogsModal').modal('show');
+            });
+
+            // Category checkboxes logic
+            const logCategoryAll = document.getElementById('logCategoryAll');
+            const logCategoryCheckboxes = document.querySelectorAll('.log-category-checkbox');
+
+            logCategoryAll.addEventListener('change', function() {
+                if (this.checked) {
+                    logCategoryCheckboxes.forEach(cb => cb.checked = false);
+                }
+            });
+
+            logCategoryCheckboxes.forEach(cb => {
+                cb.addEventListener('change', function() {
+                    if (this.checked) {
+                        logCategoryAll.checked = false;
+                    }
+                    // If no category is selected, select "all"
+                    const anySelected = Array.from(logCategoryCheckboxes).some(c => c.checked);
+                    if (!anySelected) {
+                        logCategoryAll.checked = true;
+                    }
+                });
+            });
+
+            // Print logs
+            $('#btnConfirmPrintLogs').on('click', function() {
+                const printerId = $('#logPrinterSelect').val();
+                if (!printerId) {
+                    alert('Seleziona una stampante');
+                    return;
+                }
+
+                // Get selected categories
+                let categories = [];
+                if (logCategoryAll.checked) {
+                    categories = ['all'];
+                } else {
+                    logCategoryCheckboxes.forEach(cb => {
+                        if (cb.checked) categories.push(cb.value);
+                    });
+                }
+
+                if (categories.length === 0) {
+                    alert('Seleziona almeno una categoria');
+                    return;
+                }
+
+                const btn = $(this);
+                const originalText = btn.html();
+                btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Stampa in corso...');
+
+                $.ajax({
+                    url: '/backoffice/logs/print-logs-filtered',
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        user_id: $('#logUserSelect').val() || null,
+                        table_number: $('#logTableNumber').val() || null,
+                        date_from: $('#logDateFrom').val(),
+                        date_to: $('#logDateTo').val(),
+                        categories: categories,
+                        printer_id: printerId
+                    }),
+                    success: function(response) {
+                        if (response.success) {
+                            alert('Log inviati alla stampante! (' + response.logs_count + ' operazioni)');
+                            $('#printLogsModal').modal('hide');
+                        } else {
+                            alert('Errore: ' + (response.message || 'Errore durante la stampa'));
+                        }
+                    },
+                    error: function(xhr) {
+                        const response = xhr.responseJSON || {};
+                        alert('Errore: ' + (response.message || 'Errore durante la stampa'));
+                    },
+                    complete: function() {
+                        btn.prop('disabled', false).html(originalText);
+                    }
+                });
+            });
         })
     </script>
 @endsection

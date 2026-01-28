@@ -45,6 +45,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal Aggiungi Giacenza -->
+    <x-load-material-modal />
 @endsection
 @section('custom-script')
     <script>
@@ -53,7 +56,7 @@
                 $(document).trigger('datatable', [{
                     url: '{{ route('restaurant.materials.datatable') }}',
                     columns: [
-                        {data: 'action', orderable: false, searchable: false, width: '70px'},
+                        {data: 'action', orderable: false, searchable: false, width: '100px'},
                         {data: 'id', width: '40px'},
                         {data: 'label'},
                         {data: 'stock'},
@@ -64,6 +67,6 @@
                     serverSide: false,
                 }]);
             }, 500);
-        })
+        });
     </script>
 @endsection

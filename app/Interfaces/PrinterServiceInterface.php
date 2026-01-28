@@ -80,4 +80,15 @@ interface PrinterServiceInterface
      * @return bool True se la stampa è andata a buon fine, false altrimenti
      */
     public function printHistory(TableOrder $tableOrder, Printer $printer, Collection $logs, ?int $operatorId = null): bool;
+
+    /**
+     * Stampa log filtrati su una stampante POS
+     *
+     * @param Printer $printer Stampante su cui stampare
+     * @param Collection $logs Collection di TableOrderLog
+     * @param array $filters Filtri applicati (date_from, date_to, user_id, table_number)
+     * @param int|null $operatorId ID dell'operatore
+     * @return bool True se la stampa è andata a buon fine, false altrimenti
+     */
+    public function printFilteredLogs(Printer $printer, Collection $logs, array $filters, ?int $operatorId = null): bool;
 }

@@ -30,6 +30,14 @@
                 <i class="fas fa-seedling"></i> Ingredienti
             </a>
         </li>
+        <li class="{{ (Request::is('backoffice/restaurant/stock*')) ? 'active' : '' }}">
+            <a href="{{ route('restaurant.stock.index') }}">
+                <i class="fas fa-boxes"></i> Giacenze
+                @if(($lowStockCount ?? 0) > 0)
+                    <span class="badge badge-danger">{{ $lowStockCount }}</span>
+                @endif
+            </a>
+        </li>
         <li class="{{ (Request::is('backoffice/restaurant/allergens')) ? 'active' : '' }}">
             <a href="{{ route('restaurant.allergens.index') }}">
                 <i class="fas fa-virus"></i> Allergeni

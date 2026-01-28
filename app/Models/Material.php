@@ -18,6 +18,7 @@ class Material extends Model
         'label',
         'stock',
         'stock_type',
+        'alert_threshold',
     ];
 
     public function stocks() : HasMany {
@@ -44,5 +45,10 @@ class Material extends Model
 
     public function getStockTypeLabelAttribute() : string {
         return $this->stock_types()[$this->stock_type];
+    }
+
+    public function isLowStock(float $currentStock): bool
+    {
+        return $this->alert_threshold !== null && $currentStock <= $this->alert_threshold;
     }
 }

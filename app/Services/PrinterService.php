@@ -816,6 +816,7 @@ class PrinterService implements PrinterServiceInterface
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
             $printer->text("Misuraca S.R.L. \n");
             $printer->text("*** DOCUMENTO NON FISCALE ***\n");
+            $printer->text("Ritirare lo scontrino alla cassa\n");
 
             $printer->feed(2);
 
@@ -1204,5 +1205,161 @@ class PrinterService implements PrinterServiceInterface
             'add_item_extras' => '[~] EXTRA AGGIUNTI',
             default => '[?] ' . strtoupper(str_replace('_', ' ', $action)),
         };
+    }
+
+    /**
+     * Stampa log filtrati su una stampante POS 80mm
+     *
+     * @param Printer $printerObj Stampante su cui stampare
+     * @param Collection $logs Collection di TableOrderLog
+     * @param array $filters Filtri applicati
+     * @param int|null $operatorId ID dell'operatore
+     * @return bool True se la stampa è andata a buon fine, false altrimenti
+     */
+    public function printFilteredLogs(Printer $printerObj, \Illuminate\Support\Collection $logs, array $filters, ?int $operatorId = null): bool
+    {
+        try {
+            $printerIp = $printerObj->ip;
+
+            // Verifica se la stampante è raggiungibile
+            if (!$this->isPrinterReachable($printerIp)) {
+                Log::warning("Stampante non raggiungibile per log filtrati", ['ip' => $printerIp]);
+                return false;
+            }
+
+            // Connessione alla stampante
+            $connector = new NetworkPrintConnector($printerIp, 9100, 5);
+            $printer = new EscposPrinter($connector);
+
+            // Inizializza la stampante
+            $printer->initialize();
+
+            // --- INTESTAZIONE ---
+            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $printer->setEmphasis(true);
+            $printer->setTextSize(2, 2);
+            $printer->text("LOG OPERAZIONI\n");
+            $printer->setTextSize(1, 1);
+            $printer->setEmphasis(false);
+            $printer->feed(1);
+
+            // Info filtri
+            $dateFrom = $filters['date_from'] ?? date('Y-m-d');
+            $dateTo = $filters['date_to'] ?? date('Y-m-d');
+            $printer->text("Dal: " . date('d/m/Y', strtotime($dateFrom)) . "\n");
+            $printer->text("Al: " . date('d/m/Y', strtotime($dateTo)) . "\n");
+
+            if (!empty($filters['table_number'])) {
+                $printer->text("Tavolo: " . $filters['table_number'] . "\n");
+            }
+
+            if (!empty($filters['user_id'])) {
+                $user = User::find($filters['user_id']);
+                $printer->text("Operatore: " . ($user->name ?? 'N/D') . "\n");
+            }
+
+            $printer->text("Operazioni: " . $logs->count() . "\n");
+            $printer->feed(1);
+
+            // Linea separatrice
+            $printer->text(str_repeat('=', 48) . "\n");
+            $printer->feed(1);
+
+            // --- ELENCO OPERAZIONI ---
+            $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+
+            $currentDate = null;
+            foreach ($logs as $log) {
+                // Separatore per data diversa
+                $logDate = $log->created_at->format('d/m/Y');
+                if ($currentDate !== $logDate) {
+                    if ($currentDate !== null) {
+                        $printer->feed(1);
+                    }
+                    $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+                    $printer->setEmphasis(true);
+                    $printer->text("--- $logDate ---\n");
+                    $printer->setEmphasis(false);
+                    $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+                    $currentDate = $logDate;
+                }
+
+                // Tavolo (sempre in evidenza per log generale)
+                $tableNumber = $log->tableOrder?->restaurantTable?->table_number ?? null;
+
+                // Prima riga: ORA | TAVOLO
+                $printer->setEmphasis(true);
+                $printer->text($log->created_at->format('H:i:s'));
+                if ($tableNumber) {
+                    $printer->text("  [TAV." . $tableNumber . "]");
+                }
+                $printer->setEmphasis(false);
+                $printer->text("\n");
+
+                // Seconda riga: Operatore
+                $operatorName = $log->user?->name ?? 'Sistema';
+                $printer->text("  Op: " . substr($operatorName, 0, 20) . "\n");
+
+                // Terza riga: Azione
+                $actionLabel = $this->getActionTextLabel($log->action);
+                $printer->text("  " . $actionLabel . "\n");
+
+                // Dettagli prodotto (se presente)
+                if ($log->orderItem && $log->orderItem->dish) {
+                    $dishName = $log->orderItem->dish->label ?? $log->orderItem->dish->name ?? 'N/D';
+                    $dishName = substr($dishName, 0, 30);
+                    $printer->text("  >> " . $dishName);
+
+                    if ($log->data_after && isset($log->data_after['quantity'])) {
+                        $printer->text(" x" . $log->data_after['quantity']);
+                    }
+
+                    // Prezzo modificato
+                    if ($log->data_after && isset($log->data_after['price_modified']) && $log->data_after['price_modified']) {
+                        $unitPrice = $log->data_after['unit_price'] ?? 0;
+                        $dishPrice = $log->data_after['dish_price'] ?? 0;
+                        $printer->text("\n     MOD: " . number_format($unitPrice, 2) . " (era " . number_format($dishPrice, 2) . ")");
+                    }
+
+                    $printer->text("\n");
+                }
+
+                // Linea separatrice sottile
+                $printer->text(str_repeat('-', 48) . "\n");
+            }
+
+            $printer->feed(1);
+
+            // --- RIEPILOGO ---
+            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $printer->text(str_repeat('=', 48) . "\n");
+            $printer->setEmphasis(true);
+            $printer->text("FINE LOG\n");
+            $printer->text("Stampato: " . now()->format('d/m/Y H:i') . "\n");
+            $printer->setEmphasis(false);
+
+            $printer->feed(3);
+
+            // Taglia la carta
+            $printer->cut();
+
+            // Chiudi la connessione
+            $printer->close();
+
+            Log::info("Log filtrati stampati con successo", [
+                'printer_ip' => $printerIp,
+                'logs_count' => $logs->count(),
+                'filters' => $filters
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            Log::error('Errore durante la stampa log filtrati', [
+                'printer_ip' => $printerObj->ip ?? 'N/D',
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
     }
 }

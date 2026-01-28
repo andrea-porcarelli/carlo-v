@@ -4,6 +4,7 @@ import Homepage from "./controllers/homepage.js";
 import Users from "./controllers/users.js";
 import Crud from "./controllers/crud.js";
 import Suppliers from "./controllers/suppliers.js";
+import Materials from "./controllers/materials.js";
 
 const init = () => {
     App.init();
@@ -12,6 +13,7 @@ const init = () => {
     Users.init();
     Crud.init();
     Suppliers.init();
+    Materials.init();
 }
 
 $(function () {

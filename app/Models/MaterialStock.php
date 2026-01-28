@@ -17,6 +17,14 @@ class MaterialStock extends Model
         'material_id',
         'supplier_invoice_product_id',
         'stock',
+        'purchase_date',
+        'purchase_price',
+        'notes',
+    ];
+
+    protected $casts = [
+        'purchase_date' => 'date',
+        'purchase_price' => 'decimal:2',
     ];
 
     public function material() : BelongsTo {

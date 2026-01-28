@@ -1,5 +1,5 @@
 services:
-  nginx:
+  cv-nginx:
     image: nginx:alpine
     ports:
       - "80:80"
@@ -7,19 +7,19 @@ services:
       - ../public:/var/www/html/public:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - app
+      - cv-app
     restart: unless-stopped
 
-  app:
+  cv-app:
     build: .
     volumes:
       - ../:/var/www/html
     environment:
-      DB_HOST: mysql
+      DB_HOST: cv-mysql
       DB_DATABASE: carlov
       DB_USERNAME: root
       DB_PASSWORD: password123
-      REDIS_HOST: carlov_redis
+      REDIS_HOST: cv-carlov_redis
     # Permette al container di accedere alla rete dell'host per stampanti POS
     # Opzione 1: Usa network_mode host (decommenta SOLO se hai problemi di connessione)
     # network_mode: "host"
@@ -27,11 +27,11 @@ services:
 #    extra_hosts:
 #       - "stampante-cucina:192.168.8.200"
     depends_on:
-      - mysql
-      - carlov_redis
+      - cv-mysql
+      - cv-carlov_redis
     restart: unless-stopped
 
-  mysql:
+  cv-mysql:
     image: mysql:8.0
     ports:
         - "3309:3306"
@@ -42,18 +42,20 @@ services:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
 
-  carlov_redis:
+  cv-carlov_redis:
     image: redis:7-alpine
     restart: unless-stopped
 
-  phpmyadmin:
+  cv-phpmyadmin:
     image: phpmyadmin/phpmyadmin
     ports:
       - "8082:80"
     environment:
-      PMA_HOST: mysql
+      PMA_HOST: cv-mysql
       PMA_USER: root
       PMA_PASSWORD: password123
+    depends_on:
+      - cv-mysql
     restart: unless-stopped
 
 volumes:

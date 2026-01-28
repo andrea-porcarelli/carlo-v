@@ -38,5 +38,16 @@
             </a>
         @endif
     @endif
+    @if (in_array('add-stock', $options))
+        <button
+            class="btn btn-xs btn-warning btn-add-stock"
+            title="Aggiungi giacenza"
+            data-id="{{ $item->id }}"
+            data-label="{{ $item->label }}"
+            data-stock-type="{{ $item->stock_type }}"
+        >
+            <span class="fa fa-plus-circle"></span>
+        </button>
+    @endif
 </div>
 <small>ID: {{ $item->id }}</small>

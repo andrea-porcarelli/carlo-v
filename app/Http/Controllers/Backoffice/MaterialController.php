@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Backoffice;
 use App\Facades\Utils;
 use App\Interfaces\MaterialInterface;
 use App\Models\Material;
+use App\Models\MaterialStock;
 use App\Models\Printer;
+use App\Services\StockService;
 use App\Traits\DatatableTrait;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +37,7 @@ class MaterialController extends BaseController
             $filters = $request->get('filters') ?? [];
 
             $elements = $this->interface->filters($filters);
-            return $this->editColumns(datatables()->of($elements), $this->name, ['edit'], null, 'restaurant.materials')
+            return $this->editColumns(datatables()->of($elements), $this->name, ['edit', 'add-stock'], null, 'restaurant.materials')
                 ->addColumn('dishes', function ($item) {
                    return $item->dishes->count();
                 })
@@ -79,11 +81,15 @@ class MaterialController extends BaseController
             $object = $this->interface->find($id);
             if ($object->id) {
                 $stock_types = Utils::key_value(Material::stock_types());
-                return view('backoffice.' . $this->name . '.edit', compact('object' , 'stock_types'));
+                $stockService = app(StockService::class);
+                $stockSummary = $stockService->calculateStock($object);
+                $movements = $stockService->getMovements($object->id);
+                return view('backoffice.' . $this->name . '.edit', compact('object', 'stock_types', 'stockSummary', 'movements'));
             }
             throw new Exception('Element not found');
         }
         catch (\Exception $e) {
+            dd($e);
             return $this->exception($e, $request);
         }
     }
@@ -117,6 +123,38 @@ class MaterialController extends BaseController
             return response()->json(['response' => 'success']);
         } catch (\Exception $e) {
             return $this->exception($e, null);
+        }
+    }
+
+    public function storeStock(int $id, Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'stock' => 'required|numeric|min:0.01',
+                'purchase_date' => 'nullable|date',
+                'purchase_price' => 'nullable|numeric|min:0',
+                'notes' => 'nullable|string|max:1000',
+            ]);
+
+            $material = $this->interface->find($id);
+            if (!$material->id) {
+                throw new Exception('Materiale non trovato');
+            }
+
+            $stock = MaterialStock::create([
+                'material_id' => $material->id,
+                'stock' => $request->stock,
+                'purchase_date' => $request->purchase_date,
+                'purchase_price' => $request->purchase_price,
+                'notes' => $request->notes,
+            ]);
+
+            return $this->success([
+                'stock' => $stock->toArray(),
+                'message' => 'Giacenza aggiunta con successo'
+            ]);
+        } catch (Exception $e) {
+            return $this->exception($e, $request);
         }
     }
 }
