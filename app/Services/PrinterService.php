@@ -714,15 +714,6 @@ class PrinterService implements PrinterServiceInterface
             // Inizializza la stampante
             $printer->initialize();
 
-            // Intestazione
-            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
-            $printer->setEmphasis(true);
-            $printer->setTextSize(2, 2);
-            $printer->text("*** PRE-CONTO ***\n");
-            $printer->setTextSize(1, 1);
-            $printer->setEmphasis(false);
-            $printer->feed(1);
-
             // Numero del tavolo
             $covers = $tableOrder->covers ?? 0;
             $coversText = $covers == 0 ? 'BEVANDE' : $covers . ' coperti';
@@ -819,7 +810,8 @@ class PrinterService implements PrinterServiceInterface
 
             // Nota finale
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
-            $printer->text("*** NON FISCALE ***\n");
+            $printer->text("*** Misuraca S.R.L. ***\n");
+            $printer->text("*** DOCUMENTO NON FISCALE ***\n");
 
             $printer->feed(2);
 
