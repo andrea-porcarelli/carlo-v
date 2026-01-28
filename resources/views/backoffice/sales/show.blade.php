@@ -395,26 +395,24 @@
 
                                                 @if($itemData)
                                                     @if(isset($itemData['quantity']))
-                                                        <br><small>Qta: <strong>{{ $itemData['quantity'] }}</strong></small>
+                                                        <br><strong>{{ $itemData['quantity'] }}x</strong>
                                                     @endif
                                                     @if(isset($itemData['unit_price']))
                                                         @if($logHasPriceChange)
-                                                            <small> • Prezzo: </small>
-                                                            <span class="label label-warning" title="Prezzo modificato da €{{ number_format($dishOriginalPrice, 2, ',', '.') }}">
-                                                                <i class="fa fa-edit"></i> €{{ number_format($itemData['unit_price'], 2, ',', '.') }}
-                                                                <small style="text-decoration: line-through;">(€{{ number_format($dishOriginalPrice, 2, ',', '.') }})</small>
-                                                            </span>
+                                                            <b>{{ Utils::price($itemData['unit_price']) }} </b>
+                                                            <small style="text-decoration: line-through;" class="text-danger">(€{{ Utils::price($dishOriginalPrice) }})</small>
                                                         @else
-                                                            <small> • Prezzo: <strong>€{{ number_format($itemData['unit_price'], 2, ',', '.') }}</strong></small>
+                                                            <strong>€{{ Utils::price($itemData['unit_price']) }}</strong>
                                                         @endif
                                                     @endif
                                                     @if(isset($itemData['subtotal']))
-                                                        <small> • Tot: <strong>€{{ number_format($itemData['subtotal'], 2, ',', '.') }}</strong></small>
+                                                         = <strong>€{{ Utils::price($itemData['subtotal']) }}</strong>
                                                     @endif
                                                     @if(isset($itemData['notes']) && $itemData['notes'])
                                                         <br><small class="text-muted"><i class="fa fa-sticky-note"></i> {{ $itemData['notes'] }}</small>
                                                     @endif
                                                 @else
+                                                    <br />
                                                     <small class="text-muted">{{ $log->notes }}</small>
                                                 @endif
                                             </td>

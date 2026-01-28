@@ -445,6 +445,11 @@ class TableOrdersManager {
         }
 
 
+        const unitPriceLabel = (item) => {
+            const up = parseFloat(item.unit_price);
+            return `€${up.toFixed(2)}`;
+        };
+
         let itemsHtml = order.items.map(item => `
             <div class="receipt-item" data-item-id="${item.id}">
                 <div class="receipt-item-header">
@@ -460,7 +465,15 @@ class TableOrdersManager {
                         <button class="quantity-btn" onclick="tableOrdersManager.increaseQuantity(${item.id}, event)">
                             <i class="fas fa-plus"></i>
                         </button>
-                        <span class="receipt-item-price">€${parseFloat(item.subtotal).toFixed(2)}</span><br />
+                        <span class="receipt-item-price" id="priceDisplay_${item.id}">
+                            <span onclick="tableOrdersManager.editPrice(${item.id}, ${parseFloat(item.unit_price)})" style="cursor:pointer;" title="Modifica prezzo">€${parseFloat(item.subtotal).toFixed(2)} <i class="fas fa-pencil-alt" style="font-size:0.7rem;color:#6c757d;"></i></span>
+                        </span>
+                        <span id="priceEdit_${item.id}" style="display:none;">
+                            <input type="number" step="0.01" min="0" value="${parseFloat(item.unit_price).toFixed(2)}" id="priceInput_${item.id}" style="width:70px;padding:2px 4px;font-size:0.85rem;border:1px solid #dc3545;border-radius:3px;">
+                            <button onclick="tableOrdersManager.savePrice(${item.id})" style="background:#28a745;border:none;color:white;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-check"></i></button>
+                            <button onclick="tableOrdersManager.cancelEditPrice(${item.id})" style="background:#6c757d;border:none;color:white;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-times"></i></button>
+                        </span>
+                        <br />
                     </div>
                     ${item.extras && Object.keys(item.extras).length > 0 ? `
                         <div class="receipt-item-extras">
@@ -481,13 +494,45 @@ class TableOrdersManager {
             </div>
         `).join('');
 
-        // Add cover charge if applicable
+        // Add cover charge row (editable)
         if (order.has_cover_charge && order.cover_charge_total > 0) {
             itemsHtml += `
                 <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #17a2b8;">
-                    <div class="receipt-item-header">
-                        <strong><i class="fas fa-utensils me-2"></i>Coperto (${order.covers} x €${parseFloat(order.cover_charge_per_person).toFixed(2)})</strong>
-                        <span class="receipt-item-price">€${parseFloat(order.cover_charge_total).toFixed(2)}</span>
+                    <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
+                        <strong><i class="fas fa-utensils me-2"></i>Coperto</strong>
+                        <span>
+                            <span id="coversDisplay" style="cursor:pointer;" onclick="tableOrdersManager.editCovers()" title="Modifica coperti">
+                                ${order.covers} x €${parseFloat(order.cover_charge_per_person).toFixed(2)} = <strong>€${parseFloat(order.cover_charge_total).toFixed(2)}</strong>
+                                <i class="fas fa-pencil-alt" style="font-size:0.7rem;color:#6c757d;margin-left:4px;"></i>
+                            </span>
+                            <span id="coversEdit" style="display:none;">
+                                <button onclick="tableOrdersManager.changeCovers(-1)" style="background:#dc3545;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">−</button>
+                                <span id="coversEditValue" style="display:inline-block;min-width:30px;text-align:center;font-weight:700;">${order.covers}</span>
+                                <button onclick="tableOrdersManager.changeCovers(1)" style="background:#28a745;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">+</button>
+                                <button onclick="tableOrdersManager.saveCovers()" style="background:#17a2b8;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;margin-left:4px;font-size:0.8rem;"><i class="fas fa-check"></i> Salva</button>
+                                <button onclick="tableOrdersManager.cancelEditCovers()" style="background:#6c757d;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-times"></i></button>
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            `;
+        } else if (order.covers === 0) {
+            itemsHtml += `
+                <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #ffc107;">
+                    <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
+                        <strong><i class="fas fa-glass-cheers me-2"></i>Consumo Bevande (no coperto)</strong>
+                        <span>
+                            <span id="coversDisplay" style="cursor:pointer;" onclick="tableOrdersManager.editCovers()" title="Modifica coperti">
+                                <i class="fas fa-pencil-alt" style="font-size:0.7rem;color:#6c757d;"></i>
+                            </span>
+                            <span id="coversEdit" style="display:none;">
+                                <button onclick="tableOrdersManager.changeCovers(-1)" style="background:#dc3545;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">−</button>
+                                <span id="coversEditValue" style="display:inline-block;min-width:30px;text-align:center;font-weight:700;">0</span>
+                                <button onclick="tableOrdersManager.changeCovers(1)" style="background:#28a745;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">+</button>
+                                <button onclick="tableOrdersManager.saveCovers()" style="background:#17a2b8;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;margin-left:4px;font-size:0.8rem;"><i class="fas fa-check"></i> Salva</button>
+                                <button onclick="tableOrdersManager.cancelEditCovers()" style="background:#6c757d;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-times"></i></button>
+                            </span>
+                        </span>
                     </div>
                 </div>
             `;
@@ -926,6 +971,160 @@ class TableOrdersManager {
         } catch (error) {
             console.error('Error updating quantity:', error);
             this.showNotification('Errore nell\'aggiornamento della quantità', 'error');
+        }
+    }
+
+    /**
+     * Show price edit controls for an item
+     */
+    editPrice(itemId, currentPrice) {
+        const display = document.getElementById(`priceDisplay_${itemId}`);
+        const edit = document.getElementById(`priceEdit_${itemId}`);
+        const input = document.getElementById(`priceInput_${itemId}`);
+        if (display) display.style.display = 'none';
+        if (edit) edit.style.display = 'inline';
+        if (input) { input.focus(); input.select(); }
+    }
+
+    /**
+     * Cancel price edit
+     */
+    cancelEditPrice(itemId) {
+        const display = document.getElementById(`priceDisplay_${itemId}`);
+        const edit = document.getElementById(`priceEdit_${itemId}`);
+        if (display) display.style.display = 'inline';
+        if (edit) edit.style.display = 'none';
+    }
+
+    /**
+     * Save new price for an item
+     */
+    async savePrice(itemId) {
+        const input = document.getElementById(`priceInput_${itemId}`);
+        if (!input) return;
+
+        const newPrice = parseFloat(input.value);
+        if (isNaN(newPrice) || newPrice < 0) {
+            this.showNotification('Prezzo non valido', 'error');
+            return;
+        }
+
+        // Request operator authentication
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+        } catch (error) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/items/${itemId}/price`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token
+                },
+                body: JSON.stringify({ unit_price: newPrice })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('Prezzo aggiornato');
+                await this.selectTable(this.currentTable.table.id);
+                await this.loadTables();
+                const modifyOverlay = document.getElementById('modifyOrderOverlay');
+                if (modifyOverlay && modifyOverlay.style.display === 'block') {
+                    this.updateModifyReceiptItems();
+                }
+            } else {
+                this.showNotification(result.message || 'Errore nell\'aggiornamento del prezzo', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating price:', error);
+            this.showNotification('Errore nell\'aggiornamento del prezzo', 'error');
+        }
+    }
+
+    /**
+     * Show covers edit controls
+     */
+    editCovers() {
+        const display = document.getElementById('coversDisplay');
+        const edit = document.getElementById('coversEdit');
+        if (display) display.style.display = 'none';
+        if (edit) edit.style.display = 'inline';
+    }
+
+    /**
+     * Cancel covers edit
+     */
+    cancelEditCovers() {
+        const display = document.getElementById('coversDisplay');
+        const edit = document.getElementById('coversEdit');
+        if (display) display.style.display = 'inline';
+        if (edit) edit.style.display = 'none';
+    }
+
+    /**
+     * Change covers value in edit mode
+     */
+    changeCovers(delta) {
+        const valueEl = document.getElementById('coversEditValue');
+        if (!valueEl) return;
+        let current = parseInt(valueEl.textContent) || 0;
+        current += delta;
+        if (current < 0) current = 0;
+        valueEl.textContent = current;
+    }
+
+    /**
+     * Save new covers value
+     */
+    async saveCovers() {
+        const valueEl = document.getElementById('coversEditValue');
+        if (!valueEl) return;
+
+        const newCovers = parseInt(valueEl.textContent) || 0;
+
+        // Request operator authentication
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+        } catch (error) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/covers`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token
+                },
+                body: JSON.stringify({ covers: newCovers })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('Coperti aggiornati');
+                await this.selectTable(this.currentTable.table.id);
+                await this.loadTables();
+                const modifyOverlay = document.getElementById('modifyOrderOverlay');
+                if (modifyOverlay && modifyOverlay.style.display === 'block') {
+                    this.updateModifyReceiptItems();
+                }
+            } else {
+                this.showNotification(result.message || 'Errore nell\'aggiornamento dei coperti', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating covers:', error);
+            this.showNotification('Errore nell\'aggiornamento dei coperti', 'error');
         }
     }
 

@@ -50,6 +50,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::post('/comunica', [TableOrderController::class, 'comunica'])->name('comunica');
     Route::get('/printers', [TableOrderController::class, 'getPrinters'])->name('printers');
     Route::put('/items/{item}/price', [TableOrderController::class, 'updateItemPrice'])->name('updateItemPrice');
+    Route::put('/{table}/covers', [TableOrderController::class, 'updateCovers'])->name('updateCovers');
 });
 
 Route::group(['prefix' => '/backoffice'], function() {

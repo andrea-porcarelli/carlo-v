@@ -164,9 +164,10 @@ class TableOrderLog extends Model
             'reopen_order' => 'Riaperto ordine',
             'add_item_notes' => 'Aggiunte note prodotto',
             'add_item_extras' => 'Aggiunti extra prodotto',
-            'update_item_quantity' => 'Modificata quantità',
+            'update_item_quantity' => 'Modificata quantità prodotto',
             'print_marcia' => 'Stampata marcia',
             'print_preconto' => 'Stampato preconto',
+            'update_item_price' => 'Modificato prezzo prodotto',
         ];
 
         return $descriptions[$this->action] ?? $this->action;

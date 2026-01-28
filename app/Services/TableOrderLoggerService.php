@@ -266,6 +266,24 @@ class TableOrderLoggerService
     }
 
     /**
+     * Log per aggiornamento prezzo item
+     */
+    public function logUpdateItemPrice(OrderItem $item, float $oldPrice, float $newPrice, int $operatorId = 0): TableOrderLog
+    {
+        $dishName = $item->dish->label ?? $item->dish->name ?? 'Prodotto';
+        return $this->log(
+            action: 'update_item_price',
+            entityType: 'order_item',
+            entity: $item,
+            dataBefore: ['unit_price' => $oldPrice],
+            dataAfter: ['unit_price' => $newPrice],
+            tableOrderId: $item->table_order_id,
+            notes: "Modificato prezzo {$dishName} da €" . number_format($oldPrice, 2) . " a €" . number_format($newPrice, 2),
+            userId: $operatorId,
+        );
+    }
+
+    /**
      * Log per stampa marcia tavolo
      */
     public function logPrintMarcia(TableOrder $order, int $operatorId = 0): TableOrderLog

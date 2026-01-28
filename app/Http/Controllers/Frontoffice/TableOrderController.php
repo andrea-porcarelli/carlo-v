@@ -1026,6 +1026,63 @@ class TableOrderController extends Controller
     }
 
     /**
+     * Update covers for an active order
+     */
+    public function updateCovers(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $validated = $request->validate([
+            'covers' => 'required|integer|min:0',
+        ]);
+
+        // Verify operator token from header
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token operatore non valido',
+            ], 401);
+        }
+
+        try {
+            $order = $table->activeOrder;
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nessun ordine attivo per questo tavolo',
+                ], 404);
+            }
+
+            DB::beginTransaction();
+
+            $oldCovers = $order->covers;
+            $order->covers = $validated['covers'];
+            $order->save();
+            $order->updateTotal();
+
+            $this->logger->logUpdateCovers($order, $oldCovers, $validated['covers'], $operatorId);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Coperti aggiornati',
+                'data' => [
+                    'covers' => $order->covers,
+                    'cover_charge_total' => $order->getCoverChargeAmount(),
+                    'total_amount' => $order->fresh()->total_amount,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error updating covers: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore nell\'aggiornamento dei coperti',
+            ], 500);
+        }
+    }
+
+    /**
      * Update item price
      */
     public function updateItemPrice(Request $request, OrderItem $item): JsonResponse
@@ -1074,7 +1131,7 @@ class TableOrderController extends Controller
             $order->save();
 
             // Log the price update
-            $this->logger->logUpdateItem($item, $dataBefore, $operatorId);
+            $this->logger->logUpdateItemPrice($item, $dataBefore['unit_price'], $validated['unit_price'], $operatorId);
 
             DB::commit();
 
