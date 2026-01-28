@@ -70,12 +70,7 @@
 
                         <div class="mini-control" id="btnModifyTable" disabled>
                             <i class="fas fa-edit"></i>
-                            <div class="mini-control-label">MODIFICA</div>
-                        </div>
-
-                        <div class="mini-control" id="showReceipt">
-                            <i class="fas fa-receipt"></i>
-                            <div class="mini-control-label">CONTO</div>
+                            <div class="mini-control-label">GESTISCI</div>
                         </div>
                     </div>
                 </div>
@@ -93,14 +88,14 @@
                             MODIFICA TAVOLO <span id="modifyTableNumber">-</span>
                         </h2>
                         <p style="margin: 5px 0 0 0; color: #6c757d;" id="modifyCoversInfo">
-                            <i class="fas fa-users"></i> <span id="modifyCoversCount">0</span> coperti
+                            <i class="fas fa-users" id="modifyCoversIcon"></i> <span id="modifyCoversCount">0</span><span id="modifyCoversLabel"> coperti</span>
                         </p>
                     </div>
 
                     <div style="display: flex; gap: 20px; height: calc(100% - 100px);">
                         <!-- Left: Menu Panel -->
-                        <div style="flex: 0 0 35%; background: white; padding: 20px; overflow-y: auto; border-radius: 8px;">
-                            <h3 style="color: #000; font-weight: 700; margin-bottom: 20px; border-bottom: 3px solid #dc3545; padding-bottom: 10px;">
+                        <div style="flex: 0 0 28%; background: white; padding: 15px; overflow-y: auto; border-radius: 8px;">
+                            <h3 style="color: #000; font-weight: 700; margin-bottom: 15px; border-bottom: 3px solid #dc3545; padding-bottom: 8px; font-size: 1.1rem;">
                                 <i class="fas fa-utensils me-2"></i> MENU
                             </h3>
                             <div id="modifyMenuContainer">
@@ -108,53 +103,65 @@
                             </div>
 
                             <!-- Temporary Cart in Modify View -->
-                            <div id="temporaryCartModify" style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px; border: 2px solid #dc3545;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <h6 style="margin: 0; color: #dc3545; font-weight: 700;">
+                            <div id="temporaryCartModify" style="display: none; margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 4px; border: 2px solid #dc3545;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <h6 style="margin: 0; color: #dc3545; font-weight: 700; font-size: 0.85rem;">
                                         <i class="fas fa-shopping-cart me-2"></i>ORDINE IN PREPARAZIONE
                                     </h6>
-                                    <button id="clearCartModify" class="btn btn-sm" style="background: #6c757d; color: white; border: none; padding: 4px 8px;">
+                                    <button id="clearCartModify" class="btn btn-sm" style="background: #6c757d; color: white; border: none; padding: 3px 6px;">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
-                                <div id="cartItemsModify" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px;">
+                                <div id="cartItemsModify" style="max-height: 150px; overflow-y: auto; margin-bottom: 8px;">
                                     <!-- Cart items will be added here -->
                                 </div>
-                                <button id="confirmCartModify" class="btn-red" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600;">
+                                <button id="confirmCartModify" class="btn-red" style="width: 100%; padding: 10px; font-size: 13px; font-weight: 600;">
                                     <i class="fas fa-check me-2"></i>CONFERMA ORDINE
                                 </button>
                             </div>
                         </div>
 
                         <!-- Right: Order Summary -->
-                        <div style="flex: 0 0 65%; background: white; padding: 0; border-radius: 8px; display: flex; flex-direction: column;">
-                            <div class="table-info-card" style="border-radius: 8px 8px 0 0;">
-                                <div class="table-info-number" id="modifySelectedTableNumber">-</div>
-                                <div class="table-info-status">
-                                    ORDINE CORRENTE
+                        <div style="flex: 1; background: white; padding: 0; border-radius: 8px; display: flex; flex-direction: column; min-width: 0;">
+                            <!-- Compact Header -->
+                            <div style="background: #000; color: white; padding: 12px 20px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 15px;">
+                                    <span style="font-size: 1.8rem; font-weight: 700; color: #dc3545;" id="modifySelectedTableNumber">-</span>
+                                    <span style="font-size: 0.85rem; color: #6c757d; text-transform: uppercase; letter-spacing: 1px;">ORDINE CORRENTE</span>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span style="font-size: 0.85rem; color: #6c757d;">TOTALE</span>
+                                    <span id="modifyTotalAmount" style="font-size: 1.5rem; font-weight: 700; color: #dc3545; margin-left: 10px;">€0.00</span>
                                 </div>
                             </div>
 
-                            <div style="padding: 20px; flex: 1; overflow-y: auto;" id="modifyReceiptItems">
+                            <!-- Order Items - Maximum Space -->
+                            <div style="padding: 15px 20px; flex: 1; overflow-y: auto;" id="modifyReceiptItems">
                                 <div class="empty-state">
                                     <i class="fas fa-shopping-cart"></i>
                                     <p>Nessun ordine</p>
                                 </div>
                             </div>
 
-                            <div class="total-section">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span style="font-size: 1.2rem; font-weight: 600;">TOTALE:</span>
-                                    <span id="modifyTotalAmount" class="total-amount">€0.00</span>
-                                </div>
-                            </div>
-
-                            <div style="padding: 20px;">
-                                <button class="action-btn" id="btnModifyPayBill">
+                            <!-- Compact Action Bar -->
+                            <div style="padding: 12px 20px; background: #f8f9fa; border-top: 2px solid #dee2e6; display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button class="action-btn-compact" id="btnMarciaTavolo" style="background: #28a745;">
+                                    <i class="fas fa-play-circle"></i> MARCIA
+                                </button>
+                                <button class="action-btn-compact" id="btnPreconto" style="background: #17a2b8;">
+                                    <i class="fas fa-receipt"></i> PRE-CONTO
+                                </button>
+                                <button class="action-btn-compact" id="btnModifyPayBill" style="background: #dc3545;">
                                     <i class="fas fa-money-bill"></i> INCASSA
                                 </button>
-                                <button class="action-btn" id="btnModifyClearBill">
+                                <button class="action-btn-compact" id="btnModifyClearBill" style="background: #6c757d;">
                                     <i class="fas fa-eraser"></i> SVUOTA
+                                </button>
+                                <button class="action-btn-compact" id="btnModifyFreeTable" style="background: #ffc107; color: #000;">
+                                    <i class="fas fa-door-open"></i> LIBERA
+                                </button>
+                                <button class="action-btn-compact" id="btnModifyComunica" style="background: #6f42c1;">
+                                    <i class="fas fa-bullhorn"></i> COMUNICA
                                 </button>
                             </div>
                         </div>
@@ -170,7 +177,7 @@
                         <div class="table-info-status">
                             TAVOLO SELEZIONATO
                             <span id="coversInfo" style="display: none; margin-left: 10px; font-size: 0.9rem; color: #666;">
-                                <i class="fas fa-users"></i> <span id="coversCount">0</span> coperti
+                                <i class="fas fa-users" id="coversIcon"></i> <span id="coversCount">0</span><span id="coversLabel"> coperti</span>
                             </span>
                         </div>
                         <button style="position: absolute; top: 10px; right: 10px; background: #dc3545; border: none; color: white; width: 30px; height: 30px; cursor: pointer;" id="closeReceiptBtn">×</button>
@@ -214,6 +221,12 @@
 
     <!-- Covers Selection Modal -->
     <x-covers-modal />
+
+    <!-- PreConto Modal -->
+    <x-preconto-modal />
+
+    <!-- Comunica Modal -->
+    <x-comunica-modal />
 
     <!-- Notification -->
     <div id="notification" class="notification">

@@ -13,6 +13,13 @@
                 Seleziona il numero di coperti per il <span id="coversTableNumber">tavolo</span>
             </p>
 
+            <!-- Drinks Mode Button -->
+            <div class="drinks-mode-container">
+                <button class="covers-btn covers-btn-drinks" id="drinksModeBtn" data-covers="0">
+                    <i class="fas fa-glass-cheers"></i> CONSUMO BEVANDE
+                </button>
+            </div>
+
             <div class="covers-grid">
                 <button class="covers-btn" data-covers="1">1</button>
                 <button class="covers-btn" data-covers="2">2</button>
@@ -137,6 +144,33 @@
 .covers-btn-custom {
     font-size: 1rem;
     padding: 15px;
+}
+
+.drinks-mode-container {
+    margin-bottom: 20px;
+}
+
+.covers-btn-drinks {
+    width: 100%;
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    border-color: #17a2b8;
+    font-size: 1.1rem;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.covers-btn-drinks:hover {
+    background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
+    border-color: #117a8b;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+}
+
+.covers-btn-drinks i {
+    font-size: 1.3rem;
 }
 
 .covers-modal-footer {

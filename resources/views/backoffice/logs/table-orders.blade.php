@@ -17,11 +17,11 @@
                     <!-- Filtri -->
                     <form method="GET" action="{{ route('backoffice.logs.table-orders') }}" class="mb-4">
                         <div class="row">
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <div class="form-group">
                                     <label>Operatore</label>
                                     <select name="user_id" class="form-control">
-                                        <option value="">Tutti gli operatori</option>
+                                        <option value="">Tutti</option>
                                         @foreach($users as $user)
                                             <option value="{{ $user->id }}" {{ request('user_id') == $user->id ? 'selected' : '' }}>
                                                 {{ $user->name }}
@@ -30,11 +30,24 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
+                                <div class="form-group">
+                                    <label>Categoria</label>
+                                    <select name="category" class="form-control">
+                                        <option value="">Tutte</option>
+                                        @foreach($categories as $key => $label)
+                                            <option value="{{ $key }}" {{ request('category') == $key ? 'selected' : '' }}>
+                                                {{ $label }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
                                 <div class="form-group">
                                     <label>Azione</label>
                                     <select name="action" class="form-control">
-                                        <option value="">Tutte le azioni</option>
+                                        <option value="">Tutte</option>
                                         @foreach($actions as $action)
                                             <option value="{{ $action }}" {{ request('action') == $action ? 'selected' : '' }}>
                                                 {{ ucfirst(str_replace('_', ' ', $action)) }}
@@ -58,9 +71,14 @@
                             <div class="col-md-2">
                                 <div class="form-group">
                                     <label>&nbsp;</label>
-                                    <button type="submit" class="btn btn-primary btn-block">
-                                        <i class="fas fa-filter"></i> Filtra
-                                    </button>
+                                    <div class="d-flex">
+                                        <button type="submit" class="btn btn-primary flex-grow-1 mr-1">
+                                            <i class="fas fa-filter"></i> Filtra
+                                        </button>
+                                        <a href="{{ route('backoffice.logs.table-orders') }}" class="btn btn-secondary">
+                                            <i class="fas fa-times"></i>
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -73,6 +91,7 @@
                                 <tr>
                                     <th>Data/Ora</th>
                                     <th>Operatore</th>
+                                    <th>Categoria</th>
                                     <th>Azione</th>
                                     <th>Tavolo</th>
                                     <th>Dettagli</th>
@@ -91,7 +110,13 @@
                                             <strong>{{ $log->user?->name ?? 'N/D' }}</strong>
                                         </td>
                                         <td>
-                                            <span class="badge badge-{{ $log->action == 'delete_order' || $log->action == 'remove_item' ? 'danger' : ($log->action == 'create_order' || $log->action == 'add_item' ? 'success' : 'info') }}">
+                                            <span class="badge badge-{{ $log->getCategoryBadgeClass() }}">
+                                                {{ $log->getCategoryDescription() }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-{{ $log->getActionBadgeClass($log->action) }}">
+                                                <i class="fas fa-{{ $log->getActionIcon($log->action) }}"></i>
                                                 {{ $log->getActionDescription() }}
                                             </span>
                                         </td>
@@ -106,12 +131,30 @@
                                         </td>
                                         <td>
                                             @if($log->orderItem)
-                                                {{ $log->orderItem->dish?->name ?? 'N/D' }}
+                                                {{ $log->orderItem->dish?->label ?? $log->orderItem->dish?->name ?? 'N/D' }}
                                                 @if($log->data_after && isset($log->data_after['quantity']))
                                                     (x{{ $log->data_after['quantity'] }})
                                                 @endif
+                                                @php
+                                                    $originalPrice = $log->orderItem->dish?->price ?? $log->orderItem->unit_price;
+                                                    $itemPrice = $log->orderItem->unit_price;
+                                                    $hasPriceChange = $originalPrice && abs($itemPrice - $originalPrice) > 0.001;
+                                                @endphp
+                                                @if($hasPriceChange)
+                                                    <br>
+                                                    <span class="badge badge-warning" title="Prezzo modificato: da €{{ number_format($originalPrice, 2, ',', '.') }} a €{{ number_format($itemPrice, 2, ',', '.') }}">
+                                                        <i class="fas fa-euro-sign"></i> €{{ number_format($itemPrice, 2) }}
+                                                        <small style="text-decoration: line-through;">(€{{ number_format($originalPrice, 2) }})</small>
+                                                    </span>
+                                                @endif
                                             @elseif($log->data_after && isset($log->data_after['covers']))
-                                                {{ $log->data_after['covers'] }} coperti
+                                                @if($log->data_after['covers'] == 0)
+                                                    <i class="fas fa-glass-cheers"></i> Consumo Bevande
+                                                @else
+                                                    {{ $log->data_after['covers'] }} coperti
+                                                @endif
+                                            @elseif($log->data_after && isset($log->data_after['split_count']) && $log->data_after['split_count'] > 1)
+                                                Diviso x{{ $log->data_after['split_count'] }}
                                             @endif
                                         </td>
                                         <td>
@@ -164,7 +207,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="text-center">Nessun log trovato</td>
+                                        <td colspan="9" class="text-center">Nessun log trovato</td>
                                     </tr>
                                 @endforelse
                             </tbody>

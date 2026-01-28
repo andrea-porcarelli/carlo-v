@@ -689,3 +689,45 @@ body {
     position: relative;
     padding-right: 50px;
 }
+
+/* Compact action buttons for modify overlay */
+.action-btn-compact {
+    border: none;
+    color: white;
+    font-weight: 600;
+    padding: 11px 18px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-size: 0.935rem;
+    flex: 1;
+    min-width: 130px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.action-btn-compact:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    filter: brightness(1.1);
+}
+
+.action-btn-compact:active {
+    transform: translateY(0);
+}
+
+.action-btn-compact i {
+    font-size: 1rem;
+}
+
+/* Desktop optimizations for modify overlay */
+@media (min-width: 1200px) {
+    .action-btn-compact {
+        padding: 13px 22px;
+        font-size: 1rem;
+    }
+}

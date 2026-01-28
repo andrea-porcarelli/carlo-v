@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\TableOrderLoggerService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class TableOrderLogController extends Controller
 {
@@ -37,6 +38,11 @@ class TableOrderLogController extends Controller
             $query->where('action', $request->action);
         }
 
+        // Filter by category
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+
         // Filter by table order
         if ($request->filled('table_order_id')) {
             $query->where('table_order_id', $request->table_order_id);
@@ -61,7 +67,10 @@ class TableOrderLogController extends Controller
             ->orderBy('action')
             ->pluck('action');
 
-        return view('backoffice.logs.table-orders', compact('logs', 'users', 'actions'));
+        // Get all available categories
+        $categories = TableOrderLog::getAvailableCategories();
+
+        return view('backoffice.logs.table-orders', compact('logs', 'users', 'actions', 'categories'));
     }
 
     /**
@@ -89,6 +98,35 @@ class TableOrderLogController extends Controller
     }
 
     /**
+     * Get category statistics for a specific date
+     */
+    public function categoryStats(Request $request)
+    {
+        $date = $request->input('date', Carbon::today()->toDateString());
+        $dateCarbon = Carbon::parse($date);
+
+        $stats = TableOrderLog::whereDate('created_at', $dateCarbon)
+            ->select('category', DB::raw('COUNT(*) as count'))
+            ->groupBy('category')
+            ->get()
+            ->pluck('count', 'category')
+            ->toArray();
+
+        // Assicuriamoci che tutte le categorie siano presenti
+        $allCategories = TableOrderLog::getAvailableCategories();
+        $result = [];
+        foreach ($allCategories as $key => $label) {
+            $result[] = [
+                'category' => $key,
+                'label' => $label,
+                'count' => $stats[$key] ?? 0,
+            ];
+        }
+
+        return response()->json($result);
+    }
+
+    /**
      * Export logs to CSV
      */
     public function export(Request $request)
@@ -102,6 +140,9 @@ class TableOrderLogController extends Controller
         }
         if ($request->filled('action')) {
             $query->where('action', $request->action);
+        }
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
         }
         if ($request->filled('table_order_id')) {
             $query->where('table_order_id', $request->table_order_id);
@@ -129,6 +170,7 @@ class TableOrderLogController extends Controller
             fputcsv($file, [
                 'Data/Ora',
                 'Operatore',
+                'Categoria',
                 'Azione',
                 'Tipo Entità',
                 'Tavolo',
@@ -143,6 +185,7 @@ class TableOrderLogController extends Controller
                 fputcsv($file, [
                     $log->created_at->format('d/m/Y H:i:s'),
                     $log->user?->name ?? 'N/D',
+                    $log->getCategoryDescription(),
                     $log->getActionDescription(),
                     $log->entity_type,
                     $log->tableOrder?->restaurantTable?->table_number ?? 'N/D',
@@ -181,6 +224,15 @@ class TableOrderLogController extends Controller
             'items_added' => $logs->where('action', 'add_item')->count(),
             'items_removed' => $logs->where('action', 'remove_item')->count(),
             'orders_closed' => $logs->where('action', 'close_order')->count(),
+            'by_category' => $logs->groupBy('category')
+                ->map(function($categoryLogs, $category) {
+                    return [
+                        'category' => $category,
+                        'label' => TableOrderLog::getAvailableCategories()[$category] ?? $category,
+                        'count' => $categoryLogs->count(),
+                    ];
+                })
+                ->values(),
             'most_active_users' => $logs->groupBy('user_id')
                 ->map(function($userLogs) {
                     return [

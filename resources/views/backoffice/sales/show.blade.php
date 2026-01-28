@@ -6,6 +6,29 @@
     ])
 @endsection
 @section('main-content')
+    @if($sale->covers == 0)
+    <!-- Banner Solo Bevande -->
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="alert alert-info" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); border: none; color: white; margin-bottom: 20px;">
+                <div class="d-flex align-items-center" style="display: flex; align-items: center;">
+                    <div style="margin-right: 15px;">
+                        <i class="fa fa-glass-cheers fa-3x"></i>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0 0 5px 0; font-weight: bold;">
+                            <i class="fa fa-info-circle"></i> Modalita Solo Bevande
+                        </h4>
+                        <p style="margin: 0;">
+                            Questo tavolo e stato aperto senza coperti - nessun coperto e stato addebitato.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <div class="row">
         <!-- Sale Info Card -->
         <div class="col-lg-4">
@@ -113,12 +136,21 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($sale->items()->withTrashed()->get() as $index => $item)
+                                    @foreach($sale->items()->withTrashed()->orderBy('id', 'DESC')->get() as $index => $item)
                                         <tr class="@if($sale->status == 'cancelled') trashed @endif">
                                             <td>{{ $index + 1 }}</td>
                                             <td>
+                                                @php
+                                                    $originalPrice = $item->dish->price ?? $item->unit_price;
+                                                    $hasPriceChange = abs($item->unit_price - $originalPrice) > 0.001;
+                                                @endphp
                                                 <div>
                                                     <strong style="font-size: 15px;">{{ $item->dish->label }}</strong>
+                                                    @if($hasPriceChange)
+                                                        <span class="badge badge-warning ml-2" title="Prezzo modificato: da €{{ number_format($originalPrice, 2, ',', '.') }} a €{{ number_format($item->unit_price, 2, ',', '.') }}">
+                                                            <i class="fas fa-euro-sign"></i> Modificato
+                                                        </span>
+                                                    @endif
                                                     @if($item->dish->category)
                                                         <br>
                                                         <small class="text-muted">
@@ -194,8 +226,28 @@
                                             <td class="text-center">
                                                 <strong style="font-size: 16px;">{{ $item->quantity }}</strong>
                                             </td>
-                                            <td class="text-end">
-                                                €{{ number_format($item->unit_price, 2, ',', '.') }}
+                                            <td class="text-end" style="font-weight: bold">
+                                                @php
+                                                    $originalPrice = $item->dish->price ?? $item->unit_price;
+                                                    $hasPriceChange = abs($item->unit_price - $originalPrice) > 0.001;
+                                                @endphp
+                                                @if($hasPriceChange)
+                                                     €{{ number_format($item->unit_price, 2, ',', '.') }}
+                                                <hr style="margin: 5px 0"/>
+                                                    <span class="badge badge-danger" style="text-decoration: line-through; font-size: 12px;">
+                                                        <i class="fas fa-edit"></i> €{{ number_format($originalPrice, 2, ',', '.') }}
+                                                    </span>
+                                                    <br>
+                                                    <small class="text-muted" style="font-weight: normal; font-size: 11px;">
+                                                        @if($item->addedBy)
+                                                            <i class="fas fa-user"></i> {{ $item->addedBy->name }}
+                                                        @endif
+                                                        <br>
+                                                        <i class="fas fa-clock"></i> {{ $item->created_at->format('H:i') }}
+                                                    </small>
+                                                @else
+                                                    €{{ number_format($item->unit_price, 2, ',', '.') }}
+                                                @endif
                                             </td>
                                             <td class="text-end">
                                                 <strong style="font-size: 15px;">
@@ -249,11 +301,14 @@
     <div class="row mt-4">
         <div class="col-xs-12">
             <div class="panel panel-info">
-                <div class="panel-heading">
-                    <h4 class="panel-title">
+                <div class="panel-heading" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4 class="panel-title" style="margin: 0;">
                         <i class="fa fa-history"></i> Storico Operazioni
                         <span class="label label-default" style="margin-left: 8px;">{{ $logs->count() }} operazioni</span>
                     </h4>
+                    <button type="button" class="btn btn-sm btn-warning" onclick="toggleModal('printHistoryModal')">
+                        <i class="fa fa-print"></i> Stampa Storico
+                    </button>
                 </div>
                 <div class="panel-body p-0">
                     @if($logs && $logs->count() > 0)
@@ -274,6 +329,8 @@
                                         @php
                                             // Estrai il nome del piatto dal log
                                             $dishName = null;
+                                            $dishOriginalPrice = null;
+
                                             if ($log->data_after && isset($log->data_after['dish_name'])) {
                                                 $dishName = $log->data_after['dish_name'];
                                             } elseif ($log->data_before && isset($log->data_before['dish_name'])) {
@@ -288,6 +345,27 @@
                                                 $itemData = $log->data_after;
                                             } elseif ($log->action === 'remove_item' && $log->data_before) {
                                                 $itemData = $log->data_before;
+                                            }
+
+                                            // Ottieni il prezzo originale del piatto
+                                            // 1. Prima dai dati del log (dish_price)
+                                            if ($itemData && isset($itemData['dish_price'])) {
+                                                $dishOriginalPrice = $itemData['dish_price'];
+                                            }
+                                            // 2. Fallback: dal piatto attuale nel database
+                                            if ($dishOriginalPrice === null && $log->orderItem && $log->orderItem->dish) {
+                                                $dishOriginalPrice = $log->orderItem->dish->price ?? null;
+                                            }
+
+                                            // Verifica se il prezzo è stato modificato
+                                            $logHasPriceChange = false;
+                                            // 1. Prima controlla il flag price_modified nei dati del log
+                                            if ($itemData && isset($itemData['price_modified']) && $itemData['price_modified']) {
+                                                $logHasPriceChange = true;
+                                            }
+                                            // 2. Fallback: calcola dal confronto prezzi
+                                            elseif ($itemData && isset($itemData['unit_price']) && $dishOriginalPrice !== null) {
+                                                $logHasPriceChange = abs(floatval($itemData['unit_price']) - floatval($dishOriginalPrice)) > 0.001;
                                             }
                                         @endphp
                                         <tr>
@@ -320,7 +398,15 @@
                                                         <br><small>Qta: <strong>{{ $itemData['quantity'] }}</strong></small>
                                                     @endif
                                                     @if(isset($itemData['unit_price']))
-                                                        <small> • Prezzo: <strong>€{{ number_format($itemData['unit_price'], 2, ',', '.') }}</strong></small>
+                                                        @if($logHasPriceChange)
+                                                            <small> • Prezzo: </small>
+                                                            <span class="label label-warning" title="Prezzo modificato da €{{ number_format($dishOriginalPrice, 2, ',', '.') }}">
+                                                                <i class="fa fa-edit"></i> €{{ number_format($itemData['unit_price'], 2, ',', '.') }}
+                                                                <small style="text-decoration: line-through;">(€{{ number_format($dishOriginalPrice, 2, ',', '.') }})</small>
+                                                            </span>
+                                                        @else
+                                                            <small> • Prezzo: <strong>€{{ number_format($itemData['unit_price'], 2, ',', '.') }}</strong></small>
+                                                        @endif
                                                     @endif
                                                     @if(isset($itemData['subtotal']))
                                                         <small> • Tot: <strong>€{{ number_format($itemData['subtotal'], 2, ',', '.') }}</strong></small>
@@ -428,6 +514,209 @@
         </div>
     </div>
 
+    <!-- Print Logs Section -->
+    <div class="row mt-4">
+        <div class="col-xs-12">
+            <div class="panel panel-warning">
+                <div class="panel-heading">
+                    <h4 class="panel-title">
+                        <i class="fa fa-print"></i> Log Stampe
+                        <span class="label label-default" style="margin-left: 8px;">{{ $printLogs->count() }} stampe</span>
+                        @if($printLogs->where('success', false)->count() > 0)
+                            <span class="label label-danger" style="margin-left: 4px;">{{ $printLogs->where('success', false)->count() }} fallite</span>
+                        @endif
+                    </h4>
+                </div>
+                <div class="panel-body p-0">
+                    @if($printLogs && $printLogs->count() > 0)
+                        <div class="table-responsive">
+                            <table class="table table-condensed table-hover table-striped">
+                                <thead>
+                                    <tr class="active">
+                                        <th width="140">Data/Ora</th>
+                                        <th width="120">Tipo</th>
+                                        <th width="100">Operazione</th>
+                                        <th width="180">Stampante</th>
+                                        <th width="150">Operatore</th>
+                                        <th width="100" class="text-center">Stato</th>
+                                        <th width="120" class="text-center">Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($printLogs as $printLog)
+                                        @php
+                                            $typeColors = [
+                                                'order' => 'primary',
+                                                'marcia' => 'success',
+                                                'preconto' => 'info',
+                                                'comunica' => 'warning',
+                                            ];
+                                            $typeIcons = [
+                                                'order' => 'fa-utensils',
+                                                'marcia' => 'fa-play-circle',
+                                                'preconto' => 'fa-receipt',
+                                                'comunica' => 'fa-bullhorn',
+                                            ];
+                                            $opColors = [
+                                                'add' => 'success',
+                                                'update' => 'info',
+                                                'remove' => 'danger',
+                                            ];
+                                        @endphp
+                                        <tr>
+                                            <td>
+                                                <small class="text-nowrap">
+                                                    {{ $printLog->created_at->format('d/m/Y') }}<br>
+                                                    <strong>{{ $printLog->created_at->format('H:i:s') }}</strong>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <span class="label label-{{ $typeColors[$printLog->print_type] ?? 'default' }}">
+                                                    <i class="fa {{ $typeIcons[$printLog->print_type] ?? 'fa-print' }}"></i>
+                                                    {{ $printLog->getPrintTypeLabel() }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if($printLog->operation)
+                                                    <span class="label label-{{ $opColors[$printLog->operation] ?? 'default' }}">
+                                                        {{ $printLog->getOperationLabel() }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-muted">-</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($printLog->printer)
+                                                    <strong>{{ $printLog->printer->label }}</strong>
+                                                    <br><small class="text-muted">{{ $printLog->printer->ip }}</small>
+                                                @else
+                                                    <span class="text-muted">N/D</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($printLog->user)
+                                                    <i class="fa fa-user"></i> {{ $printLog->user->name }}
+                                                @else
+                                                    <em class="text-muted">N/D</em>
+                                                @endif
+                                            </td>
+                                            <td class="text-center">
+                                                @if($printLog->success)
+                                                    <span class="label label-success">
+                                                        <i class="fa fa-check"></i> OK
+                                                    </span>
+                                                @else
+                                                    <span class="label label-danger" title="{{ $printLog->error_message }}">
+                                                        <i class="fa fa-times"></i> Errore
+                                                    </span>
+                                                @endif
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group">
+                                                    <a href="{{ route('backoffice.logs.print-preview', $printLog->id) }}"
+                                                       class="btn btn-xs btn-info"
+                                                       target="_blank"
+                                                       title="Anteprima">
+                                                        <i class="fa fa-eye"></i>
+                                                    </a>
+                                                    @if($printLog->printer)
+                                                        <button type="button"
+                                                                class="btn btn-xs btn-warning btn-reprint"
+                                                                data-id="{{ $printLog->id }}"
+                                                                title="Ristampa">
+                                                            <i class="fa fa-redo"></i>
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        @if(!$printLog->success && $printLog->error_message)
+                                            <tr class="danger">
+                                                <td colspan="7" style="padding-left: 30px;">
+                                                    <small><i class="fa fa-exclamation-triangle"></i> <strong>Errore:</strong> {{ $printLog->error_message }}</small>
+                                                </td>
+                                            </tr>
+                                        @endif
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="alert alert-warning text-center" style="margin: 15px;">
+                            <i class="fa fa-info-circle"></i>
+                            Nessun log di stampa registrato per questa vendita.
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print History Modal -->
+    <div id="printHistoryModal" class="log-modal" onclick="if(event.target === this) toggleModal('printHistoryModal')">
+        <div class="log-modal-content">
+            <div class="log-modal-header" style="background: #f0ad4e;">
+                <h5>
+                    <i class="fa fa-print"></i> Stampa Storico Operazioni
+                </h5>
+                <button type="button" onclick="toggleModal('printHistoryModal')" class="log-modal-close">
+                    &times;
+                </button>
+            </div>
+            <div class="log-modal-body">
+                <form id="printHistoryForm">
+                    <input type="hidden" name="sale_id" value="{{ $sale->id }}">
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="font-weight: bold; margin-bottom: 10px; display: block;">
+                            <i class="fa fa-filter"></i> Categorie da stampare
+                        </label>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            @php
+                                $categories = \App\Models\TableOrderLog::getAvailableCategories();
+                            @endphp
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" name="categories[]" value="all" id="categoryAll" checked style="width: 18px; height: 18px; margin-right: 10px;">
+                                <span><strong>Tutte le categorie</strong></span>
+                            </label>
+                            <hr style="margin: 5px 0;">
+                            @foreach($categories as $key => $label)
+                                <label style="display: flex; align-items: center; cursor: pointer; padding-left: 20px;">
+                                    <input type="checkbox" name="categories[]" value="{{ $key }}" class="category-checkbox" style="width: 18px; height: 18px; margin-right: 10px;">
+                                    <span>{{ $label }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label style="font-weight: bold; margin-bottom: 10px; display: block;">
+                            <i class="fa fa-print"></i> Stampante
+                        </label>
+                        <select name="printer_id" id="historyPrinterSelect" class="form-control" required style="padding: 10px; font-size: 14px;">
+                            <option value="">-- Seleziona stampante --</option>
+                            @php
+                                $printers = \App\Models\Printer::where('is_active', true)->orderBy('label')->get();
+                            @endphp
+                            @foreach($printers as $printer)
+                                <option value="{{ $printer->id }}">{{ $printer->label }} ({{ $printer->ip }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 25px;">
+                        <button type="button" class="btn btn-default" style="flex: 1;" onclick="toggleModal('printHistoryModal')">
+                            <i class="fa fa-times"></i> Annulla
+                        </button>
+                        <button type="submit" class="btn btn-warning" style="flex: 2;" id="btnPrintHistory">
+                            <i class="fa fa-print"></i> Stampa
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Print Styles -->
     <style>
         @media print {
@@ -438,8 +727,8 @@
                 border: 1px solid #ddd !important;
                 page-break-inside: avoid;
             }
-            /* Hide log section in print */
-            .panel-info {
+            /* Hide log sections in print */
+            .panel-info, .panel-warning {
                 display: none !important;
             }
         }
@@ -549,6 +838,131 @@
                     modal.classList.remove('active');
                 });
             }
+        });
+
+        // Reprint functionality
+        document.querySelectorAll('.btn-reprint').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const id = this.getAttribute('data-id');
+                const button = this;
+
+                if (!confirm('Vuoi ristampare questo documento?')) {
+                    return;
+                }
+
+                button.disabled = true;
+                button.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+
+                fetch('/backoffice/logs/print/' + id + '/reprint', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Ristampa inviata con successo!');
+                    } else {
+                        alert('Errore: ' + (data.message || 'Errore durante la ristampa'));
+                    }
+                })
+                .catch(error => {
+                    alert('Errore durante la ristampa');
+                    console.error('Error:', error);
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fa fa-redo"></i>';
+                });
+            });
+        });
+
+        // Print History - Category checkboxes logic
+        const categoryAll = document.getElementById('categoryAll');
+        const categoryCheckboxes = document.querySelectorAll('.category-checkbox');
+
+        categoryAll.addEventListener('change', function() {
+            if (this.checked) {
+                categoryCheckboxes.forEach(cb => cb.checked = false);
+            }
+        });
+
+        categoryCheckboxes.forEach(cb => {
+            cb.addEventListener('change', function() {
+                if (this.checked) {
+                    categoryAll.checked = false;
+                }
+                // If no category is selected, select "all"
+                const anySelected = Array.from(categoryCheckboxes).some(c => c.checked);
+                if (!anySelected) {
+                    categoryAll.checked = true;
+                }
+            });
+        });
+
+        // Print History Form Submit
+        document.getElementById('printHistoryForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const printerId = document.getElementById('historyPrinterSelect').value;
+            if (!printerId) {
+                alert('Seleziona una stampante');
+                return;
+            }
+
+            // Get selected categories
+            let categories = [];
+            if (categoryAll.checked) {
+                categories = ['all'];
+            } else {
+                categoryCheckboxes.forEach(cb => {
+                    if (cb.checked) categories.push(cb.value);
+                });
+            }
+
+            if (categories.length === 0) {
+                alert('Seleziona almeno una categoria');
+                return;
+            }
+
+            const btn = document.getElementById('btnPrintHistory');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Stampa in corso...';
+
+            fetch('/backoffice/logs/print-history', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    sale_id: {{ $sale->id }},
+                    printer_id: printerId,
+                    categories: categories
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Storico inviato alla stampante!');
+                    toggleModal('printHistoryModal');
+                } else {
+                    alert('Errore: ' + (data.message || 'Errore durante la stampa'));
+                }
+            })
+            .catch(error => {
+                alert('Errore durante la stampa');
+                console.error('Error:', error);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
         });
     </script>
 @endsection

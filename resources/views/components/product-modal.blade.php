@@ -17,7 +17,7 @@
                     style="{{ !$isMobile ? 'margin: 0; font-weight: 700; text-transform: uppercase;' : '' }}"
                     class="{{ $isMobile ? '' : '' }}"
                 >PRODOTTO</h4>
-                <div id="{{ $isMobile ? 'modalProductPriceMobile' : 'modalProductPrice' }}"
+                <div id="{{ $isMobile ? 'modalProductPriceDisplayMobile' : 'modalProductPriceDisplay' }}"
                      class="{{ $isMobile ? 'product-price' : '' }}"
                      style="{{ !$isMobile ? 'color: #dc3545; font-size: 1.2rem; font-weight: 700; margin-top: 5px;' : '' }}"
                 >€0.00</div>
@@ -25,7 +25,7 @@
             <button
                 class="{{ $isMobile ? 'mobile-close-btn' : '' }}"
                 style="{{ !$isMobile ? 'position: absolute; top: 15px; right: 15px; background: #dc3545; border: none; color: white; width: 30px; height: 30px; cursor: pointer; font-size: 18px;' : '' }}"
-                id="{{ $isMobile ? 'closeProductModalMobile' : 'closeProductModalBtn' }}"
+                id="{{ $isMobile ? 'closeProductModalMobile' : 'closeProductModal' }}"
             >
                 {{ $isMobile ? '' : '×' }}
                 @if($isMobile)<i class="fas fa-times"></i>@endif
@@ -36,34 +36,58 @@
         <div class="{{ $isMobile ? 'mobile-modal-body' : '' }}"
              style="{{ !$isMobile ? 'padding: 30px;' : '' }}"
         >
-            <!-- Quantity -->
-            <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
-                 style="{{ !$isMobile ? 'margin-bottom: 25px;' : '' }}"
-            >
-                <label class="{{ $isMobile ? 'mobile-form-label' : '' }}"
-                       style="{{ !$isMobile ? 'display: block; font-weight: 700; margin-bottom: 10px; color: #000; text-transform: uppercase;' : '' }}"
-                >QUANTITÀ</label>
-                <div class="{{ $isMobile ? 'mobile-quantity-control' : '' }}"
-                     style="{{ !$isMobile ? 'display: flex; align-items: center; gap: 15px;' : '' }}"
+            <!-- Quantity and Price Row -->
+            <div style="{{ !$isMobile ? 'display: flex; gap: 30px; margin-bottom: 25px;' : '' }}">
+                <!-- Quantity -->
+                <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
+                     style="{{ !$isMobile ? 'flex: 1;' : '' }}"
                 >
-                    <button
-                        class="{{ $isMobile ? 'mobile-qty-btn' : 'btn-red' }}"
-                        style="{{ !$isMobile ? 'width: 40px; height: 40px; font-size: 18px; font-weight: 700;' : '' }}"
-                        id="{{ $isMobile ? 'decreaseQtyMobile' : 'decreaseQty' }}"
-                    >−</button>
-                    <input
-                        type="number"
-                        id="{{ $isMobile ? 'productQuantityMobile' : 'productQuantity' }}"
-                        value="1"
-                        min="1"
-                        class="{{ $isMobile ? 'mobile-qty-input' : '' }}"
-                        style="{{ !$isMobile ? 'width: 80px; height: 40px; text-align: center; border: 2px solid #dee2e6; font-size: 18px; font-weight: 700;' : '' }}"
+                    <label class="{{ $isMobile ? 'mobile-form-label' : '' }}"
+                           style="{{ !$isMobile ? 'display: block; font-weight: 700; margin-bottom: 10px; color: #000; text-transform: uppercase;' : '' }}"
+                    >QUANTITÀ</label>
+                    <div class="{{ $isMobile ? 'mobile-quantity-control' : '' }}"
+                         style="{{ !$isMobile ? 'display: flex; align-items: center; gap: 15px;' : '' }}"
                     >
-                    <button
-                        class="{{ $isMobile ? 'mobile-qty-btn' : 'btn-red' }}"
-                        style="{{ !$isMobile ? 'width: 40px; height: 40px; font-size: 18px; font-weight: 700;' : '' }}"
-                        id="{{ $isMobile ? 'increaseQtyMobile' : 'increaseQty' }}"
-                    >+</button>
+                        <button
+                            class="{{ $isMobile ? 'mobile-qty-btn' : 'btn-red' }}"
+                            style="{{ !$isMobile ? 'width: 40px; height: 40px; font-size: 18px; font-weight: 700;' : '' }}"
+                            id="{{ $isMobile ? 'decreaseQtyMobile' : 'decreaseQty' }}"
+                        >−</button>
+                        <input
+                            type="number"
+                            id="{{ $isMobile ? 'productQuantityMobile' : 'productQuantity' }}"
+                            value="1"
+                            min="1"
+                            class="{{ $isMobile ? 'mobile-qty-input' : '' }}"
+                            style="{{ !$isMobile ? 'width: 80px; height: 40px; text-align: center; border: 2px solid #dee2e6; font-size: 18px; font-weight: 700;' : '' }}"
+                        >
+                        <button
+                            class="{{ $isMobile ? 'mobile-qty-btn' : 'btn-red' }}"
+                            style="{{ !$isMobile ? 'width: 40px; height: 40px; font-size: 18px; font-weight: 700;' : '' }}"
+                            id="{{ $isMobile ? 'increaseQtyMobile' : 'increaseQty' }}"
+                        >+</button>
+                    </div>
+                </div>
+
+                <!-- Custom Price -->
+                <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
+                     style="{{ !$isMobile ? 'flex: 1;' : '' }}"
+                >
+                    <label class="{{ $isMobile ? 'mobile-form-label' : '' }}"
+                           style="{{ !$isMobile ? 'display: block; font-weight: 700; margin-bottom: 10px; color: #000; text-transform: uppercase;' : '' }}"
+                    >PREZZO UNITARIO</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 18px; font-weight: 700; color: #dc3545;">€</span>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            id="{{ $isMobile ? 'productCustomPriceMobile' : 'productCustomPrice' }}"
+                            value="0.00"
+                            class="{{ $isMobile ? 'mobile-qty-input' : '' }}"
+                            style="{{ !$isMobile ? 'width: 100px; height: 40px; text-align: center; border: 2px solid #dee2e6; font-size: 18px; font-weight: 700;' : 'flex: 1;' }}"
+                        >
+                    </div>
                 </div>
             </div>
 
@@ -80,6 +104,34 @@
                     class="{{ $isMobile ? 'mobile-textarea' : '' }}"
                     style="{{ !$isMobile ? 'width: 100%; height: 80px; border: 2px solid #dee2e6; padding: 10px; resize: vertical; font-family: inherit;' : '' }}"
                 ></textarea>
+            </div>
+
+            <!-- Segue Option -->
+            <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
+                 style="{{ !$isMobile ? 'margin-bottom: 25px;' : '' }}"
+            >
+                @if($isMobile)
+                <div class="mobile-segue-toggle" id="segueToggleMobile" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent;">
+                    <span style="font-weight: 700; color: #dc3545; font-size: 16px;">
+                        <i class="fas fa-clock me-2"></i>SEGUE (esce dopo)
+                    </span>
+                    <div class="segue-switch" style="width: 60px; height: 34px; background: #ccc; border-radius: 17px; position: relative; transition: background 0.3s;">
+                        <div class="segue-switch-handle" style="width: 26px; height: 26px; background: white; border-radius: 50%; position: absolute; top: 4px; left: 4px; transition: transform 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
+                    </div>
+                    <input type="checkbox" id="productSegueMobile" style="display: none;">
+                </div>
+                @else
+                <label class="segue-checkbox-container" style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                    <input
+                        type="checkbox"
+                        id="productSegue"
+                        style="width: 20px; height: 20px; margin-right: 10px; accent-color: #dc3545;"
+                    >
+                    <span style="font-weight: 700; color: #dc3545; text-transform: uppercase; font-size: 1rem;">
+                        <i class="fas fa-clock me-2"></i>SEGUE (esce dopo)
+                    </span>
+                </label>
+                @endif
             </div>
 
             <!-- Extras -->

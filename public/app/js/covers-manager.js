@@ -19,10 +19,15 @@ const coversManager = {
     setupEventListeners() {
         const self = this;
 
-        // Cover number buttons
-        $('.covers-btn[data-covers]').on('click', function() {
+        // Cover number buttons (excluding drinks mode and custom)
+        $('.covers-btn[data-covers]').not('#drinksModeBtn').not('#customCoversBtn').on('click', function() {
             const covers = parseInt($(this).data('covers'));
             self.selectCovers(covers);
+        });
+
+        // Drinks mode button (covers = 0)
+        $('#drinksModeBtn').on('click', function() {
+            self.selectCovers(0);
         });
 
         // Custom covers button
@@ -77,10 +82,10 @@ const coversManager = {
 
     /**
      * Select covers and close modal
-     * @param {number} covers - Number of covers selected
+     * @param {number} covers - Number of covers selected (0 for drinks mode)
      */
     selectCovers(covers) {
-        if (covers && covers > 0) {
+        if (covers !== null && covers !== undefined && covers >= 0) {
             // Haptic feedback
             if (navigator.vibrate) {
                 navigator.vibrate(50);

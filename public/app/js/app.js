@@ -73,6 +73,54 @@ $(document).ready(function() {
         }
     });
 
+    // Marcia Tavolo from modify overlay
+    $('#btnMarciaTavolo').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.marciaTavolo();
+        }
+    });
+
+    // PreConto from modify overlay
+    $('#btnPreconto').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.openPrecontoModal();
+        }
+    });
+
+    // Free table from modify overlay
+    $('#btnModifyFreeTable').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.clearTable();
+            $('#modifyOrderOverlay').fadeOut(300);
+        }
+    });
+
+    // Comunica from modify overlay
+    $('#btnModifyComunica').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.openComunicaModal();
+        }
+    });
+
+    // Close Comunica modal
+    $('#closeComunicaModal, #cancelComunica').click(function() {
+        $('#comunicaModal').fadeOut(300);
+    });
+
+    // Confirm Comunica
+    $('#confirmComunica').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.sendComunica();
+        }
+    });
+
+    // Close Comunica modal on overlay click
+    $('#comunicaModal').click(function(e) {
+        if (e.target === this) {
+            $(this).fadeOut(300);
+        }
+    });
+
     // Show receipt - delegate to tableOrdersManager
     $('#showReceipt').click(function() {
         if (typeof tableOrdersManager !== 'undefined' && tableOrdersManager.currentTable) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Backoffice;
 
 use App\Facades\Utils;
+use App\Models\PrintLog;
 use App\Models\TableOrder;
 use App\Services\TableOrderLoggerService;
 use App\Traits\DatatableTrait;
@@ -108,7 +109,13 @@ class SalesController extends BaseController
         $loggerService = new TableOrderLoggerService();
         $logs = $loggerService->getLogsForOrder($id);
 
-        return view('backoffice.sales.show', compact('sale', 'logs'));
+        // Load print logs for this sale
+        $printLogs = PrintLog::with(['printer', 'user'])
+            ->where('table_order_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('backoffice.sales.show', compact('sale', 'logs', 'printLogs'));
     }
 
     /**

@@ -22,6 +22,7 @@ class OrderItem extends Model
         'extras',
         'removals',
         'status',
+        'segue',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class OrderItem extends Model
         'subtotal' => 'decimal:2',
         'extras' => 'array',
         'removals' => 'array',
+        'segue' => 'boolean',
     ];
 
     /**

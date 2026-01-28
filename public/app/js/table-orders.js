@@ -46,6 +46,9 @@ class TableOrdersManager {
         this.getElement('increaseQty')?.addEventListener('click', () => this.changeQuantity(1));
         this.getElement('productQuantity')?.addEventListener('input', () => this.updateModalTotal());
 
+        // Custom price input
+        this.getElement('productCustomPrice')?.addEventListener('input', () => this.updateModalTotal());
+
         // Extras and removals
         const extrasContainer = this.getElement('extrasContainer');
         const removalsContainer = this.getElement('removalsContainer');
@@ -318,6 +321,14 @@ class TableOrdersManager {
             if (receiptTableNumber) {
                 receiptTableNumber.textContent = this.currentTable.table.table_number;
             }
+
+            // Update total in action bar
+            const mobileTotal = document.getElementById('selectedTableTotalMobile');
+            if (mobileTotal && this.currentTable.order) {
+                mobileTotal.textContent = '€' + parseFloat(this.currentTable.order.total_amount || 0).toFixed(2);
+            } else if (mobileTotal) {
+                mobileTotal.textContent = '';
+            }
         }
 
         // Update MODIFICA button state (only for desktop)
@@ -330,7 +341,7 @@ class TableOrdersManager {
     }
 
     /**
-     * Update MODIFICA button state based on table status
+     * Update GESTISCI button state based on table status
      */
     updateModifyButtonState() {
         const modifyBtn = document.getElementById('btnModifyTable');
@@ -373,9 +384,23 @@ class TableOrdersManager {
         const order = this.currentTable.order;
         const modifyCoversInfo = document.getElementById('modifyCoversInfo');
         const modifyCoversCount = document.getElementById('modifyCoversCount');
-        if (order && order.covers && modifyCoversInfo && modifyCoversCount) {
-            modifyCoversCount.textContent = order.covers;
-            modifyCoversInfo.style.display = 'block';
+        const modifyCoversIcon = document.getElementById('modifyCoversIcon');
+        const modifyCoversLabel = document.getElementById('modifyCoversLabel');
+        if (order && modifyCoversInfo && modifyCoversCount) {
+            if (order.covers === 0) {
+                // Drinks mode
+                if (modifyCoversIcon) modifyCoversIcon.className = 'fas fa-glass-cheers';
+                modifyCoversCount.textContent = 'Consumo Bevande';
+                if (modifyCoversLabel) modifyCoversLabel.textContent = '';
+                modifyCoversInfo.style.display = 'block';
+            } else if (order.covers > 0) {
+                if (modifyCoversIcon) modifyCoversIcon.className = 'fas fa-users';
+                modifyCoversCount.textContent = order.covers;
+                if (modifyCoversLabel) modifyCoversLabel.textContent = ' coperti';
+                modifyCoversInfo.style.display = 'block';
+            } else {
+                modifyCoversInfo.style.display = 'none';
+            }
         } else if (modifyCoversInfo) {
             modifyCoversInfo.style.display = 'none';
         }
@@ -420,7 +445,7 @@ class TableOrdersManager {
         }
 
 
-        itemsContainer.innerHTML = order.items.map(item => `
+        let itemsHtml = order.items.map(item => `
             <div class="receipt-item" data-item-id="${item.id}">
                 <div class="receipt-item-header">
                     <strong>${item.dish_name}</strong>
@@ -456,6 +481,20 @@ class TableOrdersManager {
             </div>
         `).join('');
 
+        // Add cover charge if applicable
+        if (order.has_cover_charge && order.cover_charge_total > 0) {
+            itemsHtml += `
+                <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #17a2b8;">
+                    <div class="receipt-item-header">
+                        <strong><i class="fas fa-utensils me-2"></i>Coperto (${order.covers} x €${parseFloat(order.cover_charge_per_person).toFixed(2)})</strong>
+                        <span class="receipt-item-price">€${parseFloat(order.cover_charge_total).toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        itemsContainer.innerHTML = itemsHtml;
+
         totalElement.textContent = `€${parseFloat(order.total_amount).toFixed(2)}`;
     }
 
@@ -473,9 +512,23 @@ class TableOrdersManager {
         // Update covers info if present
         const coversInfo = document.getElementById('coversInfo');
         const coversCount = document.getElementById('coversCount');
-        if (order && order.covers && coversInfo && coversCount) {
-            coversCount.textContent = order.covers;
-            coversInfo.style.display = 'inline';
+        const coversIcon = document.getElementById('coversIcon');
+        const coversLabel = document.getElementById('coversLabel');
+        if (order && coversInfo && coversCount) {
+            if (order.covers === 0) {
+                // Drinks mode
+                if (coversIcon) coversIcon.className = 'fas fa-glass-cheers';
+                coversCount.textContent = 'Consumo Bevande';
+                if (coversLabel) coversLabel.textContent = '';
+                coversInfo.style.display = 'inline';
+            } else if (order.covers > 0) {
+                if (coversIcon) coversIcon.className = 'fas fa-users';
+                coversCount.textContent = order.covers;
+                if (coversLabel) coversLabel.textContent = ' coperti';
+                coversInfo.style.display = 'inline';
+            } else {
+                coversInfo.style.display = 'none';
+            }
         } else if (coversInfo) {
             coversInfo.style.display = 'none';
         }
@@ -491,7 +544,7 @@ class TableOrdersManager {
             return;
         }
 
-        itemsContainer.innerHTML = order.items.map(item => `
+        let itemsHtml = order.items.map(item => `
             <div class="receipt-item" data-item-id="${item.id}">
                 <div class="receipt-item-header">
                     <strong>${item.dish_name}</strong>
@@ -519,6 +572,20 @@ class TableOrdersManager {
             </div>
         `).join('');
 
+        // Add cover charge if applicable
+        if (order.has_cover_charge && order.cover_charge_total > 0) {
+            itemsHtml += `
+                <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #17a2b8;">
+                    <div class="receipt-item-header">
+                        <strong><i class="fas fa-utensils me-2"></i>Coperto (${order.covers} x €${parseFloat(order.cover_charge_per_person).toFixed(2)})</strong>
+                        <span class="receipt-item-price">€${parseFloat(order.cover_charge_total).toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        itemsContainer.innerHTML = itemsHtml;
+
         totalElement.textContent = `€${parseFloat(order.total_amount).toFixed(2)}`;
     }
 
@@ -535,17 +602,21 @@ class TableOrdersManager {
 
         // Set product info
         const nameElement = this.getElement('modalProductName');
-        const priceElement = this.getElement('modalProductPrice');
+        const priceDisplayElement = this.getElement('modalProductPriceDisplay');
+        const customPriceElement = this.getElement('productCustomPrice');
 
         if (nameElement) nameElement.textContent = dish.name;
-        if (priceElement) priceElement.textContent = `€${parseFloat(dish.price).toFixed(2)}`;
+        if (priceDisplayElement) priceDisplayElement.textContent = `€${parseFloat(dish.price).toFixed(2)}`;
+        if (customPriceElement) customPriceElement.value = parseFloat(dish.price).toFixed(2);
 
         // Reset form
         const quantityElement = this.getElement('productQuantity');
         const notesElement = this.getElement('productNotes');
+        const segueElement = this.getElement('productSegue');
 
         if (quantityElement) quantityElement.value = 1;
         if (notesElement) notesElement.value = '';
+        if (segueElement) segueElement.checked = false;
 
         // Reset checkboxes
         const extrasContainer = this.getElement('extrasContainer');
@@ -592,12 +663,18 @@ class TableOrdersManager {
         if (!this.currentProduct) return;
 
         const quantityElement = this.getElement('productQuantity');
+        const customPriceElement = this.getElement('productCustomPrice');
         const totalElement = this.getElement('modalTotal');
 
         if (!quantityElement || !totalElement) return;
 
         const quantity = parseInt(quantityElement.value) || 1;
-        let total = parseFloat(this.currentProduct.price);
+
+        // Use custom price if available, otherwise use product price
+        let basePrice = customPriceElement ? parseFloat(customPriceElement.value) : parseFloat(this.currentProduct.price);
+        if (isNaN(basePrice)) basePrice = parseFloat(this.currentProduct.price);
+
+        let total = basePrice;
 
         // Add extras
         const extrasContainer = this.getElement('extrasContainer');
@@ -630,14 +707,22 @@ class TableOrdersManager {
 
         const quantityElement = this.getElement('productQuantity');
         const notesElement = this.getElement('productNotes');
+        const segueElement = this.getElement('productSegue');
+        const customPriceElement = this.getElement('productCustomPrice');
         const extrasContainer = this.getElement('extrasContainer');
         const removalsContainer = this.getElement('removalsContainer');
+
+        // Get custom price
+        let customPrice = customPriceElement ? parseFloat(customPriceElement.value) : null;
+        if (isNaN(customPrice)) customPrice = null;
 
         // Gather data
         const data = {
             dish_id: this.currentProduct.id,
             quantity: parseInt(quantityElement?.value || 1),
             notes: notesElement?.value || null,
+            segue: segueElement?.checked || false,
+            custom_price: customPrice,
             extras: {},
             removals: [],
             operator_token: auth.token
@@ -885,10 +970,21 @@ class TableOrdersManager {
                 const modifyOverlay = document.getElementById('modifyOrderOverlay');
                 if (modifyOverlay) modifyOverlay.style.display = 'none';
 
-                // Disable MODIFICA button
+                // Disable MODIFICA button (desktop)
                 if (!this.isMobile) {
                     const modifyBtn = document.getElementById('btnModifyTable');
                     if (modifyBtn) modifyBtn.setAttribute('disabled', 'disabled');
+                }
+
+                // Hide mobile elements
+                if (this.isMobile) {
+                    const manageModal = document.getElementById('manageModalMobile');
+                    if (manageModal) {
+                        manageModal.classList.remove('active');
+                        manageModal.style.display = 'none';
+                    }
+                    const actionBar = document.getElementById('mobileActionBar');
+                    if (actionBar) actionBar.style.display = 'none';
                 }
             } else {
                 this.showNotification(result.message || 'Errore nello svuotamento', 'error');
@@ -940,10 +1036,21 @@ class TableOrdersManager {
                 const modifyOverlay = document.getElementById('modifyOrderOverlay');
                 if (modifyOverlay) modifyOverlay.style.display = 'none';
 
-                // Disable MODIFICA button
+                // Disable MODIFICA button (desktop)
                 if (!this.isMobile) {
                     const modifyBtn = document.getElementById('btnModifyTable');
                     if (modifyBtn) modifyBtn.setAttribute('disabled', 'disabled');
+                }
+
+                // Hide mobile elements
+                if (this.isMobile) {
+                    const manageModal = document.getElementById('manageModalMobile');
+                    if (manageModal) {
+                        manageModal.classList.remove('active');
+                        manageModal.style.display = 'none';
+                    }
+                    const actionBar = document.getElementById('mobileActionBar');
+                    if (actionBar) actionBar.style.display = 'none';
                 }
             } else {
                 this.showNotification(result.message || 'Errore nell\'incasso', 'error');
@@ -951,6 +1058,225 @@ class TableOrdersManager {
         } catch (error) {
             console.error('Error paying table:', error);
             this.showNotification('Errore nell\'incasso', 'error');
+        }
+    }
+
+    /**
+     * Send "Marcia Tavolo" command to all printers
+     */
+    async marciaTavolo() {
+        if (!this.currentTable) {
+            this.showNotification('Seleziona prima un tavolo', 'error');
+            return;
+        }
+
+        if (!confirm('Inviare MARCIA TAVOLO alle stampanti?')) return;
+
+        // Request operator authentication
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+        } catch (error) {
+            console.log('Authentication cancelled');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/marcia`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('Marcia tavolo inviata con successo', 'success');
+            } else {
+                this.showNotification(result.message || 'Errore nell\'invio della marcia', 'error');
+            }
+        } catch (error) {
+            console.error('Error sending marcia tavolo:', error);
+            this.showNotification('Errore nell\'invio della marcia', 'error');
+        }
+    }
+
+    /**
+     * Open PreConto modal
+     */
+    openPrecontoModal() {
+        if (!this.currentTable || !this.currentTable.order) {
+            this.showNotification('Seleziona prima un tavolo con un ordine attivo', 'error');
+            return;
+        }
+
+        const modal = document.getElementById('precontoModal');
+        const tableNumberEl = document.getElementById('precontoTableNumber');
+        const totalAmountEl = document.getElementById('precontoTotalAmount');
+
+        if (tableNumberEl) {
+            tableNumberEl.textContent = this.currentTable.table.table_number;
+        }
+        if (totalAmountEl) {
+            totalAmountEl.textContent = `€${parseFloat(this.currentTable.order.total_amount).toFixed(2)}`;
+        }
+
+        // Reset form
+        const fullRadio = document.querySelector('input[name="precontoType"][value="full"]');
+        if (fullRadio) fullRadio.checked = true;
+
+        const splitContainer = document.getElementById('splitCountContainer');
+        if (splitContainer) splitContainer.style.display = 'none';
+
+        const splitCountInput = document.getElementById('splitCount');
+        if (splitCountInput) splitCountInput.value = 2;
+
+        this.updateSplitPreview();
+
+        // Show modal
+        if (modal) modal.style.display = 'flex';
+
+        // Setup event listeners
+        this.setupPrecontoModalListeners();
+    }
+
+    /**
+     * Setup PreConto modal event listeners
+     */
+    setupPrecontoModalListeners() {
+        const self = this;
+
+        // Radio buttons for preconto type
+        document.querySelectorAll('input[name="precontoType"]').forEach(radio => {
+            radio.onchange = function() {
+                const splitContainer = document.getElementById('splitCountContainer');
+                if (this.value === 'split') {
+                    splitContainer.style.display = 'block';
+                    self.updateSplitPreview();
+                } else {
+                    splitContainer.style.display = 'none';
+                }
+            };
+        });
+
+        // Split count controls
+        const decreaseBtn = document.getElementById('decreaseSplit');
+        const increaseBtn = document.getElementById('increaseSplit');
+        const splitInput = document.getElementById('splitCount');
+
+        if (decreaseBtn) {
+            decreaseBtn.onclick = () => {
+                const current = parseInt(splitInput.value) || 2;
+                if (current > 2) {
+                    splitInput.value = current - 1;
+                    this.updateSplitPreview();
+                }
+            };
+        }
+
+        if (increaseBtn) {
+            increaseBtn.onclick = () => {
+                const current = parseInt(splitInput.value) || 2;
+                if (current < 20) {
+                    splitInput.value = current + 1;
+                    this.updateSplitPreview();
+                }
+            };
+        }
+
+        if (splitInput) {
+            splitInput.oninput = () => this.updateSplitPreview();
+        }
+
+        // Close buttons
+        const closeBtn = document.getElementById('closePrecontoModal');
+        const cancelBtn = document.getElementById('cancelPreconto');
+
+        if (closeBtn) closeBtn.onclick = () => this.closePrecontoModal();
+        if (cancelBtn) cancelBtn.onclick = () => this.closePrecontoModal();
+
+        // Confirm button
+        const confirmBtn = document.getElementById('confirmPreconto');
+        if (confirmBtn) {
+            confirmBtn.onclick = () => this.printPreconto();
+        }
+    }
+
+    /**
+     * Update split preview amount
+     */
+    updateSplitPreview() {
+        if (!this.currentTable || !this.currentTable.order) return;
+
+        const splitInput = document.getElementById('splitCount');
+        const perPersonEl = document.getElementById('perPersonAmount');
+
+        if (!splitInput || !perPersonEl) return;
+
+        const splitCount = parseInt(splitInput.value) || 2;
+        const total = parseFloat(this.currentTable.order.total_amount) || 0;
+        const perPerson = total / splitCount;
+
+        perPersonEl.textContent = `€${perPerson.toFixed(2)}`;
+    }
+
+    /**
+     * Close PreConto modal
+     */
+    closePrecontoModal() {
+        const modal = document.getElementById('precontoModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    /**
+     * Print PreConto
+     */
+    async printPreconto() {
+        if (!this.currentTable) return;
+
+        // Request operator authentication
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+        } catch (error) {
+            console.log('Authentication cancelled');
+            return;
+        }
+
+        // Get split count if applicable
+        const precontoType = document.querySelector('input[name="precontoType"]:checked')?.value;
+        let splitCount = null;
+
+        if (precontoType === 'split') {
+            splitCount = parseInt(document.getElementById('splitCount').value) || null;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token
+                },
+                body: JSON.stringify({ split_count: splitCount })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification(result.message || 'PreConto stampato con successo', 'success');
+                this.closePrecontoModal();
+            } else {
+                this.showNotification(result.message || 'Errore nella stampa del PreConto', 'error');
+            }
+        } catch (error) {
+            console.error('Error printing preconto:', error);
+            this.showNotification('Errore nella stampa del PreConto', 'error');
         }
     }
 
@@ -1013,8 +1339,14 @@ class TableOrdersManager {
 
         const quantityElement = this.getElement('productQuantity');
         const notesElement = this.getElement('productNotes');
+        const segueElement = this.getElement('productSegue');
+        const customPriceElement = this.getElement('productCustomPrice');
         const extrasContainer = this.getElement('extrasContainer');
         const removalsContainer = this.getElement('removalsContainer');
+
+        // Get custom price
+        let customPrice = customPriceElement ? parseFloat(customPriceElement.value) : null;
+        if (isNaN(customPrice)) customPrice = null;
 
         // Gather data
         const extras = {};
@@ -1034,19 +1366,24 @@ class TableOrdersManager {
             removals.push(checkbox.dataset.name);
         });
 
+        // Use custom price if available, otherwise use product price
+        const unitPrice = customPrice !== null ? customPrice : parseFloat(this.currentProduct.price);
+
         // Create cart item
         const cartItem = {
             dish_id: this.currentProduct.id,
             dish_name: this.currentProduct.name,
-            dish_price: this.currentProduct.price,
+            dish_price: unitPrice,
+            custom_price: customPrice,
             quantity: parseInt(quantityElement?.value || 1),
             notes: notesElement?.value || null,
+            segue: segueElement?.checked || false,
             extras: Object.keys(extras).length > 0 ? extras : null,
             removals: removals.length > 0 ? removals : null,
         };
 
         // Calculate item total
-        let itemTotal = parseFloat(this.currentProduct.price);
+        let itemTotal = unitPrice;
         Object.values(extras).forEach(price => {
             itemTotal += price;
         });
@@ -1114,11 +1451,16 @@ class TableOrdersManager {
                 notesHtml = `<div style="font-size: 0.8rem; color: #6c757d; font-style: italic;">${item.notes}</div>`;
             }
 
+            let segueHtml = '';
+            if (item.segue) {
+                segueHtml = `<span style="background: #dc3545; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 3px; margin-left: 8px;">SEGUE</span>`;
+            }
+
             return `
                 <div style="background: white; padding: 8px; margin-bottom: 8px; border-radius: 4px; border: 1px solid #dee2e6;">
                     <div style="display: flex; justify-content: space-between; align-items: start;">
                         <div style="flex: 1;">
-                            <strong style="font-size: 0.9rem;">${item.quantity}x ${item.dish_name}</strong>
+                            <strong style="font-size: 0.9rem;">${item.quantity}x ${item.dish_name}</strong>${segueHtml}
                             ${notesHtml}
                             ${extrasHtml}
                             ${removalsHtml}
@@ -1185,6 +1527,8 @@ class TableOrdersManager {
                 dish_id: item.dish_id,
                 quantity: item.quantity,
                 notes: item.notes,
+                segue: item.segue || false,
+                custom_price: item.custom_price || null,
                 extras: item.extras,
                 removals: item.removals,
             }));
@@ -1223,6 +1567,108 @@ class TableOrdersManager {
         } catch (error) {
             console.error('Error confirming cart:', error);
             this.showNotification('Errore nell\'aggiunta dei prodotti', 'error');
+        }
+    }
+
+    /**
+     * Open Comunica modal
+     */
+    openComunicaModal() {
+        const modal = document.getElementById('comunicaModal');
+        const tableNumberInput = document.getElementById('comunicaTableNumber');
+        const messageInput = document.getElementById('comunicaMessage');
+        const printerSelect = document.getElementById('comunicaPrinterSelect');
+
+        // Reset form
+        if (messageInput) messageInput.value = '';
+        if (printerSelect) printerSelect.value = '';
+
+        // Set table number if available
+        if (tableNumberInput) {
+            if (this.currentTable && this.currentTable.table) {
+                tableNumberInput.value = 'Tavolo ' + this.currentTable.table.table_number;
+            } else {
+                tableNumberInput.value = '';
+            }
+        }
+
+        // Show modal
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    }
+
+    /**
+     * Close Comunica modal
+     */
+    closeComunicaModal() {
+        const modal = document.getElementById('comunicaModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    /**
+     * Send Comunica message to printer
+     */
+    async sendComunica() {
+        const printerSelect = document.getElementById('comunicaPrinterSelect');
+        const messageInput = document.getElementById('comunicaMessage');
+
+        const printerId = printerSelect?.value;
+        const message = messageInput?.value?.trim();
+
+        // Validate
+        if (!printerId) {
+            this.showNotification('Seleziona una stampante', 'error');
+            return;
+        }
+
+        if (!message) {
+            this.showNotification('Inserisci un messaggio', 'error');
+            return;
+        }
+
+        // Request operator authentication
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+        } catch (error) {
+            console.log('Authentication cancelled');
+            return;
+        }
+
+        try {
+            const requestData = {
+                printer_id: printerId,
+                message: message
+            };
+
+            // Add table_id if a table is selected
+            if (this.currentTable && this.currentTable.table) {
+                requestData.table_id = this.currentTable.table.id;
+            }
+
+            const response = await fetch(`${this.apiBase}/comunica`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification(result.message || 'Comunicazione inviata con successo', 'success');
+                this.closeComunicaModal();
+            } else {
+                this.showNotification(result.message || 'Errore nell\'invio della comunicazione', 'error');
+            }
+        } catch (error) {
+            console.error('Error sending comunica:', error);
+            this.showNotification('Errore nell\'invio della comunicazione', 'error');
         }
     }
 }

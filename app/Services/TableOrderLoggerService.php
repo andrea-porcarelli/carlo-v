@@ -7,6 +7,8 @@ use App\Models\TableOrder;
 use App\Models\OrderItem;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class TableOrderLoggerService
 {
@@ -22,15 +24,22 @@ class TableOrderLoggerService
         ?string $notes = null,
         ?int $tableOrderId = null,
         ?int $orderItemId = null,
-        ?int $userId = null
+        ?int $userId = null,
+        ?string $category = null
     ): TableOrderLog {
         $changes = $this->calculateChanges($dataBefore, $dataAfter);
+
+        // Auto-detect category from action if not provided
+        if ($category === null) {
+            $category = TableOrderLog::getCategoryForAction($action);
+        }
 
         return TableOrderLog::create([
             'table_order_id' => $tableOrderId ?? ($entity instanceof TableOrder ? $entity->id : null),
             'order_item_id' => $orderItemId ?? ($entity instanceof OrderItem ? $entity->id : null),
             'user_id' => $userId ?? Auth::id(),
             'action' => $action,
+            'category' => $category,
             'entity_type' => $entityType,
             'data_before' => $dataBefore,
             'data_after' => $dataAfter,
@@ -204,6 +213,90 @@ class TableOrderLoggerService
     }
 
     /**
+     * Log per aggiunta note a un item
+     */
+    public function logAddItemNotes(OrderItem $item, ?string $notes, int $operatorId = 0): TableOrderLog
+    {
+        $dishName = $item->dish->label ?? $item->dish->name ?? 'Prodotto';
+        return $this->log(
+            action: 'add_item_notes',
+            entityType: 'order_item',
+            entity: $item,
+            dataAfter: ['notes' => $notes],
+            tableOrderId: $item->table_order_id,
+            notes: "Aggiunte note a {$dishName}: \"{$notes}\"",
+            userId: $operatorId,
+        );
+    }
+
+    /**
+     * Log per aggiunta extras a un item
+     */
+    public function logAddItemExtras(OrderItem $item, array $extras, int $operatorId = 0): TableOrderLog
+    {
+        $dishName = $item->dish->label ?? $item->dish->name ?? 'Prodotto';
+        $extrasDescription = implode(', ', array_keys($extras));
+        return $this->log(
+            action: 'add_item_extras',
+            entityType: 'order_item',
+            entity: $item,
+            dataAfter: ['extras' => $extras],
+            tableOrderId: $item->table_order_id,
+            notes: "Aggiunti extra a {$dishName}: {$extrasDescription}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
+     * Log per aggiornamento quantità item
+     */
+    public function logUpdateItemQuantity(OrderItem $item, int $oldQty, int $newQty, int $operatorId = 0): TableOrderLog
+    {
+        $dishName = $item->dish->label ?? $item->dish->name ?? 'Prodotto';
+        return $this->log(
+            action: 'update_item_quantity',
+            entityType: 'order_item',
+            entity: $item,
+            dataBefore: ['quantity' => $oldQty],
+            dataAfter: ['quantity' => $newQty],
+            tableOrderId: $item->table_order_id,
+            notes: "Modificata quantità {$dishName} da {$oldQty} a {$newQty}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
+     * Log per stampa marcia tavolo
+     */
+    public function logPrintMarcia(TableOrder $order, int $operatorId = 0): TableOrderLog
+    {
+        return $this->log(
+            action: 'print_marcia',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: $this->getOrderData($order),
+            notes: "Stampata marcia per tavolo #{$order->restaurantTable->table_number}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
+     * Log per stampa preconto
+     */
+    public function logPrintPreconto(TableOrder $order, int $operatorId = 0, ?int $splitCount = null): TableOrderLog
+    {
+        $splitInfo = $splitCount && $splitCount > 1 ? " (diviso per {$splitCount})" : '';
+        return $this->log(
+            action: 'print_preconto',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: array_merge($this->getOrderData($order), ['split_count' => $splitCount]),
+            notes: "Stampato preconto per tavolo #{$order->restaurantTable->table_number}{$splitInfo}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
      * Ottiene i dati dell'ordine in formato array
      */
     private function getOrderData(TableOrder $order): array
@@ -225,13 +318,19 @@ class TableOrderLoggerService
      */
     private function getItemData(OrderItem $item): array
     {
+        $dishPrice = $item->dish->price ?? null;
+        $unitPrice = $item->unit_price;
+        $hasPriceChange = $dishPrice !== null && abs(floatval($unitPrice) - floatval($dishPrice)) > 0.001;
+
         return [
             'id' => $item->id,
             'table_order_id' => $item->table_order_id,
             'dish_id' => $item->dish_id,
             'dish_name' => $item->dish->label ?? $item->dish->name ?? null,
+            'dish_price' => $dishPrice,
             'quantity' => $item->quantity,
             'unit_price' => $item->unit_price,
+            'price_modified' => $hasPriceChange,
             'subtotal' => $item->subtotal,
             'notes' => $item->notes,
             'extras' => $item->extras,
@@ -323,5 +422,46 @@ class TableOrderLoggerService
             'items_removed' => $logs->where('action', 'remove_item')->count(),
             'actions_by_type' => $logs->groupBy('action')->map->count(),
         ];
+    }
+
+    /**
+     * Recupera i log per categoria e giorno
+     */
+    public function getLogsByCategoryAndDay(string $category, $date, int $limit = 100)
+    {
+        $dateCarbon = $date instanceof Carbon ? $date : Carbon::parse($date);
+
+        return TableOrderLog::where('category', $category)
+            ->whereDate('created_at', $dateCarbon)
+            ->with(['user:id,name', 'tableOrder.restaurantTable', 'orderItem.dish:id,label'])
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Recupera statistiche per categoria in un periodo
+     */
+    public function getCategoryStats($startDate, $endDate): array
+    {
+        $startCarbon = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate);
+        $endCarbon = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate);
+
+        $stats = TableOrderLog::whereBetween('created_at', [$startCarbon, $endCarbon])
+            ->select('category', DB::raw('COUNT(*) as count'))
+            ->groupBy('category')
+            ->get()
+            ->pluck('count', 'category')
+            ->toArray();
+
+        // Assicuriamoci che tutte le categorie siano presenti
+        $allCategories = TableOrderLog::getAvailableCategories();
+        foreach (array_keys($allCategories) as $category) {
+            if (!isset($stats[$category])) {
+                $stats[$category] = 0;
+            }
+        }
+
+        return $stats;
     }
 }

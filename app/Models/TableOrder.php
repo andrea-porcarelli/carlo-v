@@ -53,12 +53,53 @@ class TableOrder extends Model
     }
 
     /**
-     * Calculate and update the total amount
+     * Calculate and update the total amount (including cover charge)
      */
     public function updateTotal(): void
     {
-        $total = $this->items()->sum('subtotal');
+        $itemsTotal = $this->items()->sum('subtotal');
+        $coverCharge = $this->getCoverChargeAmount();
+        $total = $itemsTotal + $coverCharge;
         $this->update(['total_amount' => $total]);
+    }
+
+    /**
+     * Get the items subtotal (without cover charge)
+     */
+    public function getItemsSubtotal(): float
+    {
+        return (float) $this->items()->sum('subtotal');
+    }
+
+    /**
+     * Get the cover charge amount
+     * Returns 0 if covers is 0 (drinks mode)
+     */
+    public function getCoverChargeAmount(): float
+    {
+        // No cover charge for drinks mode (covers = 0)
+        if ($this->covers <= 0) {
+            return 0.00;
+        }
+
+        $coverChargePerPerson = Setting::getCoverCharge();
+        return $coverChargePerPerson * $this->covers;
+    }
+
+    /**
+     * Get cover charge per person
+     */
+    public function getCoverChargePerPerson(): float
+    {
+        return Setting::getCoverCharge();
+    }
+
+    /**
+     * Check if this order has cover charge
+     */
+    public function hasCoverCharge(): bool
+    {
+        return $this->covers > 0;
     }
 
     /**

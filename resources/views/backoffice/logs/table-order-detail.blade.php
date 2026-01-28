@@ -10,12 +10,34 @@
                         Storico Ordine Tavolo #{{ $tableOrder->restaurantTable->table_number }}
                     </h3>
                     <div class="card-tools">
+                        <a href="{{ route('backoffice.logs.print-logs', $tableOrder->id) }}" class="btn btn-sm btn-info">
+                            <i class="fas fa-print"></i> Log Stampe
+                        </a>
                         <a href="{{ route('backoffice.logs.table-orders') }}" class="btn btn-sm btn-secondary">
                             <i class="fas fa-arrow-left"></i> Torna ai log
                         </a>
                     </div>
                 </div>
                 <div class="card-body">
+                    @if($tableOrder->covers == 0)
+                    <!-- Banner Solo Bevande -->
+                    <div class="alert alert-info alert-dismissible mb-4" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); border: none;">
+                        <div class="d-flex align-items-center">
+                            <div class="mr-3">
+                                <i class="fas fa-glass-cheers fa-3x text-white"></i>
+                            </div>
+                            <div>
+                                <h4 class="alert-heading text-white mb-1">
+                                    <i class="fas fa-info-circle"></i> Modalità Solo Bevande
+                                </h4>
+                                <p class="mb-0 text-white">
+                                    Questo tavolo è stato aperto senza coperti - nessun coperto viene addebitato.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
                     <!-- Informazioni ordine -->
                     <div class="row mb-4">
                         <div class="col-md-3">
@@ -29,10 +51,12 @@
                         </div>
                         <div class="col-md-3">
                             <div class="info-box">
-                                <span class="info-box-icon bg-success"><i class="fas fa-users"></i></span>
+                                <span class="info-box-icon bg-{{ $tableOrder->covers == 0 ? 'info' : 'success' }}">
+                                    <i class="fas fa-{{ $tableOrder->covers == 0 ? 'glass-cheers' : 'users' }}"></i>
+                                </span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">Coperti</span>
-                                    <span class="info-box-number">{{ $tableOrder->covers }}</span>
+                                    <span class="info-box-text">{{ $tableOrder->covers == 0 ? 'Modalità' : 'Coperti' }}</span>
+                                    <span class="info-box-number">{{ $tableOrder->covers == 0 ? 'Consumo Bevande' : $tableOrder->covers }}</span>
                                 </div>
                             </div>
                         </div>

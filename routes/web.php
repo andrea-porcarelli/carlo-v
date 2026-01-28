@@ -10,6 +10,7 @@ use App\Http\Controllers\Backoffice\MaterialController;
 use App\Http\Controllers\Backoffice\PrinterController;
 use App\Http\Controllers\Backoffice\SalesController;
 use App\Http\Controllers\Backoffice\SupplierController;
+use App\Http\Controllers\Backoffice\PrintLogController;
 use App\Http\Controllers\Backoffice\TableOrderLogController;
 use App\Http\Controllers\Backoffice\UploadController;
 use App\Http\Controllers\Backoffice\UserController;
@@ -39,9 +40,14 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::delete('/items/{item}', [TableOrderController::class, 'removeItem'])->name('removeItem');
     Route::post('/{table}/clear', [TableOrderController::class, 'clearTable'])->name('clear');
     Route::post('/{table}/pay', [TableOrderController::class, 'payTable'])->name('pay');
+    Route::post('/{table}/marcia', [TableOrderController::class, 'marciaTable'])->name('marcia');
+    Route::post('/{table}/preconto', [TableOrderController::class, 'precontoTable'])->name('preconto');
     Route::post('/save', [TableOrderController::class, 'saveTable'])->name('save');
     Route::post('/add-batch', [TableOrderController::class, 'addTables'])->name('addBatch');
     Route::delete('/{table}', [TableOrderController::class, 'deleteTable'])->name('delete');
+    Route::post('/comunica', [TableOrderController::class, 'comunica'])->name('comunica');
+    Route::get('/printers', [TableOrderController::class, 'getPrinters'])->name('printers');
+    Route::put('/items/{item}/price', [TableOrderController::class, 'updateItemPrice'])->name('updateItemPrice');
 });
 
 Route::group(['prefix' => '/backoffice'], function() {
@@ -138,9 +144,14 @@ Route::group(['prefix' => '/backoffice'], function() {
         Route::group(['prefix' => '/logs', 'as' => 'backoffice.logs.'], function() {
             Route::get('/table-orders', [TableOrderLogController::class, 'index'])->name('table-orders');
             Route::get('/table-order/{tableOrder}', [TableOrderLogController::class, 'show'])->name('table-order');
+            Route::get('/table-order/{tableOrder}/prints', [PrintLogController::class, 'index'])->name('print-logs');
+            Route::get('/print/{printLog}/preview', [PrintLogController::class, 'preview'])->name('print-preview');
+            Route::post('/print/{printLog}/reprint', [PrintLogController::class, 'reprint'])->name('print-reprint');
+            Route::post('/print-history', [PrintLogController::class, 'printHistory'])->name('print-history');
             Route::get('/user/{user}', [TableOrderLogController::class, 'userLogs'])->name('user');
             Route::get('/export', [TableOrderLogController::class, 'export'])->name('export');
             Route::get('/activity-summary', [TableOrderLogController::class, 'activitySummary'])->name('activity-summary');
+            Route::get('/category-stats', [TableOrderLogController::class, 'categoryStats'])->name('category-stats');
         });
     });
 });
