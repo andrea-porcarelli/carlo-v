@@ -497,7 +497,7 @@ class TableOrdersManager {
         // Add cover charge row (editable)
         if (order.has_cover_charge && order.cover_charge_total > 0) {
             itemsHtml += `
-                <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #17a2b8;">
+                <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #17a2b8; padding-left: 15px">
                     <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
                         <strong><i class="fas fa-utensils me-2"></i>Coperto</strong>
                         <span>
