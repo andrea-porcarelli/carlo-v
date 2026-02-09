@@ -21,6 +21,11 @@ class DomainRedirect
         // Get the current path
         $path = $request->path();
 
+        // Allow sync API requests through without domain restrictions
+        if (str_starts_with($path, 'api/sync')) {
+            return $next($request);
+        }
+
         // Check if we are NOT in the /backoffice path AND NOT on internal.carlov.it domain
         $isNotBackoffice = !str_starts_with($path, 'backoffice');
         $isNotInternalDomain = $host !== 'internal.carlov.it';

@@ -13,6 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('stock:check-low')->everySixHours();
+        $schedule->command('sync:run')->everySixHours()->withoutOverlapping()->appendOutputTo(storage_path('logs/sync.log'));
     }
 
     /**
