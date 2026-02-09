@@ -40,20 +40,26 @@ class SyncService
      */
     public function runFullSync(): array
     {
-        $peerRole = $this->getPeerRole();
-        $tables = config("sync.sync_order.{$peerRole}", []);
+        Cache::put('sync_in_progress', true);
 
-        $results = [];
-        foreach ($tables as $table) {
-            $results[$table] = $this->syncTable($table);
+        try {
+            $peerRole = $this->getPeerRole();
+            $tables = config("sync.sync_order.{$peerRole}", []);
+
+            $results = [];
+            foreach ($tables as $table) {
+                $results[$table] = $this->syncTable($table);
+            }
+
+            // Sync media files after media records
+            if ($peerRole === 'web') {
+                $results['media_files'] = $this->syncMediaFiles();
+            }
+
+            return $results;
+        } finally {
+            Cache::forget('sync_in_progress');
         }
-
-        // Sync media files after media records
-        if ($peerRole === 'web') {
-            $results['media_files'] = $this->syncMediaFiles();
-        }
-
-        return $results;
     }
 
     /**

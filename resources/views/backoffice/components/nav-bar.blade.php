@@ -22,6 +22,12 @@
                     </a>
                 </li>
                 <li>
+                    <a href="#" id="nav-sync-btn" onclick="triggerSync(this); return false;">
+                        <i class="fa fa-sync"></i>
+                        <span class="nav-label">Sync</span>
+                    </a>
+                </li>
+                <li>
                     <a href="{{ url('backoffice/log-viewer') }}" target="_blank">
                         <i class="fa fa-cogs"></i>
                         <span class="nav-label">Logs</span>

@@ -10,6 +10,11 @@
                 <span class="m-r-sm text-muted welcome-message"></span>
             </li>
             <li>
+                <a href="#" id="top-sync-btn" onclick="triggerSync(this); return false;" title="Sync">
+                    <i class="fa fa-sync"></i>
+                </a>
+            </li>
+            <li>
                 <a href="#" class=" btn-logout">
                     ({{ Auth::id() }}) {{ Auth::user()->name }} -
                     <i class="fa fa-outdent"></i> Log out

@@ -13,6 +13,7 @@ use App\Http\Controllers\Backoffice\StockController;
 use App\Http\Controllers\Backoffice\SettingController;
 use App\Http\Controllers\Backoffice\SupplierController;
 use App\Http\Controllers\Backoffice\PrintLogController;
+use App\Http\Controllers\Backoffice\SyncController;
 use App\Http\Controllers\Backoffice\TableOrderLogController;
 use App\Http\Controllers\Backoffice\UploadController;
 use App\Http\Controllers\Backoffice\UserController;
@@ -151,6 +152,10 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::put('/{id}/status', [DishController::class, 'status']);
             });
         });
+
+        // Sync
+        Route::post('/sync/trigger', [SyncController::class, 'trigger'])->name('backoffice.sync.trigger');
+        Route::get('/sync/status', [SyncController::class, 'status'])->name('backoffice.sync.status');
 
         // Table Order Logs
         Route::group(['prefix' => '/logs', 'as' => 'backoffice.logs.'], function() {
