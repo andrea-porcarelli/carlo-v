@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Backoffice;
 
 use App\Http\Controllers\Backoffice\Requests\LoginRequest;
-use App\Http\Controllers\Controller;
 use App\Interfaces\UserInterface;
 use Carbon\Carbon;
 use Exception;
