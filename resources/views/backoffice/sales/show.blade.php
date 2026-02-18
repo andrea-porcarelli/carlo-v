@@ -91,25 +91,29 @@
                                     @endif
                                 </td>
                             </tr>
+                            <tr>
+                                <td><strong>Metodo pagamento:</strong></td>
+                                <td>
+                                    @php
+                                        $pmLabels = [
+                                            'pos'      => ['label' => 'POS',         'icon' => 'fa-credit-card',  'class' => 'success'],
+                                            'contanti' => ['label' => 'Contanti',     'icon' => 'fa-coins',        'class' => 'info'],
+                                            'fattura'  => ['label' => 'Fattura',      'icon' => 'fa-file-invoice', 'class' => 'primary'],
+                                            'misto'    => ['label' => 'Misto',        'icon' => 'fa-layer-group',  'class' => 'warning'],
+                                        ];
+                                        $pm = $pmLabels[$sale->payment_method] ?? null;
+                                    @endphp
+                                    @if($pm)
+                                        <span class="badge badge-{{ $pm['class'] }}">
+                                            <i class="fas {{ $pm['icon'] }}"></i> {{ $pm['label'] }}
+                                        </span>
+                                    @else
+                                        <em class="text-muted">Non specificato</em>
+                                    @endif
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
-                </div>
-            </div>
-
-            <!-- Total Card -->
-            <div class="panel panel-success">
-                <div class="panel-heading">
-                    <h4 class="panel-title">
-                        <i class="fas fa-euro-sign"></i> Totale Vendita
-                    </h4>
-                </div>
-                <div class="panel-body text-center">
-                    <h1 class="@if($sale->status == 'cancelled') text-danger @else text-success @endif mb-0 @if($sale->status == 'cancelled') trashed @endif">
-                        <strong>€{{ number_format($sale->total_amount, 2, ',', '.') }}</strong>
-                    </h1>
-                    <p class="text-muted mb-0 @if($sale->status == 'cancelled') trashed @endif">
-                        {{ $sale->items()->withTrashed()->get()->count() }} prodotti
-                    </p>
                 </div>
             </div>
         </div>
@@ -303,6 +307,152 @@
             </div>
         </div>
     </div>
+
+    <!-- Invoice Section -->
+    @php
+        $invoiceLogs = $logs->where('action', 'create_invoice')->values();
+    @endphp
+    @if($invoiceLogs->count() > 0)
+    <div class="row mt-4">
+        <div class="col-xs-12">
+            <div class="panel panel-primary">
+                <div class="panel-heading" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4 class="panel-title" style="margin: 0;">
+                        <i class="fas fa-file-invoice"></i> Fatturazioni
+                        <span class="label label-default" style="margin-left: 8px;">{{ $invoiceLogs->count() }} fattura/e</span>
+                        @if($invoiceLogs->filter(fn($l) => !empty($l->data_after['fic_sent']))->count() > 0)
+                            <span class="label label-success" style="margin-left: 4px;">
+                                <i class="fas fa-check"></i> {{ $invoiceLogs->filter(fn($l) => !empty($l->data_after['fic_sent']))->count() }} inviate FIC
+                            </span>
+                        @endif
+                    </h4>
+                    @php
+                        $totalInvoiced = $invoiceLogs->sum(fn($l) => (float)($l->data_after['amount'] ?? 0));
+                        $totalAmount   = (float) $sale->total_amount;
+                        $remaining     = round($totalAmount - $totalInvoiced, 2);
+                    @endphp
+                    <div style="text-align: right;">
+                        <small class="text-muted">Totale fatturato:</small>
+                        <strong style="font-size: 1.1rem; margin-left: 6px;">€{{ number_format($totalInvoiced, 2, ',', '.') }}</strong>
+                        @if($remaining > 0.01)
+                            <small class="text-muted" style="margin-left: 10px;">Resto scontrino:</small>
+                            <strong style="font-size: 1.1rem; margin-left: 6px;">€{{ number_format($remaining, 2, ',', '.') }}</strong>
+                        @endif
+                    </div>
+                </div>
+                <div class="panel-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-condensed table-hover table-striped" style="margin: 0;">
+                            <thead>
+                                <tr class="active">
+                                    <th width="140">Data/Ora</th>
+                                    <th width="120" class="text-end">Importo</th>
+                                    <th>Descrizione</th>
+                                    <th width="200">Intestatario</th>
+                                    <th width="150">Cod. Fiscale / P.IVA</th>
+                                    <th width="80" class="text-center">FIC</th>
+                                    <th width="160">N° Documento FIC</th>
+                                    <th width="120">Operatore</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($invoiceLogs as $inv)
+                                    @php
+                                        $d         = $inv->data_after ?? [];
+                                        $ficSent   = !empty($d['fic_sent']);
+                                        $ficDocId  = $d['fic_doc_id'] ?? null;
+                                        $ficDocNum = $d['fic_doc_number'] ?? null;
+                                    @endphp
+                                    <tr>
+                                        <td>
+                                            <small class="text-nowrap">
+                                                {{ $inv->created_at->format('d/m/Y') }}<br>
+                                                <strong>{{ $inv->created_at->format('H:i:s') }}</strong>
+                                            </small>
+                                        </td>
+                                        <td class="text-end">
+                                            <strong style="font-size: 1rem;">€{{ number_format($d['amount'] ?? 0, 2, ',', '.') }}</strong>
+                                        </td>
+                                        <td>{{ $d['description'] ?? 'Pasto completo' }}</td>
+                                        <td>
+                                            @if(!empty($d['customer_name']))
+                                                <i class="fas fa-user"></i> {{ $d['customer_name'] }}
+                                            @else
+                                                <em class="text-muted">—</em>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if(!empty($d['customer_tax_code']))
+                                                <code style="font-size: 0.85rem;">{{ $d['customer_tax_code'] }}</code>
+                                            @else
+                                                <em class="text-muted">—</em>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            @if($ficSent && $ficDocId)
+                                                <span class="label label-success" title="Fattura inviata a Fatture in Cloud">
+                                                    <i class="fas fa-check"></i> Inviata
+                                                </span>
+                                            @elseif($ficSent)
+                                                <span class="label label-warning" title="Inviata ma senza ID documento">
+                                                    <i class="fas fa-question"></i>
+                                                </span>
+                                            @else
+                                                <span class="label label-default" title="Non inviata a FIC (sistema non configurato)">
+                                                    <i class="fas fa-minus"></i> N/A
+                                                </span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($ficDocId)
+                                                <code style="font-size: 0.85rem;">
+                                                    @if($ficDocNum){{ $ficDocNum }}@else#{{ $ficDocId }}@endif
+                                                </code>
+                                                <br>
+                                                <small class="text-muted">ID: {{ $ficDocId }}</small>
+                                            @else
+                                                <em class="text-muted">—</em>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($inv->user)
+                                                <i class="fas fa-user"></i> {{ $inv->user->name }}
+                                            @else
+                                                <em class="text-muted">—</em>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr class="active">
+                                    <td colspan="1"><strong>Totale fatturato</strong></td>
+                                    <td class="text-end">
+                                        <strong>€{{ number_format($totalInvoiced, 2, ',', '.') }}</strong>
+                                    </td>
+                                    <td colspan="6">
+                                        @if($remaining > 0.01)
+                                            @php
+                                                $pmLabels = ['pos' => 'POS', 'contanti' => 'Contanti'];
+                                                $restMethod = $pmLabels[$sale->payment_method] ?? null;
+                                            @endphp
+                                            <small class="text-muted">
+                                                Restante €{{ number_format($remaining, 2, ',', '.') }}
+                                                @if($sale->payment_method === 'misto')
+                                                    pagato tramite metodo complementare
+                                                @endif
+                                            </small>
+                                        @endif
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <!-- Order Activity Log -->
     <div class="row mt-4">

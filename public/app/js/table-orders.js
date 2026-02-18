@@ -1240,11 +1240,48 @@ class TableOrdersManager {
     }
 
     /**
-     * Pay table
+     * Pay table — shows payment method selection modal
      */
-    async payTable() {
+    payTable() {
         if (!this.currentTable) return;
-        if (!confirm('Confermi l\'incasso del conto?')) return;
+        if (!this.currentTable.order) {
+            this.showNotification('Nessun ordine attivo per questo tavolo', 'error');
+            return;
+        }
+        this.showPaymentMethodModal();
+    }
+
+    /**
+     * Show payment method selection modal
+     */
+    showPaymentMethodModal() {
+        const modal = document.getElementById('paymentMethodModal');
+        if (!modal) return;
+
+        // Populate info
+        const tableNum = document.getElementById('pmTableNumber');
+        const total = document.getElementById('pmTotalAmount');
+        if (tableNum) tableNum.textContent = this.currentTable.table.table_number;
+        if (total) total.textContent = `€${parseFloat(this.currentTable.order.total_amount).toFixed(2)}`;
+
+        modal.style.display = 'flex';
+    }
+
+    /**
+     * Close payment method modal
+     */
+    closePaymentMethodModal() {
+        const modal = document.getElementById('paymentMethodModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    /**
+     * Execute payment with specified method (pos/contanti)
+     */
+    async executePayment(method) {
+        if (!this.currentTable) return;
+
+        this.closePaymentMethodModal();
 
         // Request operator authentication
         let auth;
@@ -1260,48 +1297,260 @@ class TableOrdersManager {
             const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
                     'X-Operator-Token': auth.token
-                }
+                },
+                body: JSON.stringify({ payment_method: method })
             });
 
             const result = await response.json();
 
             if (result.success) {
                 this.showNotification(`Conto incassato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
-                this.currentTable = null;
-                await this.loadTables();
-
-                // Hide receipt overlay
-                const receiptOverlay = this.getElement('receiptOverlay');
-                if (receiptOverlay) receiptOverlay.style.display = 'none';
-
-                // Hide modify overlay
-                const modifyOverlay = document.getElementById('modifyOrderOverlay');
-                if (modifyOverlay) modifyOverlay.style.display = 'none';
-
-                // Disable MODIFICA button (desktop)
-                if (!this.isMobile) {
-                    const modifyBtn = document.getElementById('btnModifyTable');
-                    if (modifyBtn) modifyBtn.setAttribute('disabled', 'disabled');
-                }
-
-                // Hide mobile elements
-                if (this.isMobile) {
-                    const manageModal = document.getElementById('manageModalMobile');
-                    if (manageModal) {
-                        manageModal.classList.remove('active');
-                        manageModal.style.display = 'none';
-                    }
-                    const actionBar = document.getElementById('mobileActionBar');
-                    if (actionBar) actionBar.style.display = 'none';
-                }
+                this._afterPaymentSuccess();
             } else {
                 this.showNotification(result.message || 'Errore nell\'incasso', 'error');
             }
         } catch (error) {
             console.error('Error paying table:', error);
             this.showNotification('Errore nell\'incasso', 'error');
+        }
+    }
+
+    /**
+     * Post-payment cleanup (hide overlays, reset state)
+     */
+    _afterPaymentSuccess() {
+        this.currentTable = null;
+        this.loadTables();
+
+        // Hide overlays
+        const receiptOverlay = this.getElement('receiptOverlay');
+        if (receiptOverlay) receiptOverlay.style.display = 'none';
+
+        const modifyOverlay = document.getElementById('modifyOrderOverlay');
+        if (modifyOverlay) modifyOverlay.style.display = 'none';
+
+        // Disable GESTISCI button (desktop)
+        if (!this.isMobile) {
+            const modifyBtn = document.getElementById('btnModifyTable');
+            if (modifyBtn) modifyBtn.setAttribute('disabled', 'disabled');
+        }
+
+        // Hide mobile elements
+        if (this.isMobile) {
+            const manageModal = document.getElementById('manageModalMobile');
+            if (manageModal) {
+                manageModal.classList.remove('active');
+                manageModal.style.display = 'none';
+            }
+            const actionBar = document.getElementById('mobileActionBar');
+            if (actionBar) actionBar.style.display = 'none';
+        }
+    }
+
+    /**
+     * Open invoice modal for fattura payment
+     */
+    openInvoiceModal() {
+        if (!this.currentTable || !this.currentTable.order) return;
+
+        this.closePaymentMethodModal();
+
+        const modal = document.getElementById('invoiceModal');
+        if (!modal) return;
+
+        const order = this.currentTable.order;
+        const total = parseFloat(order.total_amount);
+        const covers = order.covers || 1;
+
+        // Set header info
+        document.getElementById('invoiceTableNumber').textContent = this.currentTable.table.table_number;
+        document.getElementById('invoiceTotalTable').textContent = `€${total.toFixed(2)}`;
+        document.getElementById('invoiceCoversCount').textContent = covers > 0 ? `${covers} cop.` : 'Bevande';
+
+        // Clear rows and add one row per cover (or 1 if 0 covers)
+        document.getElementById('invoiceRowsContainer').innerHTML = '';
+        this._invoiceRowIndex = 0;
+
+        const defaultRows = covers > 0 ? covers : 1;
+        const perCoverAmount = covers > 0 ? (total / covers) : total;
+
+        for (let i = 0; i < defaultRows; i++) {
+            this._addInvoiceRow(perCoverAmount.toFixed(2));
+        }
+
+        this._updateInvoiceTotals();
+
+        modal.style.display = 'flex';
+    }
+
+    /**
+     * Close invoice modal
+     */
+    closeInvoiceModal() {
+        const modal = document.getElementById('invoiceModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    /**
+     * Add an invoice row to the modal
+     */
+    _addInvoiceRow(defaultAmount = '') {
+        const idx = this._invoiceRowIndex++;
+        const container = document.getElementById('invoiceRowsContainer');
+        const empty = document.getElementById('invoiceRowsEmpty');
+        if (empty) empty.style.display = 'none';
+
+        const row = document.createElement('div');
+        row.className = 'invoice-row';
+        row.dataset.rowIdx = idx;
+        row.innerHTML = `
+            <button class="btn-remove-invoice-row" onclick="tableOrdersManager._removeInvoiceRow(${idx})" title="Rimuovi">
+                <i class="fas fa-times"></i>
+            </button>
+            <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; align-items: end;">
+                <div>
+                    <label>Importo (€)</label>
+                    <input type="number" class="invoice-amount" step="0.01" min="0" value="${defaultAmount}" placeholder="0.00" oninput="tableOrdersManager._updateInvoiceTotals()">
+                </div>
+                <div>
+                    <label>Descrizione fattura</label>
+                    <input type="text" class="invoice-description" value="Pasto completo" placeholder="Pasto completo">
+                </div>
+                <div>
+                    <label>Nome ospite (opz.)</label>
+                    <input type="text" class="invoice-customer-name" placeholder="Mario Rossi">
+                </div>
+            </div>
+            <div style="margin-top: 8px;">
+                <label>Codice fiscale / P.IVA (opz.)</label>
+                <input type="text" class="invoice-tax-code" placeholder="RSSMRA80A01H501U" style="max-width: 260px;">
+            </div>
+        `;
+        container.appendChild(row);
+        this._updateInvoiceTotals();
+    }
+
+    /**
+     * Remove an invoice row
+     */
+    _removeInvoiceRow(idx) {
+        const row = document.querySelector(`.invoice-row[data-row-idx="${idx}"]`);
+        if (row) row.remove();
+
+        const container = document.getElementById('invoiceRowsContainer');
+        const empty = document.getElementById('invoiceRowsEmpty');
+        if (empty) empty.style.display = container.children.length === 0 ? 'block' : 'none';
+
+        this._updateInvoiceTotals();
+    }
+
+    /**
+     * Recalculate totals in invoice modal
+     */
+    _updateInvoiceTotals() {
+        if (!this.currentTable || !this.currentTable.order) return;
+
+        const total = parseFloat(this.currentTable.order.total_amount) || 0;
+        let invoiced = 0;
+
+        document.querySelectorAll('.invoice-amount').forEach(input => {
+            invoiced += parseFloat(input.value) || 0;
+        });
+
+        const remaining = Math.max(0, total - invoiced);
+
+        document.getElementById('invoiceTotalInvoiced').textContent = `€${invoiced.toFixed(2)}`;
+
+        const remainingEl = document.getElementById('invoiceRemainingDisplay');
+        const remainingLabel = document.getElementById('invoiceRemainingLabel');
+        const remainingSection = document.getElementById('invoiceRemainingSection');
+
+        if (remainingEl) {
+            remainingEl.textContent = `€${remaining.toFixed(2)}`;
+            remainingEl.style.color = remaining > 0.01 ? '#dc3545' : '#28a745';
+        }
+        if (remainingLabel) remainingLabel.textContent = `€${remaining.toFixed(2)}`;
+        if (remainingSection) remainingSection.style.display = remaining > 0.01 ? 'block' : 'none';
+    }
+
+    /**
+     * Submit invoice payment
+     */
+    async submitInvoicePayment() {
+        if (!this.currentTable) return;
+
+        // Collect invoice rows
+        const rows = document.querySelectorAll('.invoice-row');
+        if (rows.length === 0) {
+            this.showNotification('Aggiungi almeno un ospite da fatturare', 'error');
+            return;
+        }
+
+        const invoices = [];
+        let valid = true;
+        rows.forEach(row => {
+            const amount = parseFloat(row.querySelector('.invoice-amount').value);
+            if (isNaN(amount) || amount <= 0) { valid = false; return; }
+            invoices.push({
+                amount: amount,
+                description: row.querySelector('.invoice-description').value || 'Pasto completo',
+                customer_name: row.querySelector('.invoice-customer-name').value || null,
+                customer_tax_code: row.querySelector('.invoice-tax-code').value || null,
+            });
+        });
+
+        if (!valid) {
+            this.showNotification('Controlla gli importi — devono essere maggiori di zero', 'error');
+            return;
+        }
+
+        const total = parseFloat(this.currentTable.order.total_amount) || 0;
+        const invoiced = invoices.reduce((s, r) => s + r.amount, 0);
+        const remaining = Math.max(0, total - invoiced);
+        const remainingMethod = document.querySelector('input[name="remainingMethod"]:checked')?.value || 'pos';
+
+        // Request auth
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+        } catch (error) {
+            console.log('Authentication cancelled');
+            return;
+        }
+
+        this.closeInvoiceModal();
+
+        try {
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay-invoice`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token
+                },
+                body: JSON.stringify({
+                    invoices: invoices,
+                    remaining_amount: remaining,
+                    remaining_method: remaining > 0.01 ? remainingMethod : null,
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const ficInfo = result.data.fic_sent > 0 ? ` — ${result.data.fic_sent} fattura/e FIC inviata/e` : '';
+                this.showNotification(`Incassato: €${parseFloat(result.data.total_paid).toFixed(2)}${ficInfo}`);
+                this._afterPaymentSuccess();
+            } else {
+                this.showNotification(result.message || 'Errore nel pagamento con fattura', 'error');
+            }
+        } catch (error) {
+            console.error('Error submitting invoice payment:', error);
+            this.showNotification('Errore nel pagamento con fattura', 'error');
         }
     }
 
@@ -1563,16 +1812,21 @@ class TableOrdersManager {
     }
 
     /**
-     * Start interval to update timers every minute
+     * Start interval to update timers every minute and auto-refresh tables every 2 minutes
      */
     startTimerUpdates() {
         // Update immediately
         this.updateTimers();
 
-        // Then update every minute
+        // Update timers every 60 seconds
         setInterval(() => {
             this.updateTimers();
-        }, 60000); // 60 seconds
+        }, 60000);
+
+        // Auto-refresh table list every 120 seconds
+        setInterval(() => {
+            this.loadTables();
+        }, 120000);
     }
 
     /**

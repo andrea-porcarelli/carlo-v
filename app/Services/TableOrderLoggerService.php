@@ -315,6 +315,56 @@ class TableOrderLoggerService
     }
 
     /**
+     * Log per pagamento ordine con metodo
+     */
+    public function logPayOrder(TableOrder $order, string $paymentMethod, int $operatorId = 0): TableOrderLog
+    {
+        $labels = ['pos' => 'POS', 'contanti' => 'Contanti', 'fattura' => 'Fattura', 'misto' => 'Misto (Fattura + altro)'];
+        $label = $labels[$paymentMethod] ?? $paymentMethod;
+        return $this->log(
+            action: 'pay_order',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: array_merge($this->getOrderData($order), ['payment_method' => $paymentMethod]),
+            notes: "Pagato ordine #{$order->id} con metodo: {$label}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
+     * Log per creazione fattura per ospite (con eventuale esito FIC)
+     *
+     * @param array|null $ficResult  Risposta API Fatture in Cloud (o null se non inviata/fallita)
+     */
+    public function logCreateInvoice(TableOrder $order, array $invoiceData, int $operatorId = 0, ?array $ficResult = null): TableOrderLog
+    {
+        $amount = number_format($invoiceData['amount'] ?? 0, 2);
+        $description = $invoiceData['description'] ?? 'Pasto completo';
+
+        // Estrai dati FIC dal risultato API se disponibili
+        $ficDocId     = $ficResult['data']['id'] ?? null;
+        $ficDocNumber = isset($ficResult['data']['number'], $ficResult['data']['numeration'])
+            ? $ficResult['data']['numeration'] . $ficResult['data']['number']
+            : ($ficResult['data']['number'] ?? null);
+
+        $dataAfter = array_merge($invoiceData, [
+            'fic_sent'       => $ficResult !== null,
+            'fic_doc_id'     => $ficDocId,
+            'fic_doc_number' => $ficDocNumber,
+        ]);
+
+        $ficInfo = $ficDocId ? " — FIC #{$ficDocId}" : '';
+        return $this->log(
+            action: 'create_invoice',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: $dataAfter,
+            notes: "Fattura per €{$amount}: {$description}{$ficInfo}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
      * Log per stampa preconto
      */
     public function logFreeAmount(TableOrder $order, int $operatorId = 0): TableOrderLog

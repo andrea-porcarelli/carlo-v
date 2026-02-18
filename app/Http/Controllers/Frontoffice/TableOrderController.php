@@ -9,6 +9,7 @@ use App\Models\OrderItem;
 use App\Models\Printer;
 use App\Models\RestaurantTable;
 use App\Models\TableOrder;
+use App\Services\FattureInCloudService;
 use App\Services\TableOrderLoggerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -585,7 +586,7 @@ class TableOrderController extends Controller
     /**
      * Pay and close table order
      */
-    public function payTable(RestaurantTable $table): JsonResponse
+    public function payTable(Request $request, RestaurantTable $table): JsonResponse
     {
         // Verify operator token from header
         $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
@@ -596,9 +597,13 @@ class TableOrderController extends Controller
             ], 401);
         }
 
+        $paymentMethod = $request->input('payment_method', 'pos');
+        if (!in_array($paymentMethod, ['pos', 'contanti', 'fattura', 'misto'])) {
+            $paymentMethod = 'pos';
+        }
+
         try {
             DB::beginTransaction();
-
 
             $order = $table->activeOrder;
             if (!$order) {
@@ -608,10 +613,10 @@ class TableOrderController extends Controller
                 ], 404);
             }
 
-            // Log order closing
+            $this->logger->logPayOrder($order, $paymentMethod, $operatorId);
             $this->logger->logCloseOrder($order, $operatorId);
 
-            $order->close();
+            $order->close($paymentMethod);
 
             DB::commit();
 
@@ -628,6 +633,97 @@ class TableOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Errore nell\'incasso del conto',
+            ], 500);
+        }
+    }
+
+    /**
+     * Pay table with invoice(s) — supports partial invoice + remainder via POS/Contanti
+     */
+    public function payTableInvoice(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $validated = $request->validate([
+            'invoices'                   => 'required|array|min:1',
+            'invoices.*.amount'          => 'required|numeric|min:0.01',
+            'invoices.*.description'     => 'nullable|string|max:255',
+            'invoices.*.customer_name'   => 'nullable|string|max:255',
+            'invoices.*.customer_tax_code' => 'nullable|string|max:50',
+            'remaining_amount'           => 'required|numeric|min:0',
+            'remaining_method'           => 'nullable|string|in:pos,contanti',
+        ]);
+
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token operatore non valido',
+            ], 401);
+        }
+
+        $order = $table->activeOrder;
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nessun ordine attivo per questo tavolo',
+            ], 404);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $ficService = app(FattureInCloudService::class);
+            $ficResults = [];
+
+            foreach ($validated['invoices'] as $invoiceData) {
+                $invoiceData['description'] = $invoiceData['description'] ?: 'Pasto completo';
+
+                // Try to send to Fatture in Cloud first (result stored in log)
+                $ficResult = null;
+                if ($ficService->isConfigured()) {
+                    $ficResult = $ficService->createInvoice($invoiceData);
+                    if ($ficResult) {
+                        $ficResults[] = $ficResult;
+                    }
+                }
+
+                // Log invoice creation including FIC outcome
+                $this->logger->logCreateInvoice($order, $invoiceData, $operatorId, $ficResult);
+            }
+
+            $totalInvoiced = collect($validated['invoices'])->sum('amount');
+            $remaining = (float) $validated['remaining_amount'];
+
+            // Determine overall payment method
+            if ($remaining > 0.01) {
+                $paymentMethod = 'misto'; // part invoice, part pos/contanti
+            } else {
+                $paymentMethod = 'fattura';
+            }
+
+            $this->logger->logPayOrder($order, $paymentMethod, $operatorId);
+            $this->logger->logCloseOrder($order, $operatorId);
+
+            $order->close($paymentMethod);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Conto incassato con successo',
+                'data' => [
+                    'total_paid'    => $order->total_amount,
+                    'invoiced'      => $totalInvoiced,
+                    'remaining'     => $remaining,
+                    'invoice_count' => count($validated['invoices']),
+                    'fic_sent'      => count($ficResults),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error processing invoice payment: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore nel pagamento con fattura',
             ], 500);
         }
     }

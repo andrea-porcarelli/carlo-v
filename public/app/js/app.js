@@ -57,11 +57,10 @@ $(document).ready(function() {
         $('#modifyOrderOverlay').fadeOut(300);
     });
 
-    // Pay bill from modify overlay
+    // Pay bill from modify overlay — show payment method modal (overlay hidden by _afterPaymentSuccess)
     $('#btnModifyPayBill').click(function() {
         if (typeof tableOrdersManager !== 'undefined') {
             tableOrdersManager.payTable();
-            $('#modifyOrderOverlay').fadeOut(300);
         }
     });
 
@@ -242,6 +241,66 @@ $(document).ready(function() {
     $('#receiptOverlay, #productModal').click(function(e) {
         if (e.target === this) {
             $(this).fadeOut(300);
+        }
+    });
+
+    // ── Payment Method Modal ──────────────────────────────────────────────────
+
+    $('#closePaymentMethodModal').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.closePaymentMethodModal();
+        }
+    });
+
+    $('#btnPayPos').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.executePayment('pos');
+        }
+    });
+
+    $('#btnPayContanti').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.executePayment('contanti');
+        }
+    });
+
+    $('#btnPayFattura').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.openInvoiceModal();
+        }
+    });
+
+    // Close payment modal on backdrop click
+    $('#paymentMethodModal').click(function(e) {
+        if (e.target === this && typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.closePaymentMethodModal();
+        }
+    });
+
+    // ── Invoice Modal ─────────────────────────────────────────────────────────
+
+    $('#closeInvoiceModal, #cancelInvoiceModal').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.closeInvoiceModal();
+        }
+    });
+
+    $('#btnAddInvoiceRow').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager._addInvoiceRow('');
+        }
+    });
+
+    $('#confirmInvoicePayment').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.submitInvoicePayment();
+        }
+    });
+
+    // Close invoice modal on backdrop click
+    $('#invoiceModal').click(function(e) {
+        if (e.target === this && typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.closeInvoiceModal();
         }
     });
 });

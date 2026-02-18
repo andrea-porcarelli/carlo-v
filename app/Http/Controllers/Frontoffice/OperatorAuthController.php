@@ -26,7 +26,6 @@ class OperatorAuthController extends Controller
             $user = null;
 
             foreach ($users as $potentialUser) {
-                Log::info($potentialUser->id . ' => ' . $validated['password'] . ' verify => ' . Hash::check($validated['password'], $potentialUser->password));
                 if (Hash::check($validated['password'], $potentialUser->password)) {
                     $user = $potentialUser;
                     break;

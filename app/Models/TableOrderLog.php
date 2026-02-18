@@ -35,6 +35,8 @@ class TableOrderLog extends Model
     const ACTION_UPDATE_ITEM_QUANTITY = 'update_item_quantity';
     const ACTION_PRINT_MARCIA = 'print_marcia';
     const ACTION_PRINT_PRECONTO = 'print_preconto';
+    const ACTION_PAY_ORDER = 'pay_order';
+    const ACTION_CREATE_INVOICE = 'create_invoice';
 
     // Mapping azione -> categoria
     const ACTION_CATEGORY_MAP = [
@@ -57,6 +59,9 @@ class TableOrderLog extends Model
         // Categoria 'print' - Stampe
         self::ACTION_PRINT_MARCIA => self::CATEGORY_PRINT,
         self::ACTION_PRINT_PRECONTO => self::CATEGORY_PRINT,
+        // Categoria 'order' - Pagamento e fatturazione
+        self::ACTION_PAY_ORDER => self::CATEGORY_ORDER,
+        self::ACTION_CREATE_INVOICE => self::CATEGORY_ORDER,
     ];
 
     protected $fillable = [

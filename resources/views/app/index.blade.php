@@ -228,6 +228,12 @@
     <!-- Comunica Modal -->
     <x-comunica-modal />
 
+    <!-- Payment Method Modal -->
+    <x-payment-method-modal />
+
+    <!-- Invoice Modal -->
+    <x-invoice-modal />
+
     <!-- Notification -->
     <div id="notification" class="notification">
         <span id="notificationText">Operazione completata!</span>

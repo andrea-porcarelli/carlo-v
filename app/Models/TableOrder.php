@@ -18,6 +18,7 @@ class TableOrder extends Model
         'status',
         'total_amount',
         'autoconsumo',
+        'payment_method',
         'opened_at',
         'closed_at',
         'waiter_id',
@@ -114,11 +115,12 @@ class TableOrder extends Model
     /**
      * Close the order
      */
-    public function close(): void
+    public function close(string $paymentMethod = 'pos'): void
     {
         $this->update([
             'status' => 'paid',
             'closed_at' => now(),
+            'payment_method' => $paymentMethod,
         ]);
 
         // Free the table

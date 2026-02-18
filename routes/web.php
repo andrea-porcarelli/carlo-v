@@ -44,6 +44,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::post('/{table}/clear', [TableOrderController::class, 'clearTable'])->name('clear');
     Route::post('/{table}/free-amount', [TableOrderController::class, 'freeAmount'])->name('free-amount');
     Route::post('/{table}/pay', [TableOrderController::class, 'payTable'])->name('pay');
+    Route::post('/{table}/pay-invoice', [TableOrderController::class, 'payTableInvoice'])->name('payInvoice');
     Route::post('/{table}/marcia', [TableOrderController::class, 'marciaTable'])->name('marcia');
     Route::post('/{table}/preconto', [TableOrderController::class, 'precontoTable'])->name('preconto');
     Route::post('/save', [TableOrderController::class, 'saveTable'])->name('save');
@@ -62,6 +63,9 @@ Route::group(['prefix' => '/backoffice'], function() {
     Route::group(['middleware' => ['auth']], function() {
 //        Route::impersonate();
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/index', function() {
+            dd(route('dashboard'));
+        });
         Route::get('/index', fn() => redirect()->route('dashboard'));
         Route::get('/daily-stats', [DashboardController::class, 'dailyStats'])->name('dashboard.daily-stats');
         Route::post('/clear-cache', [DashboardController::class, 'clearCache'])->name('dashboard.clear-cache');
