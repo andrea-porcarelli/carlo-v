@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\MessageBag;
 use Illuminate\View\View;
 
-class LoginController extends Controller
+class LoginController extends BaseController
 {
     protected UserInterface $user;
     public function __construct(UserInterface $user)
