@@ -12,7 +12,7 @@
                 </div>
             </li>
             @if ($role === 'admin')
-                @include('backoffice.components.nav-bar-item', ['route' => 'dashboard', 'icon' => 'fa-home', 'label' => 'Dashboard']))
+                @include('backoffice.components.nav-bar-item', ['route' => 'dashboard', 'icon' => 'fa-home', 'label' => 'Dashboard'])
                 @include('backoffice.components.nav-bar-restaurant')
                 @include('backoffice.components.nav-bar-supplier')
                 @include('backoffice.components.nav-bar-item', ['route' => 'users.index', 'icon' => 'fa-users', 'label' => 'Utenti'])
