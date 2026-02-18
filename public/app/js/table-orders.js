@@ -130,7 +130,7 @@ class TableOrdersManager {
                     <div class="mobile-table-number">${table.table_number}</div>
                     <div class="mobile-table-status">${this.getStatusLabel(table.status)}</div>
                     ${table.has_active_order ? `
-                        <div class="mobile-table-total">€${parseFloat(table.current_total).toFixed(2)}</div>
+                        <div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="mobile-table-total ${table.active_order.autoconsumo ? ' autoconsumo' : ''}">€${parseFloat(table.current_total).toFixed(2)}</div>
                         <div class="mobile-table-timer" data-opened-at="${table.active_order.opened_at}">
                             ${this.formatElapsedTime(table.active_order.opened_at)}
                         </div>
@@ -143,7 +143,7 @@ class TableOrdersManager {
                     <div class="table-number">${table.table_number}</div>
                     <div class="table-status">${this.getStatusLabel(table.status)}</div>
                     ${table.has_active_order ? `
-                        <div class="table-total">€${parseFloat(table.current_total).toFixed(2)}</div>
+                        <div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="table-total ${table.active_order.autoconsumo ? ' autoconsumo' : ''}">€${parseFloat(table.current_total).toFixed(2)}</div>
                         <div class="table-timer" data-opened-at="${table.active_order.opened_at}">
                             <i class="fas fa-clock"></i> ${this.formatElapsedTime(table.active_order.opened_at)}
                         </div>
@@ -1185,6 +1185,51 @@ class TableOrdersManager {
                     const actionBar = document.getElementById('mobileActionBar');
                     if (actionBar) actionBar.style.display = 'none';
                 }
+            } else {
+                this.showNotification(result.message || 'Errore nello svuotamento', 'error');
+            }
+        } catch (error) {
+            console.error('Error clearing table:', error);
+            this.showNotification('Errore nello svuotamento', 'error');
+        }
+    }
+    /**
+     * Clear table
+     */
+    async freeAmount() {
+        if (!this.currentTable) return;
+        if (!confirm('Vuoi impstare il tavolo in autoconsumo?')) return;
+
+        // Request operator authentication
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+            if (auth.user.role !== 'admin') {
+             alert("Questa operazione richiede utenza admin")
+             return;
+            }
+        } catch (error) {
+            console.log('Authentication cancelled');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/free-amount`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('Tavolo svuotato');
+                this.currentTable = null;
+                await this.loadTables();
+
             } else {
                 this.showNotification(result.message || 'Errore nello svuotamento', 'error');
             }

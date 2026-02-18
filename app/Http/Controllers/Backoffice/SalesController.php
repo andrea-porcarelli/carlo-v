@@ -172,6 +172,9 @@ class SalesController extends BaseController
                     return $item->items->count() . ' prodotti';
                 })
                 ->addColumn('total', function ($item) {
+                    if ($item->autoconsumo) {
+                        return '<strong style="text-decoration: line-through">' . Utils::price($item->total_amount) . '</strong><br /><b>Autoconsumo</b>';
+                    }
                     return '<strong>' . Utils::price($item->total_amount) . '</strong>';
                 })
                 ->addColumn('waiter', function ($item) {

@@ -116,12 +116,11 @@ class UserController extends BaseController
         try {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
-                'email' => 'required|email|unique:users,email',
+                'email' => 'nullable|email|unique:users,email',
                 'password' => 'required|string|min:4|confirmed',
                 'role' => 'required|in:admin,operator',
             ], [
                 'name.required' => 'Il nome è obbligatorio',
-                'email.required' => 'L\'email è obbligatoria',
                 'email.email' => 'Inserisci un\'email valida',
                 'email.unique' => 'Questa email è già registrata',
                 'password.required' => 'La password è obbligatoria',
@@ -174,8 +173,8 @@ class UserController extends BaseController
 
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
-                'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-                'password' => 'nullable|string|min:8|confirmed',
+                'email' => ['nullable', 'email', Rule::unique('users')->ignore($user->id)],
+                'password' => 'nullable|string|min:4|confirmed',
                 'role' => 'required|in:admin,operator',
             ], [
                 'name.required' => 'Il nome è obbligatorio',

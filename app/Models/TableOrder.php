@@ -17,6 +17,7 @@ class TableOrder extends Model
         'covers',
         'status',
         'total_amount',
+        'autoconsumo',
         'opened_at',
         'closed_at',
         'waiter_id',

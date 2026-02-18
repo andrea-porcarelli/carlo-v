@@ -84,6 +84,7 @@ class TableOrderController extends Controller
                             'items_count' => $table->activeOrder->items->count(),
                             'total_amount' => $table->activeOrder->total_amount,
                             'opened_at' => $table->activeOrder->opened_at->toIso8601String(),
+                            'autoconsumo' => $table->activeOrder->autoconsumo,
                         ] : null,
                     ];
                 });
@@ -1149,6 +1150,43 @@ class TableOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Errore nell\'aggiornamento del prezzo',
+            ], 500);
+        }
+    }
+
+    public function freeAmount(RestaurantTable $table): JsonResponse
+    {
+        // Verify operator token from header
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token operatore non valido',
+            ], 401);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $order = $table->activeOrder;
+            if ($order) {
+                // Log order autoconsumo
+                $this->logger->logFreeAmount($order, $operatorId);
+                $order->update(['autoconsumo' => 1]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Tavolo svuotato con successo',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error clearing table: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore nello svuotamento del tavolo',
             ], 500);
         }
     }

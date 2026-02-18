@@ -315,6 +315,21 @@ class TableOrderLoggerService
     }
 
     /**
+     * Log per stampa preconto
+     */
+    public function logFreeAmount(TableOrder $order, int $operatorId = 0): TableOrderLog
+    {
+        return $this->log(
+            action: 'autoconsumo',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: array_merge($this->getOrderData($order), ['autoconsumo' => 1]),
+            notes: "Autoconsumo per tavolo #{$order->restaurantTable->table_number}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
      * Ottiene i dati dell'ordine in formato array
      */
     private function getOrderData(TableOrder $order): array

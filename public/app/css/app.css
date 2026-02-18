@@ -118,9 +118,12 @@ body {
 }
 
 .table-total {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     margin-top: 3px;
+}
+.table-total.autoconsumo {
+    text-decoration: line-through;
 }
 
 .table-timer {

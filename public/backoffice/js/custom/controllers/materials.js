@@ -50,8 +50,11 @@ const init = () => {
         }).then(() => {
             $('#addStockModal').modal('hide');
             toastr.success('Giacenza aggiunta con successo');
-            // Ricarica datatable
-            $('.datatable_table').DataTable().ajax.reload();
+            if ($('.datatable_table').length) {
+                $('.datatable_table').DataTable().ajax.reload();
+            } else {
+                location.reload();
+            }
         }).catch((xhr) => {
             let message = 'Errore durante il salvataggio';
             if (xhr.responseJSON && xhr.responseJSON.message) {

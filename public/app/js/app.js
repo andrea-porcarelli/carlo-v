@@ -66,9 +66,9 @@ $(document).ready(function() {
     });
 
     // Clear bill from modify overlay
-    $('#btnModifyClearBill').click(function() {
+    $('#btnModifyFreeAmount').click(function() {
         if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.clearTable();
+            tableOrdersManager.freeAmount();
             $('#modifyOrderOverlay').fadeOut(300);
         }
     });
@@ -145,9 +145,9 @@ $(document).ready(function() {
     });
 
     // Clear bill - delegate to tableOrdersManager
-    $('#btnClearBill').click(function() {
+    $('#btnFreeAmount').click(function() {
         if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.clearTable();
+            tableOrdersManager.freeAmount();
         }
     });
 

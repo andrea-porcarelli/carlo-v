@@ -67,6 +67,9 @@ class RestaurantTable extends Model
     public function getCurrentTotal(): float
     {
         $activeOrder = $this->activeOrder;
-        return $activeOrder ? $activeOrder->total_amount : 0;
+        if (isset($activeOrder)) {
+            return $activeOrder->autoconsumo ? 0 : $activeOrder->total;
+        }
+        return 0;
     }
 }

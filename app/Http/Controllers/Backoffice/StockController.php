@@ -32,7 +32,18 @@ class StockController extends Controller
             $stocks = $stocks->filter(fn($s) => str_contains(strtolower($s['material']->label), $search));
         }
 
-        return view('backoffice.stock.index', compact('stocks', 'lowStockCount'));
+        // Ordinamento
+        $sortable = ['imported', 'consumed', 'current'];
+        $sort = in_array($request->sort, $sortable) ? $request->sort : null;
+        $direction = $request->direction === 'asc' ? 'asc' : 'desc';
+
+        if ($sort) {
+            $stocks = $direction === 'asc'
+                ? $stocks->sortBy(fn($s) => $s[$sort])
+                : $stocks->sortByDesc(fn($s) => $s[$sort]);
+        }
+
+        return view('backoffice.stock.index', compact('stocks', 'lowStockCount', 'sort', 'direction'));
     }
 
     /**

@@ -258,12 +258,19 @@
                                     @endforeach
                                 </tbody>
                                 <tfoot>
+                                    @if($sale->autoconsumo)
+                                        <tr class="table-success">
+                                            <td colspan="5" class="text-right" style="font-size: 16px">
+                                                <b>AUTOCONSUMO</b>
+                                            </td>
+                                        </tr>
+                                    @endif
                                     <tr class="table-success">
                                         <td colspan="4" class="text-end">
                                             <strong style="font-size: 16px;" class="@if($sale->status == 'cancelled') trashed @endif">TOTALE:</strong>
                                         </td>
                                         <td class="text-end">
-                                            <strong style="font-size: 18px;"  class="@if($sale->status == 'cancelled') text-danger @else text-success @endif @if($sale->status == 'cancelled') trashed @endif">
+                                            <strong style="font-size: 18px; @if($sale->autoconsumo) text-decoration:line-through @endif"  class="@if($sale->status == 'cancelled') text-danger @else text-success @endif @if($sale->status == 'cancelled') trashed @endif">
                                                 €{{ number_format($sale->total_amount, 2, ',', '.') }}
                                             </strong>
                                         </td>

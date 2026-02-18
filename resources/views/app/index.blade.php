@@ -154,8 +154,8 @@
                                 <button class="action-btn-compact" id="btnModifyPayBill" style="background: #dc3545;">
                                     <i class="fas fa-money-bill"></i> INCASSA
                                 </button>
-                                <button class="action-btn-compact" id="btnModifyClearBill" style="background: #6c757d;">
-                                    <i class="fas fa-eraser"></i> SVUOTA
+                                <button class="action-btn-compact" id="btnModifyFreeAmount" style="background: #6c757d;">
+                                    <i class="fas fa-eraser"></i> AUTOCONSUMO
                                 </button>
                                 <button class="action-btn-compact" id="btnModifyFreeTable" style="background: #ffc107; color: #000;">
                                     <i class="fas fa-door-open"></i> LIBERA
@@ -201,8 +201,8 @@
                         <button class="action-btn" id="btnPayBill">
                             <i class="fas fa-money-bill"></i> INCASSA
                         </button>
-                        <button class="action-btn" id="btnClearBill">
-                            <i class="fas fa-eraser"></i> SVUOTA
+                        <button class="action-btn" id="btnFreeAmount">
+                            <i class="fas fa-eraser"></i> AUTOCONSUMO
                         </button>
                         <button class="action-btn" id="btnFreeTable">
                             <i class="fas fa-door-open"></i> LIBERA

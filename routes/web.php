@@ -42,6 +42,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::put('/items/{item}/quantity', [TableOrderController::class, 'updateItemQuantity'])->name('updateItemQuantity');
     Route::delete('/items/{item}', [TableOrderController::class, 'removeItem'])->name('removeItem');
     Route::post('/{table}/clear', [TableOrderController::class, 'clearTable'])->name('clear');
+    Route::post('/{table}/free-amount', [TableOrderController::class, 'freeAmount'])->name('free-amount');
     Route::post('/{table}/pay', [TableOrderController::class, 'payTable'])->name('pay');
     Route::post('/{table}/marcia', [TableOrderController::class, 'marciaTable'])->name('marcia');
     Route::post('/{table}/preconto', [TableOrderController::class, 'precontoTable'])->name('preconto');
