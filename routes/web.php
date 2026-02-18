@@ -56,7 +56,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::put('/{table}/covers', [TableOrderController::class, 'updateCovers'])->name('updateCovers');
 });
 
-Route::group(['prefix' => '/cp'], function() {
+Route::group(['prefix' => '/backoffice'], function() {
     Route::get('/login',[LoginController::class, 'index'])->name('login');
     Route::post('/login',[LoginController::class, 'login']);
 
