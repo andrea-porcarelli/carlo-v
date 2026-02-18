@@ -61,9 +61,10 @@ Route::group(['prefix' => '/backoffice'], function() {
 
     Route::group(['middleware' => ['auth']], function() {
 //        Route::impersonate();
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/index', fn() => redirect()->route('dashboard'));
 
         Route::post('/upload', [UploadController::class, 'start'])->name('upload');
-        Route::get('/index', [DashboardController::class, 'index'])->name('dashboard');
 
         // Users Management
         Route::group(['prefix' => '/users', 'as' => 'users.'], function() {

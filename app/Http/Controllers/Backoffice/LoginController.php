@@ -31,13 +31,11 @@ class LoginController extends Controller
             if(!Auth::validate($request->all())) {
                 return response()->json(['message' => 'I dati inseriti sono errati'], 422);
             }
+            if(Auth::user()->role !== 'admin') {
+                return response()->json(['message' => "Non puoi accedere a quest'area"], 422);
+            }
             $user = Auth::getProvider()->retrieveByCredentials($request->all());
             Auth::login($user);
-            if ($user->role == 'admin') {
-                Session::put('company_id', $user->company_id);
-                Session::put('company', $user->company);
-                Session::put('company-to-be-select', true);
-            }
             return response()->json(['response' => 'ok', 'url' => redirect()->getIntendedUrl() ?? '/backoffice/index']);
         } catch (Exception $e) {
             $this->exception($e);
