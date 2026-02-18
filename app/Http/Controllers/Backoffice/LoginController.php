@@ -30,10 +30,10 @@ class LoginController extends BaseController
             if(!Auth::validate($request->all())) {
                 return response()->json(['message' => 'I dati inseriti sono errati'], 422);
             }
-            if(Auth::user()->role !== 'admin') {
+            $user = Auth::getProvider()->retrieveByCredentials($request->all());
+            if($user->role !== 'admin') {
                 return response()->json(['message' => "Non puoi accedere a quest'area"], 422);
             }
-            $user = Auth::getProvider()->retrieveByCredentials($request->all());
             Auth::login($user);
             return response()->json(['response' => 'ok', 'url' => redirect()->getIntendedUrl() ?? '/backoffice/index']);
         } catch (Exception $e) {
