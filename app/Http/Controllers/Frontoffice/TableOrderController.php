@@ -45,6 +45,7 @@ class TableOrderController extends Controller
         }
 
         $tokenData = session('operator_token_' . $tokenToVerify);
+        Log::info($tokenData);
 
         if (!$tokenData || !isset($tokenData['user_id'])) {
             return null;

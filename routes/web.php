@@ -63,6 +63,8 @@ Route::group(['prefix' => '/backoffice'], function() {
 //        Route::impersonate();
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/index', fn() => redirect()->route('dashboard'));
+        Route::get('/daily-stats', [DashboardController::class, 'dailyStats'])->name('dashboard.daily-stats');
+        Route::post('/clear-cache', [DashboardController::class, 'clearCache'])->name('dashboard.clear-cache');
 
         Route::post('/upload', [UploadController::class, 'start'])->name('upload');
 

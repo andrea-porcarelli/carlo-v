@@ -31,7 +31,6 @@
                                 'name' => 'email',
                                 'col' => 4,
                                 'type' => 'email',
-                                'required' => true,
                                 'placeholder' => 'Es: mario.rossi@example.com'
                             ])
 

@@ -13,13 +13,16 @@
      SEZIONE FINANZIARIA
 ══════════════════════════════════════════════════════════ --}}
 <div class="row m-b-sm">
-    <div class="col-lg-12">
-        <h3 class="m-t-none">
+    <div class="col-lg-12" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <h3 class="m-t-none m-b-none">
             <i class="fa fa-line-chart"></i> Andamento Finanziario
             <small class="text-muted" style="font-size:13px;">
                 <i class="fa fa-clock-o"></i> Aggiornato ogni 5 minuti &mdash; Autoconsumo escluso
             </small>
         </h3>
+        <button id="btn-clear-cache" class="btn btn-sm btn-default" title="Invalida la cache e ricarica tutti i dati in tempo reale">
+            <i class="fa fa-refresh"></i> Aggiorna dati ora
+        </button>
     </div>
 </div>
 
@@ -121,9 +124,9 @@
     </div>
 </div>
 
-{{-- Top dishes + Miglior scontrino dettaglio --}}
+{{-- Top dishes + Classifica operatori --}}
 <div class="row">
-    <div class="{{ $bestReceipt ? 'col-lg-7' : 'col-lg-12' }}">
+    <div class="col-lg-7">
         <div class="panel panel-default">
             <div class="panel-heading">
                 <i class="fa fa-cutlery"></i> Top 10 Piatti Più Venduti
@@ -171,52 +174,204 @@
         </div>
     </div>
 
-    @if($bestReceipt)
     <div class="col-lg-5">
-        <div class="panel panel-warning">
+        <div class="panel panel-default">
             <div class="panel-heading">
-                <i class="fa fa-trophy"></i> Dettaglio Miglior Scontrino
+                <i class="fa fa-users"></i> Classifica Operatori per Venduto
             </div>
-            <div class="panel-body">
-                <table class="table table-condensed m-b-none">
-                    <tr>
-                        <td><strong>Tavolo</strong></td>
-                        <td>{{ $bestReceipt->restaurantTable?->table_number ?? 'N/A' }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Data</strong></td>
-                        <td>{{ $bestReceipt->closed_at?->format('d/m/Y H:i') ?? '-' }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Cameriere</strong></td>
-                        <td>{{ $bestReceipt->waiter?->name ?? '-' }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>N. Prodotti</strong></td>
-                        <td>{{ $bestReceipt->items->count() }}</td>
-                    </tr>
-                </table>
-                <div class="text-center m-t-sm m-b-sm">
-                    <div class="h2 text-warning m-none">
-                        € {{ number_format($bestReceipt->total_amount, 2, ',', '.') }}
+            <div class="panel-body" style="padding: 5px 0 0;">
+                @php $maxRev = $topOperators->first()?->total_revenue ?? 1; @endphp
+                @forelse($topOperators as $i => $op)
+                @php
+                    $pct      = $maxRev > 0 ? round(($op->total_revenue / $maxRev) * 100) : 0;
+                    $barColor = ['progress-bar-warning', 'progress-bar-info', 'progress-bar-success'][$i] ?? 'progress-bar-info';
+                @endphp
+                <div style="padding: 8px 15px; {{ $i < $topOperators->count() - 1 ? 'border-bottom:1px solid #f5f5f5;' : '' }}">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                        <div>
+                            @if($i === 0)
+                                <span class="label label-warning"><i class="fa fa-trophy"></i> 1°</span>
+                            @elseif($i === 1)
+                                <span class="label label-default">2°</span>
+                            @elseif($i === 2)
+                                <span class="label label-default">3°</span>
+                            @else
+                                <span class="text-muted" style="font-size:12px;">{{ $i + 1 }}°</span>
+                            @endif
+                            <strong style="margin-left:6px;">{{ $op->waiter?->name ?? 'N/A' }}</strong>
+                        </div>
+                        <div class="text-right">
+                            <strong>€ {{ number_format($op->total_revenue, 2, ',', '.') }}</strong>
+                            <small class="text-muted" style="display:block;">
+                                {{ $op->orders_count }} scontrini &mdash; media € {{ number_format($op->avg_ticket, 2, ',', '.') }}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="progress progress-mini m-b-none">
+                        <div class="progress-bar {{ $barColor }}" style="width:{{ $pct }}%;"></div>
                     </div>
                 </div>
-                <hr style="margin: 8px 0;">
-                <strong><i class="fa fa-list"></i> Prodotti ordinati:</strong>
-                <ul class="list-unstyled m-t-sm m-b-none" style="max-height:200px; overflow-y:auto;">
-                    @foreach($bestReceipt->items as $item)
-                    <li style="padding: 3px 0; border-bottom: 1px solid #f5f5f5;">
-                        <i class="fa fa-cutlery text-muted"></i>
-                        {{ $item->dish?->label ?? 'N/A' }}
-                        <span class="badge" style="margin-left:4px;">x{{ $item->quantity }}</span>
-                        <span class="pull-right text-muted">€ {{ number_format($item->subtotal, 2, ',', '.') }}</span>
-                    </li>
-                    @endforeach
-                </ul>
+                @empty
+                    <div class="text-center text-muted" style="padding:20px;">Nessun dato disponibile</div>
+                @endforelse
             </div>
         </div>
     </div>
-    @endif
+</div>
+
+{{-- ══════════════════════════════════════════════════════════
+     SEZIONE OPERATIVA GIORNALIERA
+══════════════════════════════════════════════════════════ --}}
+<div class="row m-t-md m-b-sm">
+    <div class="col-lg-12" style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+        <h3 class="m-t-none m-b-none">
+            <i class="fa fa-calendar-check-o"></i> Riepilogo Giornaliero
+        </h3>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <input type="date" id="daily-date-picker" class="form-control input-sm"
+                   value="{{ date('Y-m-d') }}" style="width:160px;">
+            <button id="btn-load-daily" class="btn btn-sm btn-primary">
+                <i class="fa fa-refresh"></i> Aggiorna
+            </button>
+        </div>
+        <small class="text-muted" id="daily-cache-note" style="display:none;">
+            <i class="fa fa-clock-o"></i> Dati aggiornati alle <span id="daily-loaded-at"></span>
+        </small>
+    </div>
+</div>
+
+{{-- KPI giornalieri --}}
+<div class="row" id="daily-kpi-row">
+    <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="panel panel-primary">
+            <div class="panel-body text-center">
+                <div class="h3 m-t-none m-b-xs" id="d-totale">—</div>
+                <div class="text-muted small">Totale Scontrinato</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="panel panel-info">
+            <div class="panel-body text-center">
+                <div class="h3 m-t-none m-b-xs" id="d-media">—</div>
+                <div class="text-muted small">Media Scontrini</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="panel panel-default">
+            <div class="panel-body text-center">
+                <div class="h3 m-t-none m-b-xs" id="d-ordini">—</div>
+                <div class="text-muted small">N. Scontrini</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="panel panel-danger">
+            <div class="panel-body text-center">
+                <div class="h3 m-t-none m-b-xs" id="d-cancellazioni">—</div>
+                <div class="text-muted small">Articoli Cancellati</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="panel panel-warning">
+            <div class="panel-body text-center">
+                <div class="h3 m-t-none m-b-xs" id="d-prezzi">—</div>
+                <div class="text-muted small">Modifiche Prezzo</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6">
+        <div class="panel panel-default">
+            <div class="panel-body text-center">
+                <div class="h3 m-t-none m-b-xs" id="d-modifiche">—</div>
+                <div class="text-muted small">Modifiche Operatore</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Tabelle di dettaglio --}}
+<div class="row" id="daily-details-row">
+    {{-- Articoli cancellati --}}
+    <div class="col-lg-4">
+        <div class="panel panel-danger">
+            <div class="panel-heading" style="cursor:pointer;" data-toggle="collapse" data-target="#tbl-cancellazioni">
+                <i class="fa fa-trash"></i> Articoli Cancellati
+                <span class="badge pull-right" id="badge-cancellazioni">0</span>
+            </div>
+            <div class="panel-body collapse in" id="tbl-cancellazioni" style="padding:0;">
+                <div class="table-responsive">
+                    <table class="table table-condensed table-hover m-b-none" id="table-cancellazioni">
+                        <thead>
+                        <tr>
+                            <th>Ora</th>
+                            <th>Operatore</th>
+                            <th>Tav.</th>
+                            <th>Prodotto</th>
+                            <th class="text-center">Qtà</th>
+                            <th class="text-right">Prezzo</th>
+                        </tr>
+                        </thead>
+                        <tbody><tr><td colspan="6" class="text-center text-muted">—</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modifiche prezzo --}}
+    <div class="col-lg-4">
+        <div class="panel panel-warning">
+            <div class="panel-heading" style="cursor:pointer;" data-toggle="collapse" data-target="#tbl-prezzi">
+                <i class="fa fa-tag"></i> Modifiche di Prezzo
+                <span class="badge pull-right" id="badge-prezzi">0</span>
+            </div>
+            <div class="panel-body collapse in" id="tbl-prezzi" style="padding:0;">
+                <div class="table-responsive">
+                    <table class="table table-condensed table-hover m-b-none" id="table-prezzi">
+                        <thead>
+                        <tr>
+                            <th>Ora</th>
+                            <th>Operatore</th>
+                            <th>Tav.</th>
+                            <th>Prodotto</th>
+                            <th class="text-right">Prima</th>
+                            <th class="text-right">Dopo</th>
+                        </tr>
+                        </thead>
+                        <tbody><tr><td colspan="6" class="text-center text-muted">—</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modifiche operatore --}}
+    <div class="col-lg-4">
+        <div class="panel panel-default">
+            <div class="panel-heading" style="cursor:pointer;" data-toggle="collapse" data-target="#tbl-modifiche">
+                <i class="fa fa-pencil"></i> Modifiche Operatore
+                <span class="badge pull-right" id="badge-modifiche">0</span>
+            </div>
+            <div class="panel-body collapse in" id="tbl-modifiche" style="padding:0;">
+                <div class="table-responsive">
+                    <table class="table table-condensed table-hover m-b-none" id="table-modifiche">
+                        <thead>
+                        <tr>
+                            <th>Ora</th>
+                            <th>Operatore</th>
+                            <th>Tav.</th>
+                            <th>Azione</th>
+                        </tr>
+                        </thead>
+                        <tbody><tr><td colspan="4" class="text-center text-muted">—</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 {{-- ══════════════════════════════════════════════════════════
@@ -397,6 +552,120 @@
             )
         },
         options: commonOptions()
+    });
+})();
+
+// ── Riepilogo Giornaliero ────────────────────────────────────────────────────
+(function () {
+    const fmt  = n => '€ ' + parseFloat(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dash = v => (v === undefined || v === null || v === '') ? '-' : v;
+
+    function renderCancellazioni(logs) {
+        if (!logs.length) return '<tr><td colspan="6" class="text-center text-muted">Nessuna cancellazione</td></tr>';
+        return logs.map(r =>
+            `<tr>
+                <td>${dash(r.time)}</td>
+                <td>${dash(r.operator)}</td>
+                <td>${dash(r.table)}</td>
+                <td>${dash(r.dish)}</td>
+                <td class="text-center">${dash(r.qty)}</td>
+                <td class="text-right">${r.price ? '€ ' + r.price : '-'}</td>
+            </tr>`
+        ).join('');
+    }
+
+    function renderPrezzi(logs) {
+        if (!logs.length) return '<tr><td colspan="6" class="text-center text-muted">Nessuna modifica prezzo</td></tr>';
+        return logs.map(r =>
+            `<tr>
+                <td>${dash(r.time)}</td>
+                <td>${dash(r.operator)}</td>
+                <td>${dash(r.table)}</td>
+                <td>${dash(r.dish)}</td>
+                <td class="text-right text-danger"><s>€ ${dash(r.price_before)}</s></td>
+                <td class="text-right text-success"><strong>€ ${dash(r.price_after)}</strong></td>
+            </tr>`
+        ).join('');
+    }
+
+    function renderModifiche(logs) {
+        if (!logs.length) return '<tr><td colspan="4" class="text-center text-muted">Nessuna modifica</td></tr>';
+        return logs.map(r =>
+            `<tr>
+                <td>${dash(r.time)}</td>
+                <td>${dash(r.operator)}</td>
+                <td>${dash(r.table)}</td>
+                <td><small>${dash(r.notes)}</small></td>
+            </tr>`
+        ).join('');
+    }
+
+    function loadDailyStats(date) {
+        $('#btn-load-daily').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+
+        $.get('{{ route("dashboard.daily-stats") }}', { date: date })
+            .done(function (data) {
+                $('#d-totale').text(fmt(data.totale));
+                $('#d-media').text(fmt(data.media));
+                $('#d-ordini').text(data.ordini);
+
+                const nC = data.cancellazioni.count;
+                const nP = data.modifiche_prezzo.count;
+                const nM = data.modifiche_operatore.count;
+
+                $('#d-cancellazioni').text(nC);
+                $('#d-prezzi').text(nP);
+                $('#d-modifiche').text(nM);
+
+                $('#badge-cancellazioni').text(nC);
+                $('#badge-prezzi').text(nP);
+                $('#badge-modifiche').text(nM);
+
+                $('#table-cancellazioni tbody').html(renderCancellazioni(data.cancellazioni.logs));
+                $('#table-prezzi tbody').html(renderPrezzi(data.modifiche_prezzo.logs));
+                $('#table-modifiche tbody').html(renderModifiche(data.modifiche_operatore.logs));
+
+                const now = new Date();
+                $('#daily-loaded-at').text(now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }));
+                $('#daily-cache-note').show();
+            })
+            .fail(function () {
+                toastr.error('Errore nel caricamento del riepilogo giornaliero');
+            })
+            .always(function () {
+                $('#btn-load-daily').prop('disabled', false).html('<i class="fa fa-refresh"></i> Aggiorna');
+            });
+    }
+
+    // Bottone invalida cache globale
+    $(function () {
+        $('#btn-clear-cache').on('click', function () {
+            const btn = $(this);
+            const date = $('#daily-date-picker').val();
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Aggiornamento...');
+            $.post('{{ route("dashboard.clear-cache") }}', { _token: '{{ csrf_token() }}', date: date })
+                .done(function () {
+                    toastr.success('Cache invalidata, ricarico i dati...');
+                    setTimeout(() => location.reload(), 800);
+                })
+                .fail(function () {
+                    toastr.error('Errore durante l\'invalidazione della cache');
+                    btn.prop('disabled', false).html('<i class="fa fa-refresh"></i> Aggiorna dati ora');
+                });
+        });
+    });
+
+    // Carica al primo avvio con la data di oggi
+    $(function () {
+        loadDailyStats($('#daily-date-picker').val());
+
+        $('#btn-load-daily').on('click', function () {
+            loadDailyStats($('#daily-date-picker').val());
+        });
+
+        $('#daily-date-picker').on('change', function () {
+            loadDailyStats($(this).val());
+        });
     });
 })();
 </script>

@@ -68,7 +68,7 @@ class RestaurantTable extends Model
     {
         $activeOrder = $this->activeOrder;
         if (isset($activeOrder)) {
-            return $activeOrder->autoconsumo ? 0 : $activeOrder->total;
+            return $activeOrder->autoconsumo ? 0 : $activeOrder->total_amount;
         }
         return 0;
     }

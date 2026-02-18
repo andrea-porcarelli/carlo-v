@@ -154,7 +154,7 @@
                                 <button class="action-btn-compact" id="btnModifyPayBill" style="background: #dc3545;">
                                     <i class="fas fa-money-bill"></i> INCASSA
                                 </button>
-                                <button class="action-btn-compact" id="btnModifyFreeAmount" style="background: #6c757d;">
+                                <button class="action-btn-compact" id="btnModifyFreeAmountIIn " style="background: #6c757d;">
                                     <i class="fas fa-eraser"></i> AUTOCONSUMO
                                 </button>
                                 <button class="action-btn-compact" id="btnModifyFreeTable" style="background: #ffc107; color: #000;">

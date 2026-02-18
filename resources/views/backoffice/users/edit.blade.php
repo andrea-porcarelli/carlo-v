@@ -2,13 +2,13 @@
 @section('breadcrumb')
     @include('backoffice.components.breadcrumb', [
         'level_1' => ['label' => 'Utenti', 'url' => route('users.index')],
-        'level_2' => ['label' => 'Modifica Utente: ' . $user->name],
+        'level_2' => ['label' => 'Modifica Utente: ' . $_user->name],
     ])
 @endsection
 @section('main-content')
     <div class="row">
         <div class="col-lg-12">
-            <form id="userForm" class="form-ajax" action="{{ route('users.edit', $user->id) }}" method="POST">
+            <form id="userForm" class="form-ajax" action="{{ route('users.edit', $_user->id) }}" method="POST">
                 @csrf
                 @method('PUT')
                 <div class="panel panel-default">
@@ -24,7 +24,7 @@
                                 'name' => 'name',
                                 'col' => 6,
                                 'required' => true,
-                                'value' => $user->name,
+                                'value' => $_user->name,
                                 'placeholder' => 'Es: Mario Rossi'
                             ])
 
@@ -33,8 +33,7 @@
                                 'name' => 'email',
                                 'col' => 6,
                                 'type' => 'email',
-                                'required' => true,
-                                'value' => $user->email,
+                                'value' => $_user->email,
                                 'placeholder' => 'Es: mario.rossi@example.com'
                             ])
 
@@ -44,7 +43,7 @@
                                 'col' => 6,
                                 'required' => true,
                                 'options' => $roles,
-                                'value' => $user->role
+                                'value' => $_user->role
                             ])
                         </div>
 
@@ -81,10 +80,10 @@
                                     <i class="fas fa-info-circle"></i>
                                     <strong>Info Account:</strong>
                                     <ul class="mb-0 mt-2">
-                                        <li>Utente creato il: <strong>{{ $user->created_at->format('d/m/Y H:i') }}</strong></li>
-                                        <li>Ultimo aggiornamento: <strong>{{ $user->updated_at->format('d/m/Y H:i') }}</strong></li>
-                                        @if($user->email_verified_at)
-                                            <li>Email verificata il: <strong>{{ $user->email_verified_at->format('d/m/Y H:i') }}</strong></li>
+                                        <li>Utente creato il: <strong>{{ $_user->created_at->format('d/m/Y H:i') }}</strong></li>
+                                        <li>Ultimo aggiornamento: <strong>{{ $_user->updated_at->format('d/m/Y H:i') }}</strong></li>
+                                        @if($_user->email_verified_at)
+                                            <li>Email verificata il: <strong>{{ $_user->email_verified_at->format('d/m/Y H:i') }}</strong></li>
                                         @else
                                             <li class="text-warning">Email non ancora verificata</li>
                                         @endif
@@ -99,7 +98,7 @@
                                 <i class="fas fa-arrow-left"></i> Torna alla lista
                             </a>
                             <div>
-                                @if(auth()->id() !== $user->id)
+                                @if(auth()->id() !== $_user->id)
                                     <button type="button" class="btn btn-danger" id="deleteUserBtn">
                                         <i class="fas fa-trash"></i> Elimina Utente
                                     </button>
@@ -153,7 +152,7 @@
             $('#deleteUserBtn').on('click', function() {
                 if (confirm('Sei sicuro di voler eliminare questo utente? Questa azione è irreversibile.')) {
                     $.ajax({
-                        url: '/backoffice/users/{{ $user->id }}',
+                        url: '/backoffice/users/{{ $_user->id }}',
                         type: 'DELETE',
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
