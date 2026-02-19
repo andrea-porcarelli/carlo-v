@@ -38,11 +38,11 @@ if [ ! -d "../vendor" ]; then
 fi
 
 # Migrazioni
-echo "🗄️ Migrazioni database..."
-docker compose exec app php artisan migrate --force
+#echo "🗄️ Migrazioni database..."
+#docker compose exec app php artisan migrate --force
 
-echo ""
+#echo ""
 echo "🎉 FATTO!"
-echo "App: http://localhost"
-echo "PhpMyAdmin: http://localhost:8080"
-echo "Backup: cd docker && ./backup.sh"
+#echo "App: http://localhost"
+#echo "PhpMyAdmin: http://localhost:8080"
+#echo "Backup: cd docker && ./backup.sh"
