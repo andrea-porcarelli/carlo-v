@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/',[AppController::class, 'index'])->name('app');
 
 // ── Deploy webhook — protected by hardcoded key, no auth middleware ────────────
-Route::post('/webhook/deploy', [DeployController::class, 'trigger'])->name('webhook.deploy');
+Route::match(['GET', 'POST'], '/webhook/deploy', [DeployController::class, 'trigger'])->name('webhook.deploy');
 
 // API Routes for Operator Authentication
 Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function() {

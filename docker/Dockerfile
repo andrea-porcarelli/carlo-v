@@ -21,8 +21,13 @@ RUN pecl install redis \
 # Installa Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Configura Git per evitare warning di ownership
-RUN git config --global --add safe.directory /var/www/html
+# Configura Git safe.directory per tutti gli utenti (system-wide)
+RUN git config --system --add safe.directory /var/www/html
+
+# Aggiunge www-data al gruppo 1001 (gid del proprietario dei file sul host)
+# così PHP-FPM può scrivere nella directory .git montata dal host
+RUN groupadd -g 1001 hostfiles 2>/dev/null || true && \
+    usermod -aG 1001 www-data
 
 WORKDIR /var/www/html
 
