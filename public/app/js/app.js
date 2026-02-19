@@ -69,7 +69,6 @@ $(document).ready(function() {
         if (typeof tableOrdersManager !== 'undefined') {
             tableOrdersManager.freeAmount();
             $('#modifyOrderOverlay').fadeOut(300);
-            console.error('test')
         }
     });
 
