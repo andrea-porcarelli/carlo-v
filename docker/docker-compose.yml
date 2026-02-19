@@ -14,6 +14,7 @@ services:
     build: .
     volumes:
       - ../:/var/www/html
+      - ./ssh:/ssh-keys:ro
     environment:
       DB_HOST: cv-mysql
       DB_DATABASE: carlov

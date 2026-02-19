@@ -1,4 +1,6 @@
 *.log
+/docker/ssh/id_ed25519
+/docker/ssh/id_ed25519.pub
 .DS_Store
 .env
 .env.backup
