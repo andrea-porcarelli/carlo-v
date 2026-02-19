@@ -471,17 +471,32 @@ class SyncService
             $params['since'] = $since;
         }
 
-        $response = Http::withHeaders([
-            'X-Sync-Token' => $this->apiToken,
-        ])->timeout($this->timeout)->get($url, $params);
+        $maxAttempts = 3;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $response = Http::withHeaders([
+                'X-Sync-Token' => $this->apiToken,
+            ])->timeout($this->timeout)->get($url, $params);
 
-        if (!$response->successful()) {
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            if ($response->status() === 429 && $attempt < $maxAttempts) {
+                $retryAfter = (int) ($response->header('Retry-After') ?: 61);
+                $retryAfter = min($retryAfter, 120);
+                Log::warning("Sync: rate limited (429) on '{$table}', retry in {$retryAfter}s (attempt {$attempt}/{$maxAttempts})");
+                sleep($retryAfter);
+                continue;
+            }
+
             throw new \RuntimeException(
                 "Peer returned HTTP {$response->status()} for table '{$table}': {$response->body()}"
             );
         }
 
-        return $response->json();
+        throw new \RuntimeException(
+            "Peer returned HTTP 429 for table '{$table}' after {$maxAttempts} attempts"
+        );
     }
 
     /**
