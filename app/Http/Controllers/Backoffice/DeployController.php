@@ -45,7 +45,7 @@ class DeployController extends BaseController
             $returnVar = 0;
 
             // Esegui git pull nella directory del progetto
-            exec("cd {$projectPath} && git pull 2>&1", $output, $returnVar);
+            exec("git -C " . escapeshellarg($projectPath) . " -c safe.directory=" . escapeshellarg($projectPath) . " pull 2>&1", $output, $returnVar);
 
             $result = implode("\n", $output);
 
