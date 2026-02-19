@@ -12,7 +12,7 @@ class SyncController extends BaseController
     public function trigger(): JsonResponse
     {
         try {
-            $service = new SyncService('web');
+            $service = new SyncService(config('sync.role'));
             $results = $service->runFullSync();
 
             return $this->success(['results' => $results]);
