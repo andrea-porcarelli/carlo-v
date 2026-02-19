@@ -216,7 +216,7 @@ class SyncService
                     $upsertKey = config("sync.upsert_keys.{$table}", 'id');
 
                     foreach ($data as $record) {
-                        $record = (array) $record;
+                        $record = $this->normalizeDateFields((array) $record);
 
                         // Track latest updated_at
                         if (!empty($record['updated_at'])) {
@@ -294,7 +294,7 @@ class SyncService
                 DB::table($table)->truncate();
                 foreach (array_chunk($data, 500) as $chunk) {
                     $rows = array_map(function ($record) use (&$latestUpdatedAt) {
-                        $record = (array) $record;
+                        $record = $this->normalizeDateFields((array) $record);
                         if (!empty($record['updated_at']) && (!$latestUpdatedAt || $record['updated_at'] > $latestUpdatedAt)) {
                             $latestUpdatedAt = $record['updated_at'];
                         }
@@ -306,7 +306,7 @@ class SyncService
             } else {
                 // Incremental: upsert by id
                 foreach ($data as $record) {
-                    $record = (array) $record;
+                    $record = $this->normalizeDateFields((array) $record);
 
                     if (!empty($record['updated_at']) && (!$latestUpdatedAt || $record['updated_at'] > $latestUpdatedAt)) {
                         $latestUpdatedAt = $record['updated_at'];
@@ -539,5 +539,20 @@ class SyncService
         foreach ($settings as $setting) {
             Cache::forget("setting_{$setting->key}");
         }
+    }
+
+    /**
+     * Convert ISO 8601 datetime strings (e.g. "2025-12-06T11:46:53.000000Z")
+     * to MySQL format ("2025-12-06 11:46:53") for all fields in a record.
+     */
+    protected function normalizeDateFields(array $record): array
+    {
+        foreach ($record as $key => $value) {
+            if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $value)) {
+                $record[$key] = Carbon::parse($value)->format('Y-m-d H:i:s');
+            }
+        }
+
+        return $record;
     }
 }
