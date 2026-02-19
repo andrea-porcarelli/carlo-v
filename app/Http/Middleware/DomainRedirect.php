@@ -26,6 +26,11 @@ class DomainRedirect
             return $next($request);
         }
 
+        // Allow deploy webhook through without domain restrictions
+        if ($path === 'webhook/deploy') {
+            return $next($request);
+        }
+
         // Check if we are NOT in the /backoffice path AND NOT on internal.carlov.it domain
         $isNotBackoffice = !str_starts_with($path, 'backoffice');
         $isNotInternalDomain = $host !== 'internal.carlov.it';

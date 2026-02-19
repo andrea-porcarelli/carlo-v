@@ -42,7 +42,8 @@ class DeployController extends BaseController
         $repoPath = base_path();
 
         $command = sprintf(
-            'git -C %s pull 2>&1',
+            'git -C %s -c safe.directory=%s pull 2>&1',
+            escapeshellarg($repoPath),
             escapeshellarg($repoPath)
         );
 

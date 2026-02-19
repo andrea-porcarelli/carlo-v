@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(SyncMaintenance::class);
         $middleware->append(DomainRedirect::class);
+        $middleware->validateCsrfTokens(except: [
+            'webhook/deploy',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
