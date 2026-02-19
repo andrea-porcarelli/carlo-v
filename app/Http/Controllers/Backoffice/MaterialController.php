@@ -42,7 +42,7 @@ class MaterialController extends BaseController
                    return $item->dishes->count();
                 })
                 ->addColumn('stock', function ($item) use ($stockService) {
-                    $stockSummary =  $stockService->getMovements($item->id);
+                    $stockSummary = $stockService->calculateStock($item);
                     return $stockSummary['current'] . ' ' . $item->stock_type;
                 })
                 ->rawColumns(['dishes', 'printer'])
