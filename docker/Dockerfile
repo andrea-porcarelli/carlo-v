@@ -31,5 +31,10 @@ RUN groupadd -g 1001 hostfiles 2>/dev/null || true && \
 
 WORKDIR /var/www/html
 
+# Entrypoint: fix .git ownership at container startup so www-data can run git pull
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 9000
+ENTRYPOINT ["entrypoint.sh"]
 CMD ["php-fpm"]
