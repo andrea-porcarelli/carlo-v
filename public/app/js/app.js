@@ -285,9 +285,16 @@ $(document).ready(function() {
         }
     });
 
-    $('#btnAddInvoiceRow').click(function() {
+    // Split selector
+    $('#btnSplitMinus').click(function() {
         if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager._addInvoiceRow('');
+            tableOrdersManager._changeSplit(-1);
+        }
+    });
+
+    $('#btnSplitPlus').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager._changeSplit(1);
         }
     });
 

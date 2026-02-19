@@ -1276,14 +1276,48 @@ class TableOrdersManager {
     }
 
     /**
-     * Execute payment with specified method (pos/contanti)
+     * Execute payment with specified method (pos/contanti).
+     * When method is 'pos', first sends a charge request to the physical POS terminal
+     * via the backend TCP/JSONPOS bridge; proceeds with closing the order only on approval.
      */
     async executePayment(method) {
         if (!this.currentTable) return;
 
         this.closePaymentMethodModal();
 
-        // Request operator authentication
+        // ── POS terminal charge (only for 'pos' payments) ─────────────────────
+        if (method === 'pos') {
+            this.showNotification('POS in attesa di pagamento...', 'info');
+
+            try {
+                const posResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pos-charge`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    },
+                });
+
+                const posResult = await posResp.json();
+
+                if (!posResult.success) {
+                    // Hard failure — POS declined or unreachable
+                    this.showNotification(posResult.message || 'Pagamento POS rifiutato', 'error');
+                    return;
+                }
+
+                if (!posResult.pos_skipped) {
+                    // Real POS approval — notify operator
+                    this.showNotification('Pagamento POS approvato', 'success');
+                }
+            } catch (error) {
+                console.error('POS charge error:', error);
+                this.showNotification('Errore comunicazione POS', 'error');
+                return;
+            }
+        }
+
+        // ── Operator authentication ────────────────────────────────────────────
         let auth;
         try {
             auth = await operatorAuthManager.requestAuth();
@@ -1293,6 +1327,7 @@ class TableOrdersManager {
             return;
         }
 
+        // ── Close the order ────────────────────────────────────────────────────
         try {
             const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
                 method: 'POST',
@@ -1351,7 +1386,7 @@ class TableOrdersManager {
     }
 
     /**
-     * Open invoice modal for fattura payment
+     * Open invoice modal — default 1 invoice for the full total
      */
     openInvoiceModal() {
         if (!this.currentTable || !this.currentTable.order) return;
@@ -1365,23 +1400,15 @@ class TableOrdersManager {
         const total = parseFloat(order.total_amount);
         const covers = order.covers || 1;
 
-        // Set header info
         document.getElementById('invoiceTableNumber').textContent = this.currentTable.table.table_number;
         document.getElementById('invoiceTotalTable').textContent = `€${total.toFixed(2)}`;
         document.getElementById('invoiceCoversCount').textContent = covers > 0 ? `${covers} cop.` : 'Bevande';
 
-        // Clear rows and add one row per cover (or 1 if 0 covers)
-        document.getElementById('invoiceRowsContainer').innerHTML = '';
+        // Always start with split = 1 (single invoice for the full amount)
+        this._invoiceSplit = 1;
         this._invoiceRowIndex = 0;
-
-        const defaultRows = covers > 0 ? covers : 1;
-        const perCoverAmount = covers > 0 ? (total / covers) : total;
-
-        for (let i = 0; i < defaultRows; i++) {
-            this._addInvoiceRow(perCoverAmount.toFixed(2));
-        }
-
-        this._updateInvoiceTotals();
+        document.getElementById('invoiceSplitCount').textContent = '1';
+        this._rebuildInvoiceRows();
 
         modal.style.display = 'flex';
     }
@@ -1395,84 +1422,136 @@ class TableOrdersManager {
     }
 
     /**
-     * Add an invoice row to the modal
+     * Change the split count by delta (+1 or -1) and rebuild rows
      */
-    _addInvoiceRow(defaultAmount = '') {
-        const idx = this._invoiceRowIndex++;
+    _changeSplit(delta) {
+        if (!this.currentTable || !this.currentTable.order) return;
+        const covers = this.currentTable.order.covers || 1;
+        const maxSplit = Math.max(covers, 20);
+        const next = Math.min(maxSplit, Math.max(1, (this._invoiceSplit || 1) + delta));
+        if (next === this._invoiceSplit) return;
+        this._invoiceSplit = next;
+        document.getElementById('invoiceSplitCount').textContent = next;
+        this._rebuildInvoiceRows();
+    }
+
+    /**
+     * Rebuild invoice rows to match current split count.
+     * Preserves descriptions and customer info already typed.
+     */
+    _rebuildInvoiceRows() {
+        if (!this.currentTable || !this.currentTable.order) return;
+
+        const total  = parseFloat(this.currentTable.order.total_amount) || 0;
+        const n      = this._invoiceSplit || 1;
+        const perRow = parseFloat((total / n).toFixed(2));
+
+        // Save existing per-row data (description, name, tax code) before clearing
+        const saved = [];
+        document.querySelectorAll('.invoice-row').forEach(row => {
+            saved.push({
+                description:   row.querySelector('.invoice-description')?.value   || 'Pasto completo',
+                customerName:  row.querySelector('.invoice-customer-name')?.value || '',
+                taxCode:       row.querySelector('.invoice-tax-code')?.value       || '',
+            });
+        });
+
+        document.getElementById('invoiceRowsContainer').innerHTML = '';
+        this._invoiceRowIndex = 0;
+
+        for (let i = 0; i < n; i++) {
+            // Last row gets the remainder to avoid rounding gaps
+            const amount = i < n - 1 ? perRow : parseFloat((total - perRow * (n - 1)).toFixed(2));
+            const prev   = saved[i] || {};
+            this._addInvoiceRow(
+                amount,
+                prev.description  || 'Pasto completo',
+                prev.customerName || '',
+                prev.taxCode      || ''
+            );
+        }
+
+        // Update per-person amount display
+        document.getElementById('invoicePerPersonAmount').textContent = `€${perRow.toFixed(2)}`;
+
+        this._updateInvoiceTotals();
+    }
+
+    /**
+     * Add a single invoice row
+     */
+    _addInvoiceRow(defaultAmount = '', description = 'Pasto completo', customerName = '', taxCode = '') {
+        const idx       = this._invoiceRowIndex++;
         const container = document.getElementById('invoiceRowsContainer');
-        const empty = document.getElementById('invoiceRowsEmpty');
-        if (empty) empty.style.display = 'none';
+        const rowNum    = idx + 1;
 
         const row = document.createElement('div');
-        row.className = 'invoice-row';
+        row.className    = 'invoice-row';
         row.dataset.rowIdx = idx;
         row.innerHTML = `
-            <button class="btn-remove-invoice-row" onclick="tableOrdersManager._removeInvoiceRow(${idx})" title="Rimuovi">
+            <span class="invoice-row-badge">Ospite ${rowNum}</span>
+            <button class="btn-remove-invoice-row" onclick="tableOrdersManager._removeInvoiceRow(${idx})" title="Rimuovi ospite">
                 <i class="fas fa-times"></i>
             </button>
-            <div style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; align-items: end;">
+            <div style="display: grid; grid-template-columns: 120px 1fr 160px; gap: 10px; align-items: end;">
                 <div>
                     <label>Importo (€)</label>
-                    <input type="number" class="invoice-amount" step="0.01" min="0" value="${defaultAmount}" placeholder="0.00" oninput="tableOrdersManager._updateInvoiceTotals()">
+                    <input type="number" class="invoice-amount" step="0.01" min="0"
+                           value="${parseFloat(defaultAmount).toFixed(2)}" placeholder="0.00"
+                           oninput="tableOrdersManager._updateInvoiceTotals()">
                 </div>
                 <div>
                     <label>Descrizione fattura</label>
-                    <input type="text" class="invoice-description" value="Pasto completo" placeholder="Pasto completo">
+                    <input type="text" class="invoice-description"
+                           value="${description}" placeholder="Pasto completo">
                 </div>
                 <div>
                     <label>Nome ospite (opz.)</label>
-                    <input type="text" class="invoice-customer-name" placeholder="Mario Rossi">
+                    <input type="text" class="invoice-customer-name"
+                           value="${customerName}" placeholder="Mario Rossi">
                 </div>
             </div>
             <div style="margin-top: 8px;">
                 <label>Codice fiscale / P.IVA (opz.)</label>
-                <input type="text" class="invoice-tax-code" placeholder="RSSMRA80A01H501U" style="max-width: 260px;">
+                <input type="text" class="invoice-tax-code"
+                       value="${taxCode}" placeholder="RSSMRA80A01H501U" style="max-width: 260px;">
             </div>
         `;
         container.appendChild(row);
-        this._updateInvoiceTotals();
     }
 
     /**
-     * Remove an invoice row
+     * Remove a row manually (doesn't affect the split counter display)
      */
     _removeInvoiceRow(idx) {
         const row = document.querySelector(`.invoice-row[data-row-idx="${idx}"]`);
         if (row) row.remove();
-
-        const container = document.getElementById('invoiceRowsContainer');
-        const empty = document.getElementById('invoiceRowsEmpty');
-        if (empty) empty.style.display = container.children.length === 0 ? 'block' : 'none';
-
         this._updateInvoiceTotals();
     }
 
     /**
-     * Recalculate totals in invoice modal
+     * Recalculate remaining amount
      */
     _updateInvoiceTotals() {
         if (!this.currentTable || !this.currentTable.order) return;
 
-        const total = parseFloat(this.currentTable.order.total_amount) || 0;
-        let invoiced = 0;
-
+        const total    = parseFloat(this.currentTable.order.total_amount) || 0;
+        let   invoiced = 0;
         document.querySelectorAll('.invoice-amount').forEach(input => {
             invoiced += parseFloat(input.value) || 0;
         });
 
-        const remaining = Math.max(0, total - invoiced);
+        const remaining = Math.max(0, parseFloat((total - invoiced).toFixed(2)));
 
-        document.getElementById('invoiceTotalInvoiced').textContent = `€${invoiced.toFixed(2)}`;
-
-        const remainingEl = document.getElementById('invoiceRemainingDisplay');
-        const remainingLabel = document.getElementById('invoiceRemainingLabel');
+        const remainingEl      = document.getElementById('invoiceRemainingDisplay');
+        const remainingLabel   = document.getElementById('invoiceRemainingLabel');
         const remainingSection = document.getElementById('invoiceRemainingSection');
 
         if (remainingEl) {
-            remainingEl.textContent = `€${remaining.toFixed(2)}`;
-            remainingEl.style.color = remaining > 0.01 ? '#dc3545' : '#28a745';
+            remainingEl.textContent  = `€${remaining.toFixed(2)}`;
+            remainingEl.style.color  = remaining > 0.01 ? '#dc3545' : '#28a745';
         }
-        if (remainingLabel) remainingLabel.textContent = `€${remaining.toFixed(2)}`;
+        if (remainingLabel)   remainingLabel.textContent                        = `€${remaining.toFixed(2)}`;
         if (remainingSection) remainingSection.style.display = remaining > 0.01 ? 'block' : 'none';
     }
 

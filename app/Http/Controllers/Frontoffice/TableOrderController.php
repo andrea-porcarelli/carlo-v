@@ -11,6 +11,7 @@ use App\Models\RestaurantTable;
 use App\Models\TableOrder;
 use App\Services\FattureInCloudService;
 use App\Services\TableOrderLoggerService;
+use App\Services\VegaPosService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -1247,6 +1248,53 @@ class TableOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Errore nell\'aggiornamento del prezzo',
+            ], 500);
+        }
+    }
+
+    /**
+     * Send a purchase request to the local POS terminal (VEGA3000 via JSONPOS TCP).
+     * Does NOT close the order — the frontend calls /pay afterwards on success.
+     */
+    public function posCharge(RestaurantTable $table): JsonResponse
+    {
+        try {
+            $order = $table->activeOrder;
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nessun ordine attivo per questo tavolo',
+                ], 404);
+            }
+
+            $posService = app(VegaPosService::class);
+
+            if (!$posService->isConfigured()) {
+                // POS not configured — let the frontend proceed with the normal payment flow
+                return response()->json([
+                    'success'     => true,
+                    'pos_skipped' => true,
+                    'message'     => 'Terminale POS non configurato — pagamento manuale',
+                ]);
+            }
+
+            $result = $posService->sendPurchase(
+                (float) $order->total_amount,
+                'ORD-' . $order->id
+            );
+
+            return response()->json([
+                'success'       => $result['success'],
+                'pos_skipped'   => false,
+                'response_code' => $result['response_code'],
+                'message'       => $result['message'],
+            ], $result['success'] ? 200 : 402);
+
+        } catch (\Exception $e) {
+            Log::error('Error in posCharge: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore comunicazione POS',
             ], 500);
         }
     }

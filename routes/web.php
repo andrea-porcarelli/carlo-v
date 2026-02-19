@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Backoffice\AllergenController;
+use App\Http\Controllers\Backoffice\DeployController;
 use App\Http\Controllers\Backoffice\CategoryController;
 use App\Http\Controllers\Backoffice\DishController;
 use App\Http\Controllers\Backoffice\InvoiceController;
@@ -25,6 +26,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/',[AppController::class, 'index'])->name('app');
 
+// ── Deploy webhook — protected by hardcoded key, no auth middleware ────────────
+Route::post('/webhook/deploy', [DeployController::class, 'trigger'])->name('webhook.deploy');
+
 // API Routes for Operator Authentication
 Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function() {
     Route::get('/', [OperatorAuthController::class, 'getOperators'])->name('list');
@@ -43,6 +47,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::delete('/items/{item}', [TableOrderController::class, 'removeItem'])->name('removeItem');
     Route::post('/{table}/clear', [TableOrderController::class, 'clearTable'])->name('clear');
     Route::post('/{table}/free-amount', [TableOrderController::class, 'freeAmount'])->name('free-amount');
+    Route::post('/{table}/pos-charge', [TableOrderController::class, 'posCharge'])->name('posCharge');
     Route::post('/{table}/pay', [TableOrderController::class, 'payTable'])->name('pay');
     Route::post('/{table}/pay-invoice', [TableOrderController::class, 'payTableInvoice'])->name('payInvoice');
     Route::post('/{table}/marcia', [TableOrderController::class, 'marciaTable'])->name('marcia');
