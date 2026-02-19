@@ -63,6 +63,267 @@ class SyncService
     }
 
     /**
+     * Generate a ZIP of local master tables and POST it to the peer.
+     */
+    public function runPushZipSync(): array
+    {
+        $role = config('sync.role');
+        $masterTables = config("sync.master_tables.{$role}", []);
+        $softDeleteTables = config('sync.soft_delete_tables', []);
+        $pivotTables = config('sync.pivot_tables', []);
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'carlov_push_') . '.zip';
+
+        try {
+            $zip = new \ZipArchive();
+            if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+                throw new \RuntimeException('Could not create push ZIP archive');
+            }
+
+            foreach ($masterTables as $table) {
+                if (in_array($table, $pivotTables)) {
+                    $records = DB::table($table)->orderBy('id')->get()->map(fn($r) => (array) $r)->toArray();
+                    $deletedIds = [];
+                } else {
+                    $modelClass = config("sync.models.{$table}");
+                    if (!$modelClass || !class_exists($modelClass)) {
+                        continue;
+                    }
+                    $query = $modelClass::query();
+                    if (in_array($table, $softDeleteTables)) {
+                        $query->withTrashed();
+                    }
+                    $records = $query->orderBy('id')->get()->toArray();
+                    $deletedIds = in_array($table, $softDeleteTables)
+                        ? $modelClass::onlyTrashed()->pluck('id')->toArray()
+                        : [];
+                }
+
+                $zip->addFromString("{$table}.json", json_encode([
+                    'table'       => $table,
+                    'data'        => $records,
+                    'deleted_ids' => $deletedIds,
+                ]));
+            }
+
+            $zip->addFromString('manifest.json', json_encode([
+                'role'        => $role,
+                'tables'      => $masterTables,
+                'exported_at' => now()->toIso8601String(),
+            ]));
+
+            $zip->close();
+
+            $response = Http::withHeaders([
+                'X-Sync-Token' => $this->apiToken,
+            ])->timeout($this->timeout)
+                ->attach('zip_file', file_get_contents($zipPath), 'sync_export.zip')
+                ->post("{$this->peerUrl}/api/sync/import-zip");
+
+            if (!$response->successful()) {
+                throw new \RuntimeException("Push sync failed: HTTP {$response->status()}: {$response->body()}");
+            }
+
+            return $response->json('results', []);
+        } finally {
+            if (file_exists($zipPath)) {
+                unlink($zipPath);
+            }
+        }
+    }
+
+    /**
+     * Import tables from an already-opened ZipArchive (used by import-zip endpoint).
+     */
+    public function importFromZip(\ZipArchive $zip): array
+    {
+        $manifestJson = $zip->getFromName('manifest.json');
+        $manifest = $manifestJson ? json_decode($manifestJson, true) : [];
+        $peerRole = $manifest['role'] ?? $this->getPeerRole();
+
+        $tables = config("sync.sync_order.{$peerRole}", []);
+        $results = [];
+
+        foreach ($tables as $table) {
+            $json = $zip->getFromName("{$table}.json");
+            if ($json === false) {
+                continue;
+            }
+
+            $tableData = json_decode($json, true);
+            $results[$table] = $this->syncTableFromData(
+                $table,
+                $tableData['data'] ?? [],
+                $tableData['deleted_ids'] ?? [],
+                $peerRole
+            );
+        }
+
+        return $results;
+    }
+
+    /**
+     * Download a ZIP from the peer containing all tables and import locally.
+     */
+    public function runZipSync(): array
+    {
+        Cache::put('sync_in_progress', true);
+
+        $zipPath = null;
+        try {
+            $zipPath = tempnam(sys_get_temp_dir(), 'carlov_sync_') . '.zip';
+
+            $response = Http::withHeaders([
+                'X-Sync-Token' => $this->apiToken,
+            ])->timeout($this->timeout)->sink($zipPath)->get("{$this->peerUrl}/api/sync/export-zip");
+
+            if (!$response->successful()) {
+                throw new \RuntimeException("Failed to download sync ZIP: HTTP {$response->status()}");
+            }
+
+            $zip = new \ZipArchive();
+            if ($zip->open($zipPath) !== true) {
+                throw new \RuntimeException("Failed to open sync ZIP archive");
+            }
+
+            $manifestJson = $zip->getFromName('manifest.json');
+            $manifest = $manifestJson ? json_decode($manifestJson, true) : [];
+            $peerRole = $manifest['role'] ?? $this->getPeerRole();
+
+            $tables = config("sync.sync_order.{$peerRole}", []);
+            $results = [];
+
+            foreach ($tables as $table) {
+                $json = $zip->getFromName("{$table}.json");
+                if ($json === false) {
+                    Log::warning("Sync ZIP: missing file for table '{$table}'");
+                    continue;
+                }
+
+                $tableData = json_decode($json, true);
+                $results[$table] = $this->syncTableFromData(
+                    $table,
+                    $tableData['data'] ?? [],
+                    $tableData['deleted_ids'] ?? [],
+                    $peerRole
+                );
+            }
+
+            $zip->close();
+
+            if ($peerRole === 'web') {
+                $results['media_files'] = $this->syncMediaFiles();
+            }
+
+            return $results;
+        } finally {
+            Cache::forget('sync_in_progress');
+            if ($zipPath && file_exists($zipPath)) {
+                unlink($zipPath);
+            }
+        }
+    }
+
+    /**
+     * Import a single table from pre-loaded data (used by ZIP sync).
+     */
+    protected function syncTableFromData(string $table, array $data, array $deletedIds, string $peerRole): array
+    {
+        $start = microtime(true);
+
+        $log = SyncLog::create([
+            'direction'    => "pull_from_{$peerRole}",
+            'peer_role'    => $peerRole,
+            'table_name'   => $table,
+            'status'       => 'running',
+            'triggered_by' => $this->triggeredBy,
+        ]);
+
+        try {
+            $watermark = SyncWatermark::getWatermark($table);
+            $totalCreated = 0;
+            $totalUpdated = 0;
+            $totalDeleted = 0;
+            $totalSkipped = 0;
+            $latestUpdatedAt = $watermark;
+
+            if (!empty($data)) {
+                $pivotTables = config('sync.pivot_tables', []);
+                if (in_array($table, $pivotTables)) {
+                    $result = $this->importPivotData($table, $data, $watermark);
+                } else {
+                    $result = $this->importModelData($table, $data);
+                }
+
+                $totalCreated += $result['created'];
+                $totalUpdated += $result['updated'];
+                $totalSkipped += $result['skipped'];
+
+                if (!empty($result['latest_updated_at'])) {
+                    $candidate = Carbon::parse($result['latest_updated_at']);
+                    if (!$latestUpdatedAt || $candidate->gt($latestUpdatedAt)) {
+                        $latestUpdatedAt = $candidate;
+                    }
+                }
+            }
+
+            if (!empty($deletedIds)) {
+                $totalDeleted += $this->applySoftDeletes($table, $deletedIds);
+            }
+
+            if ($latestUpdatedAt) {
+                SyncWatermark::setWatermark($table, $latestUpdatedAt);
+            }
+
+            if ($table === 'settings') {
+                $this->invalidateSettingsCache();
+            }
+
+            $durationMs = (int) ((microtime(true) - $start) * 1000);
+            $totalImported = $totalCreated + $totalUpdated;
+
+            $log->update([
+                'status'           => 'success',
+                'records_exported' => count($data),
+                'records_imported' => $totalImported,
+                'records_created'  => $totalCreated,
+                'records_updated'  => $totalUpdated,
+                'records_deleted'  => $totalDeleted,
+                'records_skipped'  => $totalSkipped,
+                'last_synced_at'   => now(),
+                'duration_ms'      => $durationMs,
+            ]);
+
+            return [
+                'status'      => 'success',
+                'exported'    => count($data),
+                'created'     => $totalCreated,
+                'updated'     => $totalUpdated,
+                'deleted'     => $totalDeleted,
+                'skipped'     => $totalSkipped,
+                'duration_ms' => $durationMs,
+            ];
+        } catch (\Throwable $e) {
+            $durationMs = (int) ((microtime(true) - $start) * 1000);
+
+            $log->update([
+                'status'        => 'failed',
+                'error_message' => $e->getMessage(),
+                'last_synced_at' => now(),
+                'duration_ms'   => $durationMs,
+            ]);
+
+            Log::error("Sync failed for table '{$table}': {$e->getMessage()}", ['exception' => $e]);
+
+            return [
+                'status'      => 'failed',
+                'error'       => $e->getMessage(),
+                'duration_ms' => $durationMs,
+            ];
+        }
+    }
+
+    /**
      * Sync a single table from the peer.
      */
     public function syncTable(string $table): array

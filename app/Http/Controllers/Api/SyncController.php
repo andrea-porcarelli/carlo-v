@@ -133,6 +133,84 @@ class SyncController extends Controller
         ]);
     }
 
+    public function exportZip(): BinaryFileResponse|JsonResponse
+    {
+        $role = config('sync.role');
+        $masterTables = config("sync.master_tables.{$role}", []);
+        $softDeleteTables = config('sync.soft_delete_tables', []);
+        $pivotTables = config('sync.pivot_tables', []);
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'carlov_sync_') . '.zip';
+        $zip = new \ZipArchive();
+
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            return response()->json(['error' => 'Could not create ZIP archive'], 500);
+        }
+
+        foreach ($masterTables as $table) {
+            if (in_array($table, $pivotTables)) {
+                $records = DB::table($table)->orderBy('id')->get()->map(fn($r) => (array) $r)->toArray();
+                $deletedIds = [];
+            } else {
+                $modelClass = config("sync.models.{$table}");
+                if (!$modelClass || !class_exists($modelClass)) {
+                    continue;
+                }
+
+                $query = $modelClass::query();
+                if (in_array($table, $softDeleteTables)) {
+                    $query->withTrashed();
+                }
+                $records = $query->orderBy('id')->get()->toArray();
+
+                $deletedIds = in_array($table, $softDeleteTables)
+                    ? $modelClass::onlyTrashed()->pluck('id')->toArray()
+                    : [];
+            }
+
+            $zip->addFromString("{$table}.json", json_encode([
+                'table'       => $table,
+                'data'        => $records,
+                'deleted_ids' => $deletedIds,
+            ]));
+        }
+
+        $zip->addFromString('manifest.json', json_encode([
+            'role'        => $role,
+            'tables'      => $masterTables,
+            'exported_at' => now()->toIso8601String(),
+        ]));
+
+        $zip->close();
+
+        return response()->download($zipPath, 'sync_export.zip', [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
+    }
+
+    public function importZip(\Illuminate\Http\Request $request): JsonResponse
+    {
+        if (!$request->hasFile('zip_file')) {
+            return response()->json(['error' => 'No ZIP file provided'], 422);
+        }
+
+        $zipPath = $request->file('zip_file')->getPathname();
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath) !== true) {
+            return response()->json(['error' => 'Invalid ZIP file'], 422);
+        }
+
+        try {
+            $service = new \App\Services\SyncService('peer_push');
+            $results = $service->importFromZip($zip);
+        } finally {
+            $zip->close();
+        }
+
+        return response()->json(['success' => true, 'results' => $results]);
+    }
+
     public function exportMedia(int $mediaId): BinaryFileResponse|JsonResponse
     {
         $role = config('sync.role');

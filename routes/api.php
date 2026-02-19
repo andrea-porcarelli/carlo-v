@@ -7,5 +7,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('sync')->middleware(SyncTokenAuth::class)->withoutMiddleware('throttle:api')->group(function () {
     Route::get('/status', [SyncController::class, 'status']);
     Route::get('/export/{table}', [SyncController::class, 'export']);
+    Route::get('/export-zip', [SyncController::class, 'exportZip']);
+    Route::post('/import-zip', [SyncController::class, 'importZip']);
     Route::get('/export-media/{mediaId}', [SyncController::class, 'exportMedia']);
 });

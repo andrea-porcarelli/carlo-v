@@ -6,6 +6,7 @@ use App\Models\SyncLog;
 use App\Models\SyncWatermark;
 use App\Services\SyncService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class SyncController extends BaseController
 {
@@ -13,14 +14,34 @@ class SyncController extends BaseController
     {
         set_time_limit(0);
 
-        try {
-            $service = new SyncService(config('sync.role'));
-            $results = $service->runFullSync();
+        $service = new SyncService(config('sync.role'));
+        $results = [];
+        $errors = [];
 
-            return $this->success(['results' => $results]);
+        // Pull: scarica i dati del peer e importa in locale
+        try {
+            $results = array_merge($results, $service->runZipSync());
         } catch (\Throwable $e) {
-            return $this->exception($e);
+            $errors['pull'] = $e->getMessage();
+            Log::warning('Sync pull failed: ' . $e->getMessage());
         }
+
+        // Push: invia i dati locali al peer
+        try {
+            $results = array_merge($results, $service->runPushZipSync());
+        } catch (\Throwable $e) {
+            $errors['push'] = $e->getMessage();
+            Log::warning('Sync push failed: ' . $e->getMessage());
+        }
+
+        if (!empty($errors) && empty($results)) {
+            return $this->exception(new \RuntimeException(implode(' | ', $errors)));
+        }
+
+        return $this->success([
+            'results' => $results,
+            'errors'  => $errors ?: null,
+        ]);
     }
 
     public function status(): JsonResponse
