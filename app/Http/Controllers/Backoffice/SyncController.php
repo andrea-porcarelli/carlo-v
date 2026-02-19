@@ -11,6 +11,8 @@ class SyncController extends BaseController
 {
     public function trigger(): JsonResponse
     {
+        set_time_limit(0);
+
         try {
             $service = new SyncService(config('sync.role'));
             $results = $service->runFullSync();
