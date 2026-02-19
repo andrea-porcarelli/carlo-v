@@ -177,19 +177,32 @@ class SyncService
         $tables = config("sync.sync_order.{$peerRole}", []);
         $results = [];
 
+        $failedTables = [];
         foreach ($tables as $table) {
             $json = $zip->getFromName("{$table}.json");
             if ($json === false) {
                 continue;
             }
 
+            if ($this->hasDependencyFailed($table, $failedTables)) {
+                Log::warning("[Sync] Skipping '{$table}': dependency failed", ['failed_deps' => $this->getFailedDependencies($table, $failedTables)]);
+                $results[$table] = ['status' => 'skipped', 'reason' => 'dependency_failed'];
+                continue;
+            }
+
             $tableData = json_decode($json, true);
-            $results[$table] = $this->syncTableFromData(
+            $result = $this->syncTableFromData(
                 $table,
                 $tableData['data'] ?? [],
                 $tableData['deleted_ids'] ?? [],
                 $peerRole
             );
+
+            if (($result['status'] ?? '') === 'failed') {
+                $failedTables[] = $table;
+            }
+
+            $results[$table] = $result;
         }
 
         return $results;
@@ -245,6 +258,7 @@ class SyncService
             $tables = config("sync.sync_order.{$peerRole}", []);
             $results = [];
 
+            $failedTables = [];
             foreach ($tables as $table) {
                 $json = $zip->getFromName("{$table}.json");
                 if ($json === false) {
@@ -252,13 +266,25 @@ class SyncService
                     continue;
                 }
 
+                if ($this->hasDependencyFailed($table, $failedTables)) {
+                    Log::warning("[Sync] Skipping '{$table}': dependency failed", ['failed_deps' => $this->getFailedDependencies($table, $failedTables)]);
+                    $results[$table] = ['status' => 'skipped', 'reason' => 'dependency_failed'];
+                    continue;
+                }
+
                 $tableData = json_decode($json, true);
-                $results[$table] = $this->syncTableFromData(
+                $result = $this->syncTableFromData(
                     $table,
                     $tableData['data'] ?? [],
                     $tableData['deleted_ids'] ?? [],
                     $peerRole
                 );
+
+                if (($result['status'] ?? '') === 'failed') {
+                    $failedTables[] = $table;
+                }
+
+                $results[$table] = $result;
             }
 
             $zip->close();
@@ -893,6 +919,17 @@ class SyncService
         foreach ($settings as $setting) {
             Cache::forget("setting_{$setting->key}");
         }
+    }
+
+    protected function hasDependencyFailed(string $table, array $failedTables): bool
+    {
+        return !empty($this->getFailedDependencies($table, $failedTables));
+    }
+
+    protected function getFailedDependencies(string $table, array $failedTables): array
+    {
+        $deps = config("sync.table_dependencies.{$table}", []);
+        return array_values(array_intersect($deps, $failedTables));
     }
 
     /**

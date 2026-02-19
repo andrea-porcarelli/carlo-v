@@ -138,6 +138,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Table FK Dependencies
+    |--------------------------------------------------------------------------
+    |
+    | Explicit FK dependencies between synced tables.
+    | If a parent table fails to import, all dependent tables are skipped
+    | to avoid FK constraint violations.
+    |
+    | Only list dependencies within the same role's tables — cross-role
+    | dependencies (e.g. order_items → dishes) are assumed already present.
+    |
+    */
+    'table_dependencies' => [
+        // local tables
+        'table_orders'      => ['restaurant_tables'],
+        'order_items'       => ['table_orders'],
+        'table_order_logs'  => ['table_orders', 'order_items'],
+        'print_logs'        => ['table_orders', 'printers'],
+        // web tables
+        'dish_allergens'    => ['dishes', 'allergens'],
+        'dish_materials'    => ['dishes', 'materials'],
+        'supplier_invoices' => ['suppliers'],
+        'supplier_invoice_products' => ['supplier_invoices'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Unique Key for Settings (upsert by 'key' instead of 'id')
     |--------------------------------------------------------------------------
     */
