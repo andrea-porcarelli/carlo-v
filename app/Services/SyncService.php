@@ -67,10 +67,17 @@ class SyncService
      */
     public function runPushZipSync(): array
     {
+        $start = microtime(true);
         $role = config('sync.role');
         $masterTables = config("sync.master_tables.{$role}", []);
         $softDeleteTables = config('sync.soft_delete_tables', []);
         $pivotTables = config('sync.pivot_tables', []);
+
+        Log::info('[Sync] Push started', [
+            'role'       => $role,
+            'peer_url'   => $this->peerUrl,
+            'tables'     => $masterTables,
+        ]);
 
         $zipPath = tempnam(sys_get_temp_dir(), 'carlov_push_') . '.zip';
 
@@ -80,6 +87,7 @@ class SyncService
                 throw new \RuntimeException('Could not create push ZIP archive');
             }
 
+            $tableStats = [];
             foreach ($masterTables as $table) {
                 if (in_array($table, $pivotTables)) {
                     $records = DB::table($table)->orderBy('id')->get()->map(fn($r) => (array) $r)->toArray();
@@ -99,6 +107,7 @@ class SyncService
                         : [];
                 }
 
+                $tableStats[$table] = count($records);
                 $zip->addFromString("{$table}.json", json_encode([
                     'table'       => $table,
                     'data'        => $records,
@@ -114,6 +123,14 @@ class SyncService
 
             $zip->close();
 
+            $zipSizeKb = round(filesize($zipPath) / 1024, 1);
+            Log::info('[Sync] Push ZIP generated', [
+                'size_kb'     => $zipSizeKb,
+                'table_stats' => $tableStats,
+                'elapsed_ms'  => (int) ((microtime(true) - $start) * 1000),
+            ]);
+
+            $uploadStart = microtime(true);
             $response = Http::withHeaders([
                 'X-Sync-Token' => $this->apiToken,
             ])->timeout($this->timeout)
@@ -124,7 +141,23 @@ class SyncService
                 throw new \RuntimeException("Push sync failed: HTTP {$response->status()}: {$response->body()}");
             }
 
-            return $response->json('results', []);
+            $results = $response->json('results', []);
+            $totalMs = (int) ((microtime(true) - $start) * 1000);
+
+            Log::info('[Sync] Push completed', [
+                'elapsed_ms'  => $totalMs,
+                'upload_ms'   => (int) ((microtime(true) - $uploadStart) * 1000),
+                'tables_sent' => count($tableStats),
+                'peer_results' => $results,
+            ]);
+
+            return $results;
+        } catch (\Throwable $e) {
+            Log::error('[Sync] Push failed', [
+                'error'      => $e->getMessage(),
+                'elapsed_ms' => (int) ((microtime(true) - $start) * 1000),
+            ]);
+            throw $e;
         } finally {
             if (file_exists($zipPath)) {
                 unlink($zipPath);
@@ -167,12 +200,19 @@ class SyncService
      */
     public function runZipSync(): array
     {
+        $start = microtime(true);
         Cache::put('sync_in_progress', true);
+
+        Log::info('[Sync] Pull started', [
+            'role'     => $this->role,
+            'peer_url' => $this->peerUrl,
+        ]);
 
         $zipPath = null;
         try {
             $zipPath = tempnam(sys_get_temp_dir(), 'carlov_sync_') . '.zip';
 
+            $downloadStart = microtime(true);
             $response = Http::withHeaders([
                 'X-Sync-Token' => $this->apiToken,
             ])->timeout($this->timeout)->sink($zipPath)->get("{$this->peerUrl}/api/sync/export-zip");
@@ -180,6 +220,12 @@ class SyncService
             if (!$response->successful()) {
                 throw new \RuntimeException("Failed to download sync ZIP: HTTP {$response->status()}");
             }
+
+            $zipSizeKb = round(filesize($zipPath) / 1024, 1);
+            Log::info('[Sync] ZIP downloaded', [
+                'size_kb'     => $zipSizeKb,
+                'download_ms' => (int) ((microtime(true) - $downloadStart) * 1000),
+            ]);
 
             $zip = new \ZipArchive();
             if ($zip->open($zipPath) !== true) {
@@ -190,13 +236,19 @@ class SyncService
             $manifest = $manifestJson ? json_decode($manifestJson, true) : [];
             $peerRole = $manifest['role'] ?? $this->getPeerRole();
 
+            Log::info('[Sync] Manifest read', [
+                'peer_role'   => $peerRole,
+                'exported_at' => $manifest['exported_at'] ?? null,
+                'tables'      => $manifest['tables'] ?? [],
+            ]);
+
             $tables = config("sync.sync_order.{$peerRole}", []);
             $results = [];
 
             foreach ($tables as $table) {
                 $json = $zip->getFromName("{$table}.json");
                 if ($json === false) {
-                    Log::warning("Sync ZIP: missing file for table '{$table}'");
+                    Log::warning('[Sync] Missing file in ZIP', ['table' => $table]);
                     continue;
                 }
 
@@ -215,7 +267,28 @@ class SyncService
                 $results['media_files'] = $this->syncMediaFiles();
             }
 
+            $totalMs = (int) ((microtime(true) - $start) * 1000);
+            $failed = array_filter($results, fn($r) => ($r['status'] ?? '') === 'failed');
+
+            Log::info('[Sync] Pull completed', [
+                'elapsed_ms'    => $totalMs,
+                'tables_synced' => count($results),
+                'tables_failed' => count($failed),
+                'summary'       => array_map(fn($r) => [
+                    'status'  => $r['status'] ?? '?',
+                    'created' => $r['created'] ?? 0,
+                    'updated' => $r['updated'] ?? 0,
+                    'deleted' => $r['deleted'] ?? 0,
+                ], $results),
+            ]);
+
             return $results;
+        } catch (\Throwable $e) {
+            Log::error('[Sync] Pull failed', [
+                'error'      => $e->getMessage(),
+                'elapsed_ms' => (int) ((microtime(true) - $start) * 1000),
+            ]);
+            throw $e;
         } finally {
             Cache::forget('sync_in_progress');
             if ($zipPath && file_exists($zipPath)) {
@@ -230,6 +303,12 @@ class SyncService
     protected function syncTableFromData(string $table, array $data, array $deletedIds, string $peerRole): array
     {
         $start = microtime(true);
+
+        Log::info("[Sync] Importing table '{$table}'", [
+            'records'     => count($data),
+            'deleted_ids' => count($deletedIds),
+            'peer_role'   => $peerRole,
+        ]);
 
         $log = SyncLog::create([
             'direction'    => "pull_from_{$peerRole}",
@@ -282,6 +361,15 @@ class SyncService
             $durationMs = (int) ((microtime(true) - $start) * 1000);
             $totalImported = $totalCreated + $totalUpdated;
 
+            Log::info("[Sync] Table '{$table}' done", [
+                'created'     => $totalCreated,
+                'updated'     => $totalUpdated,
+                'deleted'     => $totalDeleted,
+                'skipped'     => $totalSkipped,
+                'duration_ms' => $durationMs,
+                'watermark'   => $latestUpdatedAt?->toIso8601String(),
+            ]);
+
             $log->update([
                 'status'           => 'success',
                 'records_exported' => count($data),
@@ -305,6 +393,11 @@ class SyncService
             ];
         } catch (\Throwable $e) {
             $durationMs = (int) ((microtime(true) - $start) * 1000);
+
+            Log::error("[Sync] Table '{$table}' failed", [
+                'error'       => $e->getMessage(),
+                'duration_ms' => $durationMs,
+            ]);
 
             $log->update([
                 'status'        => 'failed',
