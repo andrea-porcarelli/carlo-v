@@ -28,8 +28,8 @@ docker compose up -d
 echo "✅ Container avviati"
 
 # Aspetta 30 secondi
-echo "⏳ Aspetto 30 secondi..."
-sleep 30
+echo "⏳ Aspetto 10 secondi..."
+sleep 10
 
 # Setup Laravel se necessario
 if [ ! -d "../vendor" ]; then
