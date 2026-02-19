@@ -37,46 +37,43 @@ class DeployController extends BaseController
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        // ── Build git pull command ─────────────────────────────────────────────
-        $repoPath  = base_path();
-        $gitUser   = (string) Setting::get('deploy_git_user', '');
+        try {
+            $projectPath = base_path();
 
-        /*
-         * If deploy_git_user is set, run via sudo so the correct user
-         * (the one who owns the .git directory) executes the pull.
-         *
-         * Required sudoers rule on the server (run "sudo visudo"):
-         *   www-data ALL=(<deploy_git_user>) NOPASSWD: /usr/bin/git
-         */
-        if ($gitUser !== '') {
-            $command = sprintf(
-                'sudo -u %s -n git -C %s -c safe.directory=%s pull 2>&1',
-                escapeshellarg($gitUser),
-                escapeshellarg($repoPath),
-                escapeshellarg($repoPath)
-            );
-        } else {
-            $command = sprintf(
-                'git -C %s -c safe.directory=%s pull 2>&1',
-                escapeshellarg($repoPath),
-                escapeshellarg($repoPath)
-            );
+            // Array per catturare l'output del comando
+            $output = [];
+            $returnVar = 0;
+
+            // Esegui git pull nella directory del progetto
+            exec("cd {$projectPath} && git pull 2>&1", $output, $returnVar);
+
+            $result = implode("\n", $output);
+
+            Log::info("Git pull executed", [
+                'output' => $result,
+                'return_code' => $returnVar
+            ]);
+
+            if ($returnVar === 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Git pull completato con successo',
+                    'output' => $result
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Errore durante git pull',
+                    'output' => $result
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Git pull error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore: ' . $e->getMessage()
+            ], 500);
         }
-
-        exec($command, $outputLines, $exitCode);
-
-        $output = implode("\n", $outputLines);
-
-        Log::info('Deploy webhook: git pull executed', [
-            'git_user'  => $gitUser ?: 'www-data',
-            'exit_code' => $exitCode,
-            'output'    => $output,
-        ]);
-
-        return response()->json([
-            'success'   => $exitCode === 0,
-            'exit_code' => $exitCode,
-            'output'    => $output,
-        ], $exitCode === 0 ? 200 : 500);
     }
 }
