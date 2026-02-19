@@ -47,25 +47,22 @@ class DeployController extends BaseController
             // Esegui git pull nella directory del progetto
             exec("git -C " . escapeshellarg($projectPath) . " -c safe.directory=" . escapeshellarg($projectPath) . " pull 2>&1", $output, $returnVar);
 
-            $result = implode("\n", $output);
-
             Log::info("Git pull executed", [
-                'output' => $result,
-                'return_code' => $returnVar
+                'output' => implode("\n", $output),
+                'return_code' => $returnVar,
             ]);
 
             if ($returnVar === 0) {
                 return response()->json([
                     'success' => true,
                     'message' => 'Git pull completato con successo',
-                    'output' => $result,
-                    'command' => "git -C " . escapeshellarg($projectPath) . " -c safe.directory=" . escapeshellarg($projectPath) . " pull 2>&1"
+                    'lines'   => array_values(array_filter($output, fn($l) => trim($l) !== '')),
                 ]);
             } else {
                 return response()->json([
                     'success' => false,
                     'message' => 'Errore durante git pull',
-                    'output' => $result
+                    'lines'   => array_values(array_filter($output, fn($l) => trim($l) !== '')),
                 ], 500);
             }
 
