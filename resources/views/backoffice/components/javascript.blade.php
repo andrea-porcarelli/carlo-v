@@ -17,6 +17,7 @@
         var $icon = $(el).find('.fa-sync');
         $(el).addClass('disabled');
         $icon.addClass('fa-spin');
+        $('#sync-overlay').css('display', 'flex');
 
         $.ajax({
             url: '{{ route("backoffice.sync.trigger") }}',
@@ -28,15 +29,16 @@
                 var failed = tables.filter(function (t) { return results[t].status === 'failed'; });
 
                 if (failed.length > 0) {
-                    alert('Sync completato con errori su: ' + failed.join(', '));
+                    toastr.warning('Errori su: ' + failed.join(', '), 'Sync completato con errori', { timeOut: 8000 });
                 } else {
-                    alert('Sync completato con successo (' + tables.length + ' tabelle)');
+                    toastr.success('Sincronizzate ' + tables.length + ' tabelle', 'Sync completato', { timeOut: 5000 });
                 }
             },
             error: function (xhr) {
-                alert('Errore durante il sync: ' + (xhr.responseJSON?.message || xhr.statusText));
+                toastr.error(xhr.responseJSON?.message || xhr.statusText, 'Errore durante il sync', { timeOut: 8000 });
             },
             complete: function () {
+                $('#sync-overlay').hide();
                 $(el).removeClass('disabled');
                 $icon.removeClass('fa-spin');
             }
