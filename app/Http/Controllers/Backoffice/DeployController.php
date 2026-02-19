@@ -58,7 +58,8 @@ class DeployController extends BaseController
                 return response()->json([
                     'success' => true,
                     'message' => 'Git pull completato con successo',
-                    'output' => $result
+                    'output' => $result,
+                    'command' => "git -C " . escapeshellarg($projectPath) . " -c safe.directory=" . escapeshellarg($projectPath) . " pull 2>&1"
                 ]);
             } else {
                 return response()->json([
