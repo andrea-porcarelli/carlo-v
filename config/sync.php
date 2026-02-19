@@ -73,7 +73,6 @@ return [
             'dish_allergens',
             'dish_materials',
             'material_stocks',
-            'settings',
             'suppliers',
             'supplier_invoices',
             'supplier_invoice_products',
