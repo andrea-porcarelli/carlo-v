@@ -35,14 +35,15 @@ class MaterialController extends BaseController
     public function datatable(Request $request) : JsonResponse {
         try {
             $filters = $request->get('filters') ?? [];
-
+            $stockService = app(StockService::class);
             $elements = $this->interface->filters($filters);
             return $this->editColumns(datatables()->of($elements), $this->name, ['edit', 'add-stock'], null, 'restaurant.materials')
                 ->addColumn('dishes', function ($item) {
                    return $item->dishes->count();
                 })
-                ->addColumn('stock', function ($item) {
-                   return $item->stock . ' ' . $item->stock_type;
+                ->addColumn('stock', function ($item) use ($stockService) {
+                    $stockSummary =  $stockService->getMovements($item->id);
+                    return $stockSummary['current'] . ' ' . $item->stock_type;
                 })
                 ->rawColumns(['dishes', 'printer'])
                 ->toJson();

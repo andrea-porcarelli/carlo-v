@@ -31,6 +31,11 @@ class DomainRedirect
             return $next($request);
         }
 
+        // Allow log-viewer through
+        if (str_starts_with($path, 'log-viewer')) {
+            return $next($request);
+        }
+
         // Check if we are NOT in the /backoffice path AND NOT on internal.carlov.it domain
         $isNotBackoffice = !str_starts_with($path, 'backoffice');
         $isNotInternalDomain = $host !== 'internal.carlov.it';
