@@ -24,6 +24,15 @@
                                         'step' => '0.01',
                                         'value' => $setting->value,
                                     ])
+                                @elseif($setting->type === 'integer' && $setting->key === 'coperto_dish_id')
+                                    @include('backoffice.components.form.select', [
+                                        'form' => 'update-or-create-element',
+                                        'name' => $setting->key,
+                                        'label' => $setting->description ?? $setting->key,
+                                        'col' => 4,
+                                        'options' => $dishes,
+                                        'value' => $setting->value,
+                                    ])
                                 @elseif($setting->type === 'integer' && $setting->key === 'preconto_printer_id')
                                     @include('backoffice.components.form.select', [
                                         'form' => 'update-or-create-element',

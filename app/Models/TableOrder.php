@@ -60,7 +60,8 @@ class TableOrder extends Model
     public function updateTotal(): void
     {
         $itemsTotal = $this->items()->sum('subtotal');
-        $coverCharge = $this->getCoverChargeAmount();
+        // If a dish is configured for coperto, it's already included as an order_item
+        $coverCharge = Setting::get('coperto_dish_id') ? 0 : $this->getCoverChargeAmount();
         $total = $itemsTotal + $coverCharge;
         $this->update(['total_amount' => $total]);
     }

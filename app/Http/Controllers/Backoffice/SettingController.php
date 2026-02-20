@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Backoffice;
 
+use App\Models\Dish;
 use App\Models\Printer;
 use App\Models\Setting;
 use Exception;
@@ -14,11 +15,16 @@ class SettingController extends BaseController
     public function index(): View
     {
         $settings = Setting::all();
+
         $printers = Printer::where('is_active', true)->get()->map(function ($printer) {
             return ['id' => $printer->id, 'label' => $printer->label];
         })->toArray();
 
-        return view('backoffice.settings.index', compact('settings', 'printers'));
+        $dishes = Dish::where('is_active', true)->orderBy('label')->get()->map(function ($dish) {
+            return ['id' => $dish->id, 'label' => $dish->label . ' (€' . number_format($dish->price, 2) . ')'];
+        })->toArray();
+
+        return view('backoffice.settings.index', compact('settings', 'printers', 'dishes'));
     }
 
     public function store(Request $request): JsonResponse

@@ -8,6 +8,7 @@ use App\Models\Dish;
 use App\Models\OrderItem;
 use App\Models\Printer;
 use App\Models\RestaurantTable;
+use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Services\FattureInCloudService;
 use App\Services\TableOrderLoggerService;
@@ -950,7 +951,10 @@ class TableOrderController extends Controller
                 'waiter_id' => $operatorId,
             ]);
 
-            // Update total (includes cover charge if applicable)
+            // Add coperto order_item if a coperto dish is configured
+            $this->syncCopertoItem($order, $validated['covers'], $operatorId);
+
+            // Update total (cover charge already in order_item if coperto_dish_id is set)
             $order->updateTotal();
 
             // Update table status to occupied
@@ -1156,6 +1160,10 @@ class TableOrderController extends Controller
             $oldCovers = $order->covers;
             $order->covers = $validated['covers'];
             $order->save();
+
+            // Sync coperto order_item with new covers count
+            $this->syncCopertoItem($order, $validated['covers'], $operatorId);
+
             $order->updateTotal();
 
             $this->logger->logUpdateCovers($order, $oldCovers, $validated['covers'], $operatorId);
@@ -1333,6 +1341,51 @@ class TableOrderController extends Controller
                 'success' => false,
                 'message' => 'Errore nello svuotamento del tavolo',
             ], 500);
+        }
+    }
+
+    /**
+     * Create, update or delete the coperto order_item based on covers count.
+     * Does nothing if no coperto_dish_id setting is configured.
+     */
+    protected function syncCopertoItem(TableOrder $order, int $covers, int $operatorId): void
+    {
+        $coperto_dish_id = (int) Setting::get('coperto_dish_id', 0);
+        if (!$coperto_dish_id) {
+            return;
+        }
+
+        $dish = Dish::find($coperto_dish_id);
+        if (!$dish) {
+            return;
+        }
+
+        $copertoItem = $order->items()->where('dish_id', $coperto_dish_id)->first();
+
+        if ($covers <= 0) {
+            // Drinks mode: remove coperto item
+            if ($copertoItem) {
+                $copertoItem->forceDelete();
+            }
+            return;
+        }
+
+        if ($copertoItem) {
+            // Update quantity to match new covers count
+            $copertoItem->quantity  = $covers;
+            $copertoItem->subtotal  = round($dish->price * $covers, 2);
+            $copertoItem->save();
+        } else {
+            // Create coperto item
+            OrderItem::create([
+                'table_order_id' => $order->id,
+                'dish_id'        => $coperto_dish_id,
+                'added_by'       => $operatorId,
+                'quantity'       => $covers,
+                'unit_price'     => $dish->price,
+                'subtotal'       => round($dish->price * $covers, 2),
+                'status'         => 'served',
+            ]);
         }
     }
 }
