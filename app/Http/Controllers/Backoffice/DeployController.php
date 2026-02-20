@@ -91,35 +91,57 @@ class DeployController extends BaseController
         }
 
         try {
-            $output = [];
+            $cwd        = getcwd();
+            $artisanPath = base_path('artisan');
+            $artisanExists = file_exists($artisanPath);
+
+            $diagnostics = [
+                '--- diagnostics ---',
+                'getcwd()   : ' . $cwd,
+                'base_path(): ' . base_path(),
+                'artisan    : ' . $artisanPath . ($artisanExists ? ' [OK]' : ' [NOT FOUND]'),
+                'PHP_BINARY : ' . PHP_BINARY,
+                '-------------------',
+            ];
+
+            if (!$artisanExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'artisan non trovato in ' . $artisanPath,
+                    'lines'   => $diagnostics,
+                ], 500);
+            }
+
+            $php     = escapeshellarg(PHP_BINARY);
+            $artisan = escapeshellarg($artisanPath);
+            $command = "{$php} {$artisan} migrate --force 2>&1";
+
+            $output    = [];
             $returnVar = 0;
-
-            $php = PHP_BINARY;
-            $artisan = escapeshellarg(base_path('artisan'));
-
-            exec("/usr/local/bin/php artisan migrate --force 2>&1", $output, $returnVar);
+            exec($command, $output, $returnVar);
 
             Log::info('Artisan migrate executed', [
+                'cwd'         => $cwd,
+                'artisan'     => $artisanPath,
                 'output'      => implode("\n", $output),
                 'return_code' => $returnVar,
-                'command' => "/usr/local/bin/php artisan  migrate --force 2>&1"
             ]);
 
-            $lines = array_values(array_filter($output, fn($l) => trim($l) !== ''));
+            $lines = array_merge($diagnostics, array_values(array_filter($output, fn($l) => trim($l) !== '')));
 
             if ($returnVar === 0) {
                 return response()->json([
                     'success' => true,
                     'message' => 'Migrate completato con successo',
                     'lines'   => $lines,
-                    'command' => "/usr/local/bin/php artisan migrate --force 2>&1"
+                    'command' => $command,
                 ]);
             } else {
                 return response()->json([
                     'success' => false,
                     'message' => 'Errore durante migrate',
                     'lines'   => $lines,
-                    'command' => "/usr/local/bin/php artisan migrate --force 2>&1"
+                    'command' => $command,
                 ], 500);
             }
         } catch (\Exception $e) {
