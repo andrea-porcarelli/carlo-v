@@ -97,12 +97,12 @@ class DeployController extends BaseController
             $php = PHP_BINARY;
             $artisan = escapeshellarg(base_path('artisan'));
 
-            exec("php artisan migrate --force 2>&1", $output, $returnVar);
+            exec("/usr/local/bin/php artisan migrate --force 2>&1", $output, $returnVar);
 
             Log::info('Artisan migrate executed', [
                 'output'      => implode("\n", $output),
                 'return_code' => $returnVar,
-                'command' => "php artisan  migrate --force 2>&1"
+                'command' => "/usr/local/bin/php artisan  migrate --force 2>&1"
             ]);
 
             $lines = array_values(array_filter($output, fn($l) => trim($l) !== ''));
@@ -112,14 +112,14 @@ class DeployController extends BaseController
                     'success' => true,
                     'message' => 'Migrate completato con successo',
                     'lines'   => $lines,
-                    'command' => "php artisan migrate --force 2>&1"
+                    'command' => "/usr/local/bin/php artisan migrate --force 2>&1"
                 ]);
             } else {
                 return response()->json([
                     'success' => false,
                     'message' => 'Errore durante migrate',
                     'lines'   => $lines,
-                    'command' => "{$php} {$artisan} migrate --force 2>&1"
+                    'command' => "/usr/local/bin/php artisan migrate --force 2>&1"
                 ], 500);
             }
         } catch (\Exception $e) {
