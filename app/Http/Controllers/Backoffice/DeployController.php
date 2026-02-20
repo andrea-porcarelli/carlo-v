@@ -100,7 +100,8 @@ class DeployController extends BaseController
                 'getcwd()   : ' . $cwd,
                 'base_path(): ' . base_path(),
                 'artisan    : ' . $artisanPath . ($artisanExists ? ' [OK]' : ' [NOT FOUND]'),
-                'PHP_BINARY : ' . PHP_BINARY,
+                'PHP_BINARY : ' . PHP_BINARY . ' (non usato)',
+                'php CLI    : /usr/local/bin/php',
                 '-------------------',
             ];
 
@@ -112,7 +113,7 @@ class DeployController extends BaseController
                 ], 500);
             }
 
-            $php     = escapeshellarg(PHP_BINARY);
+            $php     = '/usr/local/bin/php';
             $artisan = escapeshellarg($artisanPath);
             $command = "{$php} {$artisan} migrate --force 2>&1";
 
