@@ -73,6 +73,10 @@ Route::group(['prefix' => '/backoffice'], function() {
         Route::get('/daily-stats', [DashboardController::class, 'dailyStats'])->name('dashboard.daily-stats');
         Route::post('/clear-cache', [DashboardController::class, 'clearCache'])->name('dashboard.clear-cache');
 
+        // Remote deploy/migrate proxy (web role only — triggers commands on carlov via carlov_url setting)
+        Route::post('/remote-deploy', [DeployController::class, 'remoteTrigger'])->name('backoffice.remote.deploy');
+        Route::post('/remote-migrate', [DeployController::class, 'remoteMigrate'])->name('backoffice.remote.migrate');
+
         Route::post('/upload', [UploadController::class, 'start'])->name('upload');
 
         // Users Management

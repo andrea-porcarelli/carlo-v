@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backoffice;
 use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class DeployController extends BaseController
@@ -127,6 +128,56 @@ class DeployController extends BaseController
                 'success' => false,
                 'message' => 'Errore: ' . $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * POST /backoffice/remote-deploy
+     *
+     * Proxy: chiama il webhook deploy sul peer carlov (carlov_url).
+     * Usato solo dall'istanza web (role=web).
+     */
+    public function remoteTrigger(): JsonResponse
+    {
+        $carlovUrl = rtrim(Setting::get('carlov_url', ''), '/');
+
+        if (!$carlovUrl) {
+            return response()->json(['success' => false, 'message' => 'Impostazione carlov_url non configurata'], 422);
+        }
+
+        try {
+            $response = Http::timeout(60)
+                ->post("{$carlovUrl}/webhook/deploy?key=" . self::DEPLOY_KEY);
+
+            return response()->json($response->json(), $response->status());
+        } catch (\Throwable $e) {
+            Log::error('Remote deploy error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /backoffice/remote-migrate
+     *
+     * Proxy: chiama il webhook migrate sul peer carlov (carlov_url).
+     * Usato solo dall'istanza web (role=web).
+     */
+    public function remoteMigrate(): JsonResponse
+    {
+        $carlovUrl = rtrim(Setting::get('carlov_url', ''), '/');
+
+        if (!$carlovUrl) {
+            return response()->json(['success' => false, 'message' => 'Impostazione carlov_url non configurata'], 422);
+        }
+
+        try {
+            $response = Http::timeout(120)
+                ->post("{$carlovUrl}/webhook/migrate?key=" . self::DEPLOY_KEY);
+
+            return response()->json($response->json(), $response->status());
+        } catch (\Throwable $e) {
+            Log::error('Remote migrate error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore: ' . $e->getMessage()], 500);
         }
     }
 }

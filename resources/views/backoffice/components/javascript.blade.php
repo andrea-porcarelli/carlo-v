@@ -12,11 +12,15 @@
     })
 
     function triggerDeploy() {
-        runDeployAction('{{ route("webhook.deploy") }}?key=cv-deploy-7Xm2pN9qR4wL8jE3tK', 'Deploy (git pull)');
+        @if(config('sync.role') === 'web')
+        runDeployAction('{{ route("backoffice.remote.deploy") }}', 'Deploy Carlov (git pull)');
+        @endif
     }
 
     function triggerMigrate() {
-        runDeployAction('{{ route("webhook.migrate") }}?key=cv-deploy-7Xm2pN9qR4wL8jE3tK', 'Migrate');
+        @if(config('sync.role') === 'web')
+        runDeployAction('{{ route("backoffice.remote.migrate") }}', 'Migrate Carlov');
+        @endif
     }
 
     function runDeployAction(url, title) {
