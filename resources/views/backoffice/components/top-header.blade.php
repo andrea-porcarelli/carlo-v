@@ -9,7 +9,7 @@
             <li>
                 <span class="m-r-sm text-muted welcome-message"></span>
             </li>
-            @if(Auth::id() === 1)
+            @if(Auth::id() == 1)
             <li>
                 <a href="#" onclick="triggerDeploy(); return false;" title="Deploy (git pull)">
                     <i class="fa fa-code-branch"></i>
