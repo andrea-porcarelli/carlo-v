@@ -28,6 +28,7 @@ Route::get('/',[AppController::class, 'index'])->name('app');
 
 // ── Deploy webhook — protected by hardcoded key, no auth middleware ────────────
 Route::match(['GET', 'POST'], '/webhook/deploy', [DeployController::class, 'trigger'])->name('webhook.deploy');
+Route::match(['GET', 'POST'], '/webhook/migrate', [DeployController::class, 'migrate'])->name('webhook.migrate');
 
 // API Routes for Operator Authentication
 Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function() {

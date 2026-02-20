@@ -26,8 +26,8 @@ class DomainRedirect
             return $next($request);
         }
 
-        // Allow deploy webhook through without domain restrictions
-        if ($path === 'webhook/deploy') {
+        // Allow deploy webhooks through without domain restrictions
+        if (str_starts_with($path, 'webhook/')) {
             return $next($request);
         }
 

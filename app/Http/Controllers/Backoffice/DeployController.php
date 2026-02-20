@@ -74,4 +74,56 @@ class DeployController extends BaseController
             ], 500);
         }
     }
+
+    /**
+     * GET|POST /webhook/migrate?key=<key>
+     *
+     * Runs "php artisan migrate --force" regardless of environment.
+     */
+    public function migrate(Request $request): JsonResponse
+    {
+        $provided = $request->query('key') ?? $request->header('X-Deploy-Key', '');
+
+        if (!hash_equals(self::DEPLOY_KEY, (string) $provided)) {
+            Log::warning('Deploy webhook: invalid key attempt on migrate', ['ip' => $request->ip()]);
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $output = [];
+            $returnVar = 0;
+
+            $php = PHP_BINARY;
+            $artisan = escapeshellarg(base_path('artisan'));
+
+            exec("{$php} {$artisan} migrate --force 2>&1", $output, $returnVar);
+
+            Log::info('Artisan migrate executed', [
+                'output'      => implode("\n", $output),
+                'return_code' => $returnVar,
+            ]);
+
+            $lines = array_values(array_filter($output, fn($l) => trim($l) !== ''));
+
+            if ($returnVar === 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Migrate completato con successo',
+                    'lines'   => $lines,
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Errore durante migrate',
+                    'lines'   => $lines,
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error('Artisan migrate error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }
