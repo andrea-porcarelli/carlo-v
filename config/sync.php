@@ -78,10 +78,10 @@ return [
             'supplier_invoice_products',
             'mapping_products',
             'media',
-        ],
-        'local' => [
             'printers',
             'restaurant_tables',
+        ],
+        'local' => [
             'table_orders',
             'order_items',
             'table_order_logs',
