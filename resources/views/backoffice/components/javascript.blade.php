@@ -46,8 +46,9 @@
             },
             error: function (xhr) {
                 var data = xhr.responseJSON || {};
-                $output.text((data.lines || []).join('\n') || xhr.statusText);
-                $status.text(data.message || 'Errore').addClass('text-danger');
+                var lines = (data.lines || []).join('\n');
+                $output.text(lines || xhr.responseText || xhr.statusText || '(nessun output)');
+                $status.text('Errore HTTP ' + xhr.status + (data.message ? ': ' + data.message : '')).addClass('text-danger');
             },
             complete: function () {
                 $spinner.hide();

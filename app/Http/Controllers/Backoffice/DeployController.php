@@ -172,10 +172,20 @@ class DeployController extends BaseController
             $response = Http::timeout(60)
                 ->post("{$carlovUrl}/webhook/deploy?key=" . self::DEPLOY_KEY);
 
-            return response()->json($response->json(), $response->status());
+            $json = $response->json();
+            if ($json === null) {
+                Log::error('Remote deploy: risposta non JSON', ['status' => $response->status(), 'body' => $response->body()]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Risposta non JSON da carlov (HTTP ' . $response->status() . ')',
+                    'lines'   => array_filter(explode("\n", $response->body())),
+                ], 502);
+            }
+
+            return response()->json($json, $response->status());
         } catch (\Throwable $e) {
             Log::error('Remote deploy error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Errore: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -197,10 +207,20 @@ class DeployController extends BaseController
             $response = Http::timeout(120)
                 ->post("{$carlovUrl}/webhook/migrate?key=" . self::DEPLOY_KEY);
 
-            return response()->json($response->json(), $response->status());
+            $json = $response->json();
+            if ($json === null) {
+                Log::error('Remote migrate: risposta non JSON', ['status' => $response->status(), 'body' => $response->body()]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Risposta non JSON da carlov (HTTP ' . $response->status() . ')',
+                    'lines'   => array_filter(explode("\n", $response->body())),
+                ], 502);
+            }
+
+            return response()->json($json, $response->status());
         } catch (\Throwable $e) {
             Log::error('Remote migrate error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Errore: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 }
