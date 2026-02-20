@@ -111,12 +111,14 @@ class DeployController extends BaseController
                     'success' => true,
                     'message' => 'Migrate completato con successo',
                     'lines'   => $lines,
+                    'command' => "{$php} {$artisan} migrate --force 2>&1"
                 ]);
             } else {
                 return response()->json([
                     'success' => false,
                     'message' => 'Errore durante migrate',
                     'lines'   => $lines,
+                    'command' => "{$php} {$artisan} migrate --force 2>&1"
                 ], 500);
             }
         } catch (\Exception $e) {
