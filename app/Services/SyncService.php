@@ -677,8 +677,8 @@ class SyncService
         DB::beginTransaction();
         try {
             if (!$watermark) {
-                // First sync: truncate and insert all
-                DB::table($table)->truncate();
+                // First sync: delete all rows and insert (DELETE is transactional, TRUNCATE is not)
+                DB::table($table)->delete();
                 foreach (array_chunk($data, 500) as $chunk) {
                     $rows = array_map(function ($record) use (&$latestUpdatedAt) {
                         $record = $this->normalizeDateFields((array) $record);
