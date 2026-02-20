@@ -31,10 +31,10 @@ class SyncService
 
         // Allow the peer URL to be overridden from the DB settings
         // (e.g. 'carlov_url' on the web server stores the zrok public endpoint)
-        $dbPeerUrl = \App\Models\Setting::get('carlov_url', '');
-        if ($dbPeerUrl) {
-            $this->peerUrl = rtrim($dbPeerUrl, '/');
-        }
+//        $dbPeerUrl = \App\Models\Setting::get('carlov_url', '');
+//        if ($dbPeerUrl) {
+//            $this->peerUrl = rtrim($dbPeerUrl, '/');
+//        }
     }
 
     public function setTriggeredBy(string $triggeredBy): void

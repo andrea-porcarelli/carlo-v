@@ -27,12 +27,12 @@ class SyncController extends BaseController
         }
 
         // Push: invia i dati locali al peer
-        try {
-            $results = array_merge($results, $service->runPushZipSync());
-        } catch (\Throwable $e) {
-            $errors['push'] = $e->getMessage();
-            Log::warning('Sync push failed: ' . $e->getMessage());
-        }
+//        try {
+//            $results = array_merge($results, $service->runPushZipSync());
+//        } catch (\Throwable $e) {
+//            $errors['push'] = $e->getMessage();
+//            Log::warning('Sync push failed: ' . $e->getMessage());
+//        }
 
         if (!empty($errors) && empty($results)) {
             return $this->exception(new \RuntimeException(implode(' | ', $errors)));
