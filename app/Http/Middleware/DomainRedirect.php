@@ -36,6 +36,11 @@ class DomainRedirect
             return $next($request);
         }
 
+        // Allow Livewire AJAX requests through
+        if (str_starts_with($path, 'livewire')) {
+            return $next($request);
+        }
+
         // Check if we are NOT in the /backoffice path AND NOT on internal.carlov.it domain
         $isNotBackoffice = !str_starts_with($path, 'backoffice');
         $isNotInternalDomain = $host !== 'internal.carlov.it';
