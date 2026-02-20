@@ -27,6 +27,28 @@
     </div>
 </div>
 
+{{-- Deploy / Migrate output modal --}}
+<div class="modal fade" id="deploy-output-modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                <h4 class="modal-title deploy-modal-title">Output</h4>
+            </div>
+            <div class="modal-body">
+                <div class="deploy-modal-spinner text-center" style="display:none; margin-bottom:10px;">
+                    <i class="fa fa-spinner fa-spin fa-2x"></i>
+                </div>
+                <pre class="deploy-modal-output" style="max-height:400px; overflow-y:auto; background:#1e1e1e; color:#d4d4d4; padding:12px; border-radius:4px; font-size:12px; white-space:pre-wrap; word-break:break-all;"></pre>
+                <div class="deploy-modal-status" style="margin-top:8px; font-weight:600;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @include('backoffice.components.footer')
 @livewireScripts
 

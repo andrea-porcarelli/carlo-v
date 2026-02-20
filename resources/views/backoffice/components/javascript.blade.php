@@ -11,6 +11,46 @@
         });
     })
 
+    function triggerDeploy() {
+        runDeployAction('{{ route("webhook.deploy") }}?key=cv-deploy-7Xm2pN9qR4wL8jE3tK', 'Deploy (git pull)');
+    }
+
+    function triggerMigrate() {
+        runDeployAction('{{ route("webhook.migrate") }}?key=cv-deploy-7Xm2pN9qR4wL8jE3tK', 'Migrate');
+    }
+
+    function runDeployAction(url, title) {
+        var $modal  = $('#deploy-output-modal');
+        var $title  = $modal.find('.deploy-modal-title');
+        var $output = $modal.find('.deploy-modal-output');
+        var $spinner = $modal.find('.deploy-modal-spinner');
+        var $status  = $modal.find('.deploy-modal-status');
+
+        $title.text(title);
+        $output.text('');
+        $status.text('').removeClass('text-success text-danger');
+        $spinner.show();
+        $modal.modal('show');
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            dataType: 'json',
+            success: function (data) {
+                $output.text((data.lines || []).join('\n') || '(nessun output)');
+                $status.text(data.message || 'Completato').addClass('text-success');
+            },
+            error: function (xhr) {
+                var data = xhr.responseJSON || {};
+                $output.text((data.lines || []).join('\n') || xhr.statusText);
+                $status.text(data.message || 'Errore').addClass('text-danger');
+            },
+            complete: function () {
+                $spinner.hide();
+            }
+        });
+    }
+
     function triggerSync(el) {
         if ($(el).hasClass('disabled')) return;
 

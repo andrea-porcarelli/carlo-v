@@ -9,6 +9,18 @@
             <li>
                 <span class="m-r-sm text-muted welcome-message"></span>
             </li>
+            @if(Auth::id() === 1)
+            <li>
+                <a href="#" onclick="triggerDeploy(); return false;" title="Deploy (git pull)">
+                    <i class="fa fa-code-branch"></i>
+                </a>
+            </li>
+            <li>
+                <a href="#" onclick="triggerMigrate(); return false;" title="Migrate">
+                    <i class="fa fa-database"></i>
+                </a>
+            </li>
+            @endif
             <li>
                 <a href="#" id="top-sync-btn" onclick="triggerSync(this); return false;" title="Sync">
                     <i class="fa fa-sync"></i>
