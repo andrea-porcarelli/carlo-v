@@ -26,9 +26,9 @@ RUN git config --system --add safe.directory /var/www/html
 
 # Aggiunge www-data al gruppo 1001 (gid del proprietario dei file sul host)
 # così PHP-FPM può scrivere nella directory .git montata dal host
-RUN groupadd -g 1001 hostfiles 2>/dev/null || true && \
-    usermod -aG 1001 www-data && \
-    usermod -d /var/www www-data
+#RUN groupadd -g 1001 hostfiles 2>/dev/null || true && \
+#    usermod -aG 1001 www-data && \
+#    usermod -d /var/www www-data
 
 WORKDIR /var/www/html
 

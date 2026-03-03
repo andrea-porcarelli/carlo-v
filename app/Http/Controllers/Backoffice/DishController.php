@@ -6,6 +6,7 @@ use App\Facades\Utils;
 use App\Http\Controllers\Backoffice\Requests\StoreDishRequest;
 use App\Interfaces\DishInterface;
 use App\Interfaces\MaterialInterface;
+use App\Models\Allergen;
 use App\Models\Category;
 use App\Models\Material;
 use App\Models\Printer;
@@ -30,7 +31,10 @@ class DishController extends BaseController
     }
 
     public function index() : View {
-        return view('backoffice.' . $this->name . '.index');
+        $categories = Utils::map_collection(Category::where('is_active', 1)->orderBy('label'));
+        $materials = Utils::map_collection(Material::orderBy('label'));
+        $allergens = Utils::map_collection(Allergen::orderBy('label'));
+        return view('backoffice.' . $this->name . '.index', compact('categories', 'materials', 'allergens'));
     }
 
     public function datatable(Request $request) : JsonResponse {

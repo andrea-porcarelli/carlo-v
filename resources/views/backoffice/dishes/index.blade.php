@@ -12,7 +12,10 @@
                     <div class="row">
                         <div class="col-lg-12">
                             <div class="row g-1 advanced-search">
-                                @include('backoffice.components.form.input', ['label' => 'Nome, Cognome, Email', 'name' => 'mixed', 'col' => 2, 'class' => 'mixed'])
+                                @include('backoffice.components.form.input', ['label' => 'Piatto', 'name' => 'dish', 'col' => 2, 'class' => 'dish'])
+                                @include('backoffice.components.form.select', ['label' => 'Categoria', 'name' => 'category_id', 'col' => 2, 'class' => 'category_id', 'options' => $categories, 'first_value_text' => 'Tutte le categorie', 'hide_first' => true])
+                                @include('backoffice.components.form.select', ['label' => 'Ingrediente', 'name' => 'material_id', 'col' => 2, 'class' => 'material_id', 'options' => $materials, 'first_value_text' => 'Tutti gli ingredienti', 'hide_first' => true])
+                                @include('backoffice.components.form.select', ['label' => 'Allergene', 'name' => 'allergen_id', 'col' => 2, 'class' => 'allergen_id', 'options' => $allergens, 'first_value_text' => 'Tutti gli allergeni', 'hide_first' => true])
                                 @include('backoffice.components.form.button', ['col' => 2, 'label' => 'Cerca', 'class' => 'btn-find', 'with_add' => true, 'class_btn_add' => 'btn-add-object', 'route' => 'restaurant.dishes.create'])
                             </div>
                         </div>
@@ -63,7 +66,7 @@
                         {data: 'allergens',},
                     ],
                     order: [[1, 'desc']],
-                    dataForm: ['mixed'],
+                    dataForm: ['dish', 'category_id', 'material_id', 'allergen_id'],
                     serverSide: false,
                 }]);
             }, 500);
