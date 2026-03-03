@@ -18,17 +18,37 @@ class SupplierInvoiceRepository extends CrudRepository implements SupplierInvoic
     public function filters(array $filters): Builder
     {
         $builder = $this->builder();
-        if (isset($filters['brand_id'])) {
-            $builder->where('brand_id', $filters['brand_id']);
+
+        if (!empty($filters['invoice_number'])) {
+            $builder->where('invoice_number', 'like', '%' . $filters['invoice_number'] . '%');
         }
-        if (isset($filters['supplier_id'])) {
-            $builder->whereHas('setting', function ($q) use ($filters) {
-                return $q->where('supplier_id', $filters['supplier_id']);
-            });
+
+        if (!empty($filters['supplier_id'])) {
+            $builder->where('supplier_id', $filters['supplier_id']);
         }
-        if (isset($filters['invoice_code'])) {
-            $builder->where('external_code', $filters['code']);
+
+        if (!empty($filters['date_from'])) {
+            $builder->whereDate('invoice_date', '>=', $filters['date_from']);
         }
+
+        if (!empty($filters['date_to'])) {
+            $builder->whereDate('invoice_date', '<=', $filters['date_to']);
+        }
+
+        // 'da_effettuare' = ha almeno un prodotto senza materiale (e non ignorato)
+        // 'effettuata'    = tutti i prodotti hanno materiale o sono ignorati
+        if (!empty($filters['mapping'])) {
+            if ($filters['mapping'] === 'da_effettuare') {
+                $builder->whereHas('products', function ($q) {
+                    $q->whereDoesntHave('material')->where('ignore_mapping', 0);
+                });
+            } elseif ($filters['mapping'] === 'effettuata') {
+                $builder->whereDoesntHave('products', function ($q) {
+                    $q->whereDoesntHave('material')->where('ignore_mapping', 0);
+                });
+            }
+        }
+
         return $builder;
     }
 

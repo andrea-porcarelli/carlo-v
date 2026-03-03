@@ -65,9 +65,16 @@ class MaterialController extends BaseController
     public function store(Request $request) : JsonResponse {
         try {
             $request->validate([
-                'label' => 'required',
-                'stock' => 'required',
-                'stock_type' => 'required',
+                'label'      => [
+                    'required',
+                    function ($attribute, $value, $fail) {
+                        if (Material::whereRaw('LOWER(label) = ?', [strtolower(trim($value))])->exists()) {
+                            $fail('Esiste già un ingrediente con questo nome.');
+                        }
+                    },
+                ],
+                'stock'      => 'required|numeric|min:0',
+                'stock_type' => ['required', \Illuminate\Validation\Rule::in(array_keys(Material::stock_types()))],
             ]);
             $store = $request->all();
             $item = $this->interface->store($store);
@@ -98,9 +105,9 @@ class MaterialController extends BaseController
     public function edit(int $id, Request $request) : JsonResponse {
         try {
             $request->validate([
-                'label' => 'required',
-                'stock' => 'required',
-                'stock_type' => 'required',
+                'label'      => 'required',
+                'stock'      => 'required|numeric|min:0',
+                'stock_type' => ['required', \Illuminate\Validation\Rule::in(array_keys(Material::stock_types()))],
             ]);
             $item = $this->interface->find($id);
             if ($item->id) {

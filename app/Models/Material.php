@@ -38,8 +38,8 @@ class Material extends Model
     {
         return [
             'pz' => 'Pezzo',
-            'g' => 'Grammi (g)',
-            'ml' => 'Millilitri (ml)',
+            'kg' => 'Kilogrammi (kg)',
+            'cl' => 'Centilitri (cl)',
         ];
     }
 

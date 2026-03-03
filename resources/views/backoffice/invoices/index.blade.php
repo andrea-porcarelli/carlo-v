@@ -12,7 +12,23 @@
                     <div class="row">
                         <div class="col-lg-12">
                             <div class="row g-1 advanced-search">
-                                @include('backoffice.components.form.input', ['label' => 'Nome, Cognome, Email', 'name' => 'mixed', 'col' => 2, 'class' => 'mixed'])
+                                @include('backoffice.components.form.input', ['label' => 'Codice fattura', 'name' => 'invoice_number', 'col' => 2, 'class' => 'invoice_number'])
+                                @include('backoffice.components.form.select', ['label' => 'Fornitore', 'name' => 'supplier_id', 'col' => 2, 'class' => 'supplier_id', 'options' => $suppliers, 'first_value_text' => 'Tutti i fornitori', 'hide_first' => true])
+                                @include('backoffice.components.form.input', ['label' => 'Da data', 'name' => 'date_from', 'col' => 2, 'class' => 'date_from', 'type' => 'date'])
+                                @include('backoffice.components.form.input', ['label' => 'A data', 'name' => 'date_to', 'col' => 2, 'class' => 'date_to', 'type' => 'date'])
+                                @include('backoffice.components.form.select', [
+                                    'label' => 'Mappatura',
+                                    'name' => 'mapping',
+                                    'col' => 2,
+                                    'class' => 'mapping',
+                                    'hide_first' => true,
+                                    'first_value_text' => 'Tutte',
+                                    'value' => 'da_effettuare',
+                                    'options' => [
+                                        ['id' => 'da_effettuare', 'label' => 'Da effettuare'],
+                                        ['id' => 'effettuata',    'label' => 'Effettuata'],
+                                    ],
+                                ])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Cerca', 'class' => 'btn-find'])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Carica fattura', 'class' => 'btn-load-invoice', 'dataset' => ['path' => route('invoices.import')]])
                             </div>
@@ -29,7 +45,7 @@
                                         <th class="all">Importo </th>
                                         <th class="all">Data </th>
                                         <th class="all">Prodotti</th>
-                                        <th class="all">Da mappare / Mappati / Importati</th>
+                                        <th class="all">Stato mappatura</th>
                                     </tr>
                                     </thead>
                                     <tfoot>
@@ -41,7 +57,7 @@
                                         <th class="all">Importo </th>
                                         <th class="all">Data </th>
                                         <th class="all">Prodotti</th>
-                                        <th class="all">Da mappare / Mappati / Importati</th>
+                                        <th class="all">Stato mappatura</th>
                                     </tr>
                                     </tfoot>
                                 </table>
@@ -53,6 +69,13 @@
         </div>
     </div>
     <x-modal title="Carica nuova fattura" class="import-invoice" />
+@endsection
+@section('custom-css')
+    <style>
+        .mapping-summary { min-width: 200px; }
+        .mapping-badges .label { display: inline-block; margin-bottom: 3px; font-size: 11px; }
+        .mapping-badges .label-success { background-color: #1ab394; }
+    </style>
 @endsection
 @section('custom-script')
     <script>
@@ -71,7 +94,7 @@
                         {data: 'mapping', class: 'text-center'},
                     ],
                     order: [[1, 'desc']],
-                    dataForm: ['mixed'],
+                    dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'mapping'],
                     serverSide: false,
                 }]);
             }, 500);

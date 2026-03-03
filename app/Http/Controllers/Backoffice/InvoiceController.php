@@ -37,7 +37,10 @@ class InvoiceController extends BaseController
     }
 
     public function index() : View {
-        return view('backoffice.' . $this->name . '.index');
+        $suppliers = Supplier::orderBy('company_name')->get()
+            ->map(fn($s) => ['id' => $s->id, 'label' => $s->company_name])
+            ->toArray();
+        return view('backoffice.' . $this->name . '.index', compact('suppliers'));
     }
 
     public function datatable(Request $request) : JsonResponse {
@@ -65,9 +68,38 @@ class InvoiceController extends BaseController
                    return $item->products_count;
                 })
                 ->addColumn('mapping', function ($item) {
-                   return $item->products()->whereDoesntHave('material')->where('ignore_mapping', 0)->count() . ' / ' . $item->products()->whereHas('material')->count() . ' / ' . $item->products()->whereHas('stock')->count();
+                    $total     = $item->products_count;
+                    $daMappare = $item->products()->whereDoesntHave('material')->where('ignore_mapping', 0)->count();
+                    $mappati   = $item->products()->whereHas('material')->count();
+                    $importati = $item->products()->whereHas('stock')->count();
+                    $ignorati  = $item->products()->where('ignore_mapping', 1)->count();
+
+                    $effective = $total - $ignorati;
+                    $perc = $effective > 0 ? round(($importati / $effective) * 100) : 100;
+                    $barClass = $perc === 100 ? 'progress-bar-success' : ($perc > 0 ? 'progress-bar-info' : 'progress-bar-warning');
+
+                    $html  = '<div class="mapping-summary">';
+                    $html .= '<div style="font-size:11px; color:#888; margin-bottom:3px;">Totale: <strong>' . $total . '</strong> prodotti &nbsp;·&nbsp; Caricati: <strong>' . $perc . '%</strong></div>';
+                    $html .= '<div class="progress" style="height:6px; margin-bottom:6px; margin-top:0;">';
+                    $html .= '<div class="progress-bar ' . $barClass . '" style="width:' . $perc . '%; min-width:2px;"></div>';
+                    $html .= '</div>';
+                    $html .= '<div class="mapping-badges">';
+                    if ($daMappare > 0) {
+                        $html .= '<span class="label label-warning"><span class="glyphicon glyphicon-exclamation-sign"></span> ' . $daMappare . ' da mappare</span> ';
+                    }
+                    if ($mappati > 0) {
+                        $html .= '<span class="label label-primary"><span class="glyphicon glyphicon-link"></span> ' . $mappati . ' mappati</span> ';
+                    }
+                    if ($importati > 0) {
+                        $html .= '<span class="label label-success"><span class="glyphicon glyphicon-ok-circle"></span> ' . $importati . ' in stock</span> ';
+                    }
+                    if ($ignorati > 0) {
+                        $html .= '<span class="label label-default"><span class="glyphicon glyphicon-minus-sign"></span> ' . $ignorati . ' ignorati</span>';
+                    }
+                    $html .= '</div></div>';
+                    return $html;
                 })
-                ->rawColumns(['invoice_number', 'supplier_name'])
+                ->rawColumns(['invoice_number', 'supplier_name', 'mapping'])
                 ->toJson();
         } catch (\Exception $e) {
             return $this->exception($e);
@@ -148,27 +180,36 @@ class InvoiceController extends BaseController
                         $fail("Il materiale selezionato non esiste.");
                     }
                 }
-            ]
+            ],
+            'multipliers.*' => ['nullable', 'numeric', 'min:0.001'],
         ]);
 
         $invoice = $this->interface->find($invoiceId);
         $mappings = $request->input('mappings', []);
+        $multipliers = $request->input('multipliers', []);
 
         DB::beginTransaction();
 
         try {
             foreach ($mappings as $productId => $materialId) {
                 $product = $invoice->products()->find($productId);
+                if (!$product) {
+                    continue;
+                }
+
+                $multiplier = isset($multipliers[$productId]) ? (float) $multipliers[$productId] : 1;
+                $multiplier = $multiplier > 0 ? $multiplier : 1;
+
                 if ($materialId === '0') {
                     $product->update(['ignore_mapping' => 1]);
                 } else {
-                    if (!$product) {
-                        continue;
-                    }
+                    $product->update(['quantity_multiplier' => $multiplier]);
+
                     if ($materialId) {
-                        MappingProduct::create([
+                        MappingProduct::firstOrCreate([
+                            'product_name' => $product->product_name,
+                        ], [
                             'material_id' => $materialId,
-                            'product_name' => $product->product_name, // Variazione (può essere positiva o negativa)
                         ]);
                     }
                 }
@@ -318,19 +359,21 @@ class InvoiceController extends BaseController
             $material = $product->material;
 
             if ($material) {
+                $realQuantity = $product->quantity * ($product->quantity_multiplier ?? 1);
+
                 // Crea il record MaterialStock
                 $materialStock = MaterialStock::firstOrCreate([
                     'supplier_invoice_product_id' => $product->id,
                 ], [
                     'material_id' => $material->id,
-                    'stock' => $product->quantity,
+                    'stock' => $realQuantity,
                 ]);
 
                 // Se il MaterialStock è stato appena creato, aggiorna lo stock del Material
                 if ($materialStock->wasRecentlyCreated) {
                     $materialModel = Material::find($material->id);
                     if ($materialModel) {
-                        $materialModel->increment('stock', $product->quantity);
+                        $materialModel->increment('stock', $realQuantity);
                     }
                 }
             }

@@ -20,9 +20,9 @@ class SupplierInvoiceProduct extends LogsModel
         'product_name',
         'price',
         'quantity',
+        'quantity_multiplier',
         'ignore_mapping',
         'iva',
-        'price',
     ];
 
     public function invoice() : BelongsTo
