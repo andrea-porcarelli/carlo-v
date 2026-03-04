@@ -39,12 +39,13 @@ class Material extends Model
         return [
             'pz' => 'Pezzo',
             'kg' => 'Kilogrammi (kg)',
+            'g'  => 'Grammi (g)',
             'cl' => 'Centilitri (cl)',
         ];
     }
 
     public function getStockTypeLabelAttribute() : string {
-        return $this->stock_types()[$this->stock_type];
+        return $this->stock_types()[$this->stock_type] ?? $this->stock_type;
     }
 
     public function isLowStock(float $currentStock): bool
