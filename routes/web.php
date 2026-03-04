@@ -128,6 +128,7 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/datatable', [CategoryController::class, 'datatable'])->name('datatable');
                 Route::get('/create', [CategoryController::class, 'create'])->name('create');
                 Route::post('/', [CategoryController::class, 'store']);
+                Route::put('/reorder', [CategoryController::class, 'reorder'])->name('reorder');
                 Route::get('/{id}', [CategoryController::class, 'show'])->name('show');
                 Route::put('/{id}', [CategoryController::class, 'edit']);
                 Route::put('/{id}/status', [CategoryController::class, 'status']);

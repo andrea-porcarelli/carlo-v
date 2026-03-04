@@ -107,6 +107,19 @@ class CategoryController extends BaseController
         }
     }
 
+    public function reorder(Request $request): JsonResponse
+    {
+        try {
+            foreach ($request->order as $item) {
+                $this->interface->find($item['id'])
+                    ->update(['sort_order' => $item['sort_order']]);
+            }
+            return $this->success([]);
+        } catch (\Exception $e) {
+            return $this->exception($e, $request);
+        }
+    }
+
     public function status(int $id): JsonResponse
     {
         try {

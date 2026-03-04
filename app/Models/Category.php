@@ -18,6 +18,7 @@ class Category extends Model
         'printer_id',
         'is_active',
         'label',
+        'sort_order',
     ];
 
     public function printer() : BelongsTo {

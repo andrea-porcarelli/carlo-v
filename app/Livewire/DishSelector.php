@@ -18,7 +18,7 @@ class DishSelector extends Component
     {
         // Carica solo le categorie attive
         $this->categories = Category::where('is_active', 1)
-            ->orderBy('label')
+            ->orderBy('sort_order')
             ->get();
     }
 

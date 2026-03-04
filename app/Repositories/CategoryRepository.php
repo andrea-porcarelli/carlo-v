@@ -17,6 +17,6 @@ class CategoryRepository extends CrudRepository implements CategoryInterface
     public function filters(array $filters): Builder
     {
         $builder = $this->builder();
-        return $builder;
+        return $builder->orderBy('sort_order');
     }
 }
