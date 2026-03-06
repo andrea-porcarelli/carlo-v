@@ -56,6 +56,7 @@ class OperatorAuthController extends Controller
                     'user_id' => $user->id,
                     'user_name' => $user->name,
                     'user_email' => $user->email,
+                    'role' => $user->role,
                 ],
             ]);
         } catch (\Exception $e) {

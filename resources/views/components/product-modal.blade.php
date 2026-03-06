@@ -34,10 +34,10 @@
 
         <!-- Body -->
         <div class="{{ $isMobile ? 'mobile-modal-body' : '' }}"
-             style="{{ !$isMobile ? 'padding: 30px;' : '' }}"
+             style="{{ !$isMobile ? 'padding: 16px;' : '' }}"
         >
             <!-- Quantity and Price Row -->
-            <div style="{{ !$isMobile ? 'display: flex; gap: 30px; margin-bottom: 25px;' : '' }}">
+            <div style="{{ !$isMobile ? 'display: flex; gap: 16px; margin-bottom: 10px;' : '' }}">
                 <!-- Quantity -->
                 <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
                      style="{{ !$isMobile ? 'flex: 1;' : '' }}"
@@ -93,22 +93,22 @@
 
             <!-- Notes -->
             <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
-                 style="{{ !$isMobile ? 'margin-bottom: 25px;' : '' }}"
+                 style="{{ !$isMobile ? 'margin-bottom: 10px;' : '' }}"
             >
                 <label class="{{ $isMobile ? 'mobile-form-label' : '' }}"
-                       style="{{ !$isMobile ? 'display: block; font-weight: 700; margin-bottom: 10px; color: #000; text-transform: uppercase;' : '' }}"
+                       style="{{ !$isMobile ? 'display: block; font-weight: 700; margin-bottom: 6px; color: #000; text-transform: uppercase;' : '' }}"
                 >NOTE</label>
                 <textarea
                     id="{{ $isMobile ? 'productNotesMobile' : 'productNotes' }}"
                     placeholder="Aggiungi note per la cucina..."
                     class="{{ $isMobile ? 'mobile-textarea' : '' }}"
-                    style="{{ !$isMobile ? 'width: 100%; height: 80px; border: 2px solid #dee2e6; padding: 10px; resize: vertical; font-family: inherit;' : '' }}"
+                    style="{{ !$isMobile ? 'width: 100%; height: 50px; border: 2px solid #dee2e6; padding: 8px; resize: vertical; font-family: inherit;' : '' }}"
                 ></textarea>
             </div>
 
             <!-- Segue Option -->
             <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
-                 style="{{ !$isMobile ? 'margin-bottom: 25px;' : '' }}"
+                 style="{{ !$isMobile ? 'margin-bottom: 8px;' : '' }}"
             >
                 @if($isMobile)
                 <div class="mobile-segue-toggle" id="segueToggleMobile" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent;">
@@ -136,13 +136,14 @@
 
             <!-- Extras -->
             <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
-                 style="{{ !$isMobile ? 'margin-bottom: 25px;' : '' }}"
+                 style="{{ !$isMobile ? 'margin-bottom: 10px;' : '' }}"
             >
                 <label class="{{ $isMobile ? 'mobile-form-label' : '' }}"
-                       style="{{ !$isMobile ? 'display: block; font-weight: 700; margin-bottom: 15px; color: #000; text-transform: uppercase;' : '' }}"
+                       style="{{ !$isMobile ? 'display: block; font-weight: 700; margin-bottom: 6px; color: #000; text-transform: uppercase;' : '' }}"
                 >SUPPLEMENTI</label>
                 <div id="{{ $isMobile ? 'extrasContainerMobile' : 'extrasContainer' }}"
                      class="{{ $isMobile ? 'mobile-checkbox-group' : '' }}"
+                     style="{{ !$isMobile ? 'display:flex;flex-wrap:wrap;gap:6px;' : '' }}"
                 >
                     <!-- Extras will be dynamically loaded -->
                 </div>
@@ -150,13 +151,14 @@
 
             <!-- Removals -->
             <div class="{{ !$isMobile ? '' : 'mobile-form-group' }}"
-                 style="{{ !$isMobile ? 'margin-bottom: 30px;' : '' }}"
+                 style="{{ !$isMobile ? 'margin-bottom: 10px;' : '' }}"
             >
                 <label class="{{ $isMobile ? 'mobile-form-label' : '' }}"
-                       style="{{ !$isMobile ? 'display: block; font-weight: 700; margin-bottom: 15px; color: #000; text-transform: uppercase;' : '' }}"
+                       style="{{ !$isMobile ? 'display: block; font-weight: 700; margin-bottom: 6px; color: #000; text-transform: uppercase;' : '' }}"
                 >RIMUOVI</label>
                 <div id="{{ $isMobile ? 'removalsContainerMobile' : 'removalsContainer' }}"
                      class="{{ $isMobile ? 'mobile-checkbox-group' : '' }}"
+                     style="{{ !$isMobile ? 'display:flex;flex-wrap:wrap;gap:6px;' : '' }}"
                 >
                     <!-- Removals will be dynamically loaded -->
                 </div>
@@ -173,31 +175,24 @@
 
         <!-- Footer -->
         @if(!$isMobile)
-        <div style="border-top: 2px solid #dee2e6; padding: 20px 30px 30px 30px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <span style="font-size: 1.2rem; font-weight: 700; color: #000;">TOTALE RIGA:</span>
-                <span id="modalTotal" style="font-size: 1.5rem; font-weight: 700; color: #dc3545;">€0.00</span>
+        <div style="border-top: 2px solid #dee2e6; padding: 10px 16px 16px 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 1rem; font-weight: 700; color: #000;">TOTALE RIGA:</span>
+                <span id="modalTotal" style="font-size: 1.3rem; font-weight: 700; color: #dc3545;">€0.00</span>
             </div>
-
-            <div style="display: flex; gap: 10px;">
-                <button class="btn-red" style="flex: 1; padding: 15px; font-size: 14px;" id="addToCartBtn">
-                    <i class="fas fa-cart-plus me-2"></i> AGGIUNGI AL CARRELLO
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-red" style="flex: 1; padding: 11px; font-size: 14px;" id="addProductBtn">
+                    <i class="fas fa-plus me-2"></i> AGGIUNGI
                 </button>
-                <button class="btn-red" style="flex: 1; padding: 15px; font-size: 14px; opacity: 0.8;" id="addProductBtn">
-                    <i class="fas fa-plus me-2"></i> AGGIUNGI SUBITO
+                <button style="flex: 0 0 auto; padding: 11px 16px; font-size: 14px; background: #6c757d; border: none; color: white; font-weight: 600; text-transform: uppercase; cursor: pointer;" id="cancelProductBtn">
+                    ANNULLA
                 </button>
             </div>
-            <button style="width: 100%; padding: 12px; font-size: 14px; background: #6c757d; border: none; color: white; font-weight: 600; text-transform: uppercase; margin-top: 10px;" id="cancelProductBtn">
-                ANNULLA
-            </button>
         </div>
         @else
         <div class="mobile-modal-footer">
-            <button class="mobile-action-btn btn-primary" id="addToCartBtnMobile">
-                <i class="fas fa-cart-plus me-2"></i> AL CARRELLO
-            </button>
-            <button class="mobile-action-btn btn-primary" id="addProductBtnMobile" style="opacity: 0.8;">
-                <i class="fas fa-plus me-2"></i> SUBITO
+            <button class="mobile-action-btn btn-primary" id="addProductBtnMobile">
+                <i class="fas fa-plus me-2"></i> AGGIUNGI
             </button>
             <button class="mobile-action-btn btn-secondary" id="cancelProductBtnMobile">
                 ANNULLA

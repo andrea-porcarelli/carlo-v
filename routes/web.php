@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Backoffice\AllergenController;
+use App\Http\Controllers\Backoffice\MenuOptionController;
 use App\Http\Controllers\Backoffice\DeployController;
 use App\Http\Controllers\Backoffice\CategoryController;
 use App\Http\Controllers\Backoffice\DishController;
@@ -37,6 +38,12 @@ Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function(
     Route::post('/verify-token', [OperatorAuthController::class, 'verifyToken'])->name('verifyToken');
 });
 
+// API Routes for Menu Options
+Route::get('/api/menu-options', [TableOrderController::class, 'getMenuOptions'])->name('api.menu-options');
+Route::get('/api/banco', [TableOrderController::class, 'getBanco'])->name('api.banco');
+Route::post('/api/banco/open', [TableOrderController::class, 'openBanco'])->name('api.banco.open');
+Route::get('/api/order/{order}', [TableOrderController::class, 'getOrderDetails'])->name('api.order.details');
+
 // API Routes for Table Management
 Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::get('/', [TableOrderController::class, 'getTables'])->name('index');
@@ -53,6 +60,9 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::post('/{table}/pay-invoice', [TableOrderController::class, 'payTableInvoice'])->name('payInvoice');
     Route::post('/{table}/marcia', [TableOrderController::class, 'marciaTable'])->name('marcia');
     Route::post('/{table}/preconto', [TableOrderController::class, 'precontoTable'])->name('preconto');
+    Route::post('/{table}/move', [TableOrderController::class, 'moveTable'])->name('move');
+    Route::post('/{table}/reprint', [TableOrderController::class, 'reprintOrder'])->name('reprint');
+    Route::post('/{table}/print-session', [TableOrderController::class, 'printSession'])->name('printSession');
     Route::post('/save', [TableOrderController::class, 'saveTable'])->name('save');
     Route::post('/add-batch', [TableOrderController::class, 'addTables'])->name('addBatch');
     Route::delete('/{table}', [TableOrderController::class, 'deleteTable'])->name('delete');
@@ -157,6 +167,15 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::post('/', [AllergenController::class, 'store']);
                 Route::get('/{id}', [AllergenController::class, 'show'])->name('show');
                 Route::put('/{id}', [AllergenController::class, 'edit']);
+            });
+            Route::group(['prefix' => '/menu-options', 'as' => 'menu-options.'], function() {
+                Route::get('/', [MenuOptionController::class, 'index'])->name('index');
+                Route::get('/datatable', [MenuOptionController::class, 'datatable'])->name('datatable');
+                Route::get('/create', [MenuOptionController::class, 'create'])->name('create');
+                Route::post('/', [MenuOptionController::class, 'store']);
+                Route::get('/{id}', [MenuOptionController::class, 'show'])->name('show');
+                Route::put('/{id}', [MenuOptionController::class, 'edit']);
+                Route::put('/{id}/status', [MenuOptionController::class, 'status']);
             });
             Route::group(['prefix' => '/dishes', 'as' => 'dishes.'], function() {
                 Route::get('/', [DishController::class, 'index'])->name('index');

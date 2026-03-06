@@ -128,19 +128,11 @@ class PrinterService implements PrinterServiceInterface
             // Inizializza la stampante
             $printer->initialize();
 
-            // Label della stampante
-            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
-            $printer->setEmphasis(true);
-            $printer->text("*** " . strtoupper($printerObj->label) . " ***\n");
-            $printer->setEmphasis(false);
-            $printer->feed(1);
-
             $covers = $tableOrder->covers ?? $tableOrder->restaurantTable->capacity ?? 'N/D';
+            $tableNumber = $tableOrder->restaurantTable->table_number ?? 'N/D';
             // Numero del tavolo (centrato)
             $printer->setEmphasis(true);
-            $printer->setTextSize(2, 2);
-            $tableNumber = $tableOrder->restaurantTable->table_number ?? 'N/D';
-            $printer->text("TAVOLO $tableNumber | PAX $covers\n\n");
+
             $printer->setTextSize(1, 1);
             $printer->setEmphasis(false);
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
@@ -153,21 +145,20 @@ class PrinterService implements PrinterServiceInterface
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
             $printer->setEmphasis(true);
             $printer->text(now()->format('d/m/Y H:i:s')  . " " . $operatorName . "\n");
+            $printer->feed(1);
+            $printer->setTextSize(2, 2);
+            if ((int) $tableNumber === 0) {
+                $printer->text("VENDITA AL BANCO\n\n");
+            } else {
+                $printer->text("TAVOLO $tableNumber | PAX $covers\n\n");
+            }
+
             $printer->setEmphasis(false);
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
 
 
-            $printer->feed(1);
 
-            // Tipo di operazione
-            $operationText = $this->getOperationText($operation);
-            if ($operationText) {
-                $printer->setEmphasis(true);
-                $printer->text("$operationText\n");
-                $printer->setEmphasis(false);
-                $printer->feed(1);
-            }
-
+            $printer->setTextSize(1, 1);
             // Linea separatrice
             $printer->text(str_repeat('-', 48) . "\n");
 
@@ -276,7 +267,7 @@ class PrinterService implements PrinterServiceInterface
 
         // Quantità e nome piatto
         $printer->setEmphasis(true);
-        $printer->setTextSize(2, 1);
+        $printer->setTextSize(2, 2);
         $quantity = str_pad($item->quantity, 3, ' ', STR_PAD_RIGHT);
         $dishName = $item->dish->label ?? 'N/D';
         $printer->text("$quantity $dishName\n");
@@ -390,6 +381,7 @@ class PrinterService implements PrinterServiceInterface
             'add' => '*** ORDINE ***',
             'update' => '*** MODIFICA ***',
             'remove' => '*** ANNULLAMENTO ***',
+            'reprint' => '*** RISTAMPA ***',
             default => null,
         };
     }
@@ -1358,6 +1350,158 @@ class PrinterService implements PrinterServiceInterface
             Log::error('Errore durante la stampa log filtrati', [
                 'printer_ip' => $printerObj->ip ?? 'N/D',
                 'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Stampa notifica spostamento tavolo su tutte le stampanti coinvolte
+     */
+    public function printSpostamento(TableOrder $sourceOrder, \App\Models\RestaurantTable $destinationTable, int $operatorId): bool
+    {
+        try {
+            $sourceOrder->load(['items.dish.category.printer', 'restaurantTable']);
+
+            if ($sourceOrder->items->isEmpty()) {
+                return true;
+            }
+
+            $itemsByPrinter = $this->groupItemsByPrinter($sourceOrder->items);
+            $allSuccess = true;
+
+            foreach ($itemsByPrinter as $printerData) {
+                $success = $this->printSpostamentoToDevice(
+                    $sourceOrder,
+                    $destinationTable,
+                    $printerData['printer'],
+                    $printerData['items'],
+                    $operatorId
+                );
+                if (!$success) {
+                    $allSuccess = false;
+                }
+            }
+
+            return $allSuccess;
+
+        } catch (\Exception $e) {
+            Log::error('Errore durante la stampa spostamento', [
+                'source_order_id' => $sourceOrder->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Stampa spostamento su un dispositivo specifico
+     */
+    protected function printSpostamentoToDevice(
+        TableOrder $sourceOrder,
+        \App\Models\RestaurantTable $destinationTable,
+        Printer $printerObj,
+        array $items,
+        int $operatorId
+    ): bool {
+        try {
+            $printerIp = $printerObj->ip;
+
+            if (!$this->isPrinterReachable($printerIp)) {
+                Log::warning("Stampante non raggiungibile per spostamento", ['ip' => $printerIp]);
+                return false;
+            }
+
+            $connector = new NetworkPrintConnector($printerIp, 9100, 5);
+            $printer = new EscposPrinter($connector);
+            $printer->initialize();
+
+            $sourceTableNumber = $sourceOrder->restaurantTable->table_number ?? 'N/D';
+            $destTableNumber = $destinationTable->table_number ?? 'N/D';
+
+            // Header stampante
+            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $printer->setEmphasis(true);
+            $printer->setTextSize(2, 2);
+            $printer->text(strtoupper($printerObj->label) . "\n");
+            $printer->setEmphasis(false);
+            $printer->feed(1);
+
+            // "Spostamento" — testo bianco su sfondo nero, tutta larghezza
+            // Con setTextSize(2,2) la riga è 24 char; paddiamo a 24 per riempire il blocco
+            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $printer->setTextSize(2, 2);
+            $printer->setEmphasis(true);
+            $printer->setReverseColors(true);
+            $printer->text(str_pad('Spostamento', 24, ' ', STR_PAD_BOTH) . "\n");
+            $printer->setReverseColors(false);
+            $printer->setTextSize(1, 1);
+            $printer->setEmphasis(false);
+            $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            $printer->feed(1);
+
+            // Destinazione
+            $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            $printer->setTextSize(2, 2);
+            $printer->setEmphasis(true);
+            $printer->text("Sul Tavolo $destTableNumber\n");
+            $printer->setEmphasis(false);
+
+            // Data e ora
+            $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            $printer->text(now()->format('d/m/Y H:i:s') . "\n");
+            $printer->feed(1);
+
+            // Articoli di questa stampante
+            foreach ($items as $item) {
+                $quantity = str_pad($item->quantity, 3, ' ', STR_PAD_RIGHT);
+                $dishName = strtoupper($item->dish->label) ?? 'N/D';
+                $printer->setTextSize(1, 1);
+                $printer->text("$quantity $dishName\n");
+                $printer->setTextSize(1, 1);
+
+                if (!empty($item->notes)) {
+                    $printer->text("  Note: " . $item->notes . "\n");
+                }
+            }
+
+            $printer->feed(1);
+
+            // Provenienza
+            $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            $printer->setTextSize(2, 2);
+            $printer->setEmphasis(true);
+            $printer->text("Dal Tavolo $sourceTableNumber\n");
+            $printer->setTextSize(1, 1);
+            $printer->setEmphasis(false);
+
+            $printer->feed(3);
+            $printer->cut();
+            $printer->close();
+
+            $this->printLogService->logPrint(
+                $sourceOrder,
+                $printerObj,
+                $operatorId,
+                'spostamento',
+                null,
+                [
+                    'source_table' => $sourceTableNumber,
+                    'destination_table' => $destTableNumber,
+                    'items' => collect($items)->map(fn($item) => [
+                        'dish_name' => $item->dish->label ?? 'N/D',
+                        'quantity' => $item->quantity,
+                    ])->toArray(),
+                ],
+                true
+            );
+
+            return true;
+
+        } catch (\Exception $e) {
+            Log::error('Errore stampa spostamento su dispositivo', [
+                'printer_ip' => $printerObj->ip ?? 'N/D',
+                'error' => $e->getMessage(),
             ]);
             return false;
         }

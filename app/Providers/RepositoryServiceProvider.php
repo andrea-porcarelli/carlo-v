@@ -30,6 +30,10 @@ use App\Repositories\PrinterRepository;
 
 use App\Interfaces\MaterialInterface;
 use App\Repositories\MaterialRepository;
+
+use App\Interfaces\MenuOptionInterface;
+use App\Repositories\MenuOptionRepository;
+
 class RepositoryServiceProvider extends ServiceProvider
 {
     /**
@@ -50,6 +54,7 @@ class RepositoryServiceProvider extends ServiceProvider
         $this->app->bind(SupplierInvoiceInterface::class, SupplierInvoiceRepository::class);
         $this->app->bind(SupplierInvoiceProductInterface::class, SupplierInvoiceProductRepository::class);
         $this->app->bind(MediaInterface::class, MediaRepository::class);
+        $this->app->bind(MenuOptionInterface::class, MenuOptionRepository::class);
 
     }
 

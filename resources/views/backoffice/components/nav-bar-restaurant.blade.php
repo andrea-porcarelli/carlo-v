@@ -43,6 +43,11 @@
                 <i class="fas fa-virus"></i> Allergeni
             </a>
         </li>
+        <li class="{{ (Request::is('backoffice/restaurant/menu-options*')) ? 'active' : '' }}">
+            <a href="{{ route('restaurant.menu-options.index') }}">
+                <i class="fas fa-plus-circle"></i> Extra / Rimozioni
+            </a>
+        </li>
         <li class="{{ (Request::is('backoffice/restaurant/products')) ? 'active' : '' }}">
             <a href="{{ route('restaurant.printers.index') }}">
                 <i class="fas fa-print"></i> Stampanti

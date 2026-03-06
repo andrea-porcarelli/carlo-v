@@ -13,9 +13,9 @@
                 <i class="fas fa-chevron-{{ $selectedCategory == $category->id ? 'down' : 'right' }} category-arrow"></i>
             </h6>
 
-            <div class="category-items" style="display: {{ $selectedCategory == $category->id ? 'block' : 'none' }};">
+            <div class="category-items" style="display: {{ $selectedCategory == $category->id ? 'flex' : 'none' }};">
                 <!-- Campo di ricerca -->
-                <div class="mb-1 px-2">
+                <div class="mb-1 px-2" style="flex: 0 0 100%;">
                     <input
                         type="text"
                         wire:model.live.debounce.300ms="search"

@@ -12,8 +12,11 @@
                     <button class="btn btn-red active me-3" id="btnMainView">
                         <i class="fas fa-home me-2"></i> SALA PRINCIPALE
                     </button>
-                    <button class="btn btn-red" id="btnAddTable">
+                    <button class="btn btn-red me-3" id="btnAddTable">
                         <i class="fas fa-plus me-2"></i> AGGIUNGI TAVOLI
+                    </button>
+                    <button class="btn btn-orange" id="btnBanco">
+                        <i class="fas fa-store me-2"></i> VENDITA AL BANCO
                     </button>
                 </div>
             </div>
@@ -22,31 +25,8 @@
         <!-- Main Restaurant View -->
         <div id="mainView" class="page-content active">
             <div class="row g-0">
-                <!-- Left Panel - Menu (30%) -->
-                <div class="col-left">
-                    @livewire('dish-selector')
-
-                    <!-- Temporary Cart -->
-                    <div id="temporaryCart" style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px; border: 2px solid #dc3545;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h6 style="margin: 0; color: #dc3545; font-weight: 700;">
-                                <i class="fas fa-shopping-cart me-2"></i>ORDINE IN PREPARAZIONE
-                            </h6>
-                            <button id="clearCart" class="btn btn-sm" style="background: #6c757d; color: white; border: none; padding: 4px 8px;">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                        <div id="cartItems" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px;">
-                            <!-- Cart items will be added here -->
-                        </div>
-                        <button id="confirmCart" class="btn-red" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600;">
-                            <i class="fas fa-check me-2"></i>CONFERMA ORDINE
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Center - Dining Area (60%) -->
-                <div class="col-center">
+                <!-- Center - Dining Area (10/12) -->
+                <div class="col-sala">
                     <div class="dining-area">
                         <h5 class="dining-title">SALA RISTORANTE</h5>
                         <div class="dining-grid" id="tablesContainer">
@@ -55,22 +35,22 @@
                     </div>
                 </div>
 
-                <!-- Right Panel - Quick Controls (10%) -->
-                <div class="col-right">
-                    <div class="mini-panel">
-                        <div class="quick-stats">
-                            <div class="quick-stats-number" id="occupiedCount">0</div>
-                            <div class="quick-stats-label">OCCUPATI</div>
+                <!-- Right Panel - Occupied Summary (2/12) -->
+                <div class="col-summary">
+                    <div class="summary-panel">
+                        <div class="summary-header">TAVOLI OCCUPATI</div>
+                        <div id="occupiedSummary">
+                            <div style="text-align:center;color:#6c757d;padding:20px;">Nessun tavolo occupato</div>
                         </div>
-
-                        <div class="quick-stats">
-                            <div class="quick-stats-number" id="freeCount">20</div>
-                            <div class="quick-stats-label">LIBERI</div>
-                        </div>
-
-                        <div class="mini-control" id="btnModifyTable" disabled>
-                            <i class="fas fa-edit"></i>
-                            <div class="mini-control-label">GESTISCI</div>
+                        <div class="summary-stats">
+                            <div class="quick-stats">
+                                <div class="quick-stats-number" id="occupiedCount">0</div>
+                                <div class="quick-stats-label">OCCUPATI</div>
+                            </div>
+                            <div class="quick-stats">
+                                <div class="quick-stats-number" id="freeCount">20</div>
+                                <div class="quick-stats-label">LIBERI</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -78,92 +58,74 @@
 
             <!-- Modify Order Overlay (Full View with Menu) -->
             <div id="modifyOrderOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000;">
-                <div style="position: relative; width: 100%; height: 100%; padding: 20px;">
+                <div style="position: relative; width: 100%; height: 100%; padding: 15px;">
                     <!-- Close Button -->
-                    <button style="position: absolute; top: 20px; right: 20px; background: #dc3545; border: none; color: white; width: 40px; height: 40px; cursor: pointer; font-size: 24px; z-index: 1001;" id="closeModifyBtn">×</button>
+                    <button style="position: absolute; top: 15px; right: 15px; background: #dc3545; border: none; color: white; width: 36px; height: 36px; cursor: pointer; font-size: 22px; z-index: 1001; border-radius: 4px;" id="closeModifyBtn">×</button>
 
                     <!-- Header -->
-                    <div style="text-align: center; color: white; margin-bottom: 20px;">
-                        <h2 style="margin: 0; font-size: 2rem; font-weight: 700;">
-                            MODIFICA TAVOLO <span id="modifyTableNumber">-</span>
+                    <div style="text-align: center; color: white; margin-bottom: 12px;">
+                        <h2 style="margin: 0; font-size: 1.4rem; font-weight: 700;">
+                            TAVOLO <span id="modifyTableNumber">-</span>
                         </h2>
-                        <p style="margin: 5px 0 0 0; color: #6c757d;" id="modifyCoversInfo">
+                        <p style="margin: 2px 0 0 0; color: #6c757d; font-size: 0.85rem;" id="modifyCoversInfo">
                             <i class="fas fa-users" id="modifyCoversIcon"></i> <span id="modifyCoversCount">0</span><span id="modifyCoversLabel"> coperti</span>
                         </p>
                     </div>
 
-                    <div style="display: flex; gap: 20px; height: calc(100% - 100px);">
-                        <!-- Left: Menu Panel -->
-                        <div style="flex: 0 0 28%; background: white; padding: 15px; overflow-y: auto; border-radius: 8px;">
-                            <h3 style="color: #000; font-weight: 700; margin-bottom: 15px; border-bottom: 3px solid #dc3545; padding-bottom: 8px; font-size: 1.1rem;">
-                                <i class="fas fa-utensils me-2"></i> MENU
-                            </h3>
-                            <div id="modifyMenuContainer">
-                                @livewire('dish-selector')
-                            </div>
-
-                            <!-- Temporary Cart in Modify View -->
-                            <div id="temporaryCartModify" style="display: none; margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 4px; border: 2px solid #dc3545;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <h6 style="margin: 0; color: #dc3545; font-weight: 700; font-size: 0.85rem;">
-                                        <i class="fas fa-shopping-cart me-2"></i>ORDINE IN PREPARAZIONE
-                                    </h6>
-                                    <button id="clearCartModify" class="btn btn-sm" style="background: #6c757d; color: white; border: none; padding: 3px 6px;">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                    <div style="display:flex; gap:10px; height:calc(100% - 80px);">
+                        <!-- 4/12: Ordine -->
+                        <div class="overlay-col-order">
+                            <div class="overlay-order-header">
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <span style="font-size:1.5rem;font-weight:700;color:#dc3545;" id="modifySelectedTableNumber">-</span>
+                                    <span style="font-size:0.8rem;color:#6c757d;text-transform:uppercase;letter-spacing:1px;">ORDINE CORRENTE</span>
                                 </div>
-                                <div id="cartItemsModify" style="max-height: 150px; overflow-y: auto; margin-bottom: 8px;">
-                                    <!-- Cart items will be added here -->
-                                </div>
-                                <button id="confirmCartModify" class="btn-red" style="width: 100%; padding: 10px; font-size: 13px; font-weight: 600;">
-                                    <i class="fas fa-check me-2"></i>CONFERMA ORDINE
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Right: Order Summary -->
-                        <div style="flex: 1; background: white; padding: 0; border-radius: 8px; display: flex; flex-direction: column; min-width: 0;">
-                            <!-- Compact Header -->
-                            <div style="background: #000; color: white; padding: 12px 20px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
-                                <div style="display: flex; align-items: center; gap: 15px;">
-                                    <span style="font-size: 1.8rem; font-weight: 700; color: #dc3545;" id="modifySelectedTableNumber">-</span>
-                                    <span style="font-size: 0.85rem; color: #6c757d; text-transform: uppercase; letter-spacing: 1px;">ORDINE CORRENTE</span>
-                                </div>
-                                <div style="text-align: right;">
-                                    <span style="font-size: 0.85rem; color: #6c757d;">TOTALE</span>
-                                    <span id="modifyTotalAmount" style="font-size: 1.5rem; font-weight: 700; color: #dc3545; margin-left: 10px;">€0.00</span>
+                                <div>
+                                    <span style="font-size:0.8rem;color:#6c757d;">TOTALE</span>
+                                    <span id="modifyTotalAmount" style="font-size:1.3rem;font-weight:700;color:#dc3545;margin-left:8px;">€0.00</span>
                                 </div>
                             </div>
-
-                            <!-- Order Items - Maximum Space -->
-                            <div style="padding: 15px 20px; flex: 1; overflow-y: auto;" id="modifyReceiptItems">
+                            <div id="modifyReceiptItems" style="flex:1;overflow-y:auto;padding:12px;">
                                 <div class="empty-state">
                                     <i class="fas fa-shopping-cart"></i>
                                     <p>Nessun ordine</p>
                                 </div>
                             </div>
+                        </div>
 
-                            <!-- Compact Action Bar -->
-                            <div style="padding: 12px 20px; background: #f8f9fa; border-top: 2px solid #dee2e6; display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button class="action-btn-compact" id="btnMarciaTavolo" style="background: #28a745;">
-                                    <i class="fas fa-play-circle"></i> MARCIA
-                                </button>
-                                <button class="action-btn-compact" id="btnPreconto" style="background: #17a2b8;">
-                                    <i class="fas fa-receipt"></i> PRE-CONTO
-                                </button>
-                                <button class="action-btn-compact" id="btnModifyPayBill" style="background: #dc3545;">
-                                    <i class="fas fa-money-bill"></i> INCASSA
-                                </button>
-                                <button class="action-btn-compact" id="btnModifyFreeAmountIIn " style="background: #6c757d;">
-                                    <i class="fas fa-eraser"></i> AUTOCONSUMO
-                                </button>
-                                <button class="action-btn-compact" id="btnModifyFreeTable" style="background: #ffc107; color: #000;">
-                                    <i class="fas fa-door-open"></i> LIBERA
-                                </button>
-                                <button class="action-btn-compact" id="btnModifyComunica" style="background: #6f42c1;">
-                                    <i class="fas fa-bullhorn"></i> COMUNICA
-                                </button>
+                        <!-- 7/12: Menu -->
+                        <div class="overlay-col-menu">
+                            <div id="modifyMenuContainer">
+                                @livewire('dish-selector')
                             </div>
+                        </div>
+
+                        <!-- 1/12: Azioni verticali -->
+                        <div class="overlay-col-actions">
+                            <button class="action-btn-v" id="btnMarciaTavolo" style="background:#28a745;">
+                                <i class="fas fa-play-circle"></i> MARCIA
+                            </button>
+                            <button class="action-btn-v" id="btnPreconto" style="background:#17a2b8;">
+                                <i class="fas fa-receipt"></i> PRE-CONTO
+                            </button>
+                            <button class="action-btn-v" id="btnModifyPayBill" style="background:#dc3545;">
+                                <i class="fas fa-money-bill"></i> INCASSA
+                            </button>
+                            <button class="action-btn-v" id="btnModifyFreeAmount" style="background:#6c757d;">
+                                <i class="fas fa-eraser"></i> AUTO
+                            </button>
+                            <button class="action-btn-v" id="btnModifyFreeTable" style="background:#ffc107;color:#000;">
+                                <i class="fas fa-door-open"></i> LIBERA
+                            </button>
+                            <button class="action-btn-v" id="btnSpostaTavolo" style="background:#fd7e14;">
+                                <i class="fas fa-exchange-alt"></i> SPOSTA
+                            </button>
+                            <button class="action-btn-v" id="btnRistampaOrdine" style="background:#343a40;">
+                                <i class="fas fa-print"></i> RISTAMPA
+                            </button>
+                            <button class="action-btn-v" id="btnModifyComunica" style="background:#6f42c1;">
+                                <i class="fas fa-bullhorn"></i> COMUNICA
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -234,8 +196,101 @@
     <!-- Invoice Modal -->
     <x-invoice-modal />
 
+    <!-- Remove Reason Modal -->
+    <div id="removeReasonModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:3000; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:8px; padding:30px; max-width:420px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+            <h4 style="margin:0 0 20px 0; font-weight:700; text-transform:uppercase; text-align:center; color:#000;">
+                <i class="fas fa-trash-alt me-2" style="color:#dc3545;"></i>Motivo della rimozione
+            </h4>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+                <button class="remove-reason-btn" data-reason="Rientro" style="padding:12px 8px; background:#f8f9fa; border:2px solid #dee2e6; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.9rem; transition:all 0.15s;">Rientro</button>
+                <button class="remove-reason-btn" data-reason="Il cliente ha sostituito" style="padding:12px 8px; background:#f8f9fa; border:2px solid #dee2e6; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.9rem; transition:all 0.15s;">Il cliente ha sostituito</button>
+                <button class="remove-reason-btn" data-reason="Errore nel piatto" style="padding:12px 8px; background:#f8f9fa; border:2px solid #dee2e6; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.9rem; transition:all 0.15s;">Errore nel piatto</button>
+                <button class="remove-reason-btn" data-reason="Omaggiato" style="padding:12px 8px; background:#f8f9fa; border:2px solid #dee2e6; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.9rem; transition:all 0.15s;">Omaggiato</button>
+                <button class="remove-reason-btn" data-reason="Errore sala" style="padding:12px 8px; background:#f8f9fa; border:2px solid #dee2e6; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.9rem; transition:all 0.15s;">Errore sala</button>
+                <button class="remove-reason-btn" data-reason="Errore cucina" style="padding:12px 8px; background:#f8f9fa; border:2px solid #dee2e6; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.9rem; transition:all 0.15s;">Errore cucina</button>
+            </div>
+            <button id="cancelRemoveReason" style="width:100%; padding:12px; background:#6c757d; border:none; color:white; font-weight:600; text-transform:uppercase; border-radius:6px; cursor:pointer;">ANNULLA</button>
+        </div>
+    </div>
+
+    <!-- Move Table Modal -->
+    <div id="moveTableModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:3000; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:8px; padding:28px; max-width:480px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+            <h4 style="margin:0 0 6px 0; font-weight:700; text-transform:uppercase; color:#000;">
+                <i class="fas fa-exchange-alt me-2" style="color:#fd7e14;"></i>Sposta Tavolo
+            </h4>
+            <p style="margin:0 0 18px 0; color:#6c757d; font-size:0.9rem;">
+                Tavolo <strong id="moveSourceTableNumber">-</strong> → seleziona destinazione
+            </p>
+            <div id="moveTableGrid" style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; max-height:280px; overflow-y:auto; margin-bottom:18px;">
+                <!-- Populated by JS -->
+            </div>
+            <button id="cancelMoveTable" style="width:100%; padding:11px; background:#6c757d; border:none; color:white; font-weight:600; text-transform:uppercase; border-radius:6px; cursor:pointer;">ANNULLA</button>
+        </div>
+    </div>
+
     <!-- Notification -->
     <div id="notification" class="notification">
         <span id="notificationText">Operazione completata!</span>
+    </div>
+
+    <!-- Autoconsumo Modal -->
+    <div id="autoconsumoModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:3500; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:8px; width:92%; max-width:920px; height:85vh; display:flex; flex-direction:column; overflow:hidden;">
+            <!-- Header -->
+            <div style="background:#6c757d; color:white; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+                <h5 style="margin:0; font-weight:700; text-transform:uppercase; letter-spacing:1px;">
+                    <i class="fas fa-eraser me-2"></i>Autoconsumo — Tavolo <span id="autoconsumoTableNumber">-</span>
+                </h5>
+                <button id="closeAutoconsumoModal" style="background:none; border:none; color:white; font-size:1.5rem; line-height:1; cursor:pointer;">×</button>
+            </div>
+
+            <!-- Mode selection -->
+            <div id="autoconsumoModeSelect" style="padding:36px 30px; text-align:center;">
+                <p style="color:#6c757d; margin-bottom:28px; font-size:0.95rem;">Scegli come applicare l'autoconsumo a questo tavolo:</p>
+                <div style="display:flex; gap:20px; justify-content:center; flex-wrap:wrap;">
+                    <button id="btnAutoconsumoFull" style="padding:22px 40px; background:#6c757d; color:white; border:none; border-radius:8px; font-weight:700; font-size:0.95rem; cursor:pointer; text-transform:uppercase; min-width:220px;">
+                        <div style="font-size:2rem; margin-bottom:8px;"><i class="fas fa-eraser"></i></div>
+                        Tutto in autoconsumo
+                        <div style="font-size:0.75rem; font-weight:400; margin-top:6px; opacity:0.85;">Segna l'intero tavolo come autoconsumo</div>
+                    </button>
+                    <button id="btnAutoconsumoPartial" style="padding:22px 40px; background:#17a2b8; color:white; border:none; border-radius:8px; font-weight:700; font-size:0.95rem; cursor:pointer; text-transform:uppercase; min-width:220px;">
+                        <div style="font-size:2rem; margin-bottom:8px;"><i class="fas fa-users"></i></div>
+                        Assegna per operatore
+                        <div style="font-size:0.75rem; font-weight:400; margin-top:6px; opacity:0.85;">Assegna ogni piatto a un operatore specifico</div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Partial assignment view -->
+            <div id="autoconsumoPartialView" style="display:none; flex:1; overflow:hidden; padding:16px 20px; gap:14px; flex-direction:row; min-height:0;">
+                <!-- Items list -->
+                <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+                    <div style="font-weight:700; text-transform:uppercase; font-size:0.85rem; letter-spacing:1px; border-bottom:3px solid #dc3545; padding-bottom:8px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>Piatti dell'ordine</span>
+                        <button id="btnSelectAllItems" style="background:#dee2e6; border:none; border-radius:4px; padding:3px 10px; font-size:0.75rem; font-weight:600; cursor:pointer;">Seleziona tutti</button>
+                    </div>
+                    <div id="autoconsumoItemsList" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px;"></div>
+                </div>
+
+                <!-- Operators -->
+                <div style="width:210px; flex-shrink:0; display:flex; flex-direction:column;">
+                    <div style="font-weight:700; text-transform:uppercase; font-size:0.85rem; letter-spacing:1px; border-bottom:3px solid #dc3545; padding-bottom:8px; margin-bottom:10px;">Assegna a</div>
+                    <div id="autoconsumoOperatorsList" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div id="autoconsumoFooter" style="display:none; padding:14px 20px; border-top:2px solid #dee2e6; flex-shrink:0; justify-content:space-between; align-items:center; gap:10px;">
+                <div id="autoconsumoLegend" style="font-size:0.82rem; color:#6c757d; flex:1;"></div>
+                <div style="display:flex; gap:10px; flex-shrink:0;">
+                    <button id="btnAutoconsumoBack" style="padding:9px 20px; background:#dee2e6; border:none; border-radius:4px; font-weight:600; cursor:pointer; text-transform:uppercase; font-size:0.85rem;">Indietro</button>
+                    <button id="btnAutoconsumoConfirm" style="padding:9px 24px; background:#6c757d; color:white; border:none; border-radius:4px; font-weight:700; text-transform:uppercase; font-size:0.85rem; cursor:pointer;">
+                        <i class="fas fa-check me-2"></i>Conferma autoconsumo
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 @endsection

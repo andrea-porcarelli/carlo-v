@@ -113,6 +113,7 @@ const operatorAuthManager = {
                     id: data.data.user_id,
                     name: data.data.user_name,
                     email: data.data.user_email,
+                    role: data.data.role,
                 };
 
                 // Show success notification

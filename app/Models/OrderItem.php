@@ -23,6 +23,7 @@ class OrderItem extends Model
         'removals',
         'status',
         'segue',
+        'autoconsumo_user_id',
     ];
 
     protected $casts = [
@@ -56,6 +57,14 @@ class OrderItem extends Model
     public function addedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'added_by');
+    }
+
+    /**
+     * Get the user assigned for autoconsumo of this item
+     */
+    public function autoconsumoUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'autoconsumo_user_id');
     }
 
     /**

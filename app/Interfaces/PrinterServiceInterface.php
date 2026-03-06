@@ -63,6 +63,16 @@ interface PrinterServiceInterface
     public function reprint(int $printLogId): bool;
 
     /**
+     * Stampa notifica spostamento tavolo su tutte le stampanti coinvolte
+     *
+     * @param TableOrder $sourceOrder L'ordine del tavolo sorgente
+     * @param \App\Models\RestaurantTable $destinationTable Il tavolo di destinazione
+     * @param int $operatorId ID dell'operatore
+     * @return bool
+     */
+    public function printSpostamento(TableOrder $sourceOrder, \App\Models\RestaurantTable $destinationTable, int $operatorId): bool;
+
+    /**
      * Set the current operator ID for logging
      *
      * @param int $operatorId

@@ -19,12 +19,14 @@ class RestaurantTable extends Model
         'position_y',
         'status',
         'is_active',
+        'is_banco',
     ];
 
     protected $casts = [
         'position_x' => 'decimal:2',
         'position_y' => 'decimal:2',
         'is_active' => 'boolean',
+        'is_banco' => 'boolean',
     ];
 
     /**
@@ -36,11 +38,21 @@ class RestaurantTable extends Model
     }
 
     /**
-     * Get the current active order for this table
+     * Get the current active order for this table (latest)
      */
     public function activeOrder(): HasOne
     {
         return $this->hasOne(TableOrder::class)
+            ->where('status', 'open')
+            ->latest();
+    }
+
+    /**
+     * Get all active orders for this table (used for banco multi-session)
+     */
+    public function activeOrders(): HasMany
+    {
+        return $this->hasMany(TableOrder::class)
             ->where('status', 'open')
             ->latest();
     }

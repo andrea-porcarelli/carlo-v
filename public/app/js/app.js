@@ -64,11 +64,10 @@ $(document).ready(function() {
         }
     });
 
-    // Clear bill from modify overlay
+    // Clear bill from modify overlay — opens autoconsumo modal
     $('#btnModifyFreeAmount').click(function() {
         if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.freeAmount();
-            $('#modifyOrderOverlay').fadeOut(300);
+            tableOrdersManager.openAutoconsumoModal();
         }
     });
 

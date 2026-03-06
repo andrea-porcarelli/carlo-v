@@ -9,7 +9,20 @@ class TableOrdersManager {
         this.currentTable = null;
         this.currentProduct = null;
         this.apiBase = '/api/tables';
-        this.temporaryCart = []; // Temporary cart for multiple items
+        this.allTables = [];
+        this.bancoOrders = [];
+
+        this.modifySession = {
+            active: false,
+            token: null,
+            items: [],
+            pendingAdd: [],
+            pendingRemove: [],
+            pendingUpdate: {},
+            itemCounter: -1,
+        };
+
+        this.menuOptions = { extras: [], removals: [] };
 
         this.init();
     }
@@ -21,6 +34,15 @@ class TableOrdersManager {
         this.attachModalEvents();
         this.loadTables();
         this.startTimerUpdates();
+        this.loadMenuOptions();
+    }
+
+    async loadMenuOptions() {
+        try {
+            const resp = await fetch('/api/menu-options');
+            const result = await resp.json();
+            if (result.success) this.menuOptions = result.data;
+        } catch (e) { /* silenzioso */ }
     }
 
     /**
@@ -64,18 +86,25 @@ class TableOrdersManager {
         this.getElement('cancelProductBtn')?.addEventListener('click', () => this.closeProductModal());
 
         // Add product
-        this.getElement('addProductBtn')?.addEventListener('click', () => this.addProductToTable());
+        this.getElement('addProductBtn')?.addEventListener('click', () => this.addProductToSession());
 
-        // Add to cart button
-        this.getElement('addToCartBtn')?.addEventListener('click', () => this.addToCart());
+        // Close modify overlay button
+        document.getElementById('closeModifyBtn')?.addEventListener('click', () => this.closeModifyOverlay());
 
-        // Cart buttons
-        document.getElementById('confirmCart')?.addEventListener('click', () => this.confirmCart());
-        document.getElementById('clearCart')?.addEventListener('click', () => this.clearTemporaryCart());
+        // Banco button
+        document.getElementById('btnBanco')?.addEventListener('click', () => this.openBanco());
 
-        // Cart buttons for modify overlay
-        document.getElementById('confirmCartModify')?.addEventListener('click', () => this.confirmCart());
-        document.getElementById('clearCartModify')?.addEventListener('click', () => this.clearTemporaryCart());
+        // Reprint order button
+        document.getElementById('btnRistampaOrdine')?.addEventListener('click', () => this.reprintOrder());
+
+        // Move table button
+        document.getElementById('btnSpostaTavolo')?.addEventListener('click', () => this.openMoveTableModal());
+
+        // Move table modal cancel
+        document.getElementById('cancelMoveTable')?.addEventListener('click', () => this.closeMoveTableModal());
+
+        // Autoconsumo modal
+        this._initAutoconsumoModal();
     }
 
     /**
@@ -97,15 +126,20 @@ class TableOrdersManager {
     }
 
     /**
-     * Load all tables
+     * Load all tables (and banco orders separately for the summary)
      */
     async loadTables() {
         try {
-            const response = await fetch(this.apiBase);
-            const result = await response.json();
+            const [tablesResp, bancoResp] = await Promise.all([
+                fetch(this.apiBase),
+                fetch('/api/banco'),
+            ]);
+            const tablesResult = await tablesResp.json();
+            const bancoResult = await bancoResp.json();
 
-            if (result.success) {
-                this.renderTables(result.data);
+            if (tablesResult.success) {
+                const bancoOrders = bancoResult.success ? bancoResult.data.orders : [];
+                this.renderTables(tablesResult.data, bancoOrders);
             }
         } catch (error) {
             console.error('Error loading tables:', error);
@@ -116,7 +150,9 @@ class TableOrdersManager {
     /**
      * Render tables in the grid
      */
-    renderTables(tables) {
+    renderTables(tables, bancoOrders = []) {
+        this.allTables = tables;
+        this.bancoOrders = bancoOrders;
         const container = document.getElementById(
             this.isMobile ? 'tablesContainerMobile' : 'tablesContainer'
         );
@@ -138,18 +174,21 @@ class TableOrdersManager {
                 </div>
             `).join('');
         } else {
-            container.innerHTML = tables.map(table => `
-                <div class="table-item table-${table.status === 'free' ? 'free' : 'occupied'}" data-table="${table.id}">
-                    <div class="table-number">${table.table_number}</div>
-                    <div class="table-status">${this.getStatusLabel(table.status)}</div>
-                    ${table.has_active_order ? `
-                        <div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="table-total ${table.active_order.autoconsumo ? ' autoconsumo' : ''}">€${parseFloat(table.current_total).toFixed(2)}</div>
-                        <div class="table-timer" data-opened-at="${table.active_order.opened_at}">
-                            <i class="fas fa-clock"></i> ${this.formatElapsedTime(table.active_order.opened_at)}
-                        </div>
-                    ` : ''}
-                </div>
-            `).join('');
+            container.innerHTML = tables
+                .filter(table => !table.is_banco)
+                .map(table => {
+                    const tableClass = table.status === 'free' ? 'free' : (table.has_preconto ? 'preconto' : 'occupied');
+                    return `
+                    <div class="table-item table-${tableClass}" data-table="${table.id}">
+                        <div class="table-number">${table.table_number}</div>
+                        ${table.has_active_order ? `
+                            <div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="table-total ${table.active_order.autoconsumo ? ' autoconsumo' : ''}">€${parseFloat(table.current_total).toFixed(2)}</div>
+                            <div class="table-timer" data-opened-at="${table.active_order.opened_at}">
+                                <i class="fas fa-clock"></i> ${this.formatElapsedTime(table.active_order.opened_at)}
+                            </div>
+                        ` : ''}
+                    </div>`;
+                }).join('');
         }
 
         // Attach click events to tables
@@ -180,7 +219,7 @@ class TableOrdersManager {
         });
 
         // Update stats
-        this.updateStats(tables);
+        this.updateStats(tables, this.bancoOrders || []);
     }
 
     /**
@@ -198,61 +237,118 @@ class TableOrdersManager {
     /**
      * Update stats counters
      */
-    updateStats(tables) {
-        const occupied = tables.filter(t => t.status === 'occupied').length;
-        const free = tables.filter(t => t.status === 'free').length;
+    updateStats(tables, bancoOrders = []) {
+        const occupied = tables.filter(t => !t.is_banco && t.status === 'occupied').length;
+        const free = tables.filter(t => !t.is_banco && t.status === 'free').length;
 
         const occupiedElement = this.getElement('occupiedCount');
         const freeElement = this.getElement('freeCount');
 
         if (occupiedElement) occupiedElement.textContent = occupied;
         if (freeElement) freeElement.textContent = free;
+
+        // Populate occupied summary panel (desktop only)
+        if (!this.isMobile) {
+            const summaryEl = document.getElementById('occupiedSummary');
+            if (summaryEl) {
+                const occupiedTables = tables.filter(t => !t.is_banco && t.has_active_order);
+                const bancoBadges = (bancoOrders || []).map(o => {
+                    const elapsed = o.opened_at ? this.formatElapsedTime(o.opened_at) : '';
+                    return `<div class="occupied-row" data-order-id="${o.id}" style="border-left-color:#fd7e14;background:#fff8f0;">
+                        <div style="flex:1;">
+                            <div style="font-weight:700;font-size:0.78rem;color:#fd7e14;text-transform:uppercase;letter-spacing:0.5px;">VENDITA AL BANCO</div>
+                            <div class="occupied-row-info">${elapsed}</div>
+                        </div>
+                        <div class="occupied-row-total">€${parseFloat(o.total_amount||0).toFixed(2)}</div>
+                    </div>`;
+                });
+
+                const tableBadges = occupiedTables.map(t => {
+                    const elapsed = t.active_order?.opened_at ? this.formatElapsedTime(t.active_order.opened_at) : '';
+                    const covers = t.active_order?.covers ?? 0;
+                    const cls = t.has_preconto ? 'occupied-row preconto' : 'occupied-row';
+                    return `<div class="${cls}" data-table-id="${t.id}">
+                        <div class="occupied-row-number">${t.table_number}</div>
+                        <div style="flex:1;">
+                            <div style="font-weight:600;font-size:0.8rem;color:#000;">${covers} cop</div>
+                            <div class="occupied-row-info">${elapsed}</div>
+                        </div>
+                        <div class="occupied-row-total">€${parseFloat(t.current_total||0).toFixed(2)}</div>
+                    </div>`;
+                });
+
+                const allBadges = [...bancoBadges, ...tableBadges];
+                summaryEl.innerHTML = allBadges.length === 0
+                    ? '<div style="text-align:center;color:#6c757d;padding:20px;">Nessun tavolo occupato</div>'
+                    : allBadges.join('');
+
+                summaryEl.querySelectorAll('.occupied-row[data-order-id]').forEach(el => {
+                    el.addEventListener('click', () => this.selectByOrderId(parseInt(el.dataset.orderId)));
+                });
+                summaryEl.querySelectorAll('.occupied-row[data-table-id]').forEach(el => {
+                    el.addEventListener('click', () => this.selectTable(parseInt(el.dataset.tableId)));
+                });
+            }
+        }
     }
 
     /**
      * Select a table
      */
-    async selectTable(tableId, skipCoversRequest = false) {
-        // Clear temporary cart when changing tables
-        if (this.currentTable && this.currentTable.table.id !== tableId) {
-            this.temporaryCart = [];
-            this.updateCartDisplay();
-        }
-
+    async selectTable(tableId) {
         try {
             const response = await fetch(`${this.apiBase}/${tableId}`);
             const result = await response.json();
 
-            if (result.success) {
-                this.currentTable = result.data;
+            if (!result.success) return;
+            this.currentTable = result.data;
 
-                // If table is free and has no active order, ask for covers (unless we just opened it)
-                if (this.currentTable.table.status === 'free' && !this.currentTable.order && !skipCoversRequest) {
-                    try {
-                        // First request covers
-                        const covers = await coversManager.requestCovers(this.currentTable.table.table_number);
+            const isFreeWithoutOrder = this.currentTable.table.status === 'free' && !this.currentTable.order;
 
-                        // Then request operator authentication
-                        const auth = await operatorAuthManager.requestAuth();
-                        if (!auth) {
-                            this.currentTable = null;
-                            this.showNotification('Autenticazione annullata', 'error');
-                            return;
-                        }
-
-                        // Open table with covers
-                        await this.openTableWithCovers(tableId, covers, auth.token);
-
-                        // Reload table data (skip covers request to avoid loop)
-                        await this.selectTable(tableId, true);
-                    } catch (error) {
-                        // User cancelled covers selection or authentication
+            if (isFreeWithoutOrder) {
+                // Ask covers then auth, then open table, then directly open overlay
+                try {
+                    const covers = await coversManager.requestCovers(this.currentTable.table.table_number);
+                    const auth = await operatorAuthManager.requestAuth();
+                    if (!auth) {
                         this.currentTable = null;
-                        this.showNotification('Operazione annullata', 'error');
+                        this.showNotification('Autenticazione annullata', 'error');
+                        return;
                     }
-                } else {
-                    this.showTableDetails();
+
+                    await this.openTableWithCovers(tableId, covers, auth.token);
+
+                    // Re-fetch table data after opening
+                    const resp2 = await fetch(`${this.apiBase}/${tableId}`);
+                    const res2 = await resp2.json();
+                    if (res2.success) {
+                        this.currentTable = res2.data;
+                        this.modifySession.token = auth.token;
+                        this.modifySession.active = true;
+                        this._initSessionFromOrder(this.currentTable.order);
+                        this.openModifyOverlay();
+                    }
+                } catch (error) {
+                    this.currentTable = null;
+                    this.showNotification('Operazione annullata', 'error');
                 }
+            } else if (this.currentTable.table.status === 'occupied' && this.currentTable.order) {
+                // Occupied table: auth → session → overlay
+                let auth;
+                try {
+                    auth = await operatorAuthManager.requestAuth();
+                } catch (error) {
+                    this.currentTable = null;
+                    return;
+                }
+                if (!auth) { this.currentTable = null; return; }
+
+                this.modifySession.token = auth.token;
+                this.modifySession.active = true;
+                this._initSessionFromOrder(this.currentTable.order);
+                this.openModifyOverlay();
+            } else {
+                this.showTableDetails();
             }
         } catch (error) {
             console.error('Error loading table:', error);
@@ -301,6 +397,19 @@ class TableOrdersManager {
     }
 
     /**
+     * Initialize modify session from current order data
+     */
+    _initSessionFromOrder(order) {
+        this.modifySession.items = order && order.items
+            ? order.items.map(item => ({ ...item, _isNew: false }))
+            : [];
+        this.modifySession.pendingAdd = [];
+        this.modifySession.pendingRemove = [];
+        this.modifySession.pendingUpdate = {};
+        this.modifySession.itemCounter = -1;
+    }
+
+    /**
      * Show table details
      */
     showTableDetails() {
@@ -331,48 +440,15 @@ class TableOrdersManager {
             }
         }
 
-        // Update MODIFICA button state (only for desktop)
-        if (!this.isMobile) {
-            this.updateModifyButtonState();
-        }
-
         // Update receipt items
         this.updateReceiptItems();
     }
 
     /**
-     * Update GESTISCI button state based on table status
-     */
-    updateModifyButtonState() {
-        const modifyBtn = document.getElementById('btnModifyTable');
-        if (!modifyBtn) return;
-
-        if (this.currentTable && this.currentTable.table.status === 'occupied') {
-            modifyBtn.removeAttribute('disabled');
-        } else {
-            modifyBtn.setAttribute('disabled', 'disabled');
-        }
-    }
-
-    /**
      * Open modify overlay with menu and order details
      */
-    async openModifyOverlay() {
+    openModifyOverlay() {
         if (!this.currentTable) return;
-
-        try {
-            // Reload table data to ensure we have the latest order items
-            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}`);
-            const result = await response.json();
-
-            if (result.success) {
-                this.currentTable = result.data;
-            }
-        } catch (error) {
-            console.error('Error loading table data:', error);
-            this.showNotification('Errore nel caricamento dei dati', 'error');
-            return;
-        }
 
         // Update table number
         const modifyTableNumber = document.getElementById('modifyTableNumber');
@@ -431,9 +507,12 @@ class TableOrdersManager {
             return;
         }
 
-        const order = this.currentTable?.order;
+        // When session is active, render from session items
+        const items = this.modifySession.active
+            ? this.modifySession.items
+            : (this.currentTable?.order?.items || []);
 
-        if (!order || !order.items || order.items.length === 0) {
+        if (!items || items.length === 0) {
             itemsContainer.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-shopping-cart"></i>
@@ -444,16 +523,11 @@ class TableOrdersManager {
             return;
         }
 
-
-        const unitPriceLabel = (item) => {
-            const up = parseFloat(item.unit_price);
-            return `€${up.toFixed(2)}`;
-        };
-
-        let itemsHtml = order.items.map(item => `
-            <div class="receipt-item" data-item-id="${item.id}">
+        let itemsHtml = items.map(item => `
+            <div class="receipt-item${item._isNew ? ' receipt-item-new' : ''}" data-item-id="${item.id}" style="${item._isNew ? 'border-left:3px solid #28a745;' : ''}">
                 <div class="receipt-item-header">
                     <strong>${item.dish_name}</strong>
+                    ${item._isNew ? '<span style="background:#28a745;color:white;font-size:0.65rem;padding:1px 5px;border-radius:3px;margin-left:6px;">NUOVO</span>' : ''}
                     ${item.notes ? `<br /><div class="receipt-item-notes"><i class="fas fa-sticky-note me-1"></i>${item.notes}</div>` : ''}
                 </div>
                 <div class="receipt-item-details">
@@ -494,8 +568,11 @@ class TableOrdersManager {
             </div>
         `).join('');
 
+        // Cover charge and total: read from session or order
+        const order = this.modifySession.active ? this.currentTable?.order : this.currentTable?.order;
+
         // Add cover charge row (editable)
-        if (order.has_cover_charge && order.cover_charge_total > 0) {
+        if (order && order.has_cover_charge && order.cover_charge_total > 0) {
             itemsHtml += `
                 <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #17a2b8; padding-left: 15px">
                     <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
@@ -516,7 +593,7 @@ class TableOrdersManager {
                     </div>
                 </div>
             `;
-        } else if (order.covers === 0) {
+        } else if (order && order.covers === 0) {
             itemsHtml += `
                 <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #ffc107;">
                     <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
@@ -540,7 +617,14 @@ class TableOrdersManager {
 
         itemsContainer.innerHTML = itemsHtml;
 
-        totalElement.textContent = `€${parseFloat(order.total_amount).toFixed(2)}`;
+        // Calculate total: session items subtotal + cover charge from order
+        if (this.modifySession.active) {
+            const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
+            const coverTotal = (order && order.has_cover_charge) ? parseFloat(order.cover_charge_total || 0) : 0;
+            totalElement.textContent = `€${(itemsTotal + coverTotal).toFixed(2)}`;
+        } else {
+            totalElement.textContent = `€${parseFloat(order ? order.total_amount : 0).toFixed(2)}`;
+        }
     }
 
     /**
@@ -663,12 +747,28 @@ class TableOrdersManager {
         if (notesElement) notesElement.value = '';
         if (segueElement) segueElement.checked = false;
 
-        // Reset checkboxes
+        // Populate extras and removals
         const extrasContainer = this.getElement('extrasContainer');
         const removalsContainer = this.getElement('removalsContainer');
 
-        extrasContainer?.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-        removalsContainer?.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        if (extrasContainer) {
+            extrasContainer.innerHTML = this.menuOptions.extras.length
+                ? this.menuOptions.extras.map(e => `
+                    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
+                        <input type="checkbox" class="extra-checkbox" data-name="${e.label}" value="${e.price}" style="accent-color:#dc3545;">
+                        <span>${e.label}</span><span style="color:#dc3545;font-weight:700;">+€${parseFloat(e.price).toFixed(2)}</span>
+                    </label>`).join('')
+                : '<small style="color:#6c757d;">Nessun supplemento disponibile</small>';
+        }
+        if (removalsContainer) {
+            removalsContainer.innerHTML = this.menuOptions.removals.length
+                ? this.menuOptions.removals.map(r => `
+                    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
+                        <input type="checkbox" class="removal-checkbox" data-name="${r.label}" value="${r.label}" style="accent-color:#dc3545;">
+                        <span>${r.label}</span>
+                    </label>`).join('')
+                : '<small style="color:#6c757d;">Nessuna rimozione disponibile</small>';
+        }
 
         // Update total
         this.updateModalTotal();
@@ -735,7 +835,72 @@ class TableOrdersManager {
     }
 
     /**
-     * Add product to table
+     * Add product to session (no auth, no API call, local only)
+     */
+    addProductToSession() {
+        if (!this.currentTable || !this.currentProduct) return;
+
+        const quantityElement = this.getElement('productQuantity');
+        const notesElement = this.getElement('productNotes');
+        const segueElement = this.getElement('productSegue');
+        const customPriceElement = this.getElement('productCustomPrice');
+        const extrasContainer = this.getElement('extrasContainer');
+        const removalsContainer = this.getElement('removalsContainer');
+
+        let customPrice = customPriceElement ? parseFloat(customPriceElement.value) : null;
+        if (isNaN(customPrice)) customPrice = null;
+
+        const unitPrice = customPrice !== null ? customPrice : parseFloat(this.currentProduct.price);
+        const quantity = parseInt(quantityElement?.value || 1);
+        const notes = notesElement?.value || null;
+        const segue = segueElement?.checked || false;
+
+        const extras = {};
+        const removals = [];
+        const checkedExtras = extrasContainer?.querySelectorAll('input[type="checkbox"]:checked') || [];
+        checkedExtras.forEach(cb => { extras[cb.dataset.name] = parseFloat(cb.value); });
+        const checkedRemovals = removalsContainer?.querySelectorAll('input[type="checkbox"]:checked') || [];
+        checkedRemovals.forEach(cb => { removals.push(cb.dataset.name); });
+
+        const extrasTotal = Object.values(extras).reduce((s, v) => s + v, 0);
+        const subtotal = parseFloat(((unitPrice + extrasTotal) * quantity).toFixed(2));
+
+        const localId = this.modifySession.itemCounter--;
+
+        const sessionItem = {
+            id: localId,
+            dish_id: this.currentProduct.id,
+            dish_name: this.currentProduct.name,
+            quantity,
+            unit_price: unitPrice,
+            subtotal,
+            notes,
+            extras: Object.keys(extras).length > 0 ? extras : {},
+            removals: removals.length > 0 ? removals : [],
+            segue,
+            _isNew: true,
+        };
+
+        this.modifySession.items.push(sessionItem);
+        this.modifySession.pendingAdd.push({
+            _localId: localId,
+            dish_id: this.currentProduct.id,
+            quantity,
+            notes,
+            segue,
+            custom_price: customPrice,
+            extras: Object.keys(extras).length > 0 ? extras : null,
+            removals: removals.length > 0 ? removals : null,
+        });
+
+        const productName = this.currentProduct.name;
+        this.closeProductModal();
+        this.updateModifyReceiptItems();
+        this.showNotification(`${productName} aggiunto`);
+    }
+
+    /**
+     * Add product to table (legacy — kept for non-session contexts)
      */
     async addProductToTable() {
         if (!this.currentTable || !this.currentProduct) return;
@@ -824,9 +989,27 @@ class TableOrdersManager {
      * Remove item from order
      */
     async removeItem(itemId) {
+        if (this.modifySession.active) {
+            const reason = await this._showRemoveReasonModal();
+            if (!reason) return; // user cancelled
+
+            const item = this.modifySession.items.find(i => i.id === itemId);
+            if (!item) return;
+
+            if (item._isNew) {
+                this.modifySession.items = this.modifySession.items.filter(i => i.id !== itemId);
+                this.modifySession.pendingAdd = this.modifySession.pendingAdd.filter(i => i._localId !== itemId);
+            } else {
+                this.modifySession.pendingRemove.push({ id: itemId, reason });
+                this.modifySession.items = this.modifySession.items.filter(i => i.id !== itemId);
+            }
+
+            this.updateModifyReceiptItems();
+            return;
+        }
+
         if (!confirm('Vuoi rimuovere questo prodotto?')) return;
 
-        // Request operator authentication
         let auth;
         try {
             auth = await operatorAuthManager.requestAuth();
@@ -851,7 +1034,6 @@ class TableOrdersManager {
                 this.showNotification('Prodotto rimosso');
                 await this.selectTable(this.currentTable.table.id);
                 await this.loadTables();
-                // Update modify overlay if open
                 const modifyOverlay = document.getElementById('modifyOrderOverlay');
                 if (modifyOverlay && modifyOverlay.style.display === 'block') {
                     this.updateModifyReceiptItems();
@@ -866,31 +1048,61 @@ class TableOrdersManager {
     }
 
     /**
+     * Show remove reason modal and return chosen reason (or null if cancelled)
+     */
+    _showRemoveReasonModal() {
+        return new Promise(resolve => {
+            const modal = document.getElementById('removeReasonModal');
+            if (!modal) { resolve('Rimosso'); return; }
+
+            modal.style.display = 'flex';
+
+            const cleanup = (reason) => {
+                modal.style.display = 'none';
+                // Remove all event listeners by replacing nodes
+                document.querySelectorAll('.remove-reason-btn').forEach(btn => {
+                    btn.replaceWith(btn.cloneNode(true));
+                });
+                const cancelBtn = document.getElementById('cancelRemoveReason');
+                if (cancelBtn) cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                resolve(reason);
+            };
+
+            document.querySelectorAll('.remove-reason-btn').forEach(btn => {
+                btn.addEventListener('click', () => cleanup(btn.dataset.reason));
+            });
+
+            const cancelBtn = document.getElementById('cancelRemoveReason');
+            if (cancelBtn) cancelBtn.addEventListener('click', () => cleanup(null));
+        });
+    }
+
+    /**
      * Increase item quantity
      */
     async increaseQuantity(itemId, event) {
         if (event) event.stopPropagation();
 
-        // Request operator authentication
+        if (this.modifySession.active) {
+            const item = this.modifySession.items.find(i => i.id === itemId);
+            if (!item) return;
+            item.quantity += 1;
+            item.subtotal = parseFloat(((parseFloat(item.unit_price) + this._itemExtrasTotal(item)) * item.quantity).toFixed(2));
+            this._updateSessionPendingQuantity(itemId, item);
+            this.updateModifyReceiptItems();
+            return;
+        }
+
         let auth;
         try {
             auth = await operatorAuthManager.requestAuth();
             if (!auth) return;
-        } catch (error) {
-            console.log('Authentication cancelled');
-            return;
-        }
+        } catch (error) { return; }
 
         try {
-            // Find the current item
             const item = this.currentTable.order.items.find(i => i.id === itemId);
-            if (!item) {
-                this.showNotification('Prodotto non trovato', 'error');
-                return;
-            }
-
-            const newQuantity = item.quantity + 1;
-            await this.updateItemQuantity(itemId, newQuantity, auth.token);
+            if (!item) { this.showNotification('Prodotto non trovato', 'error'); return; }
+            await this.updateItemQuantity(itemId, item.quantity + 1, auth.token);
         } catch (error) {
             console.error('Error increasing quantity:', error);
             this.showNotification('Errore nell\'aggiornamento della quantità', 'error');
@@ -903,38 +1115,56 @@ class TableOrdersManager {
     async decreaseQuantity(itemId, event) {
         if (event) event.stopPropagation();
 
-        // Request operator authentication
+        if (this.modifySession.active) {
+            const item = this.modifySession.items.find(i => i.id === itemId);
+            if (!item) return;
+            if (item.quantity <= 1) {
+                await this.removeItem(itemId);
+                return;
+            }
+            item.quantity -= 1;
+            item.subtotal = parseFloat(((parseFloat(item.unit_price) + this._itemExtrasTotal(item)) * item.quantity).toFixed(2));
+            this._updateSessionPendingQuantity(itemId, item);
+            this.updateModifyReceiptItems();
+            return;
+        }
+
         let auth;
         try {
             auth = await operatorAuthManager.requestAuth();
             if (!auth) return;
-        } catch (error) {
-            console.log('Authentication cancelled');
-            return;
-        }
+        } catch (error) { return; }
 
         try {
-            // Find the current item
             const item = this.currentTable.order.items.find(i => i.id === itemId);
-            if (!item) {
-                this.showNotification('Prodotto non trovato', 'error');
-                return;
-            }
-
-            const newQuantity = item.quantity - 1;
-
-            // If quantity becomes 0, remove the item
-            if (newQuantity <= 0) {
+            if (!item) { this.showNotification('Prodotto non trovato', 'error'); return; }
+            if (item.quantity - 1 <= 0) {
                 if (confirm('Rimuovere questo prodotto dall\'ordine?')) {
                     await this.removeItem(itemId);
                 }
                 return;
             }
-
-            await this.updateItemQuantity(itemId, newQuantity, auth.token);
+            await this.updateItemQuantity(itemId, item.quantity - 1, auth.token);
         } catch (error) {
             console.error('Error decreasing quantity:', error);
             this.showNotification('Errore nell\'aggiornamento della quantità', 'error');
+        }
+    }
+
+    /** Helper: calculate extras total for a session item */
+    _itemExtrasTotal(item) {
+        if (!item.extras || typeof item.extras !== 'object') return 0;
+        return Object.values(item.extras).reduce((s, v) => s + parseFloat(v), 0);
+    }
+
+    /** Helper: update pendingAdd or pendingUpdate for quantity changes */
+    _updateSessionPendingQuantity(itemId, item) {
+        if (item._isNew) {
+            const paIdx = this.modifySession.pendingAdd.findIndex(i => i._localId === itemId);
+            if (paIdx >= 0) this.modifySession.pendingAdd[paIdx].quantity = item.quantity;
+        } else {
+            if (!this.modifySession.pendingUpdate[itemId]) this.modifySession.pendingUpdate[itemId] = {};
+            this.modifySession.pendingUpdate[itemId].quantity = item.quantity;
         }
     }
 
@@ -1009,14 +1239,38 @@ class TableOrdersManager {
             return;
         }
 
-        // Request operator authentication
+        if (this.modifySession.active) {
+            const motivation = prompt('Motivo della modifica prezzo:');
+            if (!motivation) {
+                this.cancelEditPrice(itemId);
+                return;
+            }
+
+            const item = this.modifySession.items.find(i => i.id === itemId);
+            if (!item) return;
+
+            item.unit_price = newPrice;
+            item.subtotal = parseFloat(((newPrice + this._itemExtrasTotal(item)) * item.quantity).toFixed(2));
+
+            if (item._isNew) {
+                const paIdx = this.modifySession.pendingAdd.findIndex(i => i._localId === itemId);
+                if (paIdx >= 0) this.modifySession.pendingAdd[paIdx].custom_price = newPrice;
+            } else {
+                if (!this.modifySession.pendingUpdate[itemId]) this.modifySession.pendingUpdate[itemId] = {};
+                this.modifySession.pendingUpdate[itemId].unit_price = newPrice;
+                this.modifySession.pendingUpdate[itemId].price_motivation = motivation;
+            }
+
+            this.cancelEditPrice(itemId);
+            this.updateModifyReceiptItems();
+            return;
+        }
+
         let auth;
         try {
             auth = await operatorAuthManager.requestAuth();
             if (!auth) return;
-        } catch (error) {
-            return;
-        }
+        } catch (error) { return; }
 
         try {
             const response = await fetch(`${this.apiBase}/items/${itemId}/price`, {
@@ -1159,6 +1413,7 @@ class TableOrdersManager {
             if (result.success) {
                 this.showNotification('Tavolo svuotato');
                 this.currentTable = null;
+                this.modifySession.active = false;
                 await this.loadTables();
 
                 // Hide receipt overlay
@@ -1166,14 +1421,7 @@ class TableOrdersManager {
                 if (receiptOverlay) receiptOverlay.style.display = 'none';
 
                 // Hide modify overlay
-                const modifyOverlay = document.getElementById('modifyOrderOverlay');
-                if (modifyOverlay) modifyOverlay.style.display = 'none';
-
-                // Disable MODIFICA button (desktop)
-                if (!this.isMobile) {
-                    const modifyBtn = document.getElementById('btnModifyTable');
-                    if (modifyBtn) modifyBtn.setAttribute('disabled', 'disabled');
-                }
+                this._hideModifyOverlay();
 
                 // Hide mobile elements
                 if (this.isMobile) {
@@ -1194,49 +1442,284 @@ class TableOrdersManager {
         }
     }
     /**
-     * Clear table
+     * Open the autoconsumo modal (admin only)
      */
-    async freeAmount() {
+    async openAutoconsumoModal() {
         if (!this.currentTable) return;
-        if (!confirm('Vuoi impstare il tavolo in autoconsumo?')) return;
 
-        // Request operator authentication
+        // Admin-only check
         let auth;
         try {
             auth = await operatorAuthManager.requestAuth();
             if (!auth) return;
+            console.log(auth)
             if (auth.user.role !== 'admin') {
-             alert("Questa operazione richiede utenza admin")
-             return;
+                alert('Questa operazione richiede utenza admin');
+                return;
             }
         } catch (error) {
             console.log('Authentication cancelled');
             return;
         }
 
+        // Store auth for later use
+        this._autoconsumoAuth = auth;
+        this._autoconsumoAssignments = {};
+        this._autoconsumoOperatorColors = {};
+
+        const tableNum = this.currentTable.table?.table_number ?? this.currentTable.table_number ?? '-';
+        document.getElementById('autoconsumoTableNumber').textContent = tableNum;
+
+        const alreadyAutoconsumo = this.currentTable.order?.autoconsumo === true;
+
+        if (alreadyAutoconsumo) {
+            // Pre-populate assignments from existing item data
+            const sessionItems = this.modifySession.items.filter(i => !i._isNew || i.id > 0);
+            sessionItems.forEach(item => {
+                if (item.autoconsumo_user_id) {
+                    this._autoconsumoAssignments[item.id] = {
+                        userId: item.autoconsumo_user_id,
+                        userName: item.autoconsumo_user_name ?? `Utente #${item.autoconsumo_user_id}`,
+                        color: null, // will be filled when operators are loaded
+                    };
+                }
+            });
+
+            // Skip mode selection and go directly to the partial view
+            document.getElementById('autoconsumoModeSelect').style.display = 'none';
+            document.getElementById('autoconsumoModal').style.display = 'flex';
+            this._showAutoconsumoPartialView();
+        } else {
+            // Show mode selection
+            document.getElementById('autoconsumoModeSelect').style.display = 'block';
+            document.getElementById('autoconsumoPartialView').style.display = 'none';
+            document.getElementById('autoconsumoFooter').style.display = 'none';
+            document.getElementById('autoconsumoModal').style.display = 'flex';
+        }
+    }
+
+    /**
+     * Show the partial assignment UI
+     */
+    async _showAutoconsumoPartialView() {
+        document.getElementById('autoconsumoModeSelect').style.display = 'none';
+        const partialView = document.getElementById('autoconsumoPartialView');
+        partialView.style.display = 'flex';
+        document.getElementById('autoconsumoFooter').style.display = 'flex';
+
+        // Fetch operators
+        let operators = [];
         try {
-            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/free-amount`, {
+            const res = await fetch('/api/operators');
+            const data = await res.json();
+            operators = Array.isArray(data.data) ? data.data : [];
+        } catch (e) {
+            console.error('Error fetching operators:', e);
+        }
+
+        // Assign a color to each operator
+        const palette = ['#dc3545','#28a745','#17a2b8','#fd7e14','#6f42c1','#e83e8c','#20c997','#ffc107'];
+        operators.forEach((op, i) => {
+            this._autoconsumoOperatorColors[op.id] = palette[i % palette.length];
+        });
+
+        // Fill in colors for pre-existing assignments (loaded before operators were fetched)
+        Object.keys(this._autoconsumoAssignments).forEach(itemId => {
+            const a = this._autoconsumoAssignments[itemId];
+            if (!a.color && this._autoconsumoOperatorColors[a.userId]) {
+                a.color = this._autoconsumoOperatorColors[a.userId];
+            } else if (!a.color) {
+                a.color = '#6c757d'; // fallback if user not in operators list
+            }
+        });
+
+        // Use session items (have correct dish_name field) — skip pending unsaved adds
+        const items = this.modifySession.items.filter(i => !i._isNew || i.id > 0);
+        const itemsList = document.getElementById('autoconsumoItemsList');
+        itemsList.innerHTML = items.length === 0
+            ? '<div style="color:#6c757d; text-align:center; padding:20px;">Nessun piatto nell\'ordine</div>'
+            : items.map(item => {
+            const name = item.dish_name ?? 'Prodotto';
+            const qty = item.quantity ?? 1;
+            const price = parseFloat(item.subtotal ?? item.unit_price ?? 0).toFixed(2);
+            return `<div class="autoconsumo-item-row" data-item-id="${item.id}"
+                style="display:flex; align-items:center; gap:12px; padding:11px 14px; background:#f8f9fa; border-radius:6px; border:2px solid #dee2e6; cursor:pointer; transition:border-color 0.15s, background 0.15s; user-select:none;">
+                <input type="checkbox" class="autoconsumo-item-check" data-item-id="${item.id}"
+                    style="width:20px; height:20px; cursor:pointer; flex-shrink:0; accent-color:#6c757d;">
+                <div style="flex:1; min-width:0;">
+                    <div style="font-weight:700; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#212529;">${name}</div>
+                    <div style="font-size:0.82rem; color:#6c757d; margin-top:2px;">x${qty} &nbsp;·&nbsp; <strong style="color:#dc3545;">€${price}</strong></div>
+                </div>
+                <div class="autoconsumo-item-badge" data-item-id="${item.id}"
+                    style="font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:14px; white-space:nowrap; display:none; flex-shrink:0;"></div>
+            </div>`;
+        }).join('');
+
+        // Apply pre-existing assignment badges (for re-edit case)
+        Object.entries(this._autoconsumoAssignments).forEach(([itemId, assignment]) => {
+            const badge = itemsList.querySelector(`.autoconsumo-item-badge[data-item-id="${itemId}"]`);
+            const row = itemsList.querySelector(`.autoconsumo-item-row[data-item-id="${itemId}"]`);
+            if (badge) {
+                badge.textContent = assignment.userName;
+                badge.style.background = assignment.color;
+                badge.style.color = 'white';
+                badge.style.display = 'inline-block';
+            }
+            if (row) {
+                row.style.borderColor = assignment.color;
+                row.style.background = assignment.color + '18';
+            }
+        });
+
+        // Row click toggles checkbox
+        itemsList.querySelectorAll('.autoconsumo-item-row').forEach(row => {
+            row.addEventListener('click', (e) => {
+                if (e.target.type === 'checkbox') return;
+                const cb = row.querySelector('.autoconsumo-item-check');
+                cb.checked = !cb.checked;
+            });
+        });
+
+        // Select all button
+        document.getElementById('btnSelectAllItems').onclick = () => {
+            const checks = itemsList.querySelectorAll('.autoconsumo-item-check');
+            const allChecked = Array.from(checks).every(c => c.checked);
+            checks.forEach(c => { c.checked = !allChecked; });
+        };
+
+        // Render operators
+        const opList = document.getElementById('autoconsumoOperatorsList');
+        opList.innerHTML = operators.map(op => {
+            const color = this._autoconsumoOperatorColors[op.id];
+            const roleLabel = op.role === 'admin' ? 'Amministratore' : 'Operatore';
+            return `<button class="autoconsumo-op-btn" data-user-id="${op.id}" data-user-name="${op.name}"
+                style="padding:10px 12px; background:${color}; color:white; border:none; border-radius:6px; font-weight:600; font-size:0.82rem; cursor:pointer; text-align:left; width:100%; text-transform:uppercase;">
+                <div style="font-size:0.95rem;">${op.name}</div>
+                <div style="font-size:0.72rem; opacity:0.85; font-weight:400; text-transform:none;">${roleLabel}</div>
+            </button>`;
+        }).join('');
+
+        // Operator button click → assign checked items
+        opList.querySelectorAll('.autoconsumo-op-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const userId = parseInt(btn.dataset.userId);
+                const userName = btn.dataset.userName;
+                const color = this._autoconsumoOperatorColors[userId];
+                const checks = itemsList.querySelectorAll('.autoconsumo-item-check:checked');
+                checks.forEach(cb => {
+                    const itemId = parseInt(cb.dataset.itemId);
+                    this._autoconsumoAssignments[itemId] = { userId, userName, color };
+                    // Update badge
+                    const badge = itemsList.querySelector(`.autoconsumo-item-badge[data-item-id="${itemId}"]`);
+                    const row = itemsList.querySelector(`.autoconsumo-item-row[data-item-id="${itemId}"]`);
+                    if (badge) {
+                        badge.textContent = userName;
+                        badge.style.background = color;
+                        badge.style.color = 'white';
+                        badge.style.display = 'inline-block';
+                    }
+                    if (row) {
+                        row.style.borderColor = color;
+                        row.style.background = color + '18';
+                    }
+                    cb.checked = false;
+                });
+                this._updateAutoconsumoLegend(items);
+            });
+        });
+
+        this._updateAutoconsumoLegend(items);
+    }
+
+    _updateAutoconsumoLegend(items) {
+        const assigned = Object.keys(this._autoconsumoAssignments).length;
+        const total = items.length;
+        const unassigned = total - assigned;
+        const legendEl = document.getElementById('autoconsumoLegend');
+        if (legendEl) {
+            legendEl.innerHTML = unassigned > 0
+                ? `<span style="color:#dc3545;"><i class="fas fa-exclamation-circle me-1"></i>${unassigned} piatto/i senza assegnazione</span>`
+                : `<span style="color:#28a745;"><i class="fas fa-check-circle me-1"></i>Tutti i piatti assegnati</span>`;
+        }
+    }
+
+    /**
+     * Submit autoconsumo (full or partial)
+     */
+    async _submitAutoconsumo(type) {
+        if (!this.currentTable || !this._autoconsumoAuth) return;
+
+        const tableId = this.currentTable.table?.id ?? this.currentTable.id;
+        const body = { type };
+
+        if (type === 'partial') {
+            const assignments = Object.entries(this._autoconsumoAssignments).map(([itemId, data]) => ({
+                item_id: parseInt(itemId),
+                user_id: data.userId,
+            }));
+            if (assignments.length === 0) {
+                alert('Nessun piatto è stato assegnato. Usa "Tutto in autoconsumo" oppure assegna i piatti agli operatori.');
+                return;
+            }
+            body.assignments = assignments;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/${tableId}/free-amount`, {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    'X-Operator-Token': auth.token
-                }
+                    'X-Operator-Token': this._autoconsumoAuth.token,
+                },
+                body: JSON.stringify(body),
             });
 
             const result = await response.json();
 
             if (result.success) {
-                this.showNotification('Tavolo svuotato');
+                document.getElementById('autoconsumoModal').style.display = 'none';
+                document.getElementById('modifyOrderOverlay').style.display = 'none';
+                this.showNotification('Autoconsumo registrato');
                 this.currentTable = null;
                 await this.loadTables();
-
             } else {
-                this.showNotification(result.message || 'Errore nello svuotamento', 'error');
+                this.showNotification(result.message || 'Errore nell\'autoconsumo', 'error');
             }
         } catch (error) {
-            console.error('Error clearing table:', error);
-            this.showNotification('Errore nello svuotamento', 'error');
+            console.error('Error in autoconsumo:', error);
+            this.showNotification('Errore nell\'autoconsumo', 'error');
         }
+    }
+
+    /**
+     * Initialize autoconsumo modal events (called once from attachModalEvents)
+     */
+    _initAutoconsumoModal() {
+        document.getElementById('closeAutoconsumoModal')?.addEventListener('click', () => {
+            document.getElementById('autoconsumoModal').style.display = 'none';
+        });
+
+        document.getElementById('btnAutoconsumoFull')?.addEventListener('click', () => {
+            if (confirm('Confermi di voler mettere tutto il tavolo in autoconsumo?')) {
+                this._submitAutoconsumo('full');
+            }
+        });
+
+        document.getElementById('btnAutoconsumoPartial')?.addEventListener('click', () => {
+            this._showAutoconsumoPartialView();
+        });
+
+        document.getElementById('btnAutoconsumoBack')?.addEventListener('click', () => {
+            this._autoconsumoAssignments = {};
+            document.getElementById('autoconsumoModeSelect').style.display = 'block';
+            document.getElementById('autoconsumoPartialView').style.display = 'none';
+            document.getElementById('autoconsumoFooter').style.display = 'none';
+        });
+
+        document.getElementById('btnAutoconsumoConfirm')?.addEventListener('click', () => {
+            this._submitAutoconsumo('partial');
+        });
     }
 
     /**
@@ -1358,20 +1841,14 @@ class TableOrdersManager {
      */
     _afterPaymentSuccess() {
         this.currentTable = null;
+        this.modifySession.active = false;
         this.loadTables();
 
         // Hide overlays
         const receiptOverlay = this.getElement('receiptOverlay');
         if (receiptOverlay) receiptOverlay.style.display = 'none';
 
-        const modifyOverlay = document.getElementById('modifyOrderOverlay');
-        if (modifyOverlay) modifyOverlay.style.display = 'none';
-
-        // Disable GESTISCI button (desktop)
-        if (!this.isMobile) {
-            const modifyBtn = document.getElementById('btnModifyTable');
-            if (modifyBtn) modifyBtn.setAttribute('disabled', 'disabled');
-        }
+        this._hideModifyOverlay();
 
         // Hide mobile elements
         if (this.isMobile) {
@@ -1677,6 +2154,161 @@ class TableOrdersManager {
     }
 
     /**
+     * Hide the modify overlay (without side effects)
+     */
+    _hideModifyOverlay() {
+        const overlay = document.getElementById('modifyOrderOverlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    /**
+     * Close modify overlay: if changes exist, ask auth then submit; else close silently
+     */
+    async closeModifyOverlay() {
+        const hasChanges =
+            this.modifySession.pendingAdd.length > 0 ||
+            this.modifySession.pendingRemove.length > 0 ||
+            Object.keys(this.modifySession.pendingUpdate).length > 0;
+
+        if (!hasChanges) {
+            this._hideModifyOverlay();
+            this.modifySession.active = false;
+            return;
+        }
+
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+        } catch (error) { return; }
+        if (!auth) return; // stay open
+
+        try {
+            await this._submitSession(auth.token);
+        } catch (error) {
+            console.error('Error submitting session:', error);
+            this.showNotification('Errore nel salvataggio delle modifiche', 'error');
+            return;
+        }
+
+        this._hideModifyOverlay();
+        this.modifySession.active = false;
+        await this.loadTables();
+    }
+
+    /**
+     * Submit all pending session changes to the backend, then trigger a single print
+     */
+    async _submitSession(token) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        const tableId = this.currentTable.table.id;
+        const updatedItemIds = [];
+
+        // 1. Remove items
+        for (const removal of this.modifySession.pendingRemove) {
+            const resp = await fetch(`${this.apiBase}/items/${removal.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Operator-Token': token,
+                },
+                body: JSON.stringify({ reason: removal.reason }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || `Errore nella rimozione (${resp.status})`);
+            }
+        }
+
+        // 2. Update quantities and prices
+        for (const [itemIdStr, updates] of Object.entries(this.modifySession.pendingUpdate)) {
+            const itemId = parseInt(itemIdStr);
+            if (updates.quantity !== undefined) {
+                const resp = await fetch(`${this.apiBase}/items/${itemId}/quantity`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Operator-Token': token,
+                    },
+                    body: JSON.stringify({ quantity: updates.quantity, skip_print: true }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.message || `Errore aggiornamento quantità (${resp.status})`);
+                }
+                if (!updatedItemIds.includes(itemId)) updatedItemIds.push(itemId);
+            }
+            if (updates.unit_price !== undefined) {
+                const resp = await fetch(`${this.apiBase}/items/${itemId}/price`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Operator-Token': token,
+                    },
+                    body: JSON.stringify({
+                        unit_price: updates.unit_price,
+                        motivation: updates.price_motivation,
+                        skip_print: true,
+                    }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.message || `Errore aggiornamento prezzo (${resp.status})`);
+                }
+                if (!updatedItemIds.includes(itemId)) updatedItemIds.push(itemId);
+            }
+        }
+
+        // 3. Add new items
+        let newItemIds = [];
+        if (this.modifySession.pendingAdd.length > 0) {
+            const items = this.modifySession.pendingAdd.map(item => ({
+                dish_id: item.dish_id,
+                quantity: item.quantity,
+                notes: item.notes,
+                segue: item.segue || false,
+                custom_price: item.custom_price || null,
+                extras: item.extras,
+                removals: item.removals,
+            }));
+
+            const resp = await fetch(`${this.apiBase}/${tableId}/items-multiple`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({ items, operator_token: token, skip_print: true }),
+            });
+            const result = await resp.json();
+            if (!result.success) {
+                throw new Error(result.message || 'Errore nell\'aggiunta dei prodotti');
+            }
+            if (result.data && result.data.item_ids) {
+                newItemIds = result.data.item_ids;
+            }
+        }
+
+        // 4. Print all changes at once
+        if (newItemIds.length > 0 || updatedItemIds.length > 0) {
+            await fetch(`${this.apiBase}/${tableId}/print-session`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({
+                    new_item_ids: newItemIds,
+                    updated_item_ids: updatedItemIds,
+                    operator_token: token,
+                }),
+            });
+        }
+    }
+
+    /**
      * Open PreConto modal
      */
     openPrecontoModal() {
@@ -1843,6 +2475,7 @@ class TableOrdersManager {
             if (result.success) {
                 this.showNotification(result.message || 'PreConto stampato con successo', 'success');
                 this.closePrecontoModal();
+                await this.loadTables();
             } else {
                 this.showNotification(result.message || 'Errore nella stampa del PreConto', 'error');
             }
@@ -1909,7 +2542,7 @@ class TableOrdersManager {
     }
 
     /**
-     * Add product to temporary cart
+     * @deprecated — cart flow removed; use addProductToSession() instead
      */
     addToCart() {
         if (!this.currentTable || !this.currentProduct) return;
@@ -2246,6 +2879,163 @@ class TableOrdersManager {
         } catch (error) {
             console.error('Error sending comunica:', error);
             this.showNotification('Errore nell\'invio della comunicazione', 'error');
+        }
+    }
+
+    /**
+     * Reprint all items of the current order grouped by printer
+     */
+    async reprintOrder() {
+        if (!this.currentTable?.order) {
+            this.showNotification('Nessun ordine attivo', 'error');
+            return;
+        }
+
+        const auth = await operatorAuthManager.requestAuth();
+        if (!auth) return;
+
+        try {
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/reprint`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token,
+                },
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                this.showNotification(result.message || 'Ordine ristampato', 'success');
+            } else {
+                this.showNotification(result.message || 'Errore nella ristampa', 'error');
+            }
+        } catch (error) {
+            console.error('Error reprinting order:', error);
+            this.showNotification('Errore nella ristampa', 'error');
+        }
+    }
+
+    /**
+     * Open a NEW banco order (always creates a fresh one)
+     */
+    async openBanco() {
+        try {
+            const auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+
+            const openResp = await fetch('/api/banco/open', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token,
+                },
+                body: JSON.stringify({ operator_token: auth.token }),
+            });
+            const openResult = await openResp.json();
+            if (!openResult.success) {
+                this.showNotification(openResult.message || 'Errore apertura banco', 'error');
+                return;
+            }
+
+            // Load the new order and open overlay
+            await this.selectByOrderId(openResult.data.order_id);
+            await this.loadTables();
+
+        } catch (error) {
+            console.error('Error opening banco:', error);
+            this.showNotification('Errore nel banco', 'error');
+        }
+    }
+
+    /**
+     * Open overlay for a specific order (banco multi-session)
+     */
+    async selectByOrderId(orderId) {
+        try {
+            const response = await fetch(`/api/order/${orderId}`);
+            const result = await response.json();
+            if (!result.success) return;
+            this.currentTable = result.data;
+            this.openModifyOverlay();
+        } catch (error) {
+            console.error('Error selecting order:', error);
+        }
+    }
+
+    /**
+     * Open move table modal
+     */
+    openMoveTableModal() {
+        if (!this.currentTable?.order) {
+            this.showNotification('Seleziona prima un tavolo con un ordine attivo', 'error');
+            return;
+        }
+
+        const sourceNumber = this.currentTable.table.table_number;
+        const sourceId = this.currentTable.table.id;
+
+        document.getElementById('moveSourceTableNumber').textContent = sourceNumber;
+
+        const grid = document.getElementById('moveTableGrid');
+        const tables = (this.allTables || []).filter(t => t.id !== sourceId);
+
+        grid.innerHTML = tables.map(t => {
+            const cls = t.status === 'free' ? 'move-table-btn free' : 'move-table-btn occupied';
+            return `<button class="${cls}" data-table-id="${t.id}" style="
+                padding:10px 4px; border:2px solid ${t.status === 'free' ? '#28a745' : '#dc3545'};
+                background:${t.status === 'free' ? '#f0fff4' : '#fff0f0'};
+                color:#000; font-weight:700; font-size:1rem; border-radius:4px; cursor:pointer;
+            ">${t.table_number}</button>`;
+        }).join('');
+
+        grid.querySelectorAll('.move-table-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.executeMove(parseInt(btn.dataset.tableId)));
+        });
+
+        const modal = document.getElementById('moveTableModal');
+        modal.style.display = 'flex';
+    }
+
+    closeMoveTableModal() {
+        document.getElementById('moveTableModal').style.display = 'none';
+    }
+
+    /**
+     * Execute table move
+     */
+    async executeMove(destinationTableId) {
+        const auth = await operatorAuthManager.requestAuth();
+        if (!auth) return;
+
+        this.closeMoveTableModal();
+
+        try {
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/move`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token,
+                },
+                body: JSON.stringify({ destination_table_id: destinationTableId }),
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification(result.message || 'Tavolo spostato con successo', 'success');
+                this.currentTable = null;
+                this.modifySession.active = false;
+                this._hideModifyOverlay();
+                await this.loadTables();
+            } else {
+                this.showNotification(result.message || 'Errore nello spostamento', 'error');
+            }
+        } catch (error) {
+            console.error('Error moving table:', error);
+            this.showNotification('Errore nello spostamento del tavolo', 'error');
         }
     }
 }

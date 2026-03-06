@@ -37,6 +37,8 @@ class TableOrderLog extends Model
     const ACTION_PRINT_PRECONTO = 'print_preconto';
     const ACTION_PAY_ORDER = 'pay_order';
     const ACTION_CREATE_INVOICE = 'create_invoice';
+    const ACTION_AUTOCONSUMO = 'autoconsumo';
+    const ACTION_AUTOCONSUMO_PARTIAL = 'autoconsumo_partial';
 
     // Mapping azione -> categoria
     const ACTION_CATEGORY_MAP = [
@@ -62,6 +64,9 @@ class TableOrderLog extends Model
         // Categoria 'order' - Pagamento e fatturazione
         self::ACTION_PAY_ORDER => self::CATEGORY_ORDER,
         self::ACTION_CREATE_INVOICE => self::CATEGORY_ORDER,
+        // Categoria 'order' - Autoconsumo
+        self::ACTION_AUTOCONSUMO => self::CATEGORY_ORDER,
+        self::ACTION_AUTOCONSUMO_PARTIAL => self::CATEGORY_ORDER,
     ];
 
     protected $fillable = [
@@ -173,6 +178,9 @@ class TableOrderLog extends Model
             'print_marcia' => 'Stampata marcia',
             'print_preconto' => 'Stampato preconto',
             'update_item_price' => 'Modificato prezzo prodotto',
+            'autoconsumo' => 'Autoconsumo completo',
+            'autoconsumo_partial' => 'Autoconsumo per operatore',
+            'pay_order' => 'Pagamento ordine',
         ];
 
         return $descriptions[$this->action] ?? $this->action;

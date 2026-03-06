@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Frontoffice;
 use App\Http\Controllers\Controller;
 use App\Interfaces\PrinterServiceInterface;
 use App\Models\Dish;
+use App\Models\MenuOption;
 use App\Models\OrderItem;
 use App\Models\Printer;
 use App\Models\RestaurantTable;
@@ -66,6 +67,17 @@ class TableOrderController extends Controller
     /**
      * Get all tables with their current orders
      */
+    public function getMenuOptions(): JsonResponse
+    {
+        $extras = MenuOption::extras()->active()
+            ->orderBy('sort_order')->orderBy('label')
+            ->get(['id', 'label', 'price']);
+        $removals = MenuOption::removals()->active()
+            ->orderBy('sort_order')->orderBy('label')
+            ->get(['id', 'label']);
+        return response()->json(['success' => true, 'data' => compact('extras', 'removals')]);
+    }
+
     public function getTables(): JsonResponse
     {
         try {
@@ -81,13 +93,16 @@ class TableOrderController extends Controller
                         'position_x' => $table->position_x,
                         'position_y' => $table->position_y,
                         'status' => $table->status,
+                        'is_banco' => (bool) $table->is_banco,
                         'has_active_order' => $table->hasActiveOrder(),
                         'current_total' => $table->getCurrentTotal(),
+                        'has_preconto' => $table->activeOrder?->preconto_requested_at !== null,
                         'active_order' => $table->activeOrder ? [
                             'id' => $table->activeOrder->id,
                             'items_count' => $table->activeOrder->items->count(),
                             'total_amount' => $table->activeOrder->total_amount,
                             'opened_at' => $table->activeOrder->opened_at->toIso8601String(),
+                            'covers' => $table->activeOrder->covers,
                             'autoconsumo' => $table->activeOrder->autoconsumo,
                         ] : null,
                     ];
@@ -112,7 +127,7 @@ class TableOrderController extends Controller
     public function getTable(RestaurantTable $table): JsonResponse
     {
         try {
-            $table->load(['activeOrder.items.dish']);
+            $table->load(['activeOrder.items.dish', 'activeOrder.items.autoconsumoUser']);
 
             $items = [];
             if ($table->activeOrder) {
@@ -128,6 +143,8 @@ class TableOrderController extends Controller
                         'extras' => $item->extras,
                         'removals' => $item->removals,
                         'status' => $item->status,
+                        'autoconsumo_user_id' => $item->autoconsumo_user_id,
+                        'autoconsumo_user_name' => $item->autoconsumoUser?->name,
                     ];
                 });
             }
@@ -145,6 +162,8 @@ class TableOrderController extends Controller
                     'order' => $order ? [
                         'id' => $order->id,
                         'covers' => $order->covers,
+                        'autoconsumo' => (bool) $order->autoconsumo,
+                        'has_preconto' => $order->preconto_requested_at !== null,
                         'items_subtotal' => $order->getItemsSubtotal(),
                         'cover_charge_per_person' => $order->getCoverChargePerPerson(),
                         'cover_charge_total' => $order->getCoverChargeAmount(),
@@ -244,20 +263,22 @@ class TableOrderController extends Controller
 
             DB::commit();
 
-            // Stampa gli articoli aggiunti sulla stampante POS
-            try {
-                // Reload items with relationships
-                $itemIds = collect($addedItems)->pluck('id');
-                $itemsWithRelations = OrderItem::with('dish.category.printer')
-                    ->whereIn('id', $itemIds)
-                    ->get();
-                $this->printerService->setOperatorId($operatorId)->printOrderItems($order, $itemsWithRelations, 'add');
-            } catch (\Exception $e) {
-                Log::warning('Errore durante la stampa POS multipla', [
-                    'table_order_id' => $order->id,
-                    'items_count' => count($addedItems),
-                    'error' => $e->getMessage()
-                ]);
+            $addedItemIds = collect($addedItems)->pluck('id')->toArray();
+            $skipPrint = $request->input('skip_print', false);
+            if (!$skipPrint) {
+                // Stampa gli articoli aggiunti sulla stampante POS
+                try {
+                    $itemsWithRelations = OrderItem::with('dish.category.printer')
+                        ->whereIn('id', $addedItemIds)
+                        ->get();
+                    $this->printerService->setOperatorId($operatorId)->printOrderItems($order, $itemsWithRelations, 'add');
+                } catch (\Exception $e) {
+                    Log::warning('Errore durante la stampa POS multipla', [
+                        'table_order_id' => $order->id,
+                        'items_count' => count($addedItems),
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
 
             return response()->json([
@@ -265,6 +286,7 @@ class TableOrderController extends Controller
                 'message' => count($addedItems) . ' prodotti aggiunti con successo',
                 'data' => [
                     'items_count' => count($addedItems),
+                    'item_ids' => $addedItemIds,
                     'order' => [
                         'id' => $order->id,
                         'total_amount' => $order->fresh()->total_amount,
@@ -366,18 +388,19 @@ class TableOrderController extends Controller
 
             DB::commit();
 
-            // Stampa l'articolo aggiunto sulla stampante POS
-            // Eseguita dopo il commit per non bloccare l'operazione in caso di errore di stampa
-            try {
-                $item->load('dish.category.printer');
-                $this->printerService->setOperatorId($operatorId)->printOrderItems($order, collect([$item]), 'add');
-            } catch (\Exception $e) {
-                // Log l'errore ma non fallire la richiesta
-                Log::warning('Errore durante la stampa POS', [
-                    'item_id' => $item->id,
-                    'table_order_id' => $order->id,
-                    'error' => $e->getMessage()
-                ]);
+            $skipPrint = $request->input('skip_print', false);
+            if (!$skipPrint) {
+                // Stampa l'articolo aggiunto sulla stampante POS
+                try {
+                    $item->load('dish.category.printer');
+                    $this->printerService->setOperatorId($operatorId)->printOrderItems($order, collect([$item]), 'add');
+                } catch (\Exception $e) {
+                    Log::warning('Errore durante la stampa POS', [
+                        'item_id' => $item->id,
+                        'table_order_id' => $order->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
 
             return response()->json([
@@ -426,9 +449,12 @@ class TableOrderController extends Controller
 
             $order = $item->order;
 
+            $reason = request()->input('reason');
             // Log item removal before deletion
-            $this->logger->logRemoveItem($item, $operatorId);
+            $this->logger->logRemoveItem($item, $operatorId, $reason);
 
+            $item->status = 'cancelled';
+            $item->saveQuietly();
             $item->delete();
 
             // Check if order has no more items, then delete it and free the table
@@ -497,18 +523,19 @@ class TableOrderController extends Controller
 
             DB::commit();
 
-            // Stampa la modifica sulla stampante POS
-            // Eseguita dopo il commit per non bloccare l'operazione in caso di errore di stampa
-            try {
-                $item->load('dish.category.printer');
-                $this->printerService->setOperatorId($operatorId)->printOrderItems($order, collect([$item]), 'update');
-            } catch (\Exception $e) {
-                // Log l'errore ma non fallire la richiesta
-                Log::warning('Errore durante la stampa POS per modifica', [
-                    'item_id' => $item->id,
-                    'table_order_id' => $order->id,
-                    'error' => $e->getMessage()
-                ]);
+            $skipPrint = $request->input('skip_print', false);
+            if (!$skipPrint) {
+                // Stampa la modifica sulla stampante POS
+                try {
+                    $item->load('dish.category.printer');
+                    $this->printerService->setOperatorId($operatorId)->printOrderItems($order, collect([$item]), 'update');
+                } catch (\Exception $e) {
+                    Log::warning('Errore durante la stampa POS per modifica', [
+                        'item_id' => $item->id,
+                        'table_order_id' => $order->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
 
             return response()->json([
@@ -564,6 +591,7 @@ class TableOrderController extends Controller
                 $this->logger->logDeleteOrder($order, $operatorId);
 
                 $order->items()->delete();
+                $order->update(['preconto_requested_at' => null]);
                 $order->delete();
             }
 
@@ -618,6 +646,7 @@ class TableOrderController extends Controller
             $this->logger->logPayOrder($order, $paymentMethod, $operatorId);
             $this->logger->logCloseOrder($order, $operatorId);
 
+            $order->update(['preconto_requested_at' => null]);
             $order->close($paymentMethod);
 
             DB::commit();
@@ -821,6 +850,7 @@ class TableOrderController extends Controller
             $this->logger->logPrintPreconto($order, $operatorId, $splitCount);
 
             if ($success) {
+                $order->update(['preconto_requested_at' => now()]);
                 $message = 'PreConto stampato con successo';
                 if ($splitCount && $splitCount > 1) {
                     $message .= " (diviso per $splitCount persone)";
@@ -841,6 +871,246 @@ class TableOrderController extends Controller
                 'success' => false,
                 'message' => 'Errore nella stampa del PreConto',
             ], 500);
+        }
+    }
+
+    /**
+     * Get all active banco orders
+     */
+    public function getBanco(): JsonResponse
+    {
+        try {
+            $table = RestaurantTable::with(['activeOrders.items.dish'])
+                ->where('is_banco', true)
+                ->firstOrFail();
+
+            $orders = $table->activeOrders->map(function ($order) {
+                return [
+                    'id' => $order->id,
+                    'total_amount' => $order->total_amount,
+                    'opened_at' => $order->opened_at?->toIso8601String(),
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'table_id' => $table->id,
+                    'orders' => $orders,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching banco: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nel caricamento del banco'], 500);
+        }
+    }
+
+    /**
+     * Open a new order on the banco (covers = 0) — always creates a new one
+     */
+    public function openBanco(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'operator_token' => 'required|string',
+        ]);
+
+        $operatorId = $this->verifyOperatorToken($validated['operator_token']);
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $table = RestaurantTable::where('is_banco', true)->firstOrFail();
+
+            $order = TableOrder::create([
+                'restaurant_table_id' => $table->id,
+                'covers' => 0,
+                'status' => 'open',
+                'waiter_id' => $operatorId,
+            ]);
+
+            $order->updateTotal();
+            $table->update(['status' => 'occupied']);
+            $this->logger->logCreateOrder($order, $operatorId);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Vendita al banco aperta',
+                'data' => ['order_id' => $order->id],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error opening banco: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nell\'apertura del banco'], 500);
+        }
+    }
+
+    /**
+     * Get details for a specific order (used for banco multi-session)
+     */
+    public function getOrderDetails(TableOrder $order): JsonResponse
+    {
+        try {
+            $order->load(['items.dish', 'items.autoconsumoUser', 'restaurantTable']);
+
+            $items = $order->items->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'dish_id' => $item->dish_id,
+                    'dish_name' => $item->dish->label,
+                    'quantity' => $item->quantity,
+                    'unit_price' => $item->unit_price,
+                    'subtotal' => $item->subtotal,
+                    'notes' => $item->notes,
+                    'extras' => $item->extras,
+                    'removals' => $item->removals,
+                    'status' => $item->status,
+                    'autoconsumo_user_id' => $item->autoconsumo_user_id,
+                    'autoconsumo_user_name' => $item->autoconsumoUser?->name,
+                ];
+            });
+
+            $table = $order->restaurantTable;
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'table' => [
+                        'id' => $table->id,
+                        'table_number' => $table->is_banco ? 'BANCO' : $table->table_number,
+                        'status' => $table->status,
+                        'is_banco' => (bool) $table->is_banco,
+                    ],
+                    'order' => [
+                        'id' => $order->id,
+                        'covers' => $order->covers,
+                        'autoconsumo' => (bool) $order->autoconsumo,
+                        'has_preconto' => $order->preconto_requested_at !== null,
+                        'items_subtotal' => $order->getItemsSubtotal(),
+                        'cover_charge_per_person' => $order->getCoverChargePerPerson(),
+                        'cover_charge_total' => $order->getCoverChargeAmount(),
+                        'has_cover_charge' => $order->hasCoverCharge(),
+                        'total_amount' => $order->total_amount,
+                        'items' => $items,
+                    ],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching order details: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nel caricamento dell\'ordine'], 500);
+        }
+    }
+
+    /**
+     * Reprint all items of the current order, grouped by printer
+     */
+    public function reprintOrder(RestaurantTable $table): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        try {
+            $order = $table->activeOrder;
+            if (!$order) {
+                return response()->json(['success' => false, 'message' => 'Nessun ordine attivo per questo tavolo'], 404);
+            }
+
+            $order->load(['items.dish.category.printer', 'restaurantTable']);
+
+            if ($order->items->isEmpty()) {
+                return response()->json(['success' => false, 'message' => 'Nessun articolo nell\'ordine'], 400);
+            }
+
+            $this->printerService->setOperatorId($operatorId);
+            $success = $this->printerService->printOrderItems($order, $order->items, 'reprint');
+
+            if ($success) {
+                return response()->json(['success' => true, 'message' => 'Ordine ristampato con successo']);
+            } else {
+                return response()->json(['success' => false, 'message' => 'Errore nella ristampa. Verificare la configurazione della stampante.'], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error reprinting order: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nella ristampa dell\'ordine'], 500);
+        }
+    }
+
+    /**
+     * Move all items from one table to another
+     */
+    public function moveTable(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $validated = $request->validate([
+            'destination_table_id' => 'required|exists:restaurant_tables,id|different:id',
+        ]);
+
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $destinationTable = RestaurantTable::findOrFail($validated['destination_table_id']);
+
+        if ($destinationTable->id === $table->id) {
+            return response()->json(['success' => false, 'message' => 'Tavolo sorgente e destinazione coincidono'], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $sourceOrder = $table->activeOrder;
+            if (!$sourceOrder) {
+                return response()->json(['success' => false, 'message' => 'Nessun ordine attivo sul tavolo sorgente'], 404);
+            }
+
+            $sourceOrder->load(['items.dish.category.printer', 'restaurantTable']);
+
+            // Stampa spostamento PRIMA di modificare i dati
+            $this->printerService->setOperatorId($operatorId)->printSpostamento($sourceOrder, $destinationTable, $operatorId);
+
+            // Recupera o crea l'ordine sul tavolo di destinazione
+            $destOrder = $destinationTable->activeOrder;
+            if (!$destOrder) {
+                $destOrder = TableOrder::create([
+                    'restaurant_table_id' => $destinationTable->id,
+                    'covers' => $sourceOrder->covers,
+                    'status' => 'open',
+                    'opened_at' => $sourceOrder->opened_at,
+                    'waiter_id' => $sourceOrder->waiter_id,
+                    'autoconsumo' => $sourceOrder->autoconsumo,
+                ]);
+                $destinationTable->update(['status' => 'occupied']);
+            }
+
+            // Sposta tutti gli items sull'ordine di destinazione
+            $sourceOrder->items()->update(['table_order_id' => $destOrder->id]);
+
+            // Aggiorna i totali
+            $destOrder->updateTotal();
+
+            // Chiudi l'ordine sorgente e libera il tavolo
+            $sourceOrder->delete();
+            $table->update(['status' => 'free']);
+
+            DB::commit();
+
+            $this->logger->logMoveTable($sourceOrder, $destOrder, $operatorId);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Tavolo {$table->table_number} spostato sul tavolo {$destinationTable->table_number}",
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Errore spostamento tavolo: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nello spostamento del tavolo'], 500);
         }
     }
 
@@ -1237,8 +1507,9 @@ class TableOrderController extends Controller
 
             $order->save();
 
+            $motivation = $request->input('motivation');
             // Log the price update
-            $this->logger->logUpdateItemPrice($item, $dataBefore['unit_price'], $validated['unit_price'], $operatorId);
+            $this->logger->logUpdateItemPrice($item, $dataBefore['unit_price'], $validated['unit_price'], $operatorId, $motivation);
 
             DB::commit();
 
@@ -1318,28 +1589,47 @@ class TableOrderController extends Controller
             ], 401);
         }
 
+        $type = request()->input('type', 'full'); // 'full' or 'partial'
+        $assignments = request()->input('assignments', []); // [{item_id, user_id}]
+
         try {
             DB::beginTransaction();
 
             $order = $table->activeOrder;
-            if ($order) {
-                // Log order autoconsumo
-                $this->logger->logFreeAmount($order, $operatorId);
-                $order->update(['autoconsumo' => 1]);
+            if (!$order) {
+                return response()->json(['success' => false, 'message' => 'Nessun ordine attivo'], 404);
             }
+
+            if ($type === 'partial' && !empty($assignments)) {
+                // Reset all existing assignments first, then apply new ones
+                $order->items()->update(['autoconsumo_user_id' => null]);
+                $assignmentMap = collect($assignments)->keyBy('item_id');
+                foreach ($order->items as $item) {
+                    if ($assignmentMap->has($item->id)) {
+                        $item->update(['autoconsumo_user_id' => $assignmentMap[$item->id]['user_id']]);
+                    }
+                }
+                $this->logger->logPartialAutoconsumo($order, $assignments, $operatorId);
+            } else {
+                // Full autoconsumo: clear any per-item assignments
+                $order->items()->update(['autoconsumo_user_id' => null]);
+                $this->logger->logFreeAmount($order, $operatorId);
+            }
+
+            $order->update(['autoconsumo' => 1]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Tavolo svuotato con successo',
+                'message' => 'Autoconsumo registrato con successo',
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error clearing table: ' . $e->getMessage());
+            Log::error('Error in freeAmount: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Errore nello svuotamento del tavolo',
+                'message' => 'Errore nell\'autoconsumo',
             ], 500);
         }
     }
@@ -1387,5 +1677,42 @@ class TableOrderController extends Controller
                 'status'         => 'served',
             ]);
         }
+    }
+
+    /**
+     * Print all pending changes after a batch modify session
+     */
+    public function printSession(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken($request->input('operator_token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token non valido'], 401);
+        }
+
+        $order = $table->activeOrder;
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Nessun ordine attivo'], 404);
+        }
+
+        $newItemIds     = $request->input('new_item_ids', []);
+        $updatedItemIds = $request->input('updated_item_ids', []);
+
+        try {
+            if (!empty($newItemIds)) {
+                $newItems = OrderItem::with('dish.category.printer')->whereIn('id', $newItemIds)->get();
+                $this->printerService->setOperatorId($operatorId)->printOrderItems($order, $newItems, 'add');
+            }
+            if (!empty($updatedItemIds)) {
+                $updatedItems = OrderItem::with('dish.category.printer')->whereIn('id', $updatedItemIds)->get();
+                $this->printerService->setOperatorId($operatorId)->printOrderItems($order, $updatedItems, 'update');
+            }
+        } catch (\Exception $e) {
+            Log::warning('Errore durante la stampa sessione', [
+                'table_order_id' => $order->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        return response()->json(['success' => true]);
     }
 }

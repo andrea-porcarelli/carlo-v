@@ -22,12 +22,14 @@ class TableOrder extends Model
         'opened_at',
         'closed_at',
         'waiter_id',
+        'preconto_requested_at',
     ];
 
     protected $casts = [
         'total_amount' => 'decimal:2',
         'opened_at' => 'datetime',
         'closed_at' => 'datetime',
+        'preconto_requested_at' => 'datetime',
     ];
 
     /**

@@ -134,16 +134,24 @@ class TableOrderLoggerService
     /**
      * Log per rimozione item
      */
-    public function logRemoveItem(OrderItem $item, int $operatorId = 0): TableOrderLog
+    public function logRemoveItem(OrderItem $item, int $operatorId = 0, ?string $reason = null): TableOrderLog
     {
         $dishName = $item->dish->label ?? $item->dish->name ?? 'Prodotto';
+        $notes = "Rimosso {$dishName} (x{$item->quantity})";
+        if ($reason) {
+            $notes .= " - Motivo: {$reason}";
+        }
+        $dataBefore = $this->getItemData($item);
+        if ($reason) {
+            $dataBefore['removal_reason'] = $reason;
+        }
         return $this->log(
             action: 'remove_item',
             entityType: 'order_item',
-            dataBefore: $this->getItemData($item),
+            dataBefore: $dataBefore,
             tableOrderId: $item->table_order_id,
             orderItemId: $item->id,
-            notes: "Rimosso {$dishName} (x{$item->quantity})",
+            notes: $notes,
             userId: $operatorId
         );
     }
@@ -268,9 +276,13 @@ class TableOrderLoggerService
     /**
      * Log per aggiornamento prezzo item
      */
-    public function logUpdateItemPrice(OrderItem $item, float $oldPrice, float $newPrice, int $operatorId = 0): TableOrderLog
+    public function logUpdateItemPrice(OrderItem $item, float $oldPrice, float $newPrice, int $operatorId = 0, ?string $motivation = null): TableOrderLog
     {
         $dishName = $item->dish->label ?? $item->dish->name ?? 'Prodotto';
+        $notes = "Modificato prezzo {$dishName} da €" . number_format($oldPrice, 2) . " a €" . number_format($newPrice, 2);
+        if ($motivation) {
+            $notes .= " - Motivazione: {$motivation}";
+        }
         return $this->log(
             action: 'update_item_price',
             entityType: 'order_item',
@@ -278,7 +290,7 @@ class TableOrderLoggerService
             dataBefore: ['unit_price' => $oldPrice],
             dataAfter: ['unit_price' => $newPrice],
             tableOrderId: $item->table_order_id,
-            notes: "Modificato prezzo {$dishName} da €" . number_format($oldPrice, 2) . " a €" . number_format($newPrice, 2),
+            notes: $notes,
             userId: $operatorId,
         );
     }
@@ -365,7 +377,7 @@ class TableOrderLoggerService
     }
 
     /**
-     * Log per stampa preconto
+     * Log per autoconsumo completo
      */
     public function logFreeAmount(TableOrder $order, int $operatorId = 0): TableOrderLog
     {
@@ -374,7 +386,39 @@ class TableOrderLoggerService
             entityType: 'table_order',
             entity: $order,
             dataAfter: array_merge($this->getOrderData($order), ['autoconsumo' => 1]),
-            notes: "Autoconsumo per tavolo #{$order->restaurantTable->table_number}",
+            notes: "Autoconsumo completo per tavolo #{$order->restaurantTable->table_number}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
+     * Log per autoconsumo parziale con assegnazione per operatore
+     */
+    public function logPartialAutoconsumo(TableOrder $order, array $assignments, int $operatorId = 0): TableOrderLog
+    {
+        $userIds = array_unique(array_column($assignments, 'user_id'));
+        $users = \App\Models\User::whereIn('id', $userIds)->pluck('name', 'id');
+        $itemIds = array_column($assignments, 'item_id');
+        $items = $order->items()->whereIn('id', $itemIds)->with('dish')->get()->keyBy('id');
+
+        $breakdown = [];
+        foreach ($assignments as $a) {
+            $userName = $users[$a['user_id']] ?? "Utente #{$a['user_id']}";
+            $itemName = isset($items[$a['item_id']]) ? $items[$a['item_id']]->dish->name : "Prodotto #{$a['item_id']}";
+            $breakdown[$userName][] = $itemName;
+        }
+
+        $noteLines = ["Autoconsumo parziale — Tavolo #{$order->restaurantTable->table_number}:"];
+        foreach ($breakdown as $userName => $itemNames) {
+            $noteLines[] = "• {$userName}: " . implode(', ', $itemNames);
+        }
+
+        return $this->log(
+            action: 'autoconsumo_partial',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: array_merge($this->getOrderData($order), ['autoconsumo' => 1, 'assignments' => $assignments]),
+            notes: implode("\n", $noteLines),
             userId: $operatorId,
         );
     }
@@ -546,5 +590,23 @@ class TableOrderLoggerService
         }
 
         return $stats;
+    }
+
+    /**
+     * Log per spostamento tavolo
+     */
+    public function logMoveTable(TableOrder $sourceOrder, TableOrder $destOrder, int $operatorId = 0): TableOrderLog
+    {
+        return $this->log(
+            action: 'move_table',
+            entityType: 'table_order',
+            entity: $destOrder,
+            dataAfter: [
+                'source_table' => $sourceOrder->restaurantTable->table_number ?? 'N/D',
+                'destination_table' => $destOrder->restaurantTable->table_number ?? 'N/D',
+            ],
+            notes: "Tavolo spostato da {$sourceOrder->restaurantTable->table_number} a {$destOrder->restaurantTable->table_number}",
+            userId: $operatorId,
+        );
     }
 }

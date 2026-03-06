@@ -82,6 +82,89 @@
                         </div>
                     </div>
 
+                    @if($tableOrder->autoconsumo)
+                    <!-- Autoconsumo Banner & Breakdown -->
+                    <div class="alert mb-4" style="background: linear-gradient(135deg, #6c757d 0%, #495057 100%); border: none; border-radius: 8px;">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-eraser fa-2x text-white mr-3"></i>
+                            <div>
+                                <h5 class="text-white mb-0 font-weight-bold">
+                                    <i class="fas fa-eraser mr-1"></i> Tavolo in Autoconsumo
+                                </h5>
+                                @php
+                                    $itemsWithUser = $tableOrder->items->filter(fn($i) => $i->autoconsumo_user_id);
+                                    $grouped = $itemsWithUser->groupBy('autoconsumo_user_id');
+                                @endphp
+                                <small class="text-white-50">
+                                    @if($itemsWithUser->isEmpty())
+                                        Autoconsumo completo — nessuna assegnazione per operatore
+                                    @else
+                                        Autoconsumo parziale — {{ $itemsWithUser->count() }}/{{ $tableOrder->items->count() }} piatti assegnati per operatore
+                                    @endif
+                                </small>
+                            </div>
+                        </div>
+
+                        @if($itemsWithUser->isNotEmpty())
+                        <div class="mt-3">
+                            <table class="table table-sm table-bordered mb-0" style="background:white; border-radius:6px; overflow:hidden;">
+                                <thead style="background:#343a40; color:white;">
+                                    <tr>
+                                        <th style="width:30%;">Operatore</th>
+                                        <th>Piatti assegnati</th>
+                                        <th style="width:100px; text-align:right;">Totale</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($grouped as $userId => $userItems)
+                                    @php $userName = $userItems->first()->autoconsumoUser?->name ?? "Utente #{$userId}"; @endphp
+                                    <tr>
+                                        <td class="font-weight-bold">{{ $userName }}</td>
+                                        <td>
+                                            @foreach($userItems as $item)
+                                                <span class="badge badge-secondary mr-1">
+                                                    {{ $item->dish->name ?? 'N/D' }} x{{ $item->quantity }}
+                                                </span>
+                                            @endforeach
+                                        </td>
+                                        <td style="text-align:right; font-weight:bold;">
+                                            €{{ number_format($userItems->sum('subtotal'), 2) }}
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                    @php
+                                        $unassignedItems = $tableOrder->items->filter(fn($i) => !$i->autoconsumo_user_id);
+                                    @endphp
+                                    @if($unassignedItems->isNotEmpty())
+                                    <tr class="table-light">
+                                        <td class="text-muted font-italic">Non assegnati</td>
+                                        <td>
+                                            @foreach($unassignedItems as $item)
+                                                <span class="badge badge-light mr-1">
+                                                    {{ $item->dish->name ?? 'N/D' }} x{{ $item->quantity }}
+                                                </span>
+                                            @endforeach
+                                        </td>
+                                        <td style="text-align:right; color:#6c757d;">
+                                            €{{ number_format($unassignedItems->sum('subtotal'), 2) }}
+                                        </td>
+                                    </tr>
+                                    @endif
+                                </tbody>
+                                <tfoot style="background:#f8f9fa;">
+                                    <tr>
+                                        <td colspan="2" class="font-weight-bold">TOTALE AUTOCONSUMO</td>
+                                        <td style="text-align:right; font-weight:bold;">
+                                            €{{ number_format($tableOrder->items->sum('subtotal'), 2) }}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        @endif
+                    </div>
+                    @endif
+
                     <!-- Timeline dei log -->
                     <div class="timeline">
                         @php
@@ -163,6 +246,15 @@
                                                 <strong>Prodotto:</strong> {{ $log->data_after['dish_name'] ?? 'N/D' }}<br>
                                                 <strong>Quantità:</strong> {{ $log->data_after['quantity'] ?? 'N/D' }}<br>
                                                 <strong>Prezzo:</strong> {{ number_format($log->data_after['price'] ?? 0, 2) }}€
+                                            </div>
+                                        @endif
+
+                                        @if($log->action == 'remove_item' && !empty($log->data_before['removal_reason']))
+                                            <div class="mt-2">
+                                                <span class="badge badge-warning" style="font-size:0.85rem; padding:5px 10px;">
+                                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                                    Motivo: {{ $log->data_before['removal_reason'] }}
+                                                </span>
                                             </div>
                                         @endif
 

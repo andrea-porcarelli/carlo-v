@@ -159,6 +159,11 @@
                                         </td>
                                         <td>
                                             <small>{{ $log->notes }}</small>
+                                            @if($log->action == 'remove_item' && !empty($log->data_before['removal_reason']))
+                                                <br><span class="badge badge-warning" style="font-size:0.75rem;">
+                                                    <i class="fas fa-exclamation-triangle mr-1"></i>{{ $log->data_before['removal_reason'] }}
+                                                </span>
+                                            @endif
                                         </td>
                                         <td>
                                             <small class="text-muted">{{ $log->ip_address }}</small>

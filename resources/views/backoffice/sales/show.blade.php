@@ -141,8 +141,8 @@
                                 </thead>
                                 <tbody>
                                     @foreach($sale->items()->withTrashed()->orderBy('id', 'DESC')->get() as $index => $item)
-                                        <tr class="@if($sale->status == 'cancelled') trashed @endif">
-                                            <td>{{ $index + 1 }}</td>
+                                        <tr class="@if($item->status == 'cancelled') trashed @endif">
+                                            <td>{{ $index + 1 }} </td>
                                             <td>
                                                 @php
                                                     $originalPrice = $item->dish->price ?? $item->unit_price;
