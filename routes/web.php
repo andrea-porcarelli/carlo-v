@@ -58,8 +58,12 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::post('/{table}/pos-charge', [TableOrderController::class, 'posCharge'])->name('posCharge');
     Route::post('/{table}/pay', [TableOrderController::class, 'payTable'])->name('pay');
     Route::post('/{table}/pay-invoice', [TableOrderController::class, 'payTableInvoice'])->name('payInvoice');
+    Route::post('/{table}/cancel-autoconsumo', [TableOrderController::class, 'cancelAutoconsumo'])->name('cancelAutoconsumo');
     Route::post('/{table}/marcia', [TableOrderController::class, 'marciaTable'])->name('marcia');
     Route::post('/{table}/preconto', [TableOrderController::class, 'precontoTable'])->name('preconto');
+    Route::get('/{table}/preconto-splits', [TableOrderController::class, 'getPrecontoSplits'])->name('precontoSplits');
+    Route::post('/{table}/pay-split/{split}', [TableOrderController::class, 'payPrecontoSplit'])->name('payPrecontoSplit');
+    Route::delete('/{table}/preconto-splits/{split}', [TableOrderController::class, 'deletePrecontoSplit'])->name('deletePrecontoSplit');
     Route::post('/{table}/move', [TableOrderController::class, 'moveTable'])->name('move');
     Route::post('/{table}/reprint', [TableOrderController::class, 'reprintOrder'])->name('reprint');
     Route::post('/{table}/print-session', [TableOrderController::class, 'printSession'])->name('printSession');
@@ -69,6 +73,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::post('/comunica', [TableOrderController::class, 'comunica'])->name('comunica');
     Route::get('/printers', [TableOrderController::class, 'getPrinters'])->name('printers');
     Route::put('/items/{item}/price', [TableOrderController::class, 'updateItemPrice'])->name('updateItemPrice');
+    Route::put('/items/{item}/details', [TableOrderController::class, 'updateItemDetails'])->name('updateItemDetails');
     Route::put('/{table}/covers', [TableOrderController::class, 'updateCovers'])->name('updateCovers');
 });
 

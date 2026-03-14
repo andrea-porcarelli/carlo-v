@@ -206,6 +206,11 @@ $(document).ready(function() {
                             <span>${item.quantity}</span>
                             <button onclick="mobileUpdateQty(${item.id}, ${item.quantity + 1})">+</button>
                         </div>
+                        <button class="btn-edit-item-mobile"
+                            onclick="event.stopPropagation(); $('#manageModalMobile').hide(); tableOrdersManager.openEditItemModal(${item.id});"
+                            style="background:#17a2b8;border:none;color:white;border-radius:50%;width:32px;height:32px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+                            <i class="fas fa-pencil-alt" style="font-size:0.75rem;pointer-events:none;"></i>
+                        </button>
                         <button class="btn-remove-item" onclick="mobileRemoveItem(${item.id})">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -219,6 +224,10 @@ $(document).ready(function() {
 
     // Close manage modal
     $('#closeManageModalMobile').click(function() {
+        if (typeof tableOrdersManager !== 'undefined' && tableOrdersManager._autoconsumoInProgress) {
+            tableOrdersManager.showNotification('Completare o annullare prima la procedura di autoconsumo', 'error');
+            return;
+        }
         $('#manageModalMobile').removeClass('active').fadeOut(300);
     });
 
@@ -237,10 +246,10 @@ $(document).ready(function() {
 
     // ===== ACTIONS FROM MANAGE MODAL =====
 
-    // Marcia
-    $('#btnMarciaMobile').click(function() {
+    // Ristampa
+    $('#btnRistampaMobile').click(function() {
         if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.marciaTavolo();
+            tableOrdersManager.reprintOrder();
             hapticFeedback();
         }
     });
@@ -252,33 +261,17 @@ $(document).ready(function() {
         }
     });
 
-    // Pay bill
-    $('#btnPayBillMobile').click(function() {
-        if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.payTable();
-            hapticFeedback([100, 50, 100, 50, 100]);
-        }
-    });
-
-    // Clear bill
-    $('#btnClearBillMobile').click(function() {
-        if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.clearTable();
-            hapticFeedback();
-        }
-    });
-
-    // Free table
-    $('#btnFreeTableMobile').click(function() {
-        if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.clearTable();
-            hapticFeedback();
-        }
-    });
-
     // Comunica
     $('#btnComunicaMobile').click(function() {
         openComunicaModalMobile();
+    });
+
+    // Sposta
+    $('#btnSpostaMobile').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.openMoveTableModal();
+            hapticFeedback();
+        }
     });
 
     // ===== PRECONTO MODAL (MOBILE) =====
@@ -298,20 +291,33 @@ $(document).ready(function() {
         // Reset form
         $('input[name="precontoTypeMobile"][value="full"]').prop('checked', true);
         $('#splitCountContainerMobile').hide();
+        $('#itemsSelectContainerMobile').hide();
         $('#splitCountMobile').val(2);
+        $('input[name="precontoDiscountTypeMobile"][value="none"]').prop('checked', true);
+        $('#precontoDiscountInputMobile').hide();
+        $('#precontoPartialTotalMobile').hide();
+        $('#preconto_discount_amount_mobile').val(0);
         updateSplitPreviewMobile();
 
         $('#precontoModalMobile').addClass('active').fadeIn(300);
     }
 
-    // Radio change
+    // Radio change — preconto type
     $('input[name="precontoTypeMobile"]').change(function() {
-        if ($(this).val() === 'split') {
+        const type = $(this).val();
+        if (type === 'split') {
             $('#splitCountContainerMobile').slideDown(200);
+            $('#itemsSelectContainerMobile').slideUp(200);
             updateSplitPreviewMobile();
+        } else if (type === 'items') {
+            $('#splitCountContainerMobile').slideUp(200);
+            $('#itemsSelectContainerMobile').slideDown(200);
+            _renderPrecontoItemsListMobile();
         } else {
             $('#splitCountContainerMobile').slideUp(200);
+            $('#itemsSelectContainerMobile').slideUp(200);
         }
+        _updateGlobalPrecontoTotalMobile();
     });
 
     // Split count controls
@@ -340,9 +346,177 @@ $(document).ready(function() {
     function updateSplitPreviewMobile() {
         if (!tableOrdersManager.currentTable?.order) return;
         const total = parseFloat(tableOrdersManager.currentTable.order.total_amount) || 0;
+        const net = _applyPrecontoDiscountMobile(total);
         const splitCount = parseInt($('#splitCountMobile').val()) || 2;
-        const perPerson = total / splitCount;
-        $('#perPersonAmountMobile').text('€' + perPerson.toFixed(2));
+        $('#perPersonAmountMobile').text('€' + (net / splitCount).toFixed(2));
+    }
+
+    function _applyPrecontoDiscountMobile(total) {
+        const dType = $('input[name="precontoDiscountTypeMobile"]:checked').val();
+        const dAmount = parseFloat($('#preconto_discount_amount_mobile').val()) || 0;
+        if (dType === 'value') return Math.max(0, total - dAmount);
+        if (dType === 'percent') return Math.max(0, total * (1 - dAmount / 100));
+        return total;
+    }
+
+    function _updateGlobalPrecontoTotalMobile() {
+        const type = $('input[name="precontoTypeMobile"]:checked').val();
+        const hasDiscount = $('input[name="precontoDiscountTypeMobile"]:checked').val() !== 'none';
+        const total = parseFloat(tableOrdersManager.currentTable?.order?.total_amount) || 0;
+        if (type === 'full') {
+            const net = _applyPrecontoDiscountMobile(total);
+            $('#precontoPartialTotalAmountMobile').text('€' + net.toFixed(2));
+            $('#precontoPartialTotalMobile').toggle(hasDiscount);
+        } else if (type === 'split') {
+            updateSplitPreviewMobile();
+            const net = _applyPrecontoDiscountMobile(total);
+            $('#precontoPartialTotalAmountMobile').text('€' + net.toFixed(2));
+            $('#precontoPartialTotalMobile').toggle(hasDiscount);
+        } else if (type === 'items') {
+            _updatePrecontoItemsTotalMobile();
+        }
+    }
+
+    function _updatePrecontoItemsTotalMobile() {
+        let total = 0;
+        document.querySelectorAll('.preconto-item-qty-mobile').forEach(input => {
+            const qty = parseInt(input.value) || 0;
+            const unitPrice = parseFloat(input.dataset.unitPrice) || 0;
+            total += qty * unitPrice;
+        });
+        const net = _applyPrecontoDiscountMobile(total);
+        $('#precontoPartialTotalAmountMobile').text('€' + net.toFixed(2));
+        const hasQty = Array.from(document.querySelectorAll('.preconto-item-qty-mobile')).some(i => parseInt(i.value) > 0);
+        const hasDiscount = $('input[name="precontoDiscountTypeMobile"]:checked').val() !== 'none';
+        $('#precontoPartialTotalMobile').toggle(hasQty || hasDiscount);
+    }
+
+    // Discount radio change
+    $('input[name="precontoDiscountTypeMobile"]').change(function() {
+        const val = $(this).val();
+        if (val === 'none') {
+            $('#precontoDiscountInputMobile').hide();
+        } else {
+            $('#precontoDiscountInputMobile').css('display', 'flex');
+            $('#precontoDiscountSymbolMobile').text(val === 'percent' ? '%' : '€');
+        }
+        _updateGlobalPrecontoTotalMobile();
+    });
+
+    $('#preconto_discount_amount_mobile').on('input', _updateGlobalPrecontoTotalMobile);
+
+    async function _renderPrecontoItemsListMobile() {
+        const order = tableOrdersManager.currentTable?.order;
+        if (!order?.items) return;
+        const tableId = tableOrdersManager.currentTable.table.id;
+        let assignedQtyMap = {}; // order_item_id => qty already in pending splits
+        let assignedCovers = 0;
+        try {
+            const r = await fetch(`/api/tables/${tableId}/preconto-splits`);
+            const d = await r.json();
+            if (d.success) {
+                (d.data?.splits || d.splits || []).filter(s => s.status === 'pending').forEach(s => {
+                    (s.items || []).forEach(i => {
+                        const id = i.order_item_id || i.item_id;
+                        assignedQtyMap[id] = (assignedQtyMap[id] || 0) + (parseInt(i.quantity) || 0);
+                    });
+                    assignedCovers += parseInt(s.covers || 0);
+                });
+            }
+        } catch(e) {}
+
+        // Compute available qty per item
+        const availableItems = order.items.map(i => ({
+            ...i,
+            _available: Math.max(0, (i.quantity || 1) - (assignedQtyMap[i.id] || 0)),
+            _assigned: assignedQtyMap[i.id] || 0,
+        })).filter(i => i._available > 0);
+
+        const remainingCovers = Math.max(0, (order.covers || 0) - assignedCovers);
+        const container = document.getElementById('precontoItemsListMobile');
+
+        if (availableItems.length === 0) {
+            container.innerHTML = '<div style="padding:12px;text-align:center;color:#6c757d;">Tutti i piatti già in preconto</div>';
+        } else {
+            container.innerHTML = availableItems.map(item => {
+                const name = item.dish?.label || item.dish?.name || 'Prodotto';
+                const avail = item._available;
+                const unitPrice = parseFloat(item.unit_price || 0);
+                const subtotal = (unitPrice * avail).toFixed(2);
+                const alreadyBadge = item._assigned > 0
+                    ? `<span style="font-size:0.7rem;color:#fd7e14;">(${item._assigned} già)</span>` : '';
+                return `<div style="padding:8px 12px;border-bottom:1px solid #f0f0f0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                        <span style="flex:1;font-size:0.88rem;">${name} ${alreadyBadge}</span>
+                        <span class="preconto-price-live-mobile" id="mpcp_${item.id}" style="font-weight:600;color:#dc3545;font-size:0.88rem;">€${subtotal}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+                        <button type="button" class="mpqi-dec" data-item-id="${item.id}"
+                            style="width:30px;height:30px;border:1px solid #adb5bd;border-radius:4px;background:#fff;cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;">−</button>
+                        <input type="number" class="preconto-item-qty-mobile" id="mpqi_${item.id}"
+                               value="${avail}" min="0" max="${avail}"
+                               data-item-id="${item.id}" data-unit-price="${unitPrice}" data-max="${avail}"
+                               style="width:46px;text-align:center;border:1px solid #dee2e6;border-radius:4px;padding:4px;font-size:0.9rem;">
+                        <button type="button" class="mpqi-inc" data-item-id="${item.id}"
+                            style="width:30px;height:30px;border:1px solid #adb5bd;border-radius:4px;background:#fff;cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;">+</button>
+                        <span style="font-size:0.75rem;color:#6c757d;">/ ${avail}</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Attach spinbox events
+            const onMobileQtyChange = (input) => {
+                const itemId = input.dataset.itemId;
+                const max = parseInt(input.dataset.max) || 0;
+                let qty = Math.max(0, Math.min(parseInt(input.value) || 0, max));
+                input.value = qty;
+                const unitPrice = parseFloat(input.dataset.unitPrice) || 0;
+                const priceEl = document.getElementById(`mpcp_${itemId}`);
+                if (priceEl) priceEl.textContent = `€${(unitPrice * qty).toFixed(2)}`;
+                _updatePrecontoItemsTotalMobile();
+            };
+
+            container.querySelectorAll('.mpqi-dec').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const input = container.querySelector(`#mpqi_${btn.dataset.itemId}`);
+                    if (input && parseInt(input.value) > 0) { input.value = parseInt(input.value) - 1; onMobileQtyChange(input); }
+                });
+            });
+            container.querySelectorAll('.mpqi-inc').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const input = container.querySelector(`#mpqi_${btn.dataset.itemId}`);
+                    const max = parseInt(input?.dataset.max) || 0;
+                    if (input && parseInt(input.value) < max) { input.value = parseInt(input.value) + 1; onMobileQtyChange(input); }
+                });
+            });
+            container.querySelectorAll('.preconto-item-qty-mobile').forEach(input => {
+                input.addEventListener('input', () => onMobileQtyChange(input));
+            });
+        }
+
+        const coversInput = $('#preconto_covers_mobile');
+        coversInput.attr('max', remainingCovers).val(remainingCovers > 0 ? 1 : 0).prop('disabled', remainingCovers <= 0);
+        $('#precontoCoversInfoMobile').text(`max ${remainingCovers} disponibili`);
+
+        $('#precontoSelectAllMobile').off('click').on('click', () => {
+            container.querySelectorAll('.preconto-item-qty-mobile').forEach(input => {
+                input.value = input.dataset.max;
+                const unitPrice = parseFloat(input.dataset.unitPrice) || 0;
+                const priceEl = document.getElementById(`mpcp_${input.dataset.itemId}`);
+                if (priceEl) priceEl.textContent = `€${(unitPrice * parseInt(input.dataset.max)).toFixed(2)}`;
+            });
+            _updatePrecontoItemsTotalMobile();
+        });
+        $('#precontoDeselectAllMobile').off('click').on('click', () => {
+            container.querySelectorAll('.preconto-item-qty-mobile').forEach(input => {
+                input.value = 0;
+                const priceEl = document.getElementById(`mpcp_${input.dataset.itemId}`);
+                if (priceEl) priceEl.textContent = `€0.00`;
+            });
+            _updatePrecontoItemsTotalMobile();
+        });
+
+        _updatePrecontoItemsTotalMobile();
     }
 
     // Close preconto modal
@@ -365,10 +539,27 @@ $(document).ready(function() {
         }
 
         const precontoType = $('input[name="precontoTypeMobile"]:checked').val();
-        let splitCount = null;
+        const discountType = $('input[name="precontoDiscountTypeMobile"]:checked').val() || 'none';
+        const discountAmount = parseFloat($('#preconto_discount_amount_mobile').val()) || 0;
+
+        let bodyData = { discount_type: discountType, discount_amount: discountAmount };
 
         if (precontoType === 'split') {
-            splitCount = parseInt($('#splitCountMobile').val()) || null;
+            bodyData.split_count = parseInt($('#splitCountMobile').val()) || null;
+        } else if (precontoType === 'items') {
+            const items = [];
+            document.querySelectorAll('.preconto-item-qty-mobile').forEach(input => {
+                const qty = parseInt(input.value) || 0;
+                if (qty > 0) {
+                    items.push({ order_item_id: parseInt(input.dataset.itemId), quantity: qty });
+                }
+            });
+            if (items.length === 0) {
+                tableOrdersManager.showNotification('Seleziona almeno un piatto', 'error');
+                return;
+            }
+            bodyData.items = items;
+            bodyData.covers = parseInt($('#preconto_covers_mobile').val()) || 0;
         }
 
         try {
@@ -379,15 +570,20 @@ $(document).ready(function() {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
                     'X-Operator-Token': auth.token
                 },
-                body: JSON.stringify({ split_count: splitCount })
+                body: JSON.stringify(bodyData)
             });
 
             const result = await response.json();
 
             if (result.success) {
                 tableOrdersManager.showNotification(result.message || 'PreConto stampato', 'success');
-                $('#precontoModalMobile').removeClass('active').fadeOut(300);
                 hapticFeedback([100, 50, 100]);
+                if (precontoType === 'items') {
+                    // Stay open: reload list (quantities may have changed)
+                    await _renderPrecontoItemsListMobile();
+                } else {
+                    $('#precontoModalMobile').removeClass('active').fadeOut(300);
+                }
             } else {
                 tableOrdersManager.showNotification(result.message || 'Errore nella stampa', 'error');
             }
@@ -789,6 +985,11 @@ function updateManageReceiptItemsGlobal() {
                         <span>${item.quantity}</span>
                         <button onclick="mobileUpdateQty(${item.id}, ${item.quantity + 1})">+</button>
                     </div>
+                    <button class="btn-edit-item-mobile"
+                        onclick="event.stopPropagation(); $('#manageModalMobile').hide(); tableOrdersManager.openEditItemModal(${item.id});"
+                        style="background:#17a2b8;border:none;color:white;border-radius:50%;width:32px;height:32px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-pencil-alt" style="font-size:0.75rem;pointer-events:none;"></i>
+                    </button>
                     <button class="btn-remove-item" onclick="mobileRemoveItem(${item.id})">
                         <i class="fas fa-trash"></i>
                     </button>

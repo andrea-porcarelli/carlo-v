@@ -26,6 +26,14 @@
                         Dividi per numero di persone
                     </span>
                 </label>
+
+                <label class="preconto-option-label">
+                    <input type="radio" name="precontoType" value="items">
+                    <span class="preconto-option-text">
+                        <i class="fas fa-list-check"></i>
+                        Seleziona piatti specifici
+                    </span>
+                </label>
             </div>
 
             <div id="splitCountContainer" class="split-count-container" style="display: none;">
@@ -38,6 +46,50 @@
                 <div class="split-preview" id="splitPreview">
                     <span>Quota per persona: <strong id="perPersonAmount">€0.00</strong></span>
                 </div>
+            </div>
+
+            <div id="itemsSelectContainer" class="items-select-container" style="display: none;">
+                <div class="items-select-header">
+                    <span>Seleziona i piatti da includere nel preconto parziale:</span>
+                    <div style="display:flex;gap:6px;">
+                        <button type="button" class="items-select-all-btn" id="precontoSelectAll">Tutti</button>
+                        <button type="button" class="items-select-all-btn" id="precontoDeselectAll">Nessuno</button>
+                    </div>
+                </div>
+                <div id="precontoItemsList" class="preconto-items-list"></div>
+                <div class="preconto-covers-row">
+                    <label for="preconto_covers">Coperti inclusi:</label>
+                    <input type="number" id="preconto_covers" value="0" min="0" max="50"
+                           style="width:70px;text-align:center;border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;"
+                           oninput="if(this.value>+this.max)this.value=this.max;if(this.value<0)this.value=0;">
+                    <span id="precontoCoversInfo" style="font-size:0.8rem;color:#6c757d;margin-left:6px;"></span>
+                </div>
+            </div>
+
+            <!-- Abbuono — visibile per tutti i tipi di preconto -->
+            <div class="preconto-discount-row">
+                <span style="font-weight:600;font-size:0.9rem;">Abbuono:</span>
+                <div class="preconto-discount-type-btns">
+                    <label class="preconto-discount-type-label">
+                        <input type="radio" name="precontoDiscountType" value="none" checked> Nessuno
+                    </label>
+                    <label class="preconto-discount-type-label">
+                        <input type="radio" name="precontoDiscountType" value="value"> € Valore
+                    </label>
+                    <label class="preconto-discount-type-label">
+                        <input type="radio" name="precontoDiscountType" value="percent"> % Percentuale
+                    </label>
+                </div>
+                <div id="precontoDiscountInputWrap" style="display:none;margin-top:6px;align-items:center;gap:6px;">
+                    <input type="number" id="preconto_discount_amount" value="0" min="0" step="0.01"
+                           style="width:90px;text-align:center;border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;"
+                           oninput="if(this.value<0)this.value=0;">
+                    <span id="precontoDiscountSymbol" style="font-weight:600;color:#dc3545;">€</span>
+                </div>
+            </div>
+
+            <div id="precontoPartialTotalRow" class="preconto-partial-total" style="display:none;">
+                Totale parziale: <strong id="precontoPartialTotal">€0.00</strong>
             </div>
         </div>
         <div class="preconto-modal-footer">
@@ -65,8 +117,11 @@
 
 .preconto-modal-content {
     background: white;
-    width: 450px;
+    width: 600px;
     max-width: 95%;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
     border-radius: 8px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     overflow: hidden;
@@ -79,6 +134,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .preconto-modal-header h3 {
@@ -102,27 +158,29 @@
 }
 
 .preconto-modal-body {
-    padding: 25px;
+    padding: 20px 25px;
+    overflow-y: auto;
+    flex: 1;
 }
 
 .preconto-modal-description {
     text-align: center;
     font-size: 1.1rem;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
     color: #333;
 }
 
 .preconto-options {
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    margin-bottom: 20px;
+    gap: 10px;
+    margin-bottom: 15px;
 }
 
 .preconto-option-label {
     display: flex;
     align-items: center;
-    padding: 15px;
+    padding: 12px 15px;
     border: 2px solid #dee2e6;
     border-radius: 8px;
     cursor: pointer;
@@ -164,7 +222,7 @@
     background: #f8f9fa;
     padding: 20px;
     border-radius: 8px;
-    margin-top: 15px;
+    margin-top: 10px;
 }
 
 .split-count-container label {
@@ -226,16 +284,239 @@
     font-size: 1.3rem;
 }
 
+/* Items select */
+.items-select-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.items-select-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 1px solid #dee2e6;
+    background: #e9ecef;
+}
+
+.items-select-all-btn {
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border: 1px solid #17a2b8;
+    background: white;
+    color: #17a2b8;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.items-select-all-btn:hover {
+    background: #17a2b8;
+    color: white;
+}
+
+.preconto-items-list {
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.preconto-item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: default;
+    transition: background 0.15s;
+}
+
+.preconto-item-row:last-child {
+    border-bottom: none;
+}
+
+.preconto-item-row.selected {
+    background: #e8f5e9;
+}
+
+.preconto-item-name {
+    flex: 1;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.preconto-item-price {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #dc3545;
+    min-width: 60px;
+    text-align: right;
+}
+
+/* Qty spinbox per preconto items */
+.preconto-qty-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.pqi-dec, .pqi-inc {
+    width: 26px;
+    height: 26px;
+    border: 1px solid #adb5bd;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+}
+
+.pqi-dec:hover, .pqi-inc:hover {
+    background: #17a2b8;
+    color: white;
+    border-color: #17a2b8;
+}
+
+.preconto-item-qty-input {
+    width: 42px;
+    text-align: center;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 3px 2px;
+    font-size: 0.9rem;
+    -moz-appearance: textfield;
+}
+
+.preconto-item-qty-input::-webkit-inner-spin-button,
+.preconto-item-qty-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+.pqi-max {
+    font-size: 0.75rem;
+    color: #6c757d;
+    white-space: nowrap;
+}
+
+/* Qty spinbox per autoconsumo items */
+.autoconsumo-qty-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.aqi-dec, .aqi-inc {
+    width: 26px;
+    height: 26px;
+    border: 1px solid #adb5bd;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+}
+
+.aqi-dec:hover, .aqi-inc:hover {
+    background: #6c757d;
+    color: white;
+    border-color: #6c757d;
+}
+
+.autoconsumo-qty-input {
+    width: 40px;
+    text-align: center;
+    border: 1px solid #adb5bd;
+    border-radius: 4px;
+    padding: 3px 2px;
+    font-size: 0.9rem;
+    -moz-appearance: textfield;
+}
+
+.autoconsumo-qty-input::-webkit-inner-spin-button,
+.autoconsumo-qty-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+.preconto-covers-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-top: 1px solid #dee2e6;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.preconto-discount-row {
+    padding: 10px 14px;
+    border-top: 2px solid #dee2e6;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+    border-radius: 0 0 6px 6px;
+}
+
+.preconto-discount-type-btns {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+
+.preconto-discount-type-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    color: #333;
+}
+
+.preconto-discount-type-label input[type="radio"] {
+    accent-color: #dc3545;
+}
+
+.preconto-partial-total {
+    padding: 10px 14px;
+    font-size: 1rem;
+    color: #333;
+    text-align: right;
+    border-top: 2px solid #dee2e6;
+}
+
+.preconto-partial-total strong {
+    color: #dc3545;
+    font-size: 1.2rem;
+}
+
 .preconto-modal-footer {
-    padding: 20px;
+    padding: 15px 20px;
     background: #f8f9fa;
     display: flex;
     gap: 10px;
+    flex-shrink: 0;
+    border-top: 1px solid #dee2e6;
 }
 
 .btn-preconto-cancel {
     flex: 1;
-    padding: 15px;
+    padding: 13px;
     border: 2px solid #6c757d;
     background: white;
     color: #6c757d;
@@ -254,7 +535,7 @@
 
 .btn-preconto-print {
     flex: 2;
-    padding: 15px;
+    padding: 13px;
     border: none;
     background: #17a2b8;
     color: white;

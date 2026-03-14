@@ -1043,6 +1043,26 @@ input, textarea, select {
     color: white;
 }
 
+.mobile-grid-btn.btn-dark {
+    background: linear-gradient(135deg, #343a40, #23272b);
+    color: white;
+}
+
+.mobile-grid-btn.btn-orange {
+    background: linear-gradient(135deg, #fd7e14, #e96b0a);
+    color: white;
+}
+
+.items-select-all-btn {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: #e9ecef;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
 /* ===== PRECONTO MODAL STYLES ===== */
 .mobile-preconto-info {
     text-align: center;

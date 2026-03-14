@@ -296,7 +296,7 @@ body {
 }
 
 .receipt-item {
-    padding: 12px 0;
+    padding: 5px 8px;
     border-bottom: 1px solid #dee2e6;
     display: flex;
     justify-content: space-between;
@@ -700,8 +700,7 @@ body {
     color: #000;
 }
 
-.btn-remove-item {
-    background: #dc3545;
+.btn-remove-item, .btn-edit-item {
     border: none;
     color: white;
     width: 30px;
@@ -709,18 +708,30 @@ body {
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.3s ease;
-    position: absolute;
-    right: 10px;
-    top: 40%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
 }
 
-.btn-remove-item:hover {
-    background: #b02a37;
+.btn-remove-item { background: #dc3545; }
+.btn-remove-item:hover { background: #b02a37; }
+.btn-edit-item { background: #17a2b8; }
+.btn-edit-item:hover { background: #138496; }
+
+.receipt-item-actions {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 4px;
+    align-items: center;
 }
 
 .receipt-item {
     position: relative;
-    padding-right: 50px;
+    padding-right: 76px;
 }
 
 /* Compact action buttons for modify overlay */

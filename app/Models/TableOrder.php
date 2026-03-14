@@ -57,6 +57,14 @@ class TableOrder extends Model
     }
 
     /**
+     * Get preconto splits for this order
+     */
+    public function precontoSplits(): HasMany
+    {
+        return $this->hasMany(PrecontoSplit::class);
+    }
+
+    /**
      * Calculate and update the total amount (including cover charge)
      */
     public function updateTotal(): void

@@ -134,6 +134,9 @@
                                     <tr>
                                         <th width="50">#</th>
                                         <th>Prodotto</th>
+                                        @if($sale->autoconsumo)
+                                            <th>Addebitato a</th>
+                                        @endif
                                         <th width="80" class="text-center">Qta</th>
                                         <th width="120" class="text-end">Prezzo Unit.</th>
                                         <th width="120" class="text-end">Subtotale</th>
@@ -227,6 +230,9 @@
                                                     </div>
                                                 @endif
                                             </td>
+                                            @if($sale->autoconsumo)
+                                                <th>{{ $item->autoconsumoUser->name }}</th>
+                                            @endif
                                             <td class="text-center">
                                                 <strong style="font-size: 16px;">{{ $item->quantity }}</strong>
                                             </td>

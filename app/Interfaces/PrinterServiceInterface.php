@@ -3,6 +3,7 @@
 namespace App\Interfaces;
 
 use App\Models\OrderItem;
+use App\Models\PrecontoSplit;
 use App\Models\Printer;
 use App\Models\TableOrder;
 use Illuminate\Support\Collection;
@@ -52,7 +53,12 @@ interface PrinterServiceInterface
      * @param int|null $splitCount Numero di persone per dividere il conto (opzionale)
      * @return bool True se la stampa è andata a buon fine, false altrimenti
      */
-    public function printPreconto(TableOrder $tableOrder, int $operatorId, ?int $splitCount = null): bool;
+    public function printPreconto(TableOrder $tableOrder, int $operatorId, ?int $splitCount = null, string $discountType = 'none', float $discountAmount = 0): bool;
+
+    /**
+     * Stampa un preconto parziale (solo i piatti del split selezionato)
+     */
+    public function printPartialPreconto(TableOrder $tableOrder, PrecontoSplit $split, int $operatorId): bool;
 
     /**
      * Reprint a logged print job

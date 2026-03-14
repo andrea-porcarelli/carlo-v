@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Interfaces\PrinterServiceInterface;
 use App\Models\OrderItem;
+use App\Models\PrecontoSplit;
 use App\Models\Printer;
 use App\Models\Setting;
 use App\Models\TableOrder;
@@ -283,9 +284,9 @@ class PrinterService implements PrinterServiceInterface
         if (!empty($item->extras) && is_array($item->extras)) {
             foreach ($item->extras as $extra => $price) {
                 $printer->text("  + $extra");
-                if ($price > 0) {
-                    $printer->text(" (€" . number_format($price, 2, ',', '.') . ")");
-                }
+//                if ($price > 0) {
+//                    $printer->text(" (€" . number_format($price, 2, ',', '.') . ")");
+//                }
                 $printer->text("\n");
             }
         }
@@ -631,7 +632,7 @@ class PrinterService implements PrinterServiceInterface
      * @param int|null $splitCount Numero di persone per dividere il conto (opzionale)
      * @return bool True se la stampa è andata a buon fine, false altrimenti
      */
-    public function printPreconto(TableOrder $tableOrder, int $operatorId, ?int $splitCount = null): bool
+    public function printPreconto(TableOrder $tableOrder, int $operatorId, ?int $splitCount = null, string $discountType = 'none', float $discountAmount = 0): bool
     {
         try {
             // Get preconto printer from settings
@@ -650,7 +651,7 @@ class PrinterService implements PrinterServiceInterface
             // Carica le relazioni necessarie
             $tableOrder->load(['items.dish', 'restaurantTable']);
 
-            return $this->printPrecontoToDevice($tableOrder, $printer, $operatorId, $splitCount);
+            return $this->printPrecontoToDevice($tableOrder, $printer, $operatorId, $splitCount, $discountType, $discountAmount);
 
         } catch (\Exception $e) {
             Log::error('Errore durante la stampa preconto', [
@@ -671,7 +672,7 @@ class PrinterService implements PrinterServiceInterface
      * @param int|null $splitCount
      * @return bool
      */
-    protected function printPrecontoToDevice(TableOrder $tableOrder, Printer $printerObj, int $operatorId, ?int $splitCount = null): bool
+    protected function printPrecontoToDevice(TableOrder $tableOrder, Printer $printerObj, int $operatorId, ?int $splitCount = null, string $discountType = 'none', float $discountAmount = 0): bool
     {
         try {
             $printerIp = $printerObj->ip;
@@ -778,11 +779,33 @@ class PrinterService implements PrinterServiceInterface
             // Linea separatrice
             $printer->text(str_repeat('-', 48) . "\n");
 
+            // Calcola sconto
+            $baseTotal = (float) $tableOrder->total_amount;
+            $discountValue = 0;
+            if ($discountType === 'value' && $discountAmount > 0) {
+                $discountValue = min($discountAmount, $baseTotal);
+            } elseif ($discountType === 'percent' && $discountAmount > 0) {
+                $discountValue = round($baseTotal * min($discountAmount, 100) / 100, 2);
+            }
+            $finalTotal = max(0, round($baseTotal - $discountValue, 2));
+
+            // Riga abbuono
+            $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            if ($discountValue > 0) {
+                $printer->setEmphasis(false);
+                $discountLabel = $discountType === 'percent'
+                    ? "Abbuono " . number_format($discountAmount, 0) . "%"
+                    : "Abbuono";
+                $discountFormatted = '-' . number_format($discountValue, 2, ',', '.');
+                $printer->text(str_pad($discountLabel, 38) . str_pad($discountFormatted, 10, ' ', STR_PAD_LEFT) . "\n");
+                $printer->text(str_repeat('-', 48) . "\n");
+            }
+
             // Totale
             $printer->setJustification(EscposPrinter::JUSTIFY_RIGHT);
             $printer->setEmphasis(true);
             $printer->setTextSize(2, 1);
-            $totalAmount = number_format($tableOrder->total_amount, 2, ',', '.');
+            $totalAmount = number_format($finalTotal, 2, ',', '.');
             $printer->text("TOTALE: EUR $totalAmount\n");
             $printer->setTextSize(1, 1);
             $printer->setEmphasis(false);
@@ -790,7 +813,7 @@ class PrinterService implements PrinterServiceInterface
 
             // Se richiesta la suddivisione
             if ($splitCount && $splitCount > 1) {
-                $perPerson = $tableOrder->total_amount / $splitCount;
+                $perPerson = $finalTotal / $splitCount;
                 $perPersonFormatted = number_format($perPerson, 2, ',', '.');
                 $printer->text(str_repeat('-', 48) . "\n");
                 $printer->setEmphasis(true);
@@ -807,8 +830,8 @@ class PrinterService implements PrinterServiceInterface
             // Nota finale
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
             $printer->text("Misuraca S.R.L. \n");
-            $printer->text("*** DOCUMENTO NON FISCALE ***\n");
-            $printer->text("Ritirare lo scontrino alla cassa\n");
+            $printer->text("***  NON FISCALE ***\n");
+            $printer->text("Documento Fiscale alla cassa\n");
 
             $printer->feed(2);
 
@@ -864,6 +887,131 @@ class PrinterService implements PrinterServiceInterface
                 $e->getMessage()
             );
 
+            return false;
+        }
+    }
+
+    /**
+     * Stampa un preconto parziale con solo i piatti del split selezionato
+     */
+    public function printPartialPreconto(TableOrder $tableOrder, PrecontoSplit $split, int $operatorId): bool
+    {
+        try {
+            $printer = Setting::getPrecontoPrinter();
+            if (!$printer) {
+                Log::error('Stampante PreConto non configurata');
+                return false;
+            }
+            if (!$printer->is_active || empty($printer->ip)) {
+                Log::error('Stampante PreConto non attiva o senza IP', ['printer_id' => $printer->id]);
+                return false;
+            }
+
+            $tableOrder->load(['restaurantTable']);
+            $printerIp = $printer->ip;
+            $operator = User::find($operatorId);
+            $operatorName = $operator?->name ?? 'N/D';
+            $tableNumber = $tableOrder->restaurantTable->table_number ?? 'N/D';
+            $label = $split->label ?? 'Preconto parziale';
+
+            if (!$this->isPrinterReachable($printerIp)) {
+                Log::warning("Stampante PreConto non raggiungibile", ['ip' => $printerIp]);
+                $this->printLogService->logPrint($tableOrder, $printer, $operatorId, 'preconto', null,
+                    ['split_id' => $split->id, 'label' => $label, 'operator_name' => $operatorName],
+                    false, 'Stampante non raggiungibile: ' . $printerIp);
+                return false;
+            }
+
+            $connector = new NetworkPrintConnector($printerIp, 9100, 5);
+            $dev = new EscposPrinter($connector);
+            $dev->initialize();
+
+            // Header
+            $dev->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $dev->setEmphasis(true);
+            $dev->setTextSize(2, 1);
+            $dev->text("TAVOLO $tableNumber\n");
+            $dev->setTextSize(1, 1);
+            $dev->text("$label\n");
+            $dev->setEmphasis(false);
+            $dev->feed(1);
+
+            $dev->text(now()->format('d/m/Y H:i:s') . "\n");
+            $dev->text("Operatore: $operatorName\n");
+            $dev->feed(1);
+
+            // Items
+            $dev->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            $dev->setEmphasis(true);
+            $dev->text(str_repeat('-', 48) . "\n");
+
+            foreach ($split->items as $item) {
+                $name = $item['dish_name'] ?? 'N/D';
+                $qty  = $item['quantity'] ?? 1;
+                $sub  = number_format($item['subtotal'] ?? 0, 2, ',', '.');
+                $line = str_pad("$qty x $name", 38) . str_pad($sub, 10, ' ', STR_PAD_LEFT);
+                $dev->text($line . "\n");
+                $dev->setEmphasis(false);
+            }
+
+            // Cover charge for this split
+            if ($split->covers > 0) {
+                $coverPerPerson = number_format($tableOrder->getCoverChargePerPerson(), 2, ',', '.');
+                $coverTotal = number_format($tableOrder->getCoverChargePerPerson() * $split->covers, 2, ',', '.');
+                $dev->setEmphasis(true);
+                $dev->text(str_pad("Coperto ({$split->covers} x $coverPerPerson)", 38) . str_pad($coverTotal, 10, ' ', STR_PAD_LEFT) . "\n");
+                $dev->setEmphasis(false);
+            }
+
+            $dev->text(str_repeat('-', 48) . "\n");
+
+            // Discount line
+            $dev->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            if (($split->discount_value ?? 0) > 0) {
+                $dev->setEmphasis(false);
+                if ($split->discount_type === 'percent') {
+                    $discountLabel = "Abbuono " . number_format($split->discount_amount, 0) . "%";
+                } else {
+                    $discountLabel = "Abbuono";
+                }
+                $discountFormatted = '-' . number_format($split->discount_value, 2, ',', '.');
+                $dev->text(str_pad($discountLabel, 38) . str_pad($discountFormatted, 10, ' ', STR_PAD_LEFT) . "\n");
+                $dev->text(str_repeat('-', 48) . "\n");
+            }
+
+            // Total
+            $dev->setJustification(EscposPrinter::JUSTIFY_RIGHT);
+            $dev->setEmphasis(true);
+            $dev->setTextSize(2, 1);
+            $totalFormatted = number_format($split->total, 2, ',', '.');
+            $dev->text("TOTALE: EUR $totalFormatted\n");
+            $dev->setTextSize(1, 1);
+            $dev->setEmphasis(false);
+            $dev->feed(1);
+
+            $dev->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $dev->text("Misuraca S.R.L. \n");
+            $dev->text("*** DOCUMENTO NON FISCALE ***\n");
+            $dev->text("Ritirare lo scontrino alla cassa\n");
+            $dev->feed(2);
+            $dev->cut();
+            $dev->close();
+
+            Log::info("Preconto parziale stampato", ['split_id' => $split->id, 'table_order_id' => $tableOrder->id]);
+
+            $this->printLogService->logPrint($tableOrder, $printer, $operatorId, 'preconto', null,
+                ['split_id' => $split->id, 'label' => $label, 'operator_name' => $operatorName], true);
+
+            return true;
+
+        } catch (\Exception $e) {
+            Log::error('Errore stampa preconto parziale', [
+                'split_id' => $split->id,
+                'error' => $e->getMessage(),
+            ]);
+            $this->printLogService->logPrint($tableOrder, $printer ?? null, $operatorId, 'preconto', null,
+                ['split_id' => $split->id, 'label' => $split->label ?? '', 'operator_name' => User::find($operatorId)?->name ?? 'N/D'],
+                false, $e->getMessage());
             return false;
         }
     }

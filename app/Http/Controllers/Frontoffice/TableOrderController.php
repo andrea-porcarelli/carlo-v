@@ -817,36 +817,119 @@ class TableOrderController extends Controller
     public function precontoTable(Request $request, RestaurantTable $table): JsonResponse
     {
         $validated = $request->validate([
-            'split_count' => 'nullable|integer|min:1',
+            'split_count'     => 'nullable|integer|min:1',
+            'type'            => 'nullable|string|in:full,split,items',
+            'items'           => 'nullable|array',
+            'items.*.order_item_id' => 'required_with:items|integer',
+            'items.*.quantity'      => 'required_with:items|integer|min:1',
+            'covers'          => 'nullable|integer|min:0',
+            'label'           => 'nullable|string|max:100',
+            'discount_type'   => 'nullable|string|in:none,value,percent',
+            'discount_amount' => 'nullable|numeric|min:0',
         ]);
 
-        // Verify operator token from header
         $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
         if (!$operatorId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Token operatore non valido',
-            ], 401);
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
         }
 
         try {
             $order = $table->activeOrder;
             if (!$order) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Nessun ordine attivo per questo tavolo',
-                ], 404);
+                return response()->json(['success' => false, 'message' => 'Nessun ordine attivo per questo tavolo'], 404);
             }
 
-            // Load items with relationships
             $order->load(['items.dish', 'restaurantTable']);
 
-            $splitCount = $validated['split_count'] ?? null;
+            $type = $validated['type'] ?? 'full';
 
-            // Print preconto
-            $success = $this->printerService->printPreconto($order, $operatorId, $splitCount);
+            if ($type === 'items' && !empty($validated['items'])) {
+                // ── Partial preconto by selected items ───────────────────────────
+                $itemIds = collect($validated['items'])->pluck('order_item_id');
+                $orderItems = $order->items->whereIn('id', $itemIds->toArray())->keyBy('id');
 
-            // Log stampa preconto
+                $splitItems = [];
+                $splitTotal = 0;
+                foreach ($validated['items'] as $sel) {
+                    $item = $orderItems[$sel['order_item_id']] ?? null;
+                    if (!$item) continue;
+                    $qty = min($sel['quantity'], $item->quantity);
+                    $unitPrice = (float) $item->unit_price;
+                    $subtotal = round($unitPrice * $qty, 2);
+                    $splitItems[] = [
+                        'order_item_id' => $item->id,
+                        'dish_name'     => $item->dish->label ?? $item->dish->name ?? 'N/D',
+                        'quantity'      => $qty,
+                        'unit_price'    => $unitPrice,
+                        'subtotal'      => $subtotal,
+                    ];
+                    $splitTotal += $subtotal;
+                }
+
+                $covers = (int) ($validated['covers'] ?? 0);
+
+                // Validate covers: cannot exceed remaining (total - already assigned in pending splits)
+                $assignedCovers = $order->precontoSplits()->where('status', 'pending')->sum('covers');
+                $remainingCovers = max(0, $order->covers - $assignedCovers);
+                if ($covers > $remainingCovers) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Coperti non validi: massimo $remainingCovers disponibili",
+                    ], 422);
+                }
+
+                $coverCharge = $covers > 0 ? ($order->getCoverChargePerPerson() * $covers) : 0;
+                $splitTotal += $coverCharge;
+
+                // Discount
+                $discountType   = $validated['discount_type'] ?? 'none';
+                $discountAmount = (float) ($validated['discount_amount'] ?? 0);
+                $discountValue  = 0;
+                if ($discountType === 'value' && $discountAmount > 0) {
+                    $discountValue = min($discountAmount, $splitTotal);
+                } elseif ($discountType === 'percent' && $discountAmount > 0) {
+                    $pct = min($discountAmount, 100);
+                    $discountValue = round($splitTotal * $pct / 100, 2);
+                }
+                $splitTotal = max(0, round($splitTotal - $discountValue, 2));
+
+                // Count existing splits to generate label
+                $splitNumber = $order->precontoSplits()->count() + 1;
+                $label = $validated['label'] ?? "Preconto $splitNumber";
+
+                $split = \App\Models\PrecontoSplit::create([
+                    'table_order_id' => $order->id,
+                    'label'          => $label,
+                    'items'          => $splitItems,
+                    'covers'         => $covers,
+                    'total'          => $splitTotal,
+                    'discount_type'  => $discountType,
+                    'discount_amount' => $discountAmount,
+                    'discount_value' => $discountValue,
+                    'status'         => 'pending',
+                ]);
+
+                $success = $this->printerService->printPartialPreconto($order, $split, $operatorId);
+                $this->logger->logPrintPreconto($order, $operatorId, null, ['split_id' => $split->id, 'label' => $label]);
+
+                if ($success) {
+                    $order->update(['preconto_requested_at' => now()]);
+                    return response()->json([
+                        'success' => true,
+                        'message' => "Preconto parziale \"$label\" stampato (€" . number_format($splitTotal, 2) . ")",
+                        'data'    => ['split_id' => $split->id, 'total' => $splitTotal],
+                    ]);
+                }
+
+                return response()->json(['success' => false, 'message' => 'Errore nella stampa del PreConto parziale'], 500);
+            }
+
+            // ── Full or split-by-count preconto ──────────────────────────────
+            $splitCount     = ($type === 'split') ? ($validated['split_count'] ?? null) : null;
+            $discountType   = $validated['discount_type'] ?? 'none';
+            $discountAmount = (float) ($validated['discount_amount'] ?? 0);
+
+            $success = $this->printerService->printPreconto($order, $operatorId, $splitCount, $discountType, $discountAmount);
             $this->logger->logPrintPreconto($order, $operatorId, $splitCount);
 
             if ($success) {
@@ -855,23 +938,124 @@ class TableOrderController extends Controller
                 if ($splitCount && $splitCount > 1) {
                     $message .= " (diviso per $splitCount persone)";
                 }
-                return response()->json([
-                    'success' => true,
-                    'message' => $message,
-                ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Errore nella stampa del PreConto. Verificare la configurazione della stampante.',
-                ], 500);
+                return response()->json(['success' => true, 'message' => $message]);
             }
+
+            return response()->json(['success' => false, 'message' => 'Errore nella stampa del PreConto. Verificare la configurazione della stampante.'], 500);
+
         } catch (\Exception $e) {
             Log::error('Error printing preconto: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Errore nella stampa del PreConto',
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Errore nella stampa del PreConto'], 500);
         }
+    }
+
+    /**
+     * Get pending preconto splits for a table order
+     */
+    public function getPrecontoSplits(RestaurantTable $table): JsonResponse
+    {
+        $order = $table->activeOrder;
+        if (!$order) {
+            return response()->json(['success' => true, 'data' => ['splits' => [], 'remaining' => 0, 'order_total' => 0]]);
+        }
+
+        $splits = $order->precontoSplits()->orderBy('created_at')->get();
+        $paidTotal = $splits->where('status', 'paid')->sum('total');
+        $remaining = max(0, round((float) $order->total_amount - $paidTotal, 2));
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'splits' => $splits->map(fn($s) => [
+                    'id'             => $s->id,
+                    'label'          => $s->label,
+                    'items'          => $s->items,
+                    'covers'         => $s->covers,
+                    'total'          => (float) $s->total,
+                    'status'         => $s->status,
+                    'payment_method' => $s->payment_method,
+                ])->values(),
+                'remaining'   => $remaining,
+                'order_total' => (float) $order->total_amount,
+            ],
+        ]);
+    }
+
+    /**
+     * Pay a single preconto split
+     */
+    public function payPrecontoSplit(Request $request, RestaurantTable $table, \App\Models\PrecontoSplit $split): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $paymentMethod = $request->input('payment_method', 'pos');
+        if (!in_array($paymentMethod, ['pos', 'contanti', 'fattura', 'misto'])) {
+            $paymentMethod = 'pos';
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $order = $table->activeOrder;
+            if (!$order || $split->table_order_id !== $order->id) {
+                return response()->json(['success' => false, 'message' => 'Split non valido per questo ordine'], 404);
+            }
+
+            $split->update(['status' => 'paid', 'payment_method' => $paymentMethod, 'paid_at' => now()]);
+
+            // Check if all splits paid and no remaining balance
+            $order->refresh();
+            $paidTotal = $order->precontoSplits->where('status', 'paid')->sum('total');
+            $remaining = round((float) $order->total_amount - $paidTotal, 2);
+            $orderClosed = false;
+
+            if ($remaining <= 0.01) {
+                $this->logger->logPayOrder($order, $paymentMethod, $operatorId);
+                $this->logger->logCloseOrder($order, $operatorId);
+                $order->update(['preconto_requested_at' => null]);
+                $order->close($paymentMethod);
+                $orderClosed = true;
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => $orderClosed ? 'Conto chiuso completamente' : "Pagato €" . number_format($split->total, 2),
+                'data'    => ['order_closed' => $orderClosed, 'remaining' => max(0, $remaining)],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error paying split: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nel pagamento del preconto'], 500);
+        }
+    }
+
+    /**
+     * Delete a pending preconto split
+     */
+    public function deletePrecontoSplit(RestaurantTable $table, \App\Models\PrecontoSplit $split): JsonResponse
+    {
+        $order = $table->activeOrder;
+        if (!$order || $split->table_order_id !== $order->id) {
+            return response()->json(['success' => false, 'message' => 'Split non valido per questo ordine'], 404);
+        }
+
+        if ($split->status === 'paid') {
+            return response()->json(['success' => false, 'message' => 'Impossibile eliminare un preconto già pagato'], 422);
+        }
+
+        $split->delete();
+
+        // If no more splits, clear preconto_requested_at
+        if ($order->precontoSplits()->count() === 0) {
+            $order->update(['preconto_requested_at' => null]);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Preconto eliminato']);
     }
 
     /**
@@ -1532,6 +1716,58 @@ class TableOrderController extends Controller
     }
 
     /**
+     * Update notes, extras, removals of an existing order item
+     */
+    public function updateItemDetails(Request $request, OrderItem $item): JsonResponse
+    {
+        $validated = $request->validate([
+            'notes'    => 'nullable|string|max:500',
+            'extras'   => 'nullable|array',
+            'removals' => 'nullable|array',
+        ]);
+
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $item->notes    = $validated['notes'] ?? null;
+            $item->extras   = !empty($validated['extras'])   ? $validated['extras']   : null;
+            $item->removals = !empty($validated['removals']) ? $validated['removals'] : null;
+
+            // Recalculate subtotal with new extras
+            $extrasTotal = !empty($item->extras) ? array_sum($item->extras) : 0;
+            $item->subtotal = round(($item->unit_price + $extrasTotal) * $item->quantity, 2);
+            $item->save();
+
+            $order = $item->order;
+            $order->updateTotal();
+
+            if (!empty($validated['notes'])) {
+                $this->logger->logAddItemNotes($item, $validated['notes'], $operatorId);
+            }
+            if (!empty($validated['extras'])) {
+                $this->logger->logAddItemExtras($item, $validated['extras'], $operatorId);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Piatto aggiornato',
+                'data'    => ['item' => $item->fresh(['dish']), 'order_total' => $order->fresh()->total_amount],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error updating item details: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nell\'aggiornamento del piatto'], 500);
+        }
+    }
+
+    /**
      * Send a purchase request to the local POS terminal (VEGA3000 via JSONPOS TCP).
      * Does NOT close the order — the frontend calls /pay afterwards on success.
      */
@@ -1601,29 +1837,67 @@ class TableOrderController extends Controller
             }
 
             if ($type === 'partial' && !empty($assignments)) {
-                // Reset all existing assignments first, then apply new ones
-                $order->items()->update(['autoconsumo_user_id' => null]);
+                // Apply per-item assignments with optional partial quantity
                 $assignmentMap = collect($assignments)->keyBy('item_id');
-                foreach ($order->items as $item) {
-                    if ($assignmentMap->has($item->id)) {
-                        $item->update(['autoconsumo_user_id' => $assignmentMap[$item->id]['user_id']]);
+                $order->items()->update(['autoconsumo_user_id' => null]);
+
+                foreach ($order->items()->get() as $item) {
+                    if (!$assignmentMap->has($item->id)) continue;
+
+                    $assignment = $assignmentMap[$item->id];
+                    $autoconsumoQty = min((int)($assignment['quantity'] ?? $item->quantity), $item->quantity);
+
+                    if ($autoconsumoQty <= 0) continue;
+
+                    if ($autoconsumoQty >= $item->quantity) {
+                        // Full item → mark for deletion
+                        $item->update(['autoconsumo_user_id' => $assignment['user_id']]);
+                    } else {
+                        // Partial qty → reduce item, mark the reduced portion implicitly via logging
+                        $item->quantity = $item->quantity - $autoconsumoQty;
+                        $item->subtotal = round((float)$item->unit_price * $item->quantity, 2);
+                        $item->autoconsumo_user_id = null;
+                        $item->save();
+                        // Create a temporary marker for the autoconsumo portion so logger can record it
+                        $assignment['actual_quantity'] = $autoconsumoQty;
+                        $assignmentMap->put($item->id, $assignment);
                     }
                 }
+
                 $this->logger->logPartialAutoconsumo($order, $assignments, $operatorId);
+
+                // Delete only the fully-assigned items
+                $order->items()->whereNotNull('autoconsumo_user_id')->delete();
+
+                // Recalculate order total after removing autoconsumo items
+                $order->refresh();
+                $order->recalculateTotal();
+                $order->refresh();
+
+                // If no items remain → close the order
+                if ($order->items()->count() === 0) {
+                    $order->update(['autoconsumo' => 1]);
+                    $order->delete();
+                    $table->update(['status' => 'free']);
+                    DB::commit();
+                    return response()->json(['success' => true, 'message' => 'Autoconsumo registrato con successo']);
+                }
+
+                // Items remain → keep order open
+                DB::commit();
+                return response()->json(['success' => true, 'message' => 'Autoconsumo parziale registrato. L\'ordine è stato aggiornato.']);
+
             } else {
-                // Full autoconsumo: clear any per-item assignments
+                // Full autoconsumo: clear any per-item assignments and close everything
                 $order->items()->update(['autoconsumo_user_id' => null]);
                 $this->logger->logFreeAmount($order, $operatorId);
+                $order->update(['autoconsumo' => 1]);
+                $order->items()->delete();
+                $order->delete();
+                $table->update(['status' => 'free']);
+                DB::commit();
+                return response()->json(['success' => true, 'message' => 'Autoconsumo registrato con successo']);
             }
-
-            $order->update(['autoconsumo' => 1]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Autoconsumo registrato con successo',
-            ]);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error in freeAmount: ' . $e->getMessage());
@@ -1632,6 +1906,23 @@ class TableOrderController extends Controller
                 'message' => 'Errore nell\'autoconsumo',
             ], 500);
         }
+    }
+
+    public function cancelAutoconsumo(RestaurantTable $table): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $order = $table->activeOrder;
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Nessun ordine attivo'], 404);
+        }
+
+        $this->logger->logAutoconsumoCancel($order, $operatorId);
+
+        return response()->json(['success' => true]);
     }
 
     /**

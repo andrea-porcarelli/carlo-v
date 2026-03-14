@@ -129,30 +129,22 @@
             </div>
 
             <!-- Actions Grid -->
-            <div class="mobile-modal-footer mobile-actions-grid">
-                <button class="mobile-grid-btn btn-green" id="btnMarciaMobile">
-                    <i class="fas fa-play-circle"></i>
-                    <span>MARCIA</span>
+            <div class="mobile-modal-footer mobile-actions-grid" style="grid-template-columns: repeat(2, 1fr);">
+                <button class="mobile-grid-btn btn-dark" id="btnRistampaMobile">
+                    <i class="fas fa-print"></i>
+                    <span>RISTAMPA</span>
                 </button>
                 <button class="mobile-grid-btn btn-cyan" id="btnPrecontoMobile">
                     <i class="fas fa-receipt"></i>
                     <span>PRE-CONTO</span>
                 </button>
-                <button class="mobile-grid-btn btn-red" id="btnPayBillMobile">
-                    <i class="fas fa-money-bill"></i>
-                    <span>INCASSA</span>
-                </button>
-                <button class="mobile-grid-btn btn-gray" id="btnClearBillMobile">
-                    <i class="fas fa-eraser"></i>
-                    <span>SVUOTA</span>
-                </button>
-                <button class="mobile-grid-btn btn-yellow" id="btnFreeTableMobile">
-                    <i class="fas fa-door-open"></i>
-                    <span>LIBERA</span>
-                </button>
                 <button class="mobile-grid-btn btn-purple" id="btnComunicaMobile">
                     <i class="fas fa-bullhorn"></i>
                     <span>COMUNICA</span>
+                </button>
+                <button class="mobile-grid-btn btn-orange" id="btnSpostaMobile">
+                    <i class="fas fa-arrows-alt"></i>
+                    <span>SPOSTA</span>
                 </button>
             </div>
         </div>
@@ -190,6 +182,10 @@
                             <input type="radio" name="precontoTypeMobile" value="split">
                             <span class="radio-label">Dividi per Persone</span>
                         </label>
+                        <label class="mobile-radio-item">
+                            <input type="radio" name="precontoTypeMobile" value="items">
+                            <span class="radio-label">Seleziona piatti</span>
+                        </label>
                     </div>
                 </div>
 
@@ -203,6 +199,49 @@
                     <div class="split-preview">
                         <span id="perPersonAmountMobile">€0.00</span> a persona
                     </div>
+                </div>
+
+                <div id="itemsSelectContainerMobile" class="mobile-form-group" style="display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <label class="mobile-form-label" style="margin-bottom:0;">Piatti inclusi</label>
+                        <div style="display:flex;gap:6px;">
+                            <button type="button" id="precontoSelectAllMobile" class="items-select-all-btn">Tutti</button>
+                            <button type="button" id="precontoDeselectAllMobile" class="items-select-all-btn">Nessuno</button>
+                        </div>
+                    </div>
+                    <div id="precontoItemsListMobile" style="max-height:180px;overflow-y:auto;border:1px solid #dee2e6;border-radius:6px;"></div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+                        <label class="mobile-form-label" style="margin-bottom:0;white-space:nowrap;">Coperti inclusi:</label>
+                        <input type="number" id="preconto_covers_mobile" value="0" min="0"
+                               style="width:70px;text-align:center;border:1px solid #dee2e6;border-radius:4px;padding:6px;"
+                               oninput="if(this.value>+this.max)this.value=this.max;if(this.value<0)this.value=0;">
+                        <span id="precontoCoversInfoMobile" style="font-size:0.78rem;color:#6c757d;"></span>
+                    </div>
+                </div>
+
+                <div style="padding:10px 0;border-top:2px solid #dee2e6;margin-top:10px;">
+                    <div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;">Abbuono:</div>
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                            <input type="radio" name="precontoDiscountTypeMobile" value="none" checked> Nessuno
+                        </label>
+                        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                            <input type="radio" name="precontoDiscountTypeMobile" value="value"> € Valore
+                        </label>
+                        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                            <input type="radio" name="precontoDiscountTypeMobile" value="percent"> % Perc.
+                        </label>
+                    </div>
+                    <div id="precontoDiscountInputMobile" style="display:none;margin-top:8px;align-items:center;gap:6px;">
+                        <input type="number" id="preconto_discount_amount_mobile" value="0" min="0" step="0.01"
+                               style="width:90px;text-align:center;border:1px solid #dee2e6;border-radius:4px;padding:6px;"
+                               oninput="if(this.value<0)this.value=0;">
+                        <span id="precontoDiscountSymbolMobile" style="font-weight:700;color:#dc3545;">€</span>
+                    </div>
+                </div>
+
+                <div id="precontoPartialTotalMobile" style="display:none;padding:8px 0;text-align:right;font-size:1rem;">
+                    Totale: <strong id="precontoPartialTotalAmountMobile" style="color:#dc3545;">€0.00</strong>
                 </div>
             </div>
 
@@ -282,6 +321,12 @@
 
     <!-- Covers Selection Modal -->
     <x-covers-modal />
+
+    <!-- Payment Method Modal -->
+    <x-payment-method-modal />
+
+    <!-- Autoconsumo Modal -->
+    <x-autoconsumo-modal />
 
     <!-- Notification (Mobile) -->
     <div id="notificationMobile" class="mobile-notification">

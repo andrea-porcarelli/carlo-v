@@ -424,6 +424,20 @@ class TableOrderLoggerService
     }
 
     /**
+     * Log per annullamento procedura autoconsumo
+     */
+    public function logAutoconsumoCancel(TableOrder $order, int $operatorId = 0): TableOrderLog
+    {
+        return $this->log(
+            action: 'autoconsumo_cancel',
+            entityType: 'table_order',
+            entity: $order,
+            notes: "Procedura autoconsumo annullata — Tavolo #{$order->restaurantTable->table_number}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
      * Ottiene i dati dell'ordine in formato array
      */
     private function getOrderData(TableOrder $order): array

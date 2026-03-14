@@ -562,9 +562,12 @@ class TableOrdersManager {
                         </div>
                     ` : ''}
                 </div>
-                <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
+                <div class="receipt-item-actions">
+                    ${!item._isNew ? `<button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica note/extra"><i class="fas fa-pen"></i></button>` : ''}
+                    <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             </div>
         `).join('');
 
@@ -695,9 +698,14 @@ class TableOrdersManager {
                         </div>
                     ` : ''}
                 </div>
-                <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
+                <div class="receipt-item-actions">
+                    <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica note/extra">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             </div>
         `).join('');
 
@@ -779,12 +787,90 @@ class TableOrdersManager {
     }
 
     /**
+     * Open product modal in "edit existing item" mode (notes/extras/removals)
+     */
+    openEditItemModal(itemId) {
+        const item = this.modifySession.items.find(i => i.id === itemId);
+        if (!item) return;
+
+        this._editingItemId = itemId;
+
+        // Populate header
+        const nameElement = this.getElement('modalProductName');
+        const priceDisplayElement = this.getElement('modalProductPriceDisplay');
+        const customPriceElement = this.getElement('productCustomPrice');
+        if (nameElement) nameElement.textContent = item.dish_name || '';
+        if (priceDisplayElement) priceDisplayElement.textContent = `€${parseFloat(item.unit_price).toFixed(2)}`;
+        if (customPriceElement) { customPriceElement.value = parseFloat(item.unit_price).toFixed(2); customPriceElement.readOnly = true; }
+
+        // Quantity (read-only in edit mode)
+        const quantityElement = this.getElement('productQuantity');
+        if (quantityElement) { quantityElement.value = item.quantity; quantityElement.readOnly = true; }
+
+        // Notes
+        const notesElement = this.getElement('productNotes');
+        if (notesElement) notesElement.value = item.notes || '';
+
+        // Segue
+        const segueElement = this.getElement('productSegue');
+        if (segueElement) segueElement.checked = item.segue || false;
+
+        // Extras — pre-check existing
+        const extrasContainer = this.getElement('extrasContainer');
+        if (extrasContainer) {
+            extrasContainer.innerHTML = this.menuOptions.extras.length
+                ? this.menuOptions.extras.map(e => {
+                    const checked = item.extras && item.extras[e.label] !== undefined ? 'checked' : '';
+                    return `<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
+                        <input type="checkbox" class="extra-checkbox" data-name="${e.label}" value="${e.price}" style="accent-color:#dc3545;" ${checked}>
+                        <span>${e.label}</span><span style="color:#dc3545;font-weight:700;">+€${parseFloat(e.price).toFixed(2)}</span>
+                    </label>`;
+                }).join('')
+                : '<small style="color:#6c757d;">Nessun supplemento disponibile</small>';
+        }
+
+        // Removals — pre-check existing
+        const removalsContainer = this.getElement('removalsContainer');
+        if (removalsContainer) {
+            removalsContainer.innerHTML = this.menuOptions.removals.length
+                ? this.menuOptions.removals.map(r => {
+                    const checked = item.removals && item.removals.includes(r.label) ? 'checked' : '';
+                    return `<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
+                        <input type="checkbox" class="removal-checkbox" data-name="${r.label}" value="${r.label}" style="accent-color:#dc3545;" ${checked}>
+                        <span>${r.label}</span>
+                    </label>`;
+                }).join('')
+                : '<small style="color:#6c757d;">Nessuna rimozione disponibile</small>';
+        }
+
+        this.updateModalTotal();
+
+        // Show modal
+        const modal = this.getElement('productModal');
+        if (modal) modal.style.display = this.isMobile ? 'flex' : 'block';
+    }
+
+    /**
      * Close product modal
      */
     closeProductModal() {
         const modal = this.getElement('productModal');
         if (modal) modal.style.display = 'none';
         this.currentProduct = null;
+        this._editingItemId = null;
+        // Reset readonly state
+        const quantityElement = this.getElement('productQuantity');
+        const customPriceElement = this.getElement('productCustomPrice');
+        if (quantityElement) quantityElement.readOnly = false;
+        if (customPriceElement) customPriceElement.readOnly = false;
+        // On mobile, reopen the manage modal
+        if (this.isMobile) {
+            const manage = document.getElementById('manageModalMobile');
+            if (manage) {
+                manage.style.display = '';
+                $('#manageModalMobile').addClass('active').show();
+            }
+        }
     }
 
     /**
@@ -835,10 +921,58 @@ class TableOrdersManager {
     }
 
     /**
-     * Add product to session (no auth, no API call, local only)
+     * Add product to session (no auth, no API call, local only).
+     * If _editingItemId is set, saves changes to an existing item instead.
      */
     addProductToSession() {
-        if (!this.currentTable || !this.currentProduct) return;
+        if (!this.currentTable) return;
+
+        // Edit mode: save notes/extras/removals to existing item
+        if (this._editingItemId) {
+            const itemId = this._editingItemId;
+            this._editingItemId = null;
+
+            const notesElement = this.getElement('productNotes');
+            const extrasContainer = this.getElement('extrasContainer');
+            const removalsContainer = this.getElement('removalsContainer');
+
+            const notes = notesElement?.value || null;
+            const extras = {};
+            extrasContainer?.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                extras[cb.dataset.name] = parseFloat(cb.value);
+            });
+            const removals = [];
+            removalsContainer?.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                removals.push(cb.dataset.name);
+            });
+
+            // Update local session item
+            const item = this.modifySession.items.find(i => i.id === itemId);
+            if (item) {
+                item.notes = notes;
+                item.extras = Object.keys(extras).length > 0 ? extras : {};
+                item.removals = removals;
+            }
+
+            // Track in pendingUpdate with printable flag
+            if (!this.modifySession.pendingUpdate[itemId]) this.modifySession.pendingUpdate[itemId] = {};
+            this.modifySession.pendingUpdate[itemId].notes    = notes;
+            this.modifySession.pendingUpdate[itemId].extras   = Object.keys(extras).length > 0 ? extras : null;
+            this.modifySession.pendingUpdate[itemId].removals = removals.length > 0 ? removals : null;
+            this.modifySession.pendingUpdate[itemId]._detailsChanged = true;
+
+            // Reset modal inputs to non-readonly for next use
+            const quantityElement = this.getElement('productQuantity');
+            const customPriceElement = this.getElement('productCustomPrice');
+            if (quantityElement) quantityElement.readOnly = false;
+            if (customPriceElement) customPriceElement.readOnly = false;
+
+            this.closeProductModal();
+            this.renderReceiptItems();
+            return;
+        }
+
+        if (!this.currentProduct) return;
 
         const quantityElement = this.getElement('productQuantity');
         const notesElement = this.getElement('productNotes');
@@ -1487,6 +1621,7 @@ class TableOrdersManager {
 
             // Skip mode selection and go directly to the partial view
             document.getElementById('autoconsumoModeSelect').style.display = 'none';
+            this._autoconsumoInProgress = true;
             document.getElementById('autoconsumoModal').style.display = 'flex';
             this._showAutoconsumoPartialView();
         } else {
@@ -1494,6 +1629,7 @@ class TableOrdersManager {
             document.getElementById('autoconsumoModeSelect').style.display = 'block';
             document.getElementById('autoconsumoPartialView').style.display = 'none';
             document.getElementById('autoconsumoFooter').style.display = 'none';
+            this._autoconsumoInProgress = true;
             document.getElementById('autoconsumoModal').style.display = 'flex';
         }
     }
@@ -1541,26 +1677,57 @@ class TableOrdersManager {
             : items.map(item => {
             const name = item.dish_name ?? 'Prodotto';
             const qty = item.quantity ?? 1;
-            const price = parseFloat(item.subtotal ?? item.unit_price ?? 0).toFixed(2);
+            const unitPrice = parseFloat(item.unit_price ?? 0);
+            const price = (unitPrice * qty).toFixed(2);
             return `<div class="autoconsumo-item-row" data-item-id="${item.id}"
-                style="display:flex; align-items:center; gap:12px; padding:11px 14px; background:#f8f9fa; border-radius:6px; border:2px solid #dee2e6; cursor:pointer; transition:border-color 0.15s, background 0.15s; user-select:none;">
+                style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:#f8f9fa; border-radius:6px; border:2px solid #dee2e6; cursor:pointer; transition:border-color 0.15s, background 0.15s; user-select:none;">
                 <input type="checkbox" class="autoconsumo-item-check" data-item-id="${item.id}"
                     style="width:20px; height:20px; cursor:pointer; flex-shrink:0; accent-color:#6c757d;">
                 <div style="flex:1; min-width:0;">
-                    <div style="font-weight:700; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#212529;">${name}</div>
-                    <div style="font-size:0.82rem; color:#6c757d; margin-top:2px;">x${qty} &nbsp;·&nbsp; <strong style="color:#dc3545;">€${price}</strong></div>
+                    <div style="font-weight:700; font-size:0.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#212529;">${name}</div>
+                    <div style="font-size:0.8rem; color:#6c757d; margin-top:1px;"><strong style="color:#dc3545;">€${price}</strong></div>
+                </div>
+                <div class="autoconsumo-qty-ctrl" onclick="event.stopPropagation()">
+                    <button type="button" class="aqi-dec" data-item-id="${item.id}">−</button>
+                    <input type="number" class="autoconsumo-qty-input" id="aqi_${item.id}"
+                           value="${qty}" min="1" max="${qty}" data-max="${qty}" data-item-id="${item.id}"
+                           data-unit-price="${unitPrice}"
+                           onclick="event.stopPropagation()">
+                    <button type="button" class="aqi-inc" data-item-id="${item.id}">+</button>
+                    <span style="font-size:0.72rem;color:#6c757d;white-space:nowrap;">/ ${qty}</span>
                 </div>
                 <div class="autoconsumo-item-badge" data-item-id="${item.id}"
                     style="font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:14px; white-space:nowrap; display:none; flex-shrink:0;"></div>
             </div>`;
         }).join('');
 
+        // Spinbox +/- buttons
+        itemsList.querySelectorAll('.aqi-dec').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const input = itemsList.querySelector(`#aqi_${btn.dataset.itemId}`);
+                if (input && parseInt(input.value) > 1) input.value = parseInt(input.value) - 1;
+            });
+        });
+        itemsList.querySelectorAll('.aqi-inc').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const input = itemsList.querySelector(`#aqi_${btn.dataset.itemId}`);
+                const max = parseInt(input?.dataset.max) || 1;
+                if (input && parseInt(input.value) < max) input.value = parseInt(input.value) + 1;
+            });
+        });
+
         // Apply pre-existing assignment badges (for re-edit case)
         Object.entries(this._autoconsumoAssignments).forEach(([itemId, assignment]) => {
             const badge = itemsList.querySelector(`.autoconsumo-item-badge[data-item-id="${itemId}"]`);
             const row = itemsList.querySelector(`.autoconsumo-item-row[data-item-id="${itemId}"]`);
+            const input = itemsList.querySelector(`#aqi_${itemId}`);
+            if (input && assignment.quantity) input.value = assignment.quantity;
             if (badge) {
-                badge.textContent = assignment.userName;
+                const maxQty = parseInt(input?.dataset.max) || 1;
+                const assignedQty = assignment.quantity || maxQty;
+                badge.textContent = assignedQty < maxQty ? `${assignment.userName} (${assignedQty}/${maxQty})` : assignment.userName;
                 badge.style.background = assignment.color;
                 badge.style.color = 'white';
                 badge.style.display = 'inline-block';
@@ -1571,10 +1738,12 @@ class TableOrdersManager {
             }
         });
 
-        // Row click toggles checkbox
+        // Row click toggles checkbox (skip spinbox area)
         itemsList.querySelectorAll('.autoconsumo-item-row').forEach(row => {
             row.addEventListener('click', (e) => {
-                if (e.target.type === 'checkbox') return;
+                if (e.target.type === 'checkbox' || e.target.classList.contains('aqi-dec') ||
+                    e.target.classList.contains('aqi-inc') || e.target.classList.contains('autoconsumo-qty-input') ||
+                    e.target.classList.contains('autoconsumo-qty-ctrl')) return;
                 const cb = row.querySelector('.autoconsumo-item-check');
                 cb.checked = !cb.checked;
             });
@@ -1599,7 +1768,7 @@ class TableOrdersManager {
             </button>`;
         }).join('');
 
-        // Operator button click → assign checked items
+        // Operator button click → assign checked items with their spinbox qty
         opList.querySelectorAll('.autoconsumo-op-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const userId = parseInt(btn.dataset.userId);
@@ -1608,12 +1777,15 @@ class TableOrdersManager {
                 const checks = itemsList.querySelectorAll('.autoconsumo-item-check:checked');
                 checks.forEach(cb => {
                     const itemId = parseInt(cb.dataset.itemId);
-                    this._autoconsumoAssignments[itemId] = { userId, userName, color };
+                    const input = itemsList.querySelector(`#aqi_${itemId}`);
+                    const qty = parseInt(input?.value) || 1;
+                    const maxQty = parseInt(input?.dataset.max) || 1;
+                    this._autoconsumoAssignments[itemId] = { userId, userName, color, quantity: qty };
                     // Update badge
                     const badge = itemsList.querySelector(`.autoconsumo-item-badge[data-item-id="${itemId}"]`);
                     const row = itemsList.querySelector(`.autoconsumo-item-row[data-item-id="${itemId}"]`);
                     if (badge) {
-                        badge.textContent = userName;
+                        badge.textContent = qty < maxQty ? `${userName} (${qty}/${maxQty})` : userName;
                         badge.style.background = color;
                         badge.style.color = 'white';
                         badge.style.display = 'inline-block';
@@ -1637,9 +1809,13 @@ class TableOrdersManager {
         const unassigned = total - assigned;
         const legendEl = document.getElementById('autoconsumoLegend');
         if (legendEl) {
-            legendEl.innerHTML = unassigned > 0
-                ? `<span style="color:#dc3545;"><i class="fas fa-exclamation-circle me-1"></i>${unassigned} piatto/i senza assegnazione</span>`
-                : `<span style="color:#28a745;"><i class="fas fa-check-circle me-1"></i>Tutti i piatti assegnati</span>`;
+            if (assigned === 0) {
+                legendEl.innerHTML = `<span style="color:#dc3545;"><i class="fas fa-exclamation-circle me-1"></i>Nessun piatto assegnato</span>`;
+            } else if (unassigned > 0) {
+                legendEl.innerHTML = `<span style="color:#fd7e14;"><i class="fas fa-info-circle me-1"></i>${unassigned} piatto/i non assegnati (resteranno in conto)</span>`;
+            } else {
+                legendEl.innerHTML = `<span style="color:#28a745;"><i class="fas fa-check-circle me-1"></i>Tutti i piatti assegnati</span>`;
+            }
         }
     }
 
@@ -1653,14 +1829,16 @@ class TableOrdersManager {
         const body = { type };
 
         if (type === 'partial') {
+            if (Object.keys(this._autoconsumoAssignments).length === 0) {
+                this.showNotification('Assegna almeno un piatto a un operatore', 'error');
+                return;
+            }
+
             const assignments = Object.entries(this._autoconsumoAssignments).map(([itemId, data]) => ({
                 item_id: parseInt(itemId),
                 user_id: data.userId,
+                quantity: data.quantity ?? 1,
             }));
-            if (assignments.length === 0) {
-                alert('Nessun piatto è stato assegnato. Usa "Tutto in autoconsumo" oppure assegna i piatti agli operatori.');
-                return;
-            }
             body.assignments = assignments;
         }
 
@@ -1678,9 +1856,10 @@ class TableOrdersManager {
             const result = await response.json();
 
             if (result.success) {
+                this._autoconsumoInProgress = false;
                 document.getElementById('autoconsumoModal').style.display = 'none';
                 document.getElementById('modifyOrderOverlay').style.display = 'none';
-                this.showNotification('Autoconsumo registrato');
+                this.showNotification(result.message || 'Autoconsumo registrato');
                 this.currentTable = null;
                 await this.loadTables();
             } else {
@@ -1696,8 +1875,8 @@ class TableOrdersManager {
      * Initialize autoconsumo modal events (called once from attachModalEvents)
      */
     _initAutoconsumoModal() {
-        document.getElementById('closeAutoconsumoModal')?.addEventListener('click', () => {
-            document.getElementById('autoconsumoModal').style.display = 'none';
+        document.getElementById('btnAutoconsumoCancel')?.addEventListener('click', () => {
+            this._cancelAutoconsumo();
         });
 
         document.getElementById('btnAutoconsumoFull')?.addEventListener('click', () => {
@@ -1722,6 +1901,28 @@ class TableOrdersManager {
         });
     }
 
+    async _cancelAutoconsumo() {
+        if (!this.currentTable || !this._autoconsumoAuth) return;
+
+        const tableId = this.currentTable.table?.id ?? this.currentTable.id;
+
+        try {
+            await fetch(`${this.apiBase}/${tableId}/cancel-autoconsumo`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'X-Operator-Token': this._autoconsumoAuth.token,
+                },
+            });
+        } catch (e) {
+            console.warn('Errore log annullamento autoconsumo', e);
+        }
+
+        this._autoconsumoInProgress = false;
+        document.getElementById('autoconsumoModal').style.display = 'none';
+    }
+
     /**
      * Pay table — shows payment method selection modal
      */
@@ -1736,8 +1937,9 @@ class TableOrdersManager {
 
     /**
      * Show payment method selection modal
+     * If there are preconto splits, show the split payment view instead.
      */
-    showPaymentMethodModal() {
+    async showPaymentMethodModal() {
         const modal = document.getElementById('paymentMethodModal');
         if (!modal) return;
 
@@ -1748,6 +1950,180 @@ class TableOrdersManager {
         if (total) total.textContent = `€${parseFloat(this.currentTable.order.total_amount).toFixed(2)}`;
 
         modal.style.display = 'flex';
+
+        // Check for preconto splits
+        try {
+            const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+            });
+            const data = await resp.json();
+            if (data.success && data.data.splits && data.data.splits.length > 0) {
+                this._showSplitPaymentView(data.data.splits, data.data.remaining, data.data.order_total);
+            } else {
+                this._showNormalPaymentView();
+            }
+        } catch (e) {
+            this._showNormalPaymentView();
+        }
+    }
+
+    _showNormalPaymentView() {
+        document.getElementById('normalPaymentView').style.display = 'flex';
+        document.getElementById('splitPaymentView').style.display = 'none';
+    }
+
+    _showSplitPaymentView(splits, remaining, orderTotal) {
+        document.getElementById('normalPaymentView').style.display = 'none';
+        const view = document.getElementById('splitPaymentView');
+        view.style.display = 'block';
+
+        const list = document.getElementById('splitPaymentList');
+        list.innerHTML = splits.map(s => {
+            const isPaid = s.status === 'paid';
+            const paidLabel = s.payment_method ? ` · ${s.payment_method.toUpperCase()}` : '';
+            return `<div class="split-pay-row ${isPaid ? 'paid' : ''}" data-split-id="${s.id}">
+                <div class="split-pay-row-header">
+                    <span class="split-pay-label"><i class="fas fa-receipt me-1"></i>${s.label || 'Preconto'}</span>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="split-pay-total">€${parseFloat(s.total).toFixed(2)}</span>
+                        <span class="split-pay-status ${s.status}">${isPaid ? 'PAGATO' + paidLabel : 'DA PAGARE'}</span>
+                    </div>
+                </div>
+                ${!isPaid ? `<div class="split-pay-btns">
+                    <button class="split-pay-btn pos" onclick="tableOrdersManager.payPrecontoSplit(${s.id}, 'pos')">
+                        <i class="fas fa-credit-card"></i> POS
+                    </button>
+                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.payPrecontoSplit(${s.id}, 'contanti')">
+                        <i class="fas fa-coins"></i> CONTANTI
+                    </button>
+                    <button class="split-pay-btn fattura" onclick="tableOrdersManager.payPrecontoSplit(${s.id}, 'fattura')">
+                        <i class="fas fa-file-invoice"></i> FATTURA
+                    </button>
+                    <button class="split-pay-btn" style="background:#dc3545;flex:0 0 auto;padding:8px 10px;" onclick="tableOrdersManager.deletePrecontoSplit(${s.id})" title="Elimina preconto">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>` : ''}
+            </div>`;
+        }).join('');
+
+        // Add remainder row if needed
+        if (remaining > 0.01) {
+            list.innerHTML += `<div class="split-pay-row split-remainder-row">
+                <div class="split-pay-row-header">
+                    <span class="split-pay-label"><i class="fas fa-calculator me-1"></i>Resto</span>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="split-pay-total">€${parseFloat(remaining).toFixed(2)}</span>
+                        <span class="split-pay-status pending">DA PAGARE</span>
+                    </div>
+                </div>
+                <div class="split-pay-btns">
+                    <button class="split-pay-btn pos" onclick="tableOrdersManager.executePayment('pos')">
+                        <i class="fas fa-credit-card"></i> POS
+                    </button>
+                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.executePayment('contanti')">
+                        <i class="fas fa-coins"></i> CONTANTI
+                    </button>
+                    <button class="split-pay-btn fattura" onclick="tableOrdersManager.executePayment('fattura')">
+                        <i class="fas fa-file-invoice"></i> FATTURA
+                    </button>
+                </div>
+            </div>`;
+        }
+    }
+
+    /**
+     * Delete a pending preconto split
+     */
+    async deletePrecontoSplit(splitId) {
+        if (!this.currentTable) return;
+        if (!confirm('Eliminare questo preconto parziale?')) return;
+
+        try {
+            const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits/${splitId}`, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+            });
+            const result = await resp.json();
+            if (result.success) {
+                this.showNotification('Preconto eliminato', 'success');
+                // Reload split view
+                const splitsResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
+                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+                });
+                const splitsData = await splitsResp.json();
+                if (splitsData.success && splitsData.data.splits.length > 0) {
+                    this._showSplitPaymentView(splitsData.data.splits, splitsData.data.remaining, splitsData.data.order_total);
+                } else {
+                    this._showNormalPaymentView();
+                }
+                await this.loadTables();
+            } else {
+                this.showNotification(result.message || 'Errore eliminazione', 'error');
+            }
+        } catch (e) {
+            console.error('Error deleting split:', e);
+            this.showNotification('Errore eliminazione preconto', 'error');
+        }
+    }
+
+    /**
+     * Pay a single preconto split
+     */
+    async payPrecontoSplit(splitId, method) {
+        if (!this.currentTable) return;
+
+        // Disable all split buttons to prevent double-click
+        document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = true);
+
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) {
+                document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+                return;
+            }
+        } catch (e) {
+            document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+            return;
+        }
+
+        try {
+            const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay-split/${splitId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token
+                },
+                body: JSON.stringify({ payment_method: method })
+            });
+            const result = await resp.json();
+
+            if (result.success) {
+                if (result.data?.order_closed) {
+                    this.showNotification('Conto chiuso completamente', 'success');
+                    this.closePaymentMethodModal();
+                    this._afterPaymentSuccess();
+                } else {
+                    this.showNotification(result.message || 'Quota pagata', 'success');
+                    // Reload splits view
+                    const splitsResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
+                        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+                    });
+                    const splitsData = await splitsResp.json();
+                    if (splitsData.success) {
+                        this._showSplitPaymentView(splitsData.data.splits, splitsData.data.remaining, splitsData.data.order_total);
+                    }
+                }
+            } else {
+                this.showNotification(result.message || 'Errore nel pagamento', 'error');
+                document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+            }
+        } catch (e) {
+            console.error('Error paying split:', e);
+            this.showNotification('Errore nel pagamento', 'error');
+            document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+        }
     }
 
     /**
@@ -2165,6 +2541,11 @@ class TableOrdersManager {
      * Close modify overlay: if changes exist, ask auth then submit; else close silently
      */
     async closeModifyOverlay() {
+        if (this._autoconsumoInProgress) {
+            this.showNotification('Completare o annullare prima la procedura di autoconsumo', 'error');
+            return;
+        }
+
         const hasChanges =
             this.modifySession.pendingAdd.length > 0 ||
             this.modifySession.pendingRemove.length > 0 ||
@@ -2237,6 +2618,7 @@ class TableOrdersManager {
                     const err = await resp.json().catch(() => ({}));
                     throw new Error(err.message || `Errore aggiornamento quantità (${resp.status})`);
                 }
+                // Quantity changes need to be printed
                 if (!updatedItemIds.includes(itemId)) updatedItemIds.push(itemId);
             }
             if (updates.unit_price !== undefined) {
@@ -2257,6 +2639,27 @@ class TableOrdersManager {
                     const err = await resp.json().catch(() => ({}));
                     throw new Error(err.message || `Errore aggiornamento prezzo (${resp.status})`);
                 }
+                // Price-only changes do NOT trigger a print — omit from updatedItemIds
+            }
+            if (updates._detailsChanged) {
+                const resp = await fetch(`${this.apiBase}/items/${itemId}/details`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Operator-Token': token,
+                    },
+                    body: JSON.stringify({
+                        notes:    updates.notes    ?? null,
+                        extras:   updates.extras   ?? null,
+                        removals: updates.removals ?? null,
+                    }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.message || `Errore aggiornamento dettagli (${resp.status})`);
+                }
+                // Details changes DO trigger a print
                 if (!updatedItemIds.includes(itemId)) updatedItemIds.push(itemId);
             }
         }
@@ -2335,6 +2738,9 @@ class TableOrdersManager {
         const splitContainer = document.getElementById('splitCountContainer');
         if (splitContainer) splitContainer.style.display = 'none';
 
+        const itemsContainer = document.getElementById('itemsSelectContainer');
+        if (itemsContainer) itemsContainer.style.display = 'none';
+
         const splitCountInput = document.getElementById('splitCount');
         if (splitCountInput) splitCountInput.value = 2;
 
@@ -2357,12 +2763,15 @@ class TableOrdersManager {
         document.querySelectorAll('input[name="precontoType"]').forEach(radio => {
             radio.onchange = function() {
                 const splitContainer = document.getElementById('splitCountContainer');
-                if (this.value === 'split') {
-                    splitContainer.style.display = 'block';
-                    self.updateSplitPreview();
-                } else {
-                    splitContainer.style.display = 'none';
-                }
+                const itemsContainer = document.getElementById('itemsSelectContainer');
+                const partialTotalRow = document.getElementById('precontoPartialTotalRow');
+                splitContainer.style.display = this.value === 'split' ? 'block' : 'none';
+                if (this.value === 'split') self.updateSplitPreview();
+                itemsContainer.style.display = this.value === 'items' ? 'block' : 'none';
+                if (this.value === 'items') self._renderPrecontoItemsList();
+                // Show partial total row for full/split (items has its own via _updatePrecontoPartialTotal)
+                if (partialTotalRow) partialTotalRow.style.display = this.value !== 'items' ? 'block' : 'none';
+                if (this.value !== 'items') self._updateGlobalTotal();
             };
         });
 
@@ -2374,39 +2783,232 @@ class TableOrdersManager {
         if (decreaseBtn) {
             decreaseBtn.onclick = () => {
                 const current = parseInt(splitInput.value) || 2;
-                if (current > 2) {
-                    splitInput.value = current - 1;
-                    this.updateSplitPreview();
-                }
+                if (current > 2) { splitInput.value = current - 1; this.updateSplitPreview(); }
             };
         }
-
         if (increaseBtn) {
             increaseBtn.onclick = () => {
                 const current = parseInt(splitInput.value) || 2;
-                if (current < 20) {
-                    splitInput.value = current + 1;
-                    this.updateSplitPreview();
-                }
+                if (current < 20) { splitInput.value = current + 1; this.updateSplitPreview(); }
             };
         }
+        if (splitInput) splitInput.oninput = () => this.updateSplitPreview();
 
-        if (splitInput) {
-            splitInput.oninput = () => this.updateSplitPreview();
-        }
+        // Select all / deselect all
+        const selectAllBtn = document.getElementById('precontoSelectAll');
+        const deselectAllBtn = document.getElementById('precontoDeselectAll');
+        if (selectAllBtn) selectAllBtn.onclick = () => {
+            document.querySelectorAll('#precontoItemsList .preconto-item-check').forEach(cb => {
+                cb.checked = true;
+                cb.closest('.preconto-item-row').classList.add('selected');
+            });
+            this._updatePrecontoPartialTotal();
+        };
+        if (deselectAllBtn) deselectAllBtn.onclick = () => {
+            document.querySelectorAll('#precontoItemsList .preconto-item-check').forEach(cb => {
+                cb.checked = false;
+                cb.closest('.preconto-item-row').classList.remove('selected');
+            });
+            this._updatePrecontoPartialTotal();
+        };
+
+        // Covers input
+        const coversInput = document.getElementById('preconto_covers');
+        if (coversInput) coversInput.oninput = () => this._updatePrecontoPartialTotal();
+
+        // Discount type radios
+        document.querySelectorAll('input[name="precontoDiscountType"]').forEach(radio => {
+            radio.onchange = () => {
+                const wrap = document.getElementById('precontoDiscountInputWrap');
+                const sym  = document.getElementById('precontoDiscountSymbol');
+                const val  = document.querySelector('input[name="precontoDiscountType"]:checked')?.value;
+                if (val === 'none') {
+                    wrap.style.display = 'none';
+                    document.getElementById('preconto_discount_amount').value = 0;
+                } else {
+                    wrap.style.display = 'flex';
+                    if (sym) sym.textContent = val === 'percent' ? '%' : '€';
+                }
+                this._updatePrecontoPartialTotal();
+                this._updateGlobalTotal();
+                this.updateSplitPreview();
+            };
+        });
+
+        // Discount amount input
+        const discountInput = document.getElementById('preconto_discount_amount');
+        if (discountInput) discountInput.oninput = () => {
+            this._updatePrecontoPartialTotal();
+            this._updateGlobalTotal();
+            this.updateSplitPreview();
+        };
 
         // Close buttons
         const closeBtn = document.getElementById('closePrecontoModal');
         const cancelBtn = document.getElementById('cancelPreconto');
-
         if (closeBtn) closeBtn.onclick = () => this.closePrecontoModal();
         if (cancelBtn) cancelBtn.onclick = () => this.closePrecontoModal();
 
         // Confirm button
         const confirmBtn = document.getElementById('confirmPreconto');
-        if (confirmBtn) {
-            confirmBtn.onclick = () => this.printPreconto();
+        if (confirmBtn) confirmBtn.onclick = () => this.printPreconto();
+    }
+
+    async _renderPrecontoItemsList() {
+        const listEl = document.getElementById('precontoItemsList');
+        if (!listEl) return;
+
+        const totalCovers = parseInt(this.currentTable?.order?.covers ?? 0);
+
+        // Fetch existing pending splits — track qty already assigned per item
+        let assignedQtyMap = {}; // order_item_id => total qty in pending splits
+        let assignedCovers = 0;
+        try {
+            const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+            });
+            const data = await resp.json();
+            if (data.success) {
+                data.data.splits
+                    .filter(s => s.status === 'pending')
+                    .forEach(s => {
+                        (s.items || []).forEach(i => {
+                            const id = i.order_item_id;
+                            assignedQtyMap[id] = (assignedQtyMap[id] || 0) + (parseInt(i.quantity) || 0);
+                        });
+                        assignedCovers += parseInt(s.covers || 0);
+                    });
+            }
+        } catch (e) { /* ignore */ }
+
+        const remainingCovers = Math.max(0, totalCovers - assignedCovers);
+
+        // Update covers input
+        const coversInput = document.getElementById('preconto_covers');
+        const coversRow = document.querySelector('.preconto-covers-row');
+        if (coversInput) {
+            coversInput.max = remainingCovers;
+            coversInput.value = remainingCovers;
+            coversInput.disabled = remainingCovers === 0;
         }
+        if (coversRow) coversRow.style.display = totalCovers > 0 ? 'flex' : 'none';
+
+        const coversInfoEl = document.getElementById('precontoCoversInfo');
+        if (coversInfoEl && totalCovers > 0) {
+            coversInfoEl.textContent = assignedCovers > 0
+                ? `(${assignedCovers} già assegnati, ${remainingCovers} disponibili)`
+                : `(${totalCovers} coperti totali)`;
+        }
+
+        const items = this.modifySession?.items?.filter(i => i.id && i.id > 0) ?? [];
+
+        // Compute available qty per item (full qty minus already in pending splits)
+        const availableItems = items.map(i => ({
+            ...i,
+            _available: Math.max(0, (i.quantity || 1) - (assignedQtyMap[i.id] || 0)),
+            _assigned: assignedQtyMap[i.id] || 0,
+        })).filter(i => i._available > 0);
+
+        if (availableItems.length === 0) {
+            const msg = items.length > 0
+                ? 'Tutti i piatti sono già stati assegnati a un preconto parziale'
+                : 'Nessun piatto nell\'ordine';
+            listEl.innerHTML = `<div style="padding:20px;text-align:center;color:#6c757d;">${msg}</div>`;
+            this._updatePrecontoPartialTotal();
+            return;
+        }
+
+        listEl.innerHTML = availableItems.map(item => {
+            const name = item.dish_name || item.name || 'N/D';
+            const avail = item._available;
+            const unitPrice = parseFloat(item.unit_price || 0);
+            const subtotal = (unitPrice * avail).toFixed(2);
+            const alreadyBadge = item._assigned > 0
+                ? `<span style="font-size:0.72rem;color:#fd7e14;margin-left:4px;">(${item._assigned} già in preconto)</span>`
+                : '';
+            return `<div class="preconto-item-row selected" data-item-id="${item.id}">
+                <span class="preconto-item-name">${name}${alreadyBadge}</span>
+                <div class="preconto-qty-ctrl">
+                    <button type="button" class="pqi-dec" data-item-id="${item.id}">−</button>
+                    <input type="number" class="preconto-item-qty-input"
+                           value="${avail}" min="0" max="${avail}"
+                           data-item-id="${item.id}" data-unit-price="${unitPrice}" data-max="${avail}">
+                    <button type="button" class="pqi-inc" data-item-id="${item.id}">+</button>
+                    <span class="pqi-max">/ ${avail}</span>
+                </div>
+                <span class="preconto-item-price" id="pcp_${item.id}">€${subtotal}</span>
+            </div>`;
+        }).join('');
+
+        const self = this;
+        const onQtyChange = (input) => {
+            const itemId = input.dataset.itemId;
+            const max = parseInt(input.dataset.max) || 0;
+            let qty = Math.max(0, Math.min(parseInt(input.value) || 0, max));
+            input.value = qty;
+            const unitPrice = parseFloat(input.dataset.unitPrice) || 0;
+            const priceEl = document.getElementById(`pcp_${itemId}`);
+            if (priceEl) priceEl.textContent = `€${(unitPrice * qty).toFixed(2)}`;
+            const row = input.closest('.preconto-item-row');
+            if (row) row.classList.toggle('selected', qty > 0);
+            self._updatePrecontoPartialTotal();
+        };
+
+        listEl.querySelectorAll('.pqi-dec').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const input = listEl.querySelector(`.preconto-item-qty-input[data-item-id="${btn.dataset.itemId}"]`);
+                if (input && parseInt(input.value) > 0) { input.value = parseInt(input.value) - 1; onQtyChange(input); }
+            });
+        });
+        listEl.querySelectorAll('.pqi-inc').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const input = listEl.querySelector(`.preconto-item-qty-input[data-item-id="${btn.dataset.itemId}"]`);
+                const max = parseInt(input?.dataset.max) || 0;
+                if (input && parseInt(input.value) < max) { input.value = parseInt(input.value) + 1; onQtyChange(input); }
+            });
+        });
+        listEl.querySelectorAll('.preconto-item-qty-input').forEach(input => {
+            input.addEventListener('input', () => onQtyChange(input));
+        });
+
+        // Select all / Deselect all
+        const selectAllBtn = document.getElementById('precontoSelectAll');
+        const deselectAllBtn = document.getElementById('precontoDeselectAll');
+        if (selectAllBtn) selectAllBtn.onclick = () => {
+            listEl.querySelectorAll('.preconto-item-qty-input').forEach(input => {
+                input.value = input.dataset.max; onQtyChange(input);
+            });
+        };
+        if (deselectAllBtn) deselectAllBtn.onclick = () => {
+            listEl.querySelectorAll('.preconto-item-qty-input').forEach(input => {
+                input.value = 0; onQtyChange(input);
+            });
+        };
+
+        this._updatePrecontoPartialTotal();
+    }
+
+    _updatePrecontoPartialTotal() {
+        let total = 0;
+        document.querySelectorAll('#precontoItemsList .preconto-item-qty-input').forEach(input => {
+            const qty = parseInt(input.value) || 0;
+            const unitPrice = parseFloat(input.dataset.unitPrice) || 0;
+            total += qty * unitPrice;
+        });
+
+        // Add cover charge
+        const covers = parseInt(document.getElementById('preconto_covers')?.value || 0);
+        if (covers > 0 && this.currentTable?.order) {
+            const coverPerPerson = parseFloat(this.currentTable.order.cover_charge_per_person || 0);
+            total += coverPerPerson * covers;
+        }
+
+        total = this._applyPrecontoDiscount(total);
+
+        const el = document.getElementById('precontoPartialTotal');
+        if (el) el.textContent = `€${total.toFixed(2)}`;
+        const row = document.getElementById('precontoPartialTotalRow');
+        if (row) row.style.display = 'block';
     }
 
     /**
@@ -2421,10 +3023,28 @@ class TableOrdersManager {
         if (!splitInput || !perPersonEl) return;
 
         const splitCount = parseInt(splitInput.value) || 2;
-        const total = parseFloat(this.currentTable.order.total_amount) || 0;
+        const total = this._applyPrecontoDiscount(parseFloat(this.currentTable.order.total_amount) || 0);
         const perPerson = total / splitCount;
 
         perPersonEl.textContent = `€${perPerson.toFixed(2)}`;
+    }
+
+    _applyPrecontoDiscount(total) {
+        const discountType   = document.querySelector('input[name="precontoDiscountType"]:checked')?.value || 'none';
+        const discountAmount = parseFloat(document.getElementById('preconto_discount_amount')?.value || 0);
+        if (discountType === 'value' && discountAmount > 0) {
+            return Math.max(0, total - Math.min(discountAmount, total));
+        } else if (discountType === 'percent' && discountAmount > 0) {
+            return Math.max(0, total - Math.round(total * Math.min(discountAmount, 100) / 100 * 100) / 100);
+        }
+        return total;
+    }
+
+    _updateGlobalTotal() {
+        if (!this.currentTable?.order) return;
+        const total = this._applyPrecontoDiscount(parseFloat(this.currentTable.order.total_amount) || 0);
+        const el = document.getElementById('precontoPartialTotal');
+        if (el) el.textContent = `€${total.toFixed(2)}`;
     }
 
     /**
@@ -2441,6 +3061,23 @@ class TableOrdersManager {
     async printPreconto() {
         if (!this.currentTable) return;
 
+        const precontoType = document.querySelector('input[name="precontoType"]:checked')?.value || 'full';
+
+        // Validate items selection
+        if (precontoType === 'items') {
+            const inputs = document.querySelectorAll('#precontoItemsList .preconto-item-qty-input');
+            const hasSelection = Array.from(inputs).some(i => parseInt(i.value) > 0);
+            if (!hasSelection) {
+                this.showNotification('Seleziona almeno un piatto per il preconto parziale', 'error');
+                return;
+            }
+            const coversInput = document.getElementById('preconto_covers');
+            if (coversInput && parseInt(coversInput.value) > parseInt(coversInput.max || 0)) {
+                this.showNotification(`Coperti non validi: massimo ${coversInput.max} disponibili`, 'error');
+                return;
+            }
+        }
+
         // Request operator authentication
         let auth;
         try {
@@ -2451,13 +3088,28 @@ class TableOrdersManager {
             return;
         }
 
-        // Get split count if applicable
-        const precontoType = document.querySelector('input[name="precontoType"]:checked')?.value;
-        let splitCount = null;
+        let body = { type: precontoType };
 
         if (precontoType === 'split') {
-            splitCount = parseInt(document.getElementById('splitCount').value) || null;
+            body.split_count = parseInt(document.getElementById('splitCount').value) || null;
+        } else if (precontoType === 'items') {
+            const selectedItems = [];
+            document.querySelectorAll('#precontoItemsList .preconto-item-qty-input').forEach(input => {
+                const qty = parseInt(input.value) || 0;
+                if (qty > 0) {
+                    selectedItems.push({
+                        order_item_id: parseInt(input.dataset.itemId),
+                        quantity: qty,
+                    });
+                }
+            });
+            body.items = selectedItems;
+            body.covers = parseInt(document.getElementById('preconto_covers')?.value || 0);
         }
+
+        // Always include discount
+        body.discount_type   = document.querySelector('input[name="precontoDiscountType"]:checked')?.value || 'none';
+        body.discount_amount = parseFloat(document.getElementById('preconto_discount_amount')?.value || 0);
 
         try {
             const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto`, {
@@ -2467,15 +3119,25 @@ class TableOrdersManager {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
                     'X-Operator-Token': auth.token
                 },
-                body: JSON.stringify({ split_count: splitCount })
+                body: JSON.stringify(body)
             });
 
             const result = await response.json();
 
             if (result.success) {
                 this.showNotification(result.message || 'PreConto stampato con successo', 'success');
-                this.closePrecontoModal();
                 await this.loadTables();
+
+                if (precontoType === 'items') {
+                    // Stay in modal: reload item list with remaining (non-assigned) items
+                    // Reset discount
+                    const noneRadio = document.querySelector('input[name="precontoDiscountType"][value="none"]');
+                    if (noneRadio) { noneRadio.checked = true; noneRadio.dispatchEvent(new Event('change')); }
+                    document.getElementById('preconto_discount_amount').value = 0;
+                    await this._renderPrecontoItemsList();
+                } else {
+                    this.closePrecontoModal();
+                }
             } else {
                 this.showNotification(result.message || 'Errore nella stampa del PreConto', 'error');
             }
