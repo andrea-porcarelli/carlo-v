@@ -10,7 +10,6 @@ class TableOrdersManager {
         this.currentProduct = null;
         this.apiBase = '/api/tables';
         this.allTables = [];
-        this.bancoOrders = [];
 
         this.modifySession = {
             active: false,
@@ -135,16 +134,10 @@ class TableOrdersManager {
      */
     async loadTables() {
         try {
-            const [tablesResp, bancoResp] = await Promise.all([
-                fetch(this.apiBase),
-                fetch('/api/banco'),
-            ]);
-            const tablesResult = await tablesResp.json();
-            const bancoResult = await bancoResp.json();
-
-            if (tablesResult.success) {
-                const bancoOrders = bancoResult.success ? bancoResult.data.orders : [];
-                this.renderTables(tablesResult.data, bancoOrders);
+            const resp = await fetch(this.apiBase);
+            const result = await resp.json();
+            if (result.success) {
+                this.renderTables(result.data);
             }
         } catch (error) {
             console.error('Error loading tables:', error);
@@ -155,9 +148,8 @@ class TableOrdersManager {
     /**
      * Render tables in the grid
      */
-    renderTables(tables, bancoOrders = []) {
+    renderTables(tables) {
         this.allTables = tables;
-        this.bancoOrders = bancoOrders;
         const container = document.getElementById(
             this.isMobile ? 'tablesContainerMobile' : 'tablesContainer'
         );
@@ -223,8 +215,7 @@ class TableOrdersManager {
             });
         });
 
-        // Update stats
-        this.updateStats(tables, this.bancoOrders || []);
+        this.updateStats();
     }
 
     /**
@@ -362,6 +353,23 @@ class TableOrdersManager {
         this.modifySession.pendingUpdate = {};
         this.modifySession.pendingDishChange = [];
         this.modifySession.itemCounter = -1;
+
+        // Restore persisted discount from DB
+        if (order && order.discount_type && order.discount_amount) {
+            this._authorizedDiscount = { type: order.discount_type, value: parseFloat(order.discount_amount) };
+            const discountInput = document.getElementById('modifyDiscountInput');
+            const btnApply = document.getElementById('btnApplyDiscount');
+            const btnReset = document.getElementById('btnResetDiscount');
+            const discountTypePct = document.getElementById('discountTypePct');
+            const discountTypeVal = document.getElementById('discountTypeVal');
+            if (discountInput) { discountInput.value = order.discount_amount; discountInput.disabled = true; }
+            if (btnApply) btnApply.style.display = 'none';
+            if (btnReset) btnReset.style.display = 'inline-flex';
+            if (discountTypePct) discountTypePct.classList.toggle('active', order.discount_type === 'percent');
+            if (discountTypeVal) discountTypeVal.classList.toggle('active', order.discount_type === 'value');
+        } else {
+            this._authorizedDiscount = null;
+        }
     }
 
     /**
@@ -660,6 +668,14 @@ class TableOrdersManager {
             if (btnApply) btnApply.style.display = 'none';
             if (btnReset) btnReset.style.display = 'inline-flex';
 
+            // Persist discount fields in local order state
+            if (this.currentTable?.order) {
+                this.currentTable.order.discount_type   = discountType;
+                this.currentTable.order.discount_amount = discountVal;
+                this.currentTable.order.discount_value  = rawTotal - finalTotal;
+                this.currentTable.order.discounted_total = finalTotal;
+            }
+
             this.updateModifyReceiptItems();
             this.showNotification(`Sconto autorizzato da ${auth.user.name}`, 'success');
         } catch {
@@ -670,8 +686,32 @@ class TableOrdersManager {
     /**
      * Reset the authorized discount
      */
-    resetDiscount() {
+    async resetDiscount() {
+        // Call API to clear discount from DB
+        const tableId = this.currentTable?.table?.id;
+        const token = this.modifySession?.token;
+        if (tableId && token) {
+            try {
+                await fetch(`${this.apiBase}/${tableId}/reset-discount`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'X-Operator-Token': token,
+                    },
+                });
+            } catch (e) {
+                console.warn('reset-discount API error:', e);
+            }
+        }
+
         this._authorizedDiscount = null;
+        if (this.currentTable?.order) {
+            this.currentTable.order.discount_type   = null;
+            this.currentTable.order.discount_amount = null;
+            this.currentTable.order.discount_value  = null;
+            this.currentTable.order.discounted_total = parseFloat(this.currentTable.order.total_amount || 0);
+        }
         const discountInput = document.getElementById('modifyDiscountInput');
         if (discountInput) { discountInput.value = ''; discountInput.disabled = false; }
         const btnApply = document.getElementById('btnApplyDiscount');
@@ -3798,7 +3838,8 @@ class TableOrdersManager {
     }
 
     /**
-     * Start interval to update timers every minute and auto-refresh tables every 2 minutes
+     * Start interval to update timers every minute and auto-refresh tables every 30 seconds.
+     * The table refresh is skipped while the modify overlay is open to avoid conflicts.
      */
     startTimerUpdates() {
         // Update immediately
@@ -3809,10 +3850,13 @@ class TableOrdersManager {
             this.updateTimers();
         }, 60000);
 
-        // Auto-refresh table list every 120 seconds
+        // Auto-refresh table list every 30 seconds (skip if overlay is open)
         setInterval(() => {
-            this.loadTables();
-        }, 120000);
+            const overlay = document.getElementById('modifyOrderOverlay');
+            if (!overlay || overlay.style.display === 'none' || overlay.style.display === '') {
+                this.loadTables();
+            }
+        }, 30000);
     }
 
     /**
@@ -4253,16 +4297,15 @@ class TableOrdersManager {
         document.getElementById('moveSourceTableNumber').textContent = sourceNumber;
 
         const grid = document.getElementById('moveTableGrid');
-        const tables = (this.allTables || []).filter(t => t.id !== sourceId);
+        const tables = (this.allTables || []).filter(t => t.id !== sourceId && t.status === 'free');
 
-        grid.innerHTML = tables.map(t => {
-            const cls = t.status === 'free' ? 'move-table-btn free' : 'move-table-btn occupied';
-            return `<button class="${cls}" data-table-id="${t.id}" style="
-                padding:10px 4px; border:2px solid ${t.status === 'free' ? '#28a745' : '#dc3545'};
-                background:${t.status === 'free' ? '#f0fff4' : '#fff0f0'};
+        grid.innerHTML = tables.length
+            ? tables.map(t => `<button class="move-table-btn free" data-table-id="${t.id}" style="
+                padding:10px 4px; border:2px solid #28a745;
+                background:#f0fff4;
                 color:#000; font-weight:700; font-size:1rem; border-radius:4px; cursor:pointer;
-            ">${t.table_number}</button>`;
-        }).join('');
+            ">${t.table_number}</button>`).join('')
+            : '<p style="color:#6c757d; text-align:center; grid-column:1/-1;">Nessun tavolo libero disponibile</p>';
 
         grid.querySelectorAll('.move-table-btn').forEach(btn => {
             btn.addEventListener('click', () => this.executeMove(parseInt(btn.dataset.tableId)));

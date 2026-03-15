@@ -6,6 +6,18 @@
     ])
 @endsection
 @section('main-content')
+@php
+  $tableId = $sale->restaurantTable->id;
+  $orderId = $sale->id;
+  $isOpen  = $sale->status === 'open';
+@endphp
+<script>
+window._boSale = {
+    tableId: {{ $tableId }},
+    orderId: {{ $orderId }},
+    isOpen: {{ $isOpen ? 'true' : 'false' }}
+};
+</script>
     @if($sale->covers == 0)
     <!-- Banner Solo Bevande -->
     <div class="row">
@@ -91,6 +103,36 @@
                                     @endif
                                 </td>
                             </tr>
+                            @if($sale->hasDiscount())
+                            <tr>
+                                <td><strong>Sconto:</strong></td>
+                                <td>
+                                    @if($sale->discount_type === 'percent')
+                                        <span class="badge badge-warning">
+                                            <i class="fas fa-percent"></i> {{ number_format($sale->discount_amount, 1) }}%
+                                        </span>
+                                    @else
+                                        <span class="badge badge-warning">
+                                            <i class="fas fa-euro-sign"></i> {{ number_format($sale->discount_amount, 2, ',', '.') }}
+                                        </span>
+                                    @endif
+                                    <span class="text-danger ml-1">
+                                        &minus;€{{ number_format($sale->discount_value, 2, ',', '.') }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Totale scontato:</strong></td>
+                                <td>
+                                    <strong class="text-success" style="font-size:15px;">
+                                        €{{ number_format($sale->getDiscountedTotal(), 2, ',', '.') }}
+                                    </strong>
+                                    <small class="text-muted ml-1" style="text-decoration:line-through;">
+                                        €{{ number_format($sale->total_amount, 2, ',', '.') }}
+                                    </small>
+                                </td>
+                            </tr>
+                            @endif
                             <tr>
                                 <td><strong>Metodo pagamento:</strong></td>
                                 <td>
@@ -116,6 +158,69 @@
                     </table>
                 </div>
             </div>
+            @if($isOpen)
+            <div class="panel panel-warning" style="margin-top: 15px;">
+                <div class="panel-heading">
+                    <h4 class="panel-title">
+                        <i class="fas fa-cogs"></i> Azioni sul Tavolo
+                    </h4>
+                </div>
+                <div class="panel-body">
+                    <div class="row" style="margin: -3px;">
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-success btn-block btn-sm btn-bo-action" data-action="marcia">
+                                <i class="fas fa-utensils"></i> Marcia
+                            </button>
+                        </div>
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-info btn-block btn-sm" onclick="toggleModal('modalPreconto')">
+                                <i class="fas fa-receipt"></i> Pre-Conto
+                            </button>
+                        </div>
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-primary btn-block btn-sm" onclick="toggleModal('modalIncassa')">
+                                <i class="fas fa-cash-register"></i> Incassa
+                            </button>
+                        </div>
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-default btn-block btn-sm" onclick="boOpenAddDish()">
+                                <i class="fas fa-plus"></i> Aggiungi
+                            </button>
+                        </div>
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-default btn-block btn-sm" onclick="toggleModal('modalCoperti')">
+                                <i class="fas fa-users"></i> Coperti
+                            </button>
+                        </div>
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-default btn-block btn-sm" onclick="toggleModal('modalSconto')">
+                                <i class="fas fa-percent"></i> Sconto
+                            </button>
+                        </div>
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-default btn-block btn-sm" onclick="boOpenSposta()">
+                                <i class="fas fa-arrows-alt"></i> Sposta
+                            </button>
+                        </div>
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-default btn-block btn-sm btn-bo-action" data-action="reprint">
+                                <i class="fas fa-print"></i> Ristampa
+                            </button>
+                        </div>
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-default btn-block btn-sm" onclick="boOpenComunica()">
+                                <i class="fas fa-comments"></i> Comunica
+                            </button>
+                        </div>
+                        <div class="col-xs-6" style="padding: 3px;">
+                            <button class="btn btn-warning btn-block btn-sm btn-bo-action" data-action="autoconsumo">
+                                <i class="fas fa-user-check"></i> Autoconsumo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
         </div>
 
         <!-- Order Items -->
@@ -144,7 +249,7 @@
                                 </thead>
                                 <tbody>
                                     @foreach($sale->items()->withTrashed()->orderBy('id', 'DESC')->get() as $index => $item)
-                                        <tr class="@if($item->status == 'cancelled') trashed @endif">
+                                        <tr class="@if($item->status == 'cancelled') trashed @endif" data-item-id="{{ $item->id }}">
                                             <td>{{ $index + 1 }} </td>
                                             <td>
                                                 @php
@@ -229,6 +334,38 @@
                                                         </div>
                                                     </div>
                                                 @endif
+                                                @if($isOpen && $item->status != 'cancelled')
+                                                <div class="btn-group btn-group-xs" style="margin-top: 8px;">
+                                                    <button class="btn btn-xs btn-default btn-item-qty"
+                                                            data-item-id="{{ $item->id }}"
+                                                            data-qty="{{ $item->quantity }}"
+                                                            title="Modifica quantità">
+                                                        <i class="fas fa-hashtag"></i>
+                                                    </button>
+                                                    <button class="btn btn-xs btn-default btn-item-price"
+                                                            data-item-id="{{ $item->id }}"
+                                                            data-price="{{ $item->unit_price }}"
+                                                            title="Modifica prezzo">
+                                                        <i class="fas fa-euro-sign"></i>
+                                                    </button>
+                                                    <button class="btn btn-xs btn-info btn-item-details"
+                                                            data-item-id="{{ $item->id }}"
+                                                            data-notes="{{ $item->notes }}"
+                                                            title="Modifica note">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button class="btn btn-xs btn-warning btn-item-change-dish"
+                                                            data-item-id="{{ $item->id }}"
+                                                            title="Cambia piatto">
+                                                        <i class="fas fa-exchange-alt"></i>
+                                                    </button>
+                                                    <button class="btn btn-xs btn-danger btn-item-remove"
+                                                            data-item-id="{{ $item->id }}"
+                                                            title="Rimuovi">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                                @endif
                                             </td>
                                             @if($sale->autoconsumo)
                                                 <th>{{ $item->autoconsumoUser->name }}</th>
@@ -275,13 +412,40 @@
                                             </td>
                                         </tr>
                                     @endif
+                                    @if($sale->hasDiscount())
+                                        <tr>
+                                            <td colspan="4" class="text-end text-muted">
+                                                Subtotale:
+                                            </td>
+                                            <td class="text-end text-muted">
+                                                €{{ number_format($sale->total_amount, 2, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                        <tr class="warning">
+                                            <td colspan="4" class="text-end">
+                                                <span class="text-danger">
+                                                    <i class="fas fa-percent"></i>
+                                                    Sconto
+                                                    @if($sale->discount_type === 'percent')
+                                                        ({{ number_format($sale->discount_amount, 1) }}%)
+                                                    @else
+                                                        (€{{ number_format($sale->discount_amount, 2, ',', '.') }})
+                                                    @endif
+                                                    :
+                                                </span>
+                                            </td>
+                                            <td class="text-end text-danger">
+                                                &minus;€{{ number_format($sale->discount_value, 2, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                    @endif
                                     <tr class="table-success">
                                         <td colspan="4" class="text-end">
                                             <strong style="font-size: 16px;" class="@if($sale->status == 'cancelled') trashed @endif">TOTALE:</strong>
                                         </td>
                                         <td class="text-end">
                                             <strong style="font-size: 18px; @if($sale->autoconsumo) text-decoration:line-through @endif"  class="@if($sale->status == 'cancelled') text-danger @else text-success @endif @if($sale->status == 'cancelled') trashed @endif">
-                                                €{{ number_format($sale->total_amount, 2, ',', '.') }}
+                                                €{{ number_format($sale->hasDiscount() ? $sale->getDiscountedTotal() : $sale->total_amount, 2, ',', '.') }}
                                             </strong>
                                         </td>
                                     </tr>
@@ -878,6 +1042,364 @@
         </div>
     </div>
 
+    @if($isOpen)
+    <!-- BO Action Modals -->
+
+    <!-- Modal: Modifica Quantità -->
+    <div id="modalItemQty" class="log-modal" onclick="if(event.target===this)toggleModal('modalItemQty')">
+        <div class="log-modal-content">
+            <div class="log-modal-header" style="background:#5cb85c;">
+                <h5><i class="fas fa-hashtag"></i> Modifica Quantità</h5>
+                <button type="button" onclick="toggleModal('modalItemQty')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formItemQty">
+                    <div class="form-group">
+                        <label>Quantità</label>
+                        <input type="number" id="inputItemQty" class="form-control" min="1" value="1">
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalItemQty')">Annulla</button>
+                        <button type="submit" class="btn btn-success" style="flex:2">Aggiorna</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Modifica Dettagli -->
+    <div id="modalItemDetails" class="log-modal" onclick="if(event.target===this)toggleModal('modalItemDetails')">
+        <div class="log-modal-content">
+            <div class="log-modal-header" style="background:#5bc0de;">
+                <h5><i class="fas fa-edit"></i> Modifica Note</h5>
+                <button type="button" onclick="toggleModal('modalItemDetails')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formItemDetails">
+                    <div class="form-group">
+                        <label>Note per la cucina</label>
+                        <textarea id="inputItemNotes" class="form-control" rows="3" placeholder="Note aggiuntive..."></textarea>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalItemDetails')">Annulla</button>
+                        <button type="submit" class="btn btn-info" style="flex:2">Salva</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Cambia Piatto -->
+    <div id="modalChangeDish" class="log-modal" onclick="if(event.target===this)toggleModal('modalChangeDish')">
+        <div class="log-modal-content">
+            <div class="log-modal-header" style="background:#f0ad4e;">
+                <h5><i class="fas fa-exchange-alt"></i> Cambia Piatto</h5>
+                <button type="button" onclick="toggleModal('modalChangeDish')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formChangeDish">
+                    <div class="form-group">
+                        <label>Nuovo Piatto</label>
+                        <select id="selectChangeDish" class="form-control">
+                            <option value="">-- Seleziona piatto --</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalChangeDish')">Annulla</button>
+                        <button type="submit" class="btn btn-warning" style="flex:2">Cambia</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Motivo Rimozione -->
+    <div id="modalRemoveReason" class="log-modal" onclick="if(event.target===this)closeRemoveReasonModal()">
+        <div class="log-modal-content" style="max-width:420px;">
+            <div class="log-modal-header" style="background:#d9534f;">
+                <h5><i class="fas fa-trash-alt"></i> Motivo della rimozione</h5>
+                <button type="button" onclick="closeRemoveReasonModal()" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+                    <button class="btn btn-default bo-remove-reason-btn" data-reason="Rientro">Rientro</button>
+                    <button class="btn btn-default bo-remove-reason-btn" data-reason="Il cliente ha sostituito">Il cliente ha sostituito</button>
+                    <button class="btn btn-default bo-remove-reason-btn" data-reason="Errore nel piatto">Errore nel piatto</button>
+                    <button class="btn btn-default bo-remove-reason-btn" data-reason="Omaggiato">Omaggiato</button>
+                    <button class="btn btn-default bo-remove-reason-btn" data-reason="Errore sala">Errore sala</button>
+                    <button class="btn btn-default bo-remove-reason-btn" data-reason="Errore cucina">Errore cucina</button>
+                </div>
+                <button type="button" class="btn btn-default btn-block" onclick="closeRemoveReasonModal()">Annulla</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Aggiungi Piatto -->
+    <div id="modalAddDish" class="log-modal" onclick="if(event.target===this)toggleModal('modalAddDish')">
+        <div class="log-modal-content">
+            <div class="log-modal-header" style="background:#337ab7;">
+                <h5><i class="fas fa-plus"></i> Aggiungi Piatto</h5>
+                <button type="button" onclick="toggleModal('modalAddDish')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formAddDish">
+                    <div class="form-group">
+                        <label>Categoria</label>
+                        <select id="selectAddDishCategory" class="form-control">
+                            <option value="">-- Tutte le categorie --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Piatto</label>
+                        <select id="selectAddDish" class="form-control">
+                            <option value="">-- Seleziona piatto --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantità</label>
+                        <input type="number" id="inputAddDishQty" class="form-control" min="1" value="1">
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalAddDish')">Annulla</button>
+                        <button type="submit" class="btn btn-primary" style="flex:2">Aggiungi</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Pre-Conto -->
+    <div id="modalPreconto" class="log-modal" onclick="if(event.target===this)toggleModal('modalPreconto')">
+        <div class="log-modal-content" style="max-width:700px;">
+            <div class="log-modal-header" style="background:#5bc0de;">
+                <h5><i class="fas fa-receipt"></i> Pre-Conto</h5>
+                <button type="button" onclick="toggleModal('modalPreconto')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formPreconto">
+                    <div class="form-group">
+                        <label><strong>Tipo di pre-conto</strong></label>
+                        <div>
+                            <label class="radio-inline">
+                                <input type="radio" name="preconto_mode" value="full" checked> Intero
+                            </label>
+                            <label class="radio-inline" style="margin-left:20px;">
+                                <input type="radio" name="preconto_mode" value="partial"> Parziale
+                            </label>
+                        </div>
+                    </div>
+                    <div id="precontoPartialItems" style="display:none;">
+                        <label><strong>Seleziona prodotti</strong></label>
+                        <div class="table-responsive">
+                            <table class="table table-condensed table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th width="30">Sel.</th>
+                                        <th>Prodotto</th>
+                                        <th width="60" class="text-center">Qta tot.</th>
+                                        <th width="90">Qta parziale</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($sale->items()->get() as $pItem)
+                                    <tr>
+                                        <td><input type="checkbox" class="preconto-item-check" data-item-id="{{ $pItem->id }}" checked></td>
+                                        <td>{{ $pItem->dish->label ?? 'N/D' }}</td>
+                                        <td class="text-center">{{ $pItem->quantity }}</td>
+                                        <td><input type="number" class="preconto-qty form-control input-sm" value="{{ $pItem->quantity }}" min="1" max="{{ $pItem->quantity }}"></td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalPreconto')">Annulla</button>
+                        <button type="submit" class="btn btn-info" style="flex:2"><i class="fas fa-receipt"></i> Invia Pre-Conto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Incassa -->
+    <div id="modalIncassa" class="log-modal" onclick="if(event.target===this)toggleModal('modalIncassa')">
+        <div class="log-modal-content" style="max-width:500px;">
+            <div class="log-modal-header" style="background:#5cb85c;">
+                <h5><i class="fas fa-cash-register"></i> Incassa</h5>
+                <button type="button" onclick="toggleModal('modalIncassa')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formIncassa">
+                    <div class="alert alert-info" style="text-align:center;margin-bottom:15px;">
+                        <strong>Totale: €{{ number_format($sale->total_amount, 2, ',', '.') }}</strong>
+                    </div>
+                    <div class="form-group">
+                        <label><strong>Metodo di pagamento</strong></label>
+                        <div>
+                            <label class="radio-inline">
+                                <input type="radio" name="payment_method" value="contanti"> Contanti
+                            </label>
+                            <label class="radio-inline" style="margin-left:15px;">
+                                <input type="radio" name="payment_method" value="pos"> POS
+                            </label>
+                            <label class="radio-inline" style="margin-left:15px;">
+                                <input type="radio" name="payment_method" value="fattura"> Fattura
+                            </label>
+                        </div>
+                    </div>
+                    <div id="cashFields" style="display:none;">
+                        <div class="form-group">
+                            <label>Importo ricevuto (€)</label>
+                            <input type="number" id="inputAmountGiven" class="form-control" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Resto</label>
+                            <div class="form-control" style="background:#f5f5f5;font-weight:bold;" id="restoCalcolato">—</div>
+                        </div>
+                    </div>
+                    <div id="invoiceFields" style="display:none;">
+                        <div class="form-group">
+                            <label>Intestatario</label>
+                            <input type="text" id="inputInvoiceName" class="form-control" placeholder="Nome / Ragione sociale">
+                        </div>
+                        <div class="form-group">
+                            <label>Cod. Fiscale / P.IVA</label>
+                            <input type="text" id="inputInvoiceTaxCode" class="form-control" placeholder="CODICE FISCALE o P.IVA">
+                        </div>
+                        <div class="form-group">
+                            <label>Descrizione</label>
+                            <input type="text" id="inputInvoiceDescription" class="form-control" value="Pasto completo" placeholder="Pasto completo">
+                        </div>
+                        <div class="form-group">
+                            <label>Importo (vuoto = totale €{{ number_format($sale->total_amount, 2, ',', '.') }})</label>
+                            <input type="number" id="inputInvoiceAmount" class="form-control" step="0.01" min="0" placeholder="{{ number_format($sale->total_amount, 2) }}">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalIncassa')">Annulla</button>
+                        <button type="submit" class="btn btn-success" style="flex:2"><i class="fas fa-cash-register"></i> Incassa</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Sposta Tavolo -->
+    <div id="modalSposta" class="log-modal" onclick="if(event.target===this)toggleModal('modalSposta')">
+        <div class="log-modal-content">
+            <div class="log-modal-header" style="background:#337ab7;">
+                <h5><i class="fas fa-arrows-alt"></i> Sposta Tavolo</h5>
+                <button type="button" onclick="toggleModal('modalSposta')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formSposta">
+                    <div class="form-group">
+                        <label>Tavolo di destinazione</label>
+                        <select id="selectTargetTable" class="form-control">
+                            <option value="">-- Seleziona tavolo --</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalSposta')">Annulla</button>
+                        <button type="submit" class="btn btn-primary" style="flex:2">Sposta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Comunica -->
+    <div id="modalComunica" class="log-modal" onclick="if(event.target===this)toggleModal('modalComunica')">
+        <div class="log-modal-content">
+            <div class="log-modal-header" style="background:#337ab7;">
+                <h5><i class="fas fa-comments"></i> Comunica</h5>
+                <button type="button" onclick="toggleModal('modalComunica')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formComunica">
+                    <div class="form-group">
+                        <label>Stampante</label>
+                        <select id="selectComunicaPrinter" class="form-control">
+                            <option value="">-- Seleziona stampante --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Messaggio</label>
+                        <textarea id="inputComunicaMessage" class="form-control" rows="4" placeholder="Messaggio da inviare..."></textarea>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalComunica')">Annulla</button>
+                        <button type="submit" class="btn btn-primary" style="flex:2"><i class="fas fa-paper-plane"></i> Invia</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Sconto -->
+    <div id="modalSconto" class="log-modal" onclick="if(event.target===this)toggleModal('modalSconto')">
+        <div class="log-modal-content">
+            <div class="log-modal-header" style="background:#d9534f;">
+                <h5><i class="fas fa-percent"></i> Applica Sconto</h5>
+                <button type="button" onclick="toggleModal('modalSconto')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formSconto">
+                    <div class="alert alert-info" style="text-align:center;margin-bottom:15px;">
+                        Totale attuale: <strong>€{{ number_format($sale->total_amount, 2, ',', '.') }}</strong>
+                    </div>
+                    <div class="form-group">
+                        <label><strong>Tipo di sconto</strong></label>
+                        <div>
+                            <label class="radio-inline">
+                                <input type="radio" name="discount_type" value="percent" checked> Percentuale (%)
+                            </label>
+                            <label class="radio-inline" style="margin-left:20px;">
+                                <input type="radio" name="discount_type" value="value"> Valore fisso (€)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label id="scontoAmountLabel">Sconto (%)</label>
+                        <input type="number" id="inputSconto" class="form-control" min="0" step="0.5" placeholder="Es: 10">
+                    </div>
+                    <div class="form-group">
+                        <label>Totale dopo sconto</label>
+                        <div class="form-control" style="background:#f5f5f5;font-weight:bold;font-size:16px;" id="scontoFinalTotal">—</div>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalSconto')">Annulla</button>
+                        <button type="submit" class="btn btn-danger" style="flex:2">Applica Sconto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Coperti -->
+    <div id="modalCoperti" class="log-modal" onclick="if(event.target===this)toggleModal('modalCoperti')">
+        <div class="log-modal-content">
+            <div class="log-modal-header" style="background:#337ab7;">
+                <h5><i class="fas fa-users"></i> Modifica Coperti</h5>
+                <button type="button" onclick="toggleModal('modalCoperti')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <form id="formCoperti">
+                    <div class="form-group">
+                        <label>Numero coperti</label>
+                        <input type="number" id="inputCoperti" class="form-control" min="0" value="{{ $sale->covers }}">
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalCoperti')">Annulla</button>
+                        <button type="submit" class="btn btn-primary" style="flex:2">Aggiorna</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- Print Styles -->
     <style>
         @media print {
@@ -1126,4 +1648,499 @@
             });
         });
     </script>
+
 @endsection
+
+@section('custom-script')
+    @if($isOpen)
+    <script>
+    $(function() {
+        var _boSale = window._boSale;
+        var csrfToken = '{{ csrf_token() }}';
+        var _boToken = null;
+
+        // Fetch operator token on page load
+        $.ajax({
+            url: '/api/admin/operator-token',
+            method: 'GET',
+            headers: { 'X-CSRF-TOKEN': csrfToken }
+        }).done(function(data) {
+            if (data.success) {
+                _boToken = data.data.token;
+            } else {
+                console.warn('Bo token fetch failed:', data);
+            }
+        }).fail(function() {
+            console.warn('Failed to fetch operator token');
+        });
+
+        // API helper
+        function boApi(method, url, data) {
+            var opts = {
+                url: url,
+                method: method,
+                headers: {
+                    'X-Operator-Token': _boToken,
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            };
+            if (data !== undefined && data !== null) {
+                opts.data = JSON.stringify(data);
+                opts.contentType = 'application/json';
+            }
+            return $.ajax(opts);
+        }
+
+        function onSuccess(msg) {
+            if (typeof toastr !== 'undefined') {
+                toastr.success(msg);
+            }
+            setTimeout(function() { location.reload(); }, 900);
+        }
+
+        function onError(xhr) {
+            var msg = 'Errore durante l\'operazione';
+            if (xhr.responseJSON) {
+                msg = xhr.responseJSON.message || xhr.responseJSON.error || msg;
+            }
+            if (typeof toastr !== 'undefined') {
+                toastr.error(msg);
+            } else {
+                alert('Errore: ' + msg);
+            }
+        }
+
+        function requireToken() {
+            if (!_boToken) {
+                alert('Token operatore non disponibile. Ricarica la pagina.');
+                return false;
+            }
+            return true;
+        }
+
+        // ---- Simple button actions ----
+
+        $('[data-action="marcia"]').on('click', function() {
+            if (!requireToken()) return;
+            var btn = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+            boApi('POST', '/api/tables/' + _boSale.tableId + '/marcia')
+                .done(function() { onSuccess('Marcia inviata!'); })
+                .fail(function(xhr) {
+                    onError(xhr);
+                    btn.prop('disabled', false).html('<i class="fas fa-utensils"></i> Marcia');
+                });
+        });
+
+        $('[data-action="reprint"]').on('click', function() {
+            if (!requireToken()) return;
+            var btn = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+            boApi('POST', '/api/tables/' + _boSale.tableId + '/reprint')
+                .done(function() { onSuccess('Ristampa inviata!'); })
+                .fail(function(xhr) {
+                    onError(xhr);
+                    btn.prop('disabled', false).html('<i class="fas fa-print"></i> Ristampa');
+                });
+        });
+
+        $('[data-action="autoconsumo"]').on('click', function() {
+            if (!requireToken()) return;
+            if (!confirm('Marcare questa vendita come autoconsumo? Il totale verrà azzerato.')) return;
+            var btn = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+            boApi('POST', '/api/tables/' + _boSale.tableId + '/clear')
+                .done(function() { onSuccess('Autoconsumo impostato!'); })
+                .fail(function(xhr) {
+                    onError(xhr);
+                    btn.prop('disabled', false).html('<i class="fas fa-user-check"></i> Autoconsumo');
+                });
+        });
+
+        // ---- Item: Modifica Quantità ----
+        $(document).on('click', '.btn-item-qty', function() {
+            var itemId = $(this).data('item-id');
+            var qty = $(this).data('qty');
+            $('#modalItemQty').data('item-id', itemId);
+            $('#inputItemQty').val(qty);
+            toggleModal('modalItemQty');
+        });
+
+        $('#formItemQty').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var itemId = $('#modalItemQty').data('item-id');
+            var qty = parseInt($('#inputItemQty').val());
+            if (!qty || qty < 1) { alert('Quantità non valida'); return; }
+            boApi('PUT', '/api/tables/items/' + itemId + '/quantity', { quantity: qty })
+                .done(function() { toggleModal('modalItemQty'); onSuccess('Quantità aggiornata!'); })
+                .fail(onError);
+        });
+
+        // ---- Item: Modifica Prezzo ----
+        $(document).on('click', '.btn-item-price', function() {
+            var itemId = $(this).data('item-id');
+            var price = parseFloat($(this).data('price')).toFixed(2);
+            var newPrice = prompt('Nuovo prezzo (€):', price);
+            if (newPrice === null) return;
+            newPrice = parseFloat(String(newPrice).replace(',', '.'));
+            if (isNaN(newPrice) || newPrice < 0) { alert('Prezzo non valido'); return; }
+            if (!requireToken()) return;
+            boApi('PUT', '/api/tables/items/' + itemId + '/price', { price: newPrice })
+                .done(function() { onSuccess('Prezzo aggiornato!'); })
+                .fail(onError);
+        });
+
+        // ---- Item: Rimuovi ----
+        var _pendingRemoveItemId = null;
+
+        function closeRemoveReasonModal() {
+            toggleModal('modalRemoveReason');
+            _pendingRemoveItemId = null;
+        }
+        window.closeRemoveReasonModal = closeRemoveReasonModal;
+
+        $(document).on('click', '.btn-item-remove', function() {
+            if (!requireToken()) return;
+            _pendingRemoveItemId = $(this).data('item-id');
+            toggleModal('modalRemoveReason');
+        });
+
+        $(document).on('click', '.bo-remove-reason-btn', function() {
+            if (!_pendingRemoveItemId) return;
+            var itemId = _pendingRemoveItemId;
+            var reason = $(this).data('reason');
+            closeRemoveReasonModal();
+            boApi('DELETE', '/api/tables/items/' + itemId, { reason: reason })
+                .done(function() { onSuccess('Prodotto rimosso!'); })
+                .fail(onError);
+        });
+
+        // ---- Item: Modifica Dettagli ----
+        $(document).on('click', '.btn-item-details', function() {
+            var itemId = $(this).data('item-id');
+            var notes = $(this).data('notes') || '';
+            $('#modalItemDetails').data('item-id', itemId);
+            $('#inputItemNotes').val(notes);
+            toggleModal('modalItemDetails');
+        });
+
+        $('#formItemDetails').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var itemId = $('#modalItemDetails').data('item-id');
+            var notes = $('#inputItemNotes').val();
+            boApi('PUT', '/api/tables/items/' + itemId + '/details', { notes: notes })
+                .done(function() { toggleModal('modalItemDetails'); onSuccess('Dettagli aggiornati!'); })
+                .fail(onError);
+        });
+
+        // ---- Item: Cambia Piatto ----
+        $(document).on('click', '.btn-item-change-dish', function() {
+            var itemId = $(this).data('item-id');
+            $('#modalChangeDish').data('item-id', itemId);
+            loadDishes('#selectChangeDish', '#modalChangeDish');
+            toggleModal('modalChangeDish');
+        });
+
+        $('#formChangeDish').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var itemId = $('#modalChangeDish').data('item-id');
+            var dishId = $('#selectChangeDish').val();
+            if (!dishId) { alert('Seleziona un piatto'); return; }
+            boApi('PUT', '/api/tables/items/' + itemId + '/dish', { dish_id: parseInt(dishId) })
+                .done(function() { toggleModal('modalChangeDish'); onSuccess('Piatto cambiato!'); })
+                .fail(onError);
+        });
+
+        // ---- Aggiungi Piatto ----
+        window.boOpenAddDish = function() {
+            loadDishes('#selectAddDish', '#modalAddDish');
+            toggleModal('modalAddDish');
+        };
+
+        $('#formAddDish').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var dishId = $('#selectAddDish').val();
+            var qty = parseInt($('#inputAddDishQty').val()) || 1;
+            if (!dishId) { alert('Seleziona un piatto'); return; }
+            boApi('POST', '/api/tables/' + _boSale.tableId + '/items', { dish_id: parseInt(dishId), quantity: qty })
+                .done(function() { toggleModal('modalAddDish'); onSuccess('Piatto aggiunto!'); })
+                .fail(onError);
+        });
+
+        // ---- Pre-Conto ----
+        $('input[name="preconto_mode"]').on('change', function() {
+            $('#precontoPartialItems').toggle($(this).val() === 'partial');
+        });
+
+        $('#formPreconto').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var mode = $('input[name="preconto_mode"]:checked').val();
+            var data = {};
+            if (mode === 'partial') {
+                var items = [];
+                $('.preconto-item-check:checked').each(function() {
+                    items.push({
+                        item_id: parseInt($(this).data('item-id')),
+                        quantity: parseInt($(this).closest('tr').find('.preconto-qty').val()) || 1
+                    });
+                });
+                if (items.length === 0) { alert('Seleziona almeno un prodotto'); return; }
+                data.items = items;
+            }
+            boApi('POST', '/api/tables/' + _boSale.tableId + '/preconto', data)
+                .done(function() { toggleModal('modalPreconto'); onSuccess('Pre-conto inviato!'); })
+                .fail(onError);
+        });
+
+        // ---- Incassa ----
+        $('input[name="payment_method"]').on('change', function() {
+            var val = $(this).val();
+            $('#invoiceFields').toggle(val === 'fattura');
+            $('#cashFields').toggle(val === 'contanti');
+        });
+
+        $('#inputAmountGiven').on('input', function() {
+            var given = parseFloat($(this).val()) || 0;
+            var total = parseFloat('{{ $sale->total_amount }}') || 0;
+            var resto = given - total;
+            $('#restoCalcolato').text(resto >= 0 ? '€' + resto.toFixed(2) : '—');
+        });
+
+        $('#formIncassa').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var method = $('input[name="payment_method"]:checked').val();
+            if (!method) { alert('Seleziona il metodo di pagamento'); return; }
+            if (method === 'fattura') {
+                var invoiceData = {
+                    customer_name: $('#inputInvoiceName').val(),
+                    customer_tax_code: $('#inputInvoiceTaxCode').val(),
+                    description: $('#inputInvoiceDescription').val() || 'Pasto completo',
+                    amount: parseFloat($('#inputInvoiceAmount').val()) || null
+                };
+                boApi('POST', '/api/tables/' + _boSale.tableId + '/pay-invoice', invoiceData)
+                    .done(function() { toggleModal('modalIncassa'); onSuccess('Fattura emessa e ordine chiuso!'); })
+                    .fail(onError);
+            } else {
+                var payData = { payment_method: method };
+                if (method === 'contanti') {
+                    payData.amount_given = parseFloat($('#inputAmountGiven').val()) || 0;
+                }
+                boApi('POST', '/api/tables/' + _boSale.tableId + '/pay', payData)
+                    .done(function() { toggleModal('modalIncassa'); onSuccess('Incasso completato!'); })
+                    .fail(onError);
+            }
+        });
+
+        // ---- Sposta Tavolo ----
+        window.boOpenSposta = function() {
+            loadAvailableTables();
+            toggleModal('modalSposta');
+        };
+
+        function loadAvailableTables() {
+            var sel = $('#selectTargetTable');
+            sel.prop('disabled', true).html('<option>Caricamento...</option>');
+            $.ajax({
+                url: '/api/tables/',
+                headers: { 'X-Operator-Token': _boToken, 'X-CSRF-TOKEN': csrfToken }
+            }).done(function(d) {
+                var tables = d.data || d;
+                sel.empty().append('<option value="">-- Seleziona tavolo --</option>');
+                if (Array.isArray(tables)) {
+                    tables.forEach(function(t) {
+                        if (t.id != _boSale.tableId) {
+                            var label = 'Tavolo ' + t.table_number;
+                            if (t.status === 'open') label += ' (occupato)';
+                            sel.append('<option value="' + t.id + '">' + label + '</option>');
+                        }
+                    });
+                }
+                sel.prop('disabled', false);
+            }).fail(function() {
+                sel.html('<option value="">Errore caricamento</option>').prop('disabled', false);
+            });
+        }
+
+        $('#formSposta').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var targetId = $('#selectTargetTable').val();
+            if (!targetId) { alert('Seleziona un tavolo di destinazione'); return; }
+            boApi('POST', '/api/tables/' + _boSale.tableId + '/move', { destination_table_id: parseInt(targetId) })
+                .done(function() { toggleModal('modalSposta'); onSuccess('Tavolo spostato!'); })
+                .fail(onError);
+        });
+
+        // ---- Comunica ----
+        window.boOpenComunica = function() {
+            loadPrinters();
+            toggleModal('modalComunica');
+        };
+
+        function loadPrinters() {
+            var sel = $('#selectComunicaPrinter');
+            sel.prop('disabled', true).html('<option>Caricamento...</option>');
+            $.ajax({
+                url: '/api/tables/printers',
+                headers: { 'X-Operator-Token': _boToken, 'X-CSRF-TOKEN': csrfToken }
+            }).done(function(d) {
+                var printers = d.data || d;
+                sel.empty().append('<option value="">-- Seleziona stampante --</option>');
+                if (Array.isArray(printers)) {
+                    printers.forEach(function(p) {
+                        sel.append('<option value="' + p.id + '">' + (p.label || p.name) + '</option>');
+                    });
+                }
+                sel.prop('disabled', false);
+            }).fail(function() {
+                sel.html('<option value="">Errore caricamento</option>').prop('disabled', false);
+            });
+        }
+
+        $('#formComunica').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var printerId = $('#selectComunicaPrinter').val();
+            var message = $('#inputComunicaMessage').val();
+            if (!printerId) { alert('Seleziona una stampante'); return; }
+            if (!message.trim()) { alert('Inserisci un messaggio'); return; }
+            boApi('POST', '/api/tables/comunica', {
+                printer_id: parseInt(printerId),
+                message: message,
+                table_id: _boSale.tableId
+            })
+                .done(function() { toggleModal('modalComunica'); onSuccess('Messaggio inviato!'); })
+                .fail(onError);
+        });
+
+        // ---- Sconto ----
+        var _scontoOriginalTotal = parseFloat('{{ $sale->total_amount }}') || 0;
+
+        function calcScontoFinal() {
+            var type = $('input[name="discount_type"]:checked').val();
+            var amount = parseFloat($('#inputSconto').val()) || 0;
+            var final;
+            if (type === 'percent') {
+                if (amount < 0 || amount > 100) { $('#scontoFinalTotal').text('—'); return null; }
+                final = Math.max(0, _scontoOriginalTotal - _scontoOriginalTotal * amount / 100);
+            } else {
+                if (amount < 0) { $('#scontoFinalTotal').text('—'); return null; }
+                final = Math.max(0, _scontoOriginalTotal - amount);
+            }
+            final = Math.round(final * 100) / 100;
+            $('#scontoFinalTotal').text('€' + final.toFixed(2).replace('.', ','));
+            return final;
+        }
+
+        $('input[name="discount_type"]').on('change', function() {
+            var isPercent = $(this).val() === 'percent';
+            $('#scontoAmountLabel').text(isPercent ? 'Sconto (%)' : 'Sconto (€)');
+            $('#inputSconto').attr('max', isPercent ? 100 : '').attr('placeholder', isPercent ? 'Es: 10' : 'Es: 5.00');
+            calcScontoFinal();
+        });
+
+        $('#inputSconto').on('input', function() { calcScontoFinal(); });
+
+        $('#formSconto').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var type = $('input[name="discount_type"]:checked').val();
+            var amount = parseFloat($('#inputSconto').val());
+            if (isNaN(amount) || amount < 0) { alert('Inserisci un valore di sconto valido'); return; }
+            if (type === 'percent' && amount > 100) { alert('La percentuale non può superare 100'); return; }
+            var finalTotal = calcScontoFinal();
+            if (finalTotal === null) { alert('Valore non valido'); return; }
+            boApi('POST', '/api/tables/' + _boSale.tableId + '/apply-discount', {
+                discount_type: type,
+                discount_amount: amount,
+                original_total: _scontoOriginalTotal,
+                final_total: finalTotal
+            })
+                .done(function() { toggleModal('modalSconto'); onSuccess('Sconto applicato!'); })
+                .fail(onError);
+        });
+
+        // ---- Coperti ----
+        $('#formCoperti').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var covers = parseInt($('#inputCoperti').val());
+            if (isNaN(covers) || covers < 0) { alert('Numero coperti non valido'); return; }
+            boApi('PUT', '/api/tables/' + _boSale.tableId + '/covers', { covers: covers })
+                .done(function() { toggleModal('modalCoperti'); onSuccess('Coperti aggiornati!'); })
+                .fail(onError);
+        });
+
+        // ---- Helper: carica piatti ----
+        var _allDishes = null;
+
+        function renderDishOptions(dishes, sel) {
+            sel.empty().append('<option value="">-- Seleziona piatto --</option>');
+            dishes.forEach(function(dish) {
+                var label = dish.label || dish.name || 'N/D';
+                if (dish.price) label += ' (€' + parseFloat(dish.price).toFixed(2) + ')';
+                sel.append('<option value="' + dish.id + '">' + label + '</option>');
+            });
+        }
+
+        function loadDishes(selectEl, modalEl) {
+            var sel = $(selectEl);
+            var isAddModal = (selectEl === '#selectAddDish');
+
+            sel.prop('disabled', true).html('<option>Caricamento piatti...</option>');
+
+            var doLoad = function(dishes) {
+                renderDishOptions(dishes, sel);
+                sel.prop('disabled', false);
+                if ($.fn.select2 && modalEl) {
+                    try { sel.select2({ dropdownParent: $(modalEl) }); } catch(e) {}
+                }
+            };
+
+            if (_allDishes) {
+                doLoad(isAddModal ? filterDishesByCategory(_allDishes, $('#selectAddDishCategory').val()) : _allDishes);
+                return;
+            }
+
+            $.get('/api/dishes', function(d) {
+                _allDishes = d.data || d;
+
+                if (isAddModal) {
+                    // Popola il filtro categorie
+                    var catSel = $('#selectAddDishCategory');
+                    var seen = {};
+                    catSel.empty().append('<option value="">-- Tutte le categorie --</option>');
+                    _allDishes.forEach(function(dish) {
+                        if (dish.category_id && !seen[dish.category_id]) {
+                            seen[dish.category_id] = true;
+                            catSel.append('<option value="' + dish.category_id + '">' + (dish.category_name || 'N/D') + '</option>');
+                        }
+                    });
+                }
+
+                doLoad(isAddModal ? _allDishes : _allDishes);
+            }).fail(function() {
+                sel.html('<option value="">Errore caricamento piatti</option>').prop('disabled', false);
+            });
+        }
+
+        function filterDishesByCategory(dishes, categoryId) {
+            if (!categoryId) return dishes;
+            return dishes.filter(function(d) { return d.category_id == categoryId; });
+        }
+
+        $('#selectAddDishCategory').on('change', function() {
+            var sel = $('#selectAddDish');
+            renderDishOptions(filterDishesByCategory(_allDishes || [], $(this).val()), sel);
+            if ($.fn.select2) {
+                try { sel.select2({ dropdownParent: $('#modalAddDish') }); } catch(e) {}
+            }
+        });
+    });
+    </script>
+    @endif
+@endsection
+

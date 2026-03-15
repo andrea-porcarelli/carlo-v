@@ -23,12 +23,17 @@ class TableOrder extends Model
         'closed_at',
         'waiter_id',
         'preconto_requested_at',
+        'discount_type',
+        'discount_amount',
+        'discount_value',
     ];
 
     protected $casts = [
-        'total_amount' => 'decimal:2',
-        'opened_at' => 'datetime',
-        'closed_at' => 'datetime',
+        'total_amount'    => 'decimal:2',
+        'discount_amount' => 'decimal:2',
+        'discount_value'  => 'decimal:2',
+        'opened_at'       => 'datetime',
+        'closed_at'       => 'datetime',
         'preconto_requested_at' => 'datetime',
     ];
 
@@ -113,6 +118,52 @@ class TableOrder extends Model
     public function hasCoverCharge(): bool
     {
         return $this->covers > 0;
+    }
+
+    /**
+     * Returns true if a discount has been applied to this order
+     */
+    public function hasDiscount(): bool
+    {
+        return $this->discount_type !== null && (float) $this->discount_value > 0;
+    }
+
+    /**
+     * Total after discount (= total_amount - discount_value)
+     */
+    public function getDiscountedTotal(): float
+    {
+        return max(0, (float) $this->total_amount - (float) ($this->discount_value ?? 0));
+    }
+
+    /**
+     * Apply or clear a discount on this order (persists to DB)
+     */
+    public function applyDiscount(string $type, float $amount): void
+    {
+        $rawTotal = (float) $this->total_amount;
+        $discountValue = match ($type) {
+            'percent' => round($rawTotal * min($amount, 100) / 100, 2),
+            'value'   => min($amount, $rawTotal),
+            default   => 0.0,
+        };
+        $this->update([
+            'discount_type'   => $type,
+            'discount_amount' => $amount,
+            'discount_value'  => $discountValue,
+        ]);
+    }
+
+    /**
+     * Remove any applied discount
+     */
+    public function clearDiscount(): void
+    {
+        $this->update([
+            'discount_type'   => null,
+            'discount_amount' => null,
+            'discount_value'  => null,
+        ]);
     }
 
     /**

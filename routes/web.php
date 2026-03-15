@@ -72,6 +72,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::post('/{table}/pay-split/{split}', [TableOrderController::class, 'payPrecontoSplit'])->name('payPrecontoSplit');
     Route::delete('/{table}/preconto-splits/{split}', [TableOrderController::class, 'deletePrecontoSplit'])->name('deletePrecontoSplit');
     Route::post('/{table}/apply-discount', [TableOrderController::class, 'applyDiscount'])->name('applyDiscount');
+    Route::post('/{table}/reset-discount', [TableOrderController::class, 'resetDiscount'])->name('resetDiscount');
     Route::post('/open-cash-drawer', [TableOrderController::class, 'openCashDrawer'])->name('openCashDrawer');
     Route::post('/{table}/move', [TableOrderController::class, 'moveTable'])->name('move');
     Route::post('/{table}/reprint', [TableOrderController::class, 'reprintOrder'])->name('reprint');

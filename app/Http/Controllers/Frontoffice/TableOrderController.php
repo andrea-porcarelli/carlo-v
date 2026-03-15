@@ -98,7 +98,7 @@ class TableOrderController extends Controller
                 'name'          => $d->label,
                 'price'         => (float) $d->price,
                 'category_id'   => $d->category_id,
-                'category_name' => $d->category->name ?? 'N/D',
+                'category_name' => $d->category->label ?? 'N/D',
             ]);
 
         return response()->json(['success' => true, 'data' => $dishes]);
@@ -194,7 +194,11 @@ class TableOrderController extends Controller
                         'cover_charge_per_person' => $order->getCoverChargePerPerson(),
                         'cover_charge_total' => $order->getCoverChargeAmount(),
                         'has_cover_charge' => $order->hasCoverCharge(),
-                        'total_amount' => $order->total_amount,
+                        'total_amount'     => $order->total_amount,
+                        'discount_type'    => $order->discount_type,
+                        'discount_amount'  => $order->discount_amount ? (float) $order->discount_amount : null,
+                        'discount_value'   => $order->discount_value ? (float) $order->discount_value : null,
+                        'discounted_total' => $order->getDiscountedTotal(),
                         'items' => $items,
                     ] : null,
                 ],
@@ -338,11 +342,10 @@ class TableOrderController extends Controller
             'removals' => 'nullable|array',
             'segue' => 'nullable|boolean',
             'custom_price' => 'nullable|numeric|min:0',
-            'operator_token' => 'required|string',
         ]);
 
         // Verify operator token
-        $operatorId = $this->verifyOperatorToken($validated['operator_token']);
+        $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
         if (!$operatorId) {
             return response()->json([
                 'success' => false,
@@ -494,8 +497,13 @@ class TableOrderController extends Controller
             DB::commit();
 
             // Print removal notification to the relevant kitchen printer
+            Log::info('removeItem: dispatching print job', [
+                'order_id' => $order->id,
+                'item_id' => $item->id,
+                'operator_id' => $operatorId,
+            ]);
             PrintOrderItemsJob::dispatch($order->id, [$item->id], 'remove', $operatorId);
-
+            Log::info(__LINE__);
             return response()->json([
                 'success' => true,
                 'message' => 'Prodotto rimosso con successo',
@@ -1233,6 +1241,8 @@ class TableOrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Nessun ordine attivo'], 404);
         }
 
+        $order->applyDiscount($validated['discount_type'], (float) $validated['discount_amount']);
+
         $this->logger->logApplyDiscount(
             $order,
             $validated['discount_type'],
@@ -1241,6 +1251,31 @@ class TableOrderController extends Controller
             (float) $validated['final_total'],
             $operatorId,
         );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'discount_type'   => $order->discount_type,
+                'discount_amount' => (float) $order->discount_amount,
+                'discount_value'  => (float) $order->discount_value,
+                'discounted_total' => $order->getDiscountedTotal(),
+            ],
+        ]);
+    }
+
+    public function resetDiscount(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $order = $table->activeOrder;
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Nessun ordine attivo'], 404);
+        }
+
+        $order->clearDiscount();
 
         return response()->json(['success' => true]);
     }
@@ -1306,28 +1341,20 @@ class TableOrderController extends Controller
             // Stampa spostamento PRIMA di modificare i dati
             $this->printerService->setOperatorId($operatorId)->printSpostamento($sourceOrder, $destinationTable, $operatorId);
 
-            // Recupera o crea l'ordine sul tavolo di destinazione
             $destOrder = $destinationTable->activeOrder;
-            if (!$destOrder) {
-                $destOrder = TableOrder::create([
-                    'restaurant_table_id' => $destinationTable->id,
-                    'covers' => $sourceOrder->covers,
-                    'status' => 'open',
-                    'opened_at' => $sourceOrder->opened_at,
-                    'waiter_id' => $sourceOrder->waiter_id,
-                    'autoconsumo' => $sourceOrder->autoconsumo,
-                ]);
+            if ($destOrder) {
+                // Tavolo destinazione occupato: sposta gli items sull'ordine esistente
+                $sourceOrder->items()->update(['table_order_id' => $destOrder->id]);
+                $destOrder->updateTotal();
+                $sourceOrder->delete();
+            } else {
+                // Tavolo destinazione libero: sposta l'ordine aggiornando il tavolo
+                $sourceOrder->restaurant_table_id = $destinationTable->id;
+                $sourceOrder->save();
+                $destOrder = $sourceOrder;
                 $destinationTable->update(['status' => 'occupied']);
             }
 
-            // Sposta tutti gli items sull'ordine di destinazione
-            $sourceOrder->items()->update(['table_order_id' => $destOrder->id]);
-
-            // Aggiorna i totali
-            $destOrder->updateTotal();
-
-            // Chiudi l'ordine sorgente e libera il tavolo
-            $sourceOrder->delete();
             $table->update(['status' => 'free']);
 
             DB::commit();
