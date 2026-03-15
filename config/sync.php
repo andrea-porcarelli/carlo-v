@@ -19,7 +19,7 @@ return [
     | Peer Connection
     |--------------------------------------------------------------------------
     */
-    'peer_url' => env('SYNC_PEER_URL', 'http://internal.carlov.it'),
+    'peer_url' => env('SYNC_PEER_URL', 'http://carlov.local'),
     'api_token' => env('SYNC_API_TOKEN', ''),
     'timeout' => (int) env('SYNC_TIMEOUT', 120),
     'batch_size' => (int) env('SYNC_BATCH_SIZE', 500),
