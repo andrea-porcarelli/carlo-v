@@ -16,7 +16,7 @@ class DeployController extends BaseController
      */
     private static function deployKey(): string
     {
-        return env('DEPLOY_KEY', 'cv-deploy-7Xm2pN9qR4wL8jE3tK');
+        return env('DEPLOY_KEY');
     }
 
     /**
