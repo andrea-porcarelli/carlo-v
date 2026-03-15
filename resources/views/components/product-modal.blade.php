@@ -33,7 +33,8 @@
         </div>
 
         <!-- Body -->
-        <div class="{{ $isMobile ? 'mobile-modal-body' : '' }}"
+        <div id="{{ $isMobile ? '' : 'productModal-editView' }}"
+             class="{{ $isMobile ? 'mobile-modal-body' : '' }}"
              style="{{ !$isMobile ? 'padding: 16px;' : '' }}"
         >
             <!-- Quantity and Price Row -->
@@ -173,21 +174,50 @@
             @endif
         </div>
 
+        <!-- Dish Selection View (desktop only, hidden by default) -->
+        @if(!$isMobile)
+        <div id="productModal-dishView" style="display:none; flex-direction:column; padding:16px; gap:10px; height:400px;">
+            <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:#fd7e14; letter-spacing:0.5px;">
+                <i class="fas fa-exchange-alt me-1"></i> Seleziona il nuovo piatto
+            </div>
+            <input type="text" id="dishChangeSearch" placeholder="Cerca piatto per nome..."
+                   oninput="tableOrdersManager._filterDishList(this.value)"
+                   style="width:100%; padding:8px 12px; border:2px solid #dee2e6; font-size:0.9rem; border-radius:4px; outline:none;">
+            <div id="dishChangeCategoryFilter" style="display:flex; flex-wrap:wrap; gap:5px; flex-shrink:0;"></div>
+            <div id="dishChangeList" style="flex:1; overflow-y:auto; display:grid; grid-template-columns:1fr 1fr; gap:6px; align-content:start;"></div>
+        </div>
+        @endif
+
         <!-- Footer -->
         @if(!$isMobile)
         <div style="border-top: 2px solid #dee2e6; padding: 10px 16px 16px 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span style="font-size: 1rem; font-weight: 700; color: #000;">TOTALE RIGA:</span>
-                <span id="modalTotal" style="font-size: 1.3rem; font-weight: 700; color: #dc3545;">€0.00</span>
+            <!-- Main edit footer -->
+            <div id="productModal-mainFooter">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 1rem; font-weight: 700; color: #000;">TOTALE RIGA:</span>
+                    <span id="modalTotal" style="font-size: 1.3rem; font-weight: 700; color: #dc3545;">€0.00</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-red" style="flex: 1; padding: 11px; font-size: 14px;" id="addProductBtn">
+                        <i class="fas fa-plus me-2"></i> AGGIUNGI
+                    </button>
+                    <button id="changeDishBtn" style="display:none; flex: 0 0 auto; padding: 11px 16px; font-size: 14px; background: #fd7e14; border: none; color: white; font-weight: 600; text-transform: uppercase; cursor: pointer;" onclick="tableOrdersManager.openDishChangeView()">
+                        <i class="fas fa-exchange-alt me-1"></i> CAMBIA PIATTO
+                    </button>
+                    <button style="flex: 0 0 auto; padding: 11px 16px; font-size: 14px; background: #6c757d; border: none; color: white; font-weight: 600; text-transform: uppercase; cursor: pointer;" id="cancelProductBtn">
+                        ANNULLA
+                    </button>
+                </div>
             </div>
-            <div style="display: flex; gap: 8px;">
-                <button class="btn-red" style="flex: 1; padding: 11px; font-size: 14px;" id="addProductBtn">
-                    <i class="fas fa-plus me-2"></i> AGGIUNGI
+            <!-- Dish selection footer (hidden by default) -->
+            <div id="dishChangeFooter" style="display:none; gap:8px;">
+                <button id="confirmDishChangeBtn"
+                        onclick="tableOrdersManager.confirmDishChange()"
+                        style="flex:1; padding:11px; font-size:14px; background:#fd7e14; border:none; color:white; font-weight:600; text-transform:uppercase; cursor:pointer; border-radius:4px;">
+                    <i class="fas fa-check me-2"></i> CONFERMA PIATTO
                 </button>
-                <button id="changeDishBtn" style="display:none; flex: 0 0 auto; padding: 11px 16px; font-size: 14px; background: #fd7e14; border: none; color: white; font-weight: 600; text-transform: uppercase; cursor: pointer;" onclick="tableOrdersManager.initiateChangeDish()">
-                    <i class="fas fa-exchange-alt me-1"></i> CAMBIA PIATTO
-                </button>
-                <button style="flex: 0 0 auto; padding: 11px 16px; font-size: 14px; background: #6c757d; border: none; color: white; font-weight: 600; text-transform: uppercase; cursor: pointer;" id="cancelProductBtn">
+                <button onclick="tableOrdersManager.closeDishChangeView()"
+                        style="flex:0 0 auto; padding:11px 16px; font-size:14px; background:#6c757d; border:none; color:white; font-weight:600; text-transform:uppercase; cursor:pointer; border-radius:4px;">
                     ANNULLA
                 </button>
             </div>

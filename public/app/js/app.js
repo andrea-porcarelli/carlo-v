@@ -23,15 +23,11 @@ $(document).ready(function() {
         const dishPrice = parseFloat($(this).data('price'));
 
         if (typeof tableOrdersManager !== 'undefined') {
-            if (tableOrdersManager._changingDishForItemId) {
-                tableOrdersManager.selectDishForChange({ id: dishId, name: dishName, price: dishPrice });
-            } else {
-                tableOrdersManager.openProductModal({
-                    id: dishId,
-                    name: dishName,
-                    price: dishPrice
-                });
-            }
+            tableOrdersManager.openProductModal({
+                id: dishId,
+                name: dishName,
+                price: dishPrice
+            });
         }
     });
 

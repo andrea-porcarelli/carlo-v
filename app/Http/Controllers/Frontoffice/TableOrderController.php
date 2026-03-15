@@ -1796,8 +1796,10 @@ class TableOrderController extends Controller
             $order->save();
 
             $motivation = $request->input('motivation');
-            // Log the price update
-            $this->logger->logUpdateItemPrice($item, $dataBefore['unit_price'], $validated['unit_price'], $operatorId, $motivation);
+            // Log only if price actually changed
+            if (abs((float) $dataBefore['unit_price'] - (float) $validated['unit_price']) > 0.001) {
+                $this->logger->logUpdateItemPrice($item, $dataBefore['unit_price'], $validated['unit_price'], $operatorId, $motivation);
+            }
 
             DB::commit();
 
@@ -1893,9 +1895,10 @@ class TableOrderController extends Controller
             $order = $item->order;
             $order->load('restaurantTable');
 
-            $oldDishName  = $item->dish->label ?? $item->dish->name ?? 'N/D';
+            $oldDishId    = $item->dish_id;
+            $oldDishName  = $item->dish->label ?? 'N/D';
             $oldPrinter   = $item->dish->category->printer ?? null;
-            $oldUnitPrice = $item->unit_price;
+            $oldUnitPrice = (float) $item->unit_price;
 
             // Load new dish
             $newDish = Dish::findOrFail($validated['dish_id']);
@@ -1909,12 +1912,16 @@ class TableOrderController extends Controller
 
             $order->updateTotal();
 
-            $this->logger->logUpdateItem($item, [
-                'old_dish' => $oldDishName,
-                'old_price' => $oldUnitPrice,
-                'new_dish' => $newDish->label ?? $newDish->name,
-                'new_price' => $newDish->price,
-            ], $operatorId);
+            $this->logger->logChangeDish(
+                $item,
+                $oldDishId,
+                $oldDishName,
+                $oldUnitPrice,
+                $newDish->id,
+                $newDish->label,
+                (float) $newDish->price,
+                $operatorId
+            );
 
             DB::commit();
 

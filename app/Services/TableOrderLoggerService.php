@@ -114,6 +114,39 @@ class TableOrderLoggerService
     }
 
     /**
+     * Log per cambio piatto su un item esistente
+     */
+    public function logChangeDish(
+        OrderItem $item,
+        int $oldDishId,
+        string $oldDishName,
+        float $oldUnitPrice,
+        int $newDishId,
+        string $newDishName,
+        float $newUnitPrice,
+        int $operatorId = 0
+    ): TableOrderLog {
+        return $this->log(
+            action: 'change_dish',
+            entityType: 'order_item',
+            entity: $item,
+            dataBefore: [
+                'dish_id'    => $oldDishId,
+                'dish_name'  => $oldDishName,
+                'unit_price' => $oldUnitPrice,
+            ],
+            dataAfter: [
+                'dish_id'    => $newDishId,
+                'dish_name'  => $newDishName,
+                'unit_price' => $newUnitPrice,
+            ],
+            tableOrderId: $item->table_order_id,
+            notes: "Cambiato piatto da '{$oldDishName}' a '{$newDishName}'",
+            userId: $operatorId
+        );
+    }
+
+    /**
      * Log per aggiornamento item
      */
     public function logUpdateItem(OrderItem $item, array $dataBefore, int $operatorId = 0): TableOrderLog

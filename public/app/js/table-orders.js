@@ -22,7 +22,10 @@ class TableOrdersManager {
             pendingDishChange: [],
             itemCounter: -1,
         };
-        this._changingDishForItemId = null;
+        this._pendingNewDish = null;
+        this._dishCache = null;
+        this._dishChangeSelectedDish = null;
+        this._dishChangeActiveCategoryId = null;
 
         this.menuOptions = { extras: [], removals: [] };
 
@@ -932,7 +935,7 @@ class TableOrdersManager {
         if (modal) modal.style.display = 'none';
         this.currentProduct = null;
         this._editingItemId = null;
-        this._changingDishForItemId = null;
+        this._pendingNewDish = null;
         // Hide "Cambia piatto" button
         const changeDishBtn = document.getElementById('changeDishBtn');
         if (changeDishBtn) changeDishBtn.style.display = 'none';
@@ -955,65 +958,159 @@ class TableOrdersManager {
     }
 
     /**
-     * Initiate dish-change mode: close modal, activate banner
+     * Open the dish-change selection view inside the product modal
      */
-    initiateChangeDish() {
-        const itemId = this._editingItemId;
-        if (!itemId) return;
-        this._changingDishForItemId = itemId;
-        // Close modal without resetting _changingDishForItemId
-        const modal = this.getElement('productModal');
-        if (modal) modal.style.display = 'none';
-        this.currentProduct = null;
-        this._editingItemId = null;
-        const changeDishBtn = document.getElementById('changeDishBtn');
-        if (changeDishBtn) changeDishBtn.style.display = 'none';
-        const qtyEl = this.getElement('productQuantity');
-        const priceEl = this.getElement('productCustomPrice');
-        if (qtyEl) qtyEl.readOnly = false;
-        if (priceEl) priceEl.readOnly = false;
-        // Show indicator
-        const indicator = document.getElementById('changeDishIndicator');
-        if (indicator) indicator.style.display = 'flex';
+    async openDishChangeView() {
+        // Load all active dishes (cached after first call)
+        if (!this._dishCache) {
+            try {
+                const resp = await fetch('/api/dishes');
+                const data = await resp.json();
+                this._dishCache = data.data || [];
+            } catch (e) {
+                this.showNotification('Errore nel caricamento dei piatti', 'error');
+                return;
+            }
+        }
+
+        // Determine current dish's category for default filter
+        const currentItem = this.modifySession.items.find(i => i.id === this._editingItemId);
+        const currentDish = this._dishCache.find(d => d.id === currentItem?.dish_id);
+        this._dishChangeActiveCategoryId = currentDish?.category_id ?? null;
+        this._dishChangeSelectedDish = null;
+
+        // Toggle views
+        const editView = document.getElementById('productModal-editView');
+        const dishView = document.getElementById('productModal-dishView');
+        const mainFooter = document.getElementById('productModal-mainFooter');
+        const dishFooter = document.getElementById('dishChangeFooter');
+        if (editView)   editView.style.display   = 'none';
+        if (dishView)   dishView.style.display    = 'flex';
+        if (mainFooter) mainFooter.style.display  = 'none';
+        if (dishFooter) dishFooter.style.display  = 'flex';
+
+        // Clear search and render
+        const searchInput = document.getElementById('dishChangeSearch');
+        if (searchInput) searchInput.value = '';
+        this._renderDishCategories();
+        this._renderDishList('');
     }
 
     /**
-     * Select a new dish for the item being changed (called from .menu-item click)
+     * Render category pills in the dish selection view
      */
-    selectDishForChange(dish) {
-        const itemId = this._changingDishForItemId;
-        if (!itemId) return;
-        // Add to pending dish changes (replace if already changed)
-        const existing = this.modifySession.pendingDishChange.findIndex(c => c.itemId === itemId);
-        const change = { itemId, newDish: { id: dish.id, name: dish.name, price: dish.price } };
-        if (existing >= 0) {
-            this.modifySession.pendingDishChange[existing] = change;
-        } else {
-            this.modifySession.pendingDishChange.push(change);
+    _renderDishCategories() {
+        const container = document.getElementById('dishChangeCategoryFilter');
+        if (!container || !this._dishCache) return;
+
+        const categories = [];
+        const seen = new Set();
+        for (const dish of this._dishCache) {
+            if (!seen.has(dish.category_id)) {
+                seen.add(dish.category_id);
+                categories.push({ id: dish.category_id, name: dish.category_name });
+            }
         }
-        // Update local session item display
-        const item = this.modifySession.items.find(i => i.id === itemId);
-        if (item) {
-            item.dish_name = dish.name;
-            item.dish_id = dish.id;
-            item.unit_price = parseFloat(dish.price);
-            item.subtotal = parseFloat((item.unit_price * item.quantity).toFixed(2));
+        categories.sort((a, b) => {
+            if (a.id === this._dishChangeActiveCategoryId) return -1;
+            if (b.id === this._dishChangeActiveCategoryId) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        container.innerHTML = categories.map(cat => {
+            const active = cat.id === this._dishChangeActiveCategoryId;
+            return `<button onclick="tableOrdersManager._selectDishCategory(${cat.id})"
+                style="padding:4px 10px; font-size:0.78rem; font-weight:600; border:2px solid ${active ? '#fd7e14' : '#dee2e6'};
+                       background:${active ? '#fd7e14' : '#f8f9fa'}; color:${active ? 'white' : '#333'};
+                       border-radius:20px; cursor:pointer; white-space:nowrap; transition:all 0.1s;">
+                ${cat.name}
+            </button>`;
+        }).join('');
+    }
+
+    _selectDishCategory(categoryId) {
+        this._dishChangeActiveCategoryId = categoryId;
+        this._renderDishCategories();
+        const searchInput = document.getElementById('dishChangeSearch');
+        if (searchInput) searchInput.value = '';
+        this._renderDishList('');
+    }
+
+    _filterDishList(searchTerm) {
+        this._renderDishList(searchTerm);
+    }
+
+    _renderDishList(searchTerm) {
+        const container = document.getElementById('dishChangeList');
+        if (!container || !this._dishCache) return;
+
+        let dishes = this._dishCache;
+        if (searchTerm && searchTerm.trim()) {
+            const term = searchTerm.toLowerCase();
+            dishes = dishes.filter(d => d.name.toLowerCase().includes(term));
+        } else if (this._dishChangeActiveCategoryId) {
+            dishes = dishes.filter(d => d.category_id === this._dishChangeActiveCategoryId);
         }
-        // Clear state and hide indicator
-        this._changingDishForItemId = null;
-        const indicator = document.getElementById('changeDishIndicator');
-        if (indicator) indicator.style.display = 'none';
-        this.updateModifyReceiptItems();
-        this.showNotification(`Piatto cambiato in: ${dish.name}`, 'success');
+
+        if (!dishes.length) {
+            container.innerHTML = '<div style="color:#6c757d; font-size:0.85rem; padding:16px; text-align:center; grid-column:1/-1;">Nessun piatto trovato</div>';
+            return;
+        }
+
+        container.innerHTML = dishes.map(dish => {
+            const selected = this._dishChangeSelectedDish?.id === dish.id;
+            return `<button onclick="tableOrdersManager._selectDish(${dish.id})"
+                style="padding:8px 10px; text-align:left; border:2px solid ${selected ? '#fd7e14' : '#dee2e6'};
+                       background:${selected ? '#fff3e6' : '#f8f9fa'}; cursor:pointer; border-radius:6px;
+                       font-size:0.82rem; transition:all 0.1s; display:flex; flex-direction:column; gap:2px;">
+                <span style="font-weight:${selected ? '700' : '500'}; color:#000;">${dish.name}</span>
+                <span style="color:#dc3545; font-weight:700; font-size:0.8rem;">€${parseFloat(dish.price).toFixed(2)}</span>
+                ${searchTerm ? `<span style="font-size:0.72rem; color:#6c757d;">${dish.category_name}</span>` : ''}
+            </button>`;
+        }).join('');
+    }
+
+    _selectDish(dishId) {
+        this._dishChangeSelectedDish = this._dishCache.find(d => d.id === dishId) ?? null;
+        const searchInput = document.getElementById('dishChangeSearch');
+        this._renderDishList(searchInput?.value || '');
     }
 
     /**
-     * Cancel dish-change mode
+     * Confirm the dish selected in the selection view → update modal header, go back to edit view
      */
-    cancelChangeDish() {
-        this._changingDishForItemId = null;
-        const indicator = document.getElementById('changeDishIndicator');
-        if (indicator) indicator.style.display = 'none';
+    confirmDishChange() {
+        if (!this._dishChangeSelectedDish) {
+            this.showNotification('Seleziona prima un piatto', 'error');
+            return;
+        }
+        this._pendingNewDish = this._dishChangeSelectedDish;
+
+        // Update modal header to show new dish
+        const nameEl = document.getElementById('modalProductName');
+        const priceDisplayEl = document.getElementById('modalProductPriceDisplay');
+        const priceInputEl = document.getElementById('productCustomPrice');
+        if (nameEl) nameEl.textContent = this._pendingNewDish.name;
+        if (priceDisplayEl) priceDisplayEl.textContent = `€${parseFloat(this._pendingNewDish.price).toFixed(2)}`;
+        if (priceInputEl) priceInputEl.value = parseFloat(this._pendingNewDish.price).toFixed(2);
+        this.currentProduct = { id: this._pendingNewDish.id, name: this._pendingNewDish.name, price: this._pendingNewDish.price };
+
+        this.closeDishChangeView();
+    }
+
+    /**
+     * Close dish selection view and return to edit view
+     */
+    closeDishChangeView() {
+        const editView = document.getElementById('productModal-editView');
+        const dishView = document.getElementById('productModal-dishView');
+        const mainFooter = document.getElementById('productModal-mainFooter');
+        const dishFooter = document.getElementById('dishChangeFooter');
+        if (editView)   editView.style.display   = '';
+        if (dishView)   dishView.style.display    = 'none';
+        if (mainFooter) mainFooter.style.display  = '';
+        if (dishFooter) dishFooter.style.display  = 'none';
+        this._dishChangeSelectedDish = null;
     }
 
     /**
@@ -1109,6 +1206,24 @@ class TableOrdersManager {
             }
 
             if (itemId > 0) {
+                // If a new dish was selected in the dish-change view, record it
+                if (this._pendingNewDish) {
+                    const existing = (this.modifySession.pendingDishChange || []).findIndex(c => c.itemId === itemId);
+                    const change = { itemId, newDish: this._pendingNewDish };
+                    if (existing >= 0) {
+                        this.modifySession.pendingDishChange[existing] = change;
+                    } else {
+                        this.modifySession.pendingDishChange.push(change);
+                    }
+                    // Update local session item display
+                    const sessItem = this.modifySession.items.find(i => i.id === itemId);
+                    if (sessItem) {
+                        sessItem.dish_name = this._pendingNewDish.name;
+                        sessItem.dish_id   = this._pendingNewDish.id;
+                    }
+                    this._pendingNewDish = null;
+                }
+
                 // Detect what actually changed compared to the current session item
                 const origItem = this.modifySession.items.find(i => i.id === itemId) || {};
                 const origQty   = origItem._origQuantity ?? origItem.quantity;
@@ -1124,7 +1239,15 @@ class TableOrdersManager {
                     JSON.stringify(Object.keys(extras).length > 0 ? extras : {}) !== origExtras ||
                     JSON.stringify([...removals].sort()) !== origRemovals;
 
-                // Existing DB item: build pendingUpdate and submit immediately
+                const hasDishChange = (this.modifySession.pendingDishChange || []).some(c => c.itemId === itemId);
+
+                // Nothing changed → just close
+                if (!qtyChanged && !priceChanged && !detailsChanged && !hasDishChange) {
+                    this.closeProductModal();
+                    return;
+                }
+
+                // Build pendingUpdate for changed fields
                 if (!this.modifySession.pendingUpdate[itemId]) this.modifySession.pendingUpdate[itemId] = {};
                 if (detailsChanged) {
                     this.modifySession.pendingUpdate[itemId].notes    = notes;

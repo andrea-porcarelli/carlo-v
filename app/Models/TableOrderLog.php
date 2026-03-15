@@ -40,6 +40,7 @@ class TableOrderLog extends Model
     const ACTION_AUTOCONSUMO = 'autoconsumo';
     const ACTION_AUTOCONSUMO_PARTIAL = 'autoconsumo_partial';
     const ACTION_APPLY_DISCOUNT = 'apply_discount';
+    const ACTION_CHANGE_DISH = 'change_dish';
 
     // Mapping azione -> categoria
     const ACTION_CATEGORY_MAP = [
@@ -57,6 +58,7 @@ class TableOrderLog extends Model
         self::ACTION_ADD_ITEM_NOTES => self::CATEGORY_ITEM,
         self::ACTION_ADD_ITEM_EXTRAS => self::CATEGORY_ITEM,
         self::ACTION_UPDATE_ITEM_QUANTITY => self::CATEGORY_ITEM,
+        self::ACTION_CHANGE_DISH => self::CATEGORY_ITEM,
         // Categoria 'covers' - Gestione coperti
         self::ACTION_UPDATE_COVERS => self::CATEGORY_COVERS,
         // Categoria 'print' - Stampe
@@ -177,6 +179,7 @@ class TableOrderLog extends Model
             'add_item_notes' => 'Aggiunte note prodotto',
             'add_item_extras' => 'Aggiunti extra prodotto',
             'update_item_quantity' => 'Modificata quantità prodotto',
+            'change_dish' => 'Cambiato piatto',
             'print_marcia' => 'Stampata marcia',
             'print_preconto' => 'Stampato preconto',
             'update_item_price' => 'Modificato prezzo prodotto',

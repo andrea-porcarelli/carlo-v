@@ -93,12 +93,7 @@
                         </div>
 
                         <!-- Menu con categorie integrate (centro + destra) -->
-                        <div class="overlay-col-menu" style="padding:0; overflow:hidden; position:relative;">
-                            <!-- Change-dish mode indicator -->
-                            <div id="changeDishIndicator" style="display:none; position:absolute; top:0; left:0; right:0; z-index:10; background:#fd7e14; color:#fff; padding:10px 16px; display:none; align-items:center; justify-content:space-between; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; font-size:0.9rem;">
-                                <span><i class="fas fa-exchange-alt me-2"></i>Seleziona il nuovo piatto</span>
-                                <button onclick="tableOrdersManager.cancelChangeDish()" style="background:#c45e00; border:none; color:#fff; padding:5px 12px; font-weight:700; cursor:pointer; border-radius:4px; font-size:0.85rem;">ANNULLA</button>
-                            </div>
+                        <div class="overlay-col-menu" style="padding:0; overflow:hidden;">
                             <div id="modifyMenuContainer" style="height:100%;">
                                 @livewire('dish-selector')
                             </div>
