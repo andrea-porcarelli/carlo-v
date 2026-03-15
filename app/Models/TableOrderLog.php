@@ -39,6 +39,7 @@ class TableOrderLog extends Model
     const ACTION_CREATE_INVOICE = 'create_invoice';
     const ACTION_AUTOCONSUMO = 'autoconsumo';
     const ACTION_AUTOCONSUMO_PARTIAL = 'autoconsumo_partial';
+    const ACTION_APPLY_DISCOUNT = 'apply_discount';
 
     // Mapping azione -> categoria
     const ACTION_CATEGORY_MAP = [
@@ -67,6 +68,7 @@ class TableOrderLog extends Model
         // Categoria 'order' - Autoconsumo
         self::ACTION_AUTOCONSUMO => self::CATEGORY_ORDER,
         self::ACTION_AUTOCONSUMO_PARTIAL => self::CATEGORY_ORDER,
+        self::ACTION_APPLY_DISCOUNT => self::CATEGORY_ORDER,
     ];
 
     protected $fillable = [

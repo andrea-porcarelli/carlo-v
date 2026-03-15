@@ -40,6 +40,7 @@ Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function(
 
 // API Routes for Menu Options
 Route::get('/api/menu-options', [TableOrderController::class, 'getMenuOptions'])->name('api.menu-options');
+Route::get('/api/dishes', [TableOrderController::class, 'getDishes'])->name('api.dishes');
 Route::get('/api/banco', [TableOrderController::class, 'getBanco'])->name('api.banco');
 Route::post('/api/banco/open', [TableOrderController::class, 'openBanco'])->name('api.banco.open');
 Route::get('/api/order/{order}', [TableOrderController::class, 'getOrderDetails'])->name('api.order.details');
@@ -64,6 +65,8 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::get('/{table}/preconto-splits', [TableOrderController::class, 'getPrecontoSplits'])->name('precontoSplits');
     Route::post('/{table}/pay-split/{split}', [TableOrderController::class, 'payPrecontoSplit'])->name('payPrecontoSplit');
     Route::delete('/{table}/preconto-splits/{split}', [TableOrderController::class, 'deletePrecontoSplit'])->name('deletePrecontoSplit');
+    Route::post('/{table}/apply-discount', [TableOrderController::class, 'applyDiscount'])->name('applyDiscount');
+    Route::post('/open-cash-drawer', [TableOrderController::class, 'openCashDrawer'])->name('openCashDrawer');
     Route::post('/{table}/move', [TableOrderController::class, 'moveTable'])->name('move');
     Route::post('/{table}/reprint', [TableOrderController::class, 'reprintOrder'])->name('reprint');
     Route::post('/{table}/print-session', [TableOrderController::class, 'printSession'])->name('printSession');
@@ -74,6 +77,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::get('/printers', [TableOrderController::class, 'getPrinters'])->name('printers');
     Route::put('/items/{item}/price', [TableOrderController::class, 'updateItemPrice'])->name('updateItemPrice');
     Route::put('/items/{item}/details', [TableOrderController::class, 'updateItemDetails'])->name('updateItemDetails');
+    Route::put('/items/{item}/dish', [TableOrderController::class, 'updateItemDish'])->name('updateItemDish');
     Route::put('/{table}/covers', [TableOrderController::class, 'updateCovers'])->name('updateCovers');
 });
 

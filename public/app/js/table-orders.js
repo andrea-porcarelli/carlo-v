@@ -19,8 +19,10 @@ class TableOrdersManager {
             pendingAdd: [],
             pendingRemove: [],
             pendingUpdate: {},
+            pendingDishChange: [],
             itemCounter: -1,
         };
+        this._changingDishForItemId = null;
 
         this.menuOptions = { extras: [], removals: [] };
 
@@ -237,59 +239,8 @@ class TableOrdersManager {
     /**
      * Update stats counters
      */
-    updateStats(tables, bancoOrders = []) {
-        const occupied = tables.filter(t => !t.is_banco && t.status === 'occupied').length;
-        const free = tables.filter(t => !t.is_banco && t.status === 'free').length;
-
-        const occupiedElement = this.getElement('occupiedCount');
-        const freeElement = this.getElement('freeCount');
-
-        if (occupiedElement) occupiedElement.textContent = occupied;
-        if (freeElement) freeElement.textContent = free;
-
-        // Populate occupied summary panel (desktop only)
-        if (!this.isMobile) {
-            const summaryEl = document.getElementById('occupiedSummary');
-            if (summaryEl) {
-                const occupiedTables = tables.filter(t => !t.is_banco && t.has_active_order);
-                const bancoBadges = (bancoOrders || []).map(o => {
-                    const elapsed = o.opened_at ? this.formatElapsedTime(o.opened_at) : '';
-                    return `<div class="occupied-row" data-order-id="${o.id}" style="border-left-color:#fd7e14;background:#fff8f0;">
-                        <div style="flex:1;">
-                            <div style="font-weight:700;font-size:0.78rem;color:#fd7e14;text-transform:uppercase;letter-spacing:0.5px;">VENDITA AL BANCO</div>
-                            <div class="occupied-row-info">${elapsed}</div>
-                        </div>
-                        <div class="occupied-row-total">€${parseFloat(o.total_amount||0).toFixed(2)}</div>
-                    </div>`;
-                });
-
-                const tableBadges = occupiedTables.map(t => {
-                    const elapsed = t.active_order?.opened_at ? this.formatElapsedTime(t.active_order.opened_at) : '';
-                    const covers = t.active_order?.covers ?? 0;
-                    const cls = t.has_preconto ? 'occupied-row preconto' : 'occupied-row';
-                    return `<div class="${cls}" data-table-id="${t.id}">
-                        <div class="occupied-row-number">${t.table_number}</div>
-                        <div style="flex:1;">
-                            <div style="font-weight:600;font-size:0.8rem;color:#000;">${covers} cop</div>
-                            <div class="occupied-row-info">${elapsed}</div>
-                        </div>
-                        <div class="occupied-row-total">€${parseFloat(t.current_total||0).toFixed(2)}</div>
-                    </div>`;
-                });
-
-                const allBadges = [...bancoBadges, ...tableBadges];
-                summaryEl.innerHTML = allBadges.length === 0
-                    ? '<div style="text-align:center;color:#6c757d;padding:20px;">Nessun tavolo occupato</div>'
-                    : allBadges.join('');
-
-                summaryEl.querySelectorAll('.occupied-row[data-order-id]').forEach(el => {
-                    el.addEventListener('click', () => this.selectByOrderId(parseInt(el.dataset.orderId)));
-                });
-                summaryEl.querySelectorAll('.occupied-row[data-table-id]').forEach(el => {
-                    el.addEventListener('click', () => this.selectTable(parseInt(el.dataset.tableId)));
-                });
-            }
-        }
+    updateStats() {
+        // Summary panel removed — nothing to update
     }
 
     /**
@@ -406,6 +357,7 @@ class TableOrdersManager {
         this.modifySession.pendingAdd = [];
         this.modifySession.pendingRemove = [];
         this.modifySession.pendingUpdate = {};
+        this.modifySession.pendingDishChange = [];
         this.modifySession.itemCounter = -1;
     }
 
@@ -484,6 +436,16 @@ class TableOrdersManager {
         // Update receipt items in modify overlay
         this.updateModifyReceiptItems();
 
+        // Hide/show buttons based on banco mode
+        const isBanco = !!this.currentTable.table?.is_banco;
+        ['btnModifyFreeAmount', 'btnSpostaTavolo', 'btnModifyComunica'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = isBanco ? 'none' : '';
+        });
+        // For banco: hide "Chiudi e invia" — overlay can only close via payment
+        const closeBtn = document.getElementById('closeModifyBtn');
+        if (closeBtn) closeBtn.style.display = isBanco ? 'none' : '';
+
         // Show overlay
         const overlay = document.getElementById('modifyOrderOverlay');
         if (overlay) {
@@ -526,27 +488,13 @@ class TableOrdersManager {
         let itemsHtml = items.map(item => `
             <div class="receipt-item${item._isNew ? ' receipt-item-new' : ''}" data-item-id="${item.id}" style="${item._isNew ? 'border-left:3px solid #28a745;' : ''}">
                 <div class="receipt-item-header">
-                    <strong>${item.dish_name}</strong>
+                    <strong>${item.quantity} × ${item.dish_name}</strong>
                     ${item._isNew ? '<span style="background:#28a745;color:white;font-size:0.65rem;padding:1px 5px;border-radius:3px;margin-left:6px;">NUOVO</span>' : ''}
                     ${item.notes ? `<br /><div class="receipt-item-notes"><i class="fas fa-sticky-note me-1"></i>${item.notes}</div>` : ''}
                 </div>
                 <div class="receipt-item-details">
                     <div class="quantity-controls">
-                        <button class="quantity-btn" onclick="tableOrdersManager.decreaseQuantity(${item.id}, event)">
-                            <i class="fas fa-minus"></i>
-                        </button>
-                        <span class="quantity-display">${item.quantity}</span>
-                        <button class="quantity-btn" onclick="tableOrdersManager.increaseQuantity(${item.id}, event)">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                        <span class="receipt-item-price" id="priceDisplay_${item.id}">
-                            <span onclick="tableOrdersManager.editPrice(${item.id}, ${parseFloat(item.unit_price)})" style="cursor:pointer;" title="Modifica prezzo">€${parseFloat(item.subtotal).toFixed(2)} <i class="fas fa-pencil-alt" style="font-size:0.7rem;color:#6c757d;"></i></span>
-                        </span>
-                        <span id="priceEdit_${item.id}" style="display:none;">
-                            <input type="number" step="0.01" min="0" value="${parseFloat(item.unit_price).toFixed(2)}" id="priceInput_${item.id}" style="width:70px;padding:2px 4px;font-size:0.85rem;border:1px solid #dc3545;border-radius:3px;">
-                            <button onclick="tableOrdersManager.savePrice(${item.id})" style="background:#28a745;border:none;color:white;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-check"></i></button>
-                            <button onclick="tableOrdersManager.cancelEditPrice(${item.id})" style="background:#6c757d;border:none;color:white;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-times"></i></button>
-                        </span>
+                        <span class="receipt-item-price">€${parseFloat(item.subtotal).toFixed(2)}</span>
                         <br />
                     </div>
                     ${item.extras && Object.keys(item.extras).length > 0 ? `
@@ -563,7 +511,7 @@ class TableOrdersManager {
                     ` : ''}
                 </div>
                 <div class="receipt-item-actions">
-                    ${!item._isNew ? `<button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica note/extra"><i class="fas fa-pen"></i></button>` : ''}
+                    <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
                     <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -620,14 +568,114 @@ class TableOrdersManager {
 
         itemsContainer.innerHTML = itemsHtml;
 
-        // Calculate total: session items subtotal + cover charge from order
+        // Calculate raw total
+        let rawTotal;
         if (this.modifySession.active) {
             const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
             const coverTotal = (order && order.has_cover_charge) ? parseFloat(order.cover_charge_total || 0) : 0;
-            totalElement.textContent = `€${(itemsTotal + coverTotal).toFixed(2)}`;
+            rawTotal = itemsTotal + coverTotal;
         } else {
-            totalElement.textContent = `€${parseFloat(order ? order.total_amount : 0).toFixed(2)}`;
+            rawTotal = parseFloat(order ? order.total_amount : 0);
         }
+
+        // Apply authorized discount (set only after auth)
+        const authorizedDiscount = this._authorizedDiscount;
+        let finalTotal = rawTotal;
+        if (authorizedDiscount && authorizedDiscount.value > 0) {
+            finalTotal = authorizedDiscount.type === 'percent'
+                ? Math.max(0, rawTotal - Math.round(rawTotal * Math.min(authorizedDiscount.value, 100) / 100 * 100) / 100)
+                : Math.max(0, rawTotal - Math.min(authorizedDiscount.value, rawTotal));
+        }
+
+        // Show/hide original total (strikethrough)
+        const originalAmountEl = document.getElementById('modifyOriginalAmount');
+        if (originalAmountEl) {
+            if (authorizedDiscount && authorizedDiscount.value > 0 && finalTotal !== rawTotal) {
+                originalAmountEl.textContent = `€${rawTotal.toFixed(2)}`;
+                originalAmountEl.style.display = 'block';
+            } else {
+                originalAmountEl.style.display = 'none';
+            }
+        }
+
+        totalElement.textContent = `€${finalTotal.toFixed(2)}`;
+    }
+
+    /**
+     * Request operator auth before applying discount
+     */
+    async requestDiscountAuth() {
+        const discountInput = document.getElementById('modifyDiscountInput');
+        const discountVal = parseFloat(discountInput?.value || 0);
+        if (!discountVal || discountVal <= 0) {
+            this.showNotification('Inserisci un valore di sconto', 'warning');
+            return;
+        }
+        const isPercent = document.getElementById('discountTypePct')?.classList.contains('active');
+        const discountType = isPercent ? 'percent' : 'value';
+
+        try {
+            const auth = await operatorAuthManager.requestAuth();
+
+            // Calculate totals
+            const order = this.currentTable?.order;
+            let rawTotal;
+            if (this.modifySession.active) {
+                const items = this.modifySession.items;
+                const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
+                const coverTotal = (order && order.has_cover_charge) ? parseFloat(order.cover_charge_total || 0) : 0;
+                rawTotal = itemsTotal + coverTotal;
+            } else {
+                rawTotal = parseFloat(order ? order.total_amount : 0);
+            }
+            const finalTotal = discountType === 'percent'
+                ? Math.max(0, rawTotal - Math.round(rawTotal * Math.min(discountVal, 100) / 100 * 100) / 100)
+                : Math.max(0, rawTotal - Math.min(discountVal, rawTotal));
+
+            // Save log via API
+            const tableId = this.currentTable.table.id;
+            await fetch(`${this.apiBase}/${tableId}/apply-discount`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token,
+                },
+                body: JSON.stringify({
+                    discount_type:   discountType,
+                    discount_amount: discountVal,
+                    original_total:  rawTotal,
+                    final_total:     finalTotal,
+                }),
+            });
+
+            // Lock discount UI and apply
+            this._authorizedDiscount = { type: discountType, value: discountVal };
+            if (discountInput) discountInput.disabled = true;
+            const btnApply = document.getElementById('btnApplyDiscount');
+            const btnReset = document.getElementById('btnResetDiscount');
+            if (btnApply) btnApply.style.display = 'none';
+            if (btnReset) btnReset.style.display = 'inline-flex';
+
+            this.updateModifyReceiptItems();
+            this.showNotification(`Sconto autorizzato da ${auth.user.name}`, 'success');
+        } catch {
+            // auth cancelled or error — do nothing
+        }
+    }
+
+    /**
+     * Reset the authorized discount
+     */
+    resetDiscount() {
+        this._authorizedDiscount = null;
+        const discountInput = document.getElementById('modifyDiscountInput');
+        if (discountInput) { discountInput.value = ''; discountInput.disabled = false; }
+        const btnApply = document.getElementById('btnApplyDiscount');
+        const btnReset = document.getElementById('btnResetDiscount');
+        if (btnApply) btnApply.style.display = 'inline-flex';
+        if (btnReset) btnReset.style.display = 'none';
+        this.updateModifyReceiptItems();
     }
 
     /**
@@ -781,6 +829,14 @@ class TableOrdersManager {
         // Update total
         this.updateModalTotal();
 
+        // Hide "Cambia piatto" button in add mode
+        const changeDishBtn = document.getElementById('changeDishBtn');
+        if (changeDishBtn) changeDishBtn.style.display = 'none';
+
+        // Restore add button label
+        const addBtn = document.getElementById('addProductBtn');
+        if (addBtn) addBtn.innerHTML = '<i class="fas fa-plus me-2"></i> AGGIUNGI';
+
         // Show modal
         const modal = this.getElement('productModal');
         if (modal) modal.style.display = this.isMobile ? 'flex' : 'block';
@@ -795,17 +851,27 @@ class TableOrdersManager {
 
         this._editingItemId = itemId;
 
+        // Snapshot original values for change detection (only on first open)
+        if (!item._origQuantity) item._origQuantity = item.quantity;
+        if (!item._origPrice)    item._origPrice    = item.unit_price;
+        if (item._origNotes    === undefined) item._origNotes    = item.notes || null;
+        if (item._origExtras   === undefined) item._origExtras   = JSON.parse(JSON.stringify(item.extras || {}));
+        if (item._origRemovals === undefined) item._origRemovals = [...(item.removals || [])];
+
+        // Set currentProduct so updateModalTotal works
+        this.currentProduct = { id: item.dish_id, name: item.dish_name, price: item.unit_price };
+
         // Populate header
         const nameElement = this.getElement('modalProductName');
         const priceDisplayElement = this.getElement('modalProductPriceDisplay');
         const customPriceElement = this.getElement('productCustomPrice');
         if (nameElement) nameElement.textContent = item.dish_name || '';
         if (priceDisplayElement) priceDisplayElement.textContent = `€${parseFloat(item.unit_price).toFixed(2)}`;
-        if (customPriceElement) { customPriceElement.value = parseFloat(item.unit_price).toFixed(2); customPriceElement.readOnly = true; }
+        if (customPriceElement) { customPriceElement.value = parseFloat(item.unit_price).toFixed(2); customPriceElement.readOnly = false; }
 
-        // Quantity (read-only in edit mode)
+        // Quantity (editable in edit mode)
         const quantityElement = this.getElement('productQuantity');
-        if (quantityElement) { quantityElement.value = item.quantity; quantityElement.readOnly = true; }
+        if (quantityElement) { quantityElement.value = item.quantity; quantityElement.readOnly = false; }
 
         // Notes
         const notesElement = this.getElement('productNotes');
@@ -843,6 +909,14 @@ class TableOrdersManager {
                 : '<small style="color:#6c757d;">Nessuna rimozione disponibile</small>';
         }
 
+        // Show "Cambia piatto" button in edit mode (only on desktop overlay)
+        const changeDishBtn = document.getElementById('changeDishBtn');
+        if (changeDishBtn && !this.isMobile) changeDishBtn.style.display = '';
+
+        // Change add button label to "CONFERMA" in edit mode
+        const addBtn = document.getElementById('addProductBtn');
+        if (addBtn) addBtn.innerHTML = '<i class="fas fa-check me-2"></i> CONFERMA';
+
         this.updateModalTotal();
 
         // Show modal
@@ -858,6 +932,13 @@ class TableOrdersManager {
         if (modal) modal.style.display = 'none';
         this.currentProduct = null;
         this._editingItemId = null;
+        this._changingDishForItemId = null;
+        // Hide "Cambia piatto" button
+        const changeDishBtn = document.getElementById('changeDishBtn');
+        if (changeDishBtn) changeDishBtn.style.display = 'none';
+        // Restore add button label
+        const addBtn = document.getElementById('addProductBtn');
+        if (addBtn) addBtn.innerHTML = '<i class="fas fa-plus me-2"></i> AGGIUNGI';
         // Reset readonly state
         const quantityElement = this.getElement('productQuantity');
         const customPriceElement = this.getElement('productCustomPrice');
@@ -871,6 +952,68 @@ class TableOrdersManager {
                 $('#manageModalMobile').addClass('active').show();
             }
         }
+    }
+
+    /**
+     * Initiate dish-change mode: close modal, activate banner
+     */
+    initiateChangeDish() {
+        const itemId = this._editingItemId;
+        if (!itemId) return;
+        this._changingDishForItemId = itemId;
+        // Close modal without resetting _changingDishForItemId
+        const modal = this.getElement('productModal');
+        if (modal) modal.style.display = 'none';
+        this.currentProduct = null;
+        this._editingItemId = null;
+        const changeDishBtn = document.getElementById('changeDishBtn');
+        if (changeDishBtn) changeDishBtn.style.display = 'none';
+        const qtyEl = this.getElement('productQuantity');
+        const priceEl = this.getElement('productCustomPrice');
+        if (qtyEl) qtyEl.readOnly = false;
+        if (priceEl) priceEl.readOnly = false;
+        // Show indicator
+        const indicator = document.getElementById('changeDishIndicator');
+        if (indicator) indicator.style.display = 'flex';
+    }
+
+    /**
+     * Select a new dish for the item being changed (called from .menu-item click)
+     */
+    selectDishForChange(dish) {
+        const itemId = this._changingDishForItemId;
+        if (!itemId) return;
+        // Add to pending dish changes (replace if already changed)
+        const existing = this.modifySession.pendingDishChange.findIndex(c => c.itemId === itemId);
+        const change = { itemId, newDish: { id: dish.id, name: dish.name, price: dish.price } };
+        if (existing >= 0) {
+            this.modifySession.pendingDishChange[existing] = change;
+        } else {
+            this.modifySession.pendingDishChange.push(change);
+        }
+        // Update local session item display
+        const item = this.modifySession.items.find(i => i.id === itemId);
+        if (item) {
+            item.dish_name = dish.name;
+            item.dish_id = dish.id;
+            item.unit_price = parseFloat(dish.price);
+            item.subtotal = parseFloat((item.unit_price * item.quantity).toFixed(2));
+        }
+        // Clear state and hide indicator
+        this._changingDishForItemId = null;
+        const indicator = document.getElementById('changeDishIndicator');
+        if (indicator) indicator.style.display = 'none';
+        this.updateModifyReceiptItems();
+        this.showNotification(`Piatto cambiato in: ${dish.name}`, 'success');
+    }
+
+    /**
+     * Cancel dish-change mode
+     */
+    cancelChangeDish() {
+        this._changingDishForItemId = null;
+        const indicator = document.getElementById('changeDishIndicator');
+        if (indicator) indicator.style.display = 'none';
     }
 
     /**
@@ -921,23 +1064,29 @@ class TableOrdersManager {
     }
 
     /**
-     * Add product to session (no auth, no API call, local only).
-     * If _editingItemId is set, saves changes to an existing item instead.
+     * Add product to session.
+     * In edit mode: requests auth, submits immediately to backend, prints.
+     * In add mode: adds locally to session (sent at "Chiudi e Invia").
      */
-    addProductToSession() {
+    async addProductToSession() {
         if (!this.currentTable) return;
 
-        // Edit mode: save notes/extras/removals to existing item
+        // Edit mode: collect changes, submit immediately with auth
         if (this._editingItemId) {
             const itemId = this._editingItemId;
-            this._editingItemId = null;
 
-            const notesElement = this.getElement('productNotes');
-            const extrasContainer = this.getElement('extrasContainer');
-            const removalsContainer = this.getElement('removalsContainer');
+            const quantityElement    = this.getElement('productQuantity');
+            const customPriceElement = this.getElement('productCustomPrice');
+            const notesElement       = this.getElement('productNotes');
+            const segueElement       = this.getElement('productSegue');
+            const extrasContainer    = this.getElement('extrasContainer');
+            const removalsContainer  = this.getElement('removalsContainer');
 
-            const notes = notesElement?.value || null;
-            const extras = {};
+            const newQty   = parseInt(quantityElement?.value || 1);
+            const newPrice = parseFloat(customPriceElement?.value);
+            const notes    = notesElement?.value || null;
+            const segue    = segueElement?.checked || false;
+            const extras   = {};
             extrasContainer?.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
                 extras[cb.dataset.name] = parseFloat(cb.value);
             });
@@ -946,29 +1095,77 @@ class TableOrdersManager {
                 removals.push(cb.dataset.name);
             });
 
-            // Update local session item
+            // Update local session item (optimistic)
             const item = this.modifySession.items.find(i => i.id === itemId);
             if (item) {
-                item.notes = notes;
-                item.extras = Object.keys(extras).length > 0 ? extras : {};
+                item.notes    = notes;
+                item.segue    = segue;
+                item.extras   = Object.keys(extras).length > 0 ? extras : {};
                 item.removals = removals;
+                if (newQty > 0) item.quantity = newQty;
+                if (!isNaN(newPrice) && newPrice >= 0) item.unit_price = newPrice;
+                const extrasTotal = Object.values(item.extras).reduce((s, v) => s + v, 0);
+                item.subtotal = parseFloat(((item.unit_price + extrasTotal) * item.quantity).toFixed(2));
             }
 
-            // Track in pendingUpdate with printable flag
-            if (!this.modifySession.pendingUpdate[itemId]) this.modifySession.pendingUpdate[itemId] = {};
-            this.modifySession.pendingUpdate[itemId].notes    = notes;
-            this.modifySession.pendingUpdate[itemId].extras   = Object.keys(extras).length > 0 ? extras : null;
-            this.modifySession.pendingUpdate[itemId].removals = removals.length > 0 ? removals : null;
-            this.modifySession.pendingUpdate[itemId]._detailsChanged = true;
+            if (itemId > 0) {
+                // Detect what actually changed compared to the current session item
+                const origItem = this.modifySession.items.find(i => i.id === itemId) || {};
+                const origQty   = origItem._origQuantity ?? origItem.quantity;
+                const origPrice = origItem._origPrice    ?? origItem.unit_price;
+                const origNotes = origItem._origNotes    ?? (origItem.notes || null);
+                const origExtras   = JSON.stringify(origItem._origExtras   ?? (origItem.extras   || {}));
+                const origRemovals = JSON.stringify([...((origItem._origRemovals ?? origItem.removals) || [])].sort());
 
-            // Reset modal inputs to non-readonly for next use
-            const quantityElement = this.getElement('productQuantity');
-            const customPriceElement = this.getElement('productCustomPrice');
-            if (quantityElement) quantityElement.readOnly = false;
-            if (customPriceElement) customPriceElement.readOnly = false;
+                const qtyChanged   = newQty !== origQty;
+                const priceChanged = !isNaN(newPrice) && newPrice >= 0 && Math.abs(newPrice - origPrice) > 0.001;
+                const detailsChanged =
+                    notes !== origNotes ||
+                    JSON.stringify(Object.keys(extras).length > 0 ? extras : {}) !== origExtras ||
+                    JSON.stringify([...removals].sort()) !== origRemovals;
 
-            this.closeProductModal();
-            this.renderReceiptItems();
+                // Existing DB item: build pendingUpdate and submit immediately
+                if (!this.modifySession.pendingUpdate[itemId]) this.modifySession.pendingUpdate[itemId] = {};
+                if (detailsChanged) {
+                    this.modifySession.pendingUpdate[itemId].notes    = notes;
+                    this.modifySession.pendingUpdate[itemId].extras   = Object.keys(extras).length > 0 ? extras : null;
+                    this.modifySession.pendingUpdate[itemId].removals = removals.length > 0 ? removals : null;
+                    this.modifySession.pendingUpdate[itemId]._detailsChanged = true;
+                }
+                if (qtyChanged)   this.modifySession.pendingUpdate[itemId].quantity = newQty;
+                if (priceChanged) {
+                    this.modifySession.pendingUpdate[itemId].unit_price = newPrice;
+                    this.modifySession.pendingUpdate[itemId].price_motivation = null;
+                }
+
+                // Request auth and submit
+                let auth;
+                try { auth = await operatorAuthManager.requestAuth(); } catch (e) { return; }
+                if (!auth) return;
+
+                this.closeProductModal();
+                try {
+                    await this._submitItemEdit(itemId, auth.token);
+                    this.showNotification('Modifiche salvate', 'success');
+                } catch (e) {
+                    console.error('Error submitting item edit:', e);
+                    this.showNotification('Errore nel salvataggio: ' + e.message, 'error');
+                }
+                this.updateModifyReceiptItems();
+            } else {
+                // Local new item → update pendingAdd entry (no submit needed now)
+                const addEntry = this.modifySession.pendingAdd.find(a => a._localId === itemId);
+                if (addEntry) {
+                    addEntry.notes    = notes;
+                    addEntry.segue    = segue;
+                    addEntry.extras   = Object.keys(extras).length > 0 ? extras : {};
+                    addEntry.removals = removals;
+                    if (newQty > 0) addEntry.quantity = newQty;
+                    if (!isNaN(newPrice) && newPrice >= 0) addEntry.custom_price = newPrice;
+                }
+                this.closeProductModal();
+                this.updateModifyReceiptItems();
+            }
             return;
         }
 
@@ -1970,6 +2167,19 @@ class TableOrdersManager {
     _showNormalPaymentView() {
         document.getElementById('normalPaymentView').style.display = 'flex';
         document.getElementById('splitPaymentView').style.display = 'none';
+        this._pmShowStep(null);
+    }
+
+    /**
+     * Show a step inside the normal payment view (null = step 1 doc type choice)
+     */
+    _pmShowStep(type) {
+        const step1 = document.getElementById('pmStep1');
+        const stepS = document.getElementById('pmStepScontrino');
+        const stepF = document.getElementById('pmStepFattura');
+        if (step1) step1.style.display = type === null ? 'flex' : 'none';
+        if (stepS) stepS.style.display = type === 'scontrino' ? 'flex' : 'none';
+        if (stepF) stepF.style.display = type === 'fattura' ? 'flex' : 'none';
     }
 
     _showSplitPaymentView(splits, remaining, orderTotal) {
@@ -1987,21 +2197,29 @@ class TableOrdersManager {
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span class="split-pay-total">€${parseFloat(s.total).toFixed(2)}</span>
                         <span class="split-pay-status ${s.status}">${isPaid ? 'PAGATO' + paidLabel : 'DA PAGARE'}</span>
+                        ${!isPaid ? `<button class="split-pay-btn" style="background:#dc3545;flex:0 0 auto;padding:6px 8px;font-size:0.75rem;" onclick="tableOrdersManager.deletePrecontoSplit(${s.id})" title="Elimina preconto"><i class="fas fa-trash"></i></button>` : ''}
                     </div>
                 </div>
-                ${!isPaid ? `<div class="split-pay-btns">
-                    <button class="split-pay-btn pos" onclick="tableOrdersManager.payPrecontoSplit(${s.id}, 'pos')">
-                        <i class="fas fa-credit-card"></i> POS
+                ${!isPaid ? `
+                <div class="split-doctype-row">
+                    <button class="split-docbtn scontrino" onclick="tableOrdersManager._splitToggleType(this,'scontrino')">
+                        <i class="fas fa-receipt"></i> SCONTRINO
                     </button>
-                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.payPrecontoSplit(${s.id}, 'contanti')">
-                        <i class="fas fa-coins"></i> CONTANTI
-                    </button>
-                    <button class="split-pay-btn fattura" onclick="tableOrdersManager.payPrecontoSplit(${s.id}, 'fattura')">
+                    <button class="split-docbtn fattura" onclick="tableOrdersManager._splitToggleType(this,'fattura')">
                         <i class="fas fa-file-invoice"></i> FATTURA
                     </button>
-                    <button class="split-pay-btn" style="background:#dc3545;flex:0 0 auto;padding:8px 10px;" onclick="tableOrdersManager.deletePrecontoSplit(${s.id})" title="Elimina preconto">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                </div>
+                <div class="split-pay-btns" data-type="scontrino-btns" style="display:none;">
+                    <button class="split-back-btn" onclick="tableOrdersManager._splitBack(this)"><i class="fas fa-arrow-left"></i></button>
+                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'contanti')"><i class="fas fa-coins"></i> CONTANTI</button>
+                    <button class="split-pay-btn pos" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'pos')"><i class="fas fa-credit-card"></i> POS</button>
+                </div>
+                <div class="split-pay-btns" data-type="fattura-btns" style="display:none;">
+                    <button class="split-back-btn" onclick="tableOrdersManager._splitBack(this)"><i class="fas fa-arrow-left"></i></button>
+                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'fattura_contanti')"><i class="fas fa-coins"></i> CONTANTI</button>
+                    <button class="split-pay-btn pos" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'fattura_pos')"><i class="fas fa-credit-card"></i> POS</button>
+                    <button class="split-pay-btn bonifico" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'bonifico')"><i class="fas fa-university"></i> BONIFICO</button>
+                    <button class="split-pay-btn assegno" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'assegno')"><i class="fas fa-money-check"></i> ASSEGNO</button>
                 </div>` : ''}
             </div>`;
         }).join('');
@@ -2016,19 +2234,42 @@ class TableOrdersManager {
                         <span class="split-pay-status pending">DA PAGARE</span>
                     </div>
                 </div>
-                <div class="split-pay-btns">
-                    <button class="split-pay-btn pos" onclick="tableOrdersManager.executePayment('pos')">
-                        <i class="fas fa-credit-card"></i> POS
+                <div class="split-doctype-row">
+                    <button class="split-docbtn scontrino" onclick="tableOrdersManager._splitToggleType(this,'scontrino')">
+                        <i class="fas fa-receipt"></i> SCONTRINO
                     </button>
-                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.executePayment('contanti')">
-                        <i class="fas fa-coins"></i> CONTANTI
-                    </button>
-                    <button class="split-pay-btn fattura" onclick="tableOrdersManager.executePayment('fattura')">
+                    <button class="split-docbtn fattura" onclick="tableOrdersManager._splitToggleType(this,'fattura')">
                         <i class="fas fa-file-invoice"></i> FATTURA
                     </button>
                 </div>
+                <div class="split-pay-btns" data-type="scontrino-btns" style="display:none;">
+                    <button class="split-back-btn" onclick="tableOrdersManager._splitBack(this)"><i class="fas fa-arrow-left"></i></button>
+                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.executePayment('contanti')"><i class="fas fa-coins"></i> CONTANTI</button>
+                    <button class="split-pay-btn pos" onclick="tableOrdersManager.executePayment('pos')"><i class="fas fa-credit-card"></i> POS</button>
+                </div>
+                <div class="split-pay-btns" data-type="fattura-btns" style="display:none;">
+                    <button class="split-back-btn" onclick="tableOrdersManager._splitBack(this)"><i class="fas fa-arrow-left"></i></button>
+                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.openInvoiceModal('fattura_contanti')"><i class="fas fa-coins"></i> CONTANTI</button>
+                    <button class="split-pay-btn pos" onclick="tableOrdersManager.openInvoiceModal('fattura_pos')"><i class="fas fa-credit-card"></i> POS</button>
+                    <button class="split-pay-btn bonifico" onclick="tableOrdersManager.openInvoiceModal('bonifico')"><i class="fas fa-university"></i> BONIFICO</button>
+                    <button class="split-pay-btn assegno" onclick="tableOrdersManager.openInvoiceModal('assegno')"><i class="fas fa-money-check"></i> ASSEGNO</button>
+                </div>
             </div>`;
         }
+    }
+
+    /** Show sub-methods (scontrino/fattura) inside a split row */
+    _splitToggleType(btn, type) {
+        const row = btn.closest('.split-pay-row, .split-remainder-row');
+        row.querySelector('.split-doctype-row').style.display = 'none';
+        row.querySelector(`[data-type="${type}-btns"]`).style.display = 'flex';
+    }
+
+    /** Go back to doc-type choice inside a split row */
+    _splitBack(btn) {
+        const row = btn.closest('.split-pay-row, .split-remainder-row');
+        row.querySelector('.split-doctype-row').style.display = 'flex';
+        row.querySelectorAll('[data-type]').forEach(el => el.style.display = 'none');
     }
 
     /**
@@ -2132,6 +2373,58 @@ class TableOrdersManager {
     closePaymentMethodModal() {
         const modal = document.getElementById('paymentMethodModal');
         if (modal) modal.style.display = 'none';
+    }
+
+    /**
+     * Chiudi conto con pagamento contanti e apri il cassetto.
+     */
+    async chiudiContoContanti() {
+        if (!this.currentTable) return;
+
+        // Operator auth
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+        } catch {
+            return;
+        }
+
+        // Pay with contanti
+        try {
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token,
+                },
+                body: JSON.stringify({ payment_method: 'contanti' }),
+            });
+
+            const result = await response.json();
+            if (!result.success) {
+                this.showNotification(result.message || 'Errore nell\'incasso', 'error');
+                return;
+            }
+
+            this.showNotification(`Conto chiuso: €${parseFloat(result.data.total_paid).toFixed(2)}`);
+
+            // Open cash drawer (non-blocking — failure is non-fatal)
+            fetch(`${this.apiBase}/open-cash-drawer`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token,
+                },
+            }).catch(() => {});
+
+            this._afterPaymentSuccess();
+        } catch (error) {
+            console.error('Error chiudi conto contanti:', error);
+            this.showNotification('Errore nell\'incasso', 'error');
+        }
     }
 
     /**
@@ -2240,10 +2533,12 @@ class TableOrdersManager {
 
     /**
      * Open invoice modal — default 1 invoice for the full total
+     * @param {string} method  Payment method (fattura_contanti, fattura_pos, bonifico, assegno)
      */
-    openInvoiceModal() {
+    openInvoiceModal(method = 'fattura_pos') {
         if (!this.currentTable || !this.currentTable.order) return;
 
+        this._pendingInvoicePaymentMethod = method;
         this.closePaymentMethodModal();
 
         const modal = document.getElementById('invoiceModal');
@@ -2468,6 +2763,7 @@ class TableOrdersManager {
                     invoices: invoices,
                     remaining_amount: remaining,
                     remaining_method: remaining > 0.01 ? remainingMethod : null,
+                    payment_method: this._pendingInvoicePaymentMethod || 'fattura_pos',
                 })
             });
 
@@ -2535,12 +2831,21 @@ class TableOrdersManager {
     _hideModifyOverlay() {
         const overlay = document.getElementById('modifyOrderOverlay');
         if (overlay) overlay.style.display = 'none';
+        this.temporaryCart = [];
+        this.updateCartDisplay();
+        this.resetDiscount();
     }
 
     /**
      * Close modify overlay: if changes exist, ask auth then submit; else close silently
      */
     async closeModifyOverlay() {
+        // Banco tables can only be closed via payment (Incassa / Chiudi Conto)
+        if (this.currentTable?.table?.is_banco) {
+            this.showNotification('Completare il pagamento per chiudere il banco', 'error');
+            return;
+        }
+
         if (this._autoconsumoInProgress) {
             this.showNotification('Completare o annullare prima la procedura di autoconsumo', 'error');
             return;
@@ -2549,7 +2854,8 @@ class TableOrdersManager {
         const hasChanges =
             this.modifySession.pendingAdd.length > 0 ||
             this.modifySession.pendingRemove.length > 0 ||
-            Object.keys(this.modifySession.pendingUpdate).length > 0;
+            Object.keys(this.modifySession.pendingUpdate).length > 0 ||
+            (this.modifySession.pendingDishChange || []).length > 0;
 
         if (!hasChanges) {
             this._hideModifyOverlay();
@@ -2557,14 +2863,15 @@ class TableOrdersManager {
             return;
         }
 
-        let auth;
-        try {
-            auth = await operatorAuthManager.requestAuth();
-        } catch (error) { return; }
-        if (!auth) return; // stay open
+        // No new auth: use the token stored when the overlay was opened
+        const token = this.modifySession.token;
+        if (!token) {
+            this.showNotification('Sessione non valida, riautenticarsi', 'error');
+            return;
+        }
 
         try {
-            await this._submitSession(auth.token);
+            await this._submitSession(token);
         } catch (error) {
             console.error('Error submitting session:', error);
             this.showNotification('Errore nel salvataggio delle modifiche', 'error');
@@ -2577,12 +2884,107 @@ class TableOrdersManager {
     }
 
     /**
+     * Submit all pending changes for a single existing item immediately.
+     * Clears the item from pendingUpdate and pendingDishChange after success.
+     */
+    async _submitItemEdit(itemId, token) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        const tableId = this.currentTable.table.id;
+        const updates = this.modifySession.pendingUpdate[itemId] || {};
+        const updatedItemIds = [];
+
+        // Dish change for this item (if any)
+        const dishChange = (this.modifySession.pendingDishChange || []).find(c => c.itemId === itemId);
+        if (dishChange) {
+            const resp = await fetch(`${this.apiBase}/items/${itemId}/dish`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Operator-Token': token },
+                body: JSON.stringify({ dish_id: dishChange.newDish.id }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || 'Errore cambio piatto');
+            }
+            // printDishChange is handled server-side by updateItemDish
+            this.modifySession.pendingDishChange = this.modifySession.pendingDishChange.filter(c => c.itemId !== itemId);
+        }
+
+        if (updates.quantity !== undefined) {
+            const resp = await fetch(`${this.apiBase}/items/${itemId}/quantity`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Operator-Token': token },
+                body: JSON.stringify({ quantity: updates.quantity, skip_print: true }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || 'Errore aggiornamento quantità');
+            }
+            updatedItemIds.push(itemId);
+        }
+
+        if (updates.unit_price !== undefined) {
+            const resp = await fetch(`${this.apiBase}/items/${itemId}/price`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Operator-Token': token },
+                body: JSON.stringify({ unit_price: updates.unit_price, motivation: updates.price_motivation, skip_print: true }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || 'Errore aggiornamento prezzo');
+            }
+            // Price-only change: no print
+        }
+
+        if (updates._detailsChanged) {
+            const resp = await fetch(`${this.apiBase}/items/${itemId}/details`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Operator-Token': token },
+                body: JSON.stringify({ notes: updates.notes, extras: updates.extras, removals: updates.removals }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || 'Errore aggiornamento dettagli');
+            }
+            if (!updatedItemIds.includes(itemId)) updatedItemIds.push(itemId);
+        }
+
+        // Print to kitchen if there are printable changes
+        if (updatedItemIds.length > 0) {
+            await fetch(`${this.apiBase}/${tableId}/print-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                body: JSON.stringify({ new_item_ids: [], updated_item_ids: updatedItemIds, operator_token: token }),
+            });
+        }
+
+        // Clear submitted changes
+        delete this.modifySession.pendingUpdate[itemId];
+    }
+
+    /**
      * Submit all pending session changes to the backend, then trigger a single print
      */
     async _submitSession(token) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
         const tableId = this.currentTable.table.id;
         const updatedItemIds = [];
+
+        // 0. Dish changes
+        for (const change of (this.modifySession.pendingDishChange || [])) {
+            const resp = await fetch(`${this.apiBase}/items/${change.itemId}/dish`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Operator-Token': token,
+                },
+                body: JSON.stringify({ dish_id: change.newDish.id }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || `Errore cambio piatto (${resp.status})`);
+            }
+        }
 
         // 1. Remove items
         for (const removal of this.modifySession.pendingRemove) {
@@ -2746,6 +3148,26 @@ class TableOrdersManager {
 
         this.updateSplitPreview();
 
+        // Pre-populate discount from table-level authorized discount (if any)
+        const discountRow = document.querySelector('.preconto-discount-row');
+        const precontoDiscountWrap = document.getElementById('precontoDiscountInputWrap');
+        const precontoDiscountSym  = document.getElementById('precontoDiscountSymbol');
+        const precontoDiscountAmt  = document.getElementById('preconto_discount_amount');
+        if (this._authorizedDiscount) {
+            const typeRadio = document.querySelector(`input[name="precontoDiscountType"][value="${this._authorizedDiscount.type}"]`);
+            if (typeRadio) typeRadio.checked = true;
+            if (precontoDiscountAmt) precontoDiscountAmt.value = this._authorizedDiscount.value;
+            if (precontoDiscountWrap) precontoDiscountWrap.style.display = 'flex';
+            if (precontoDiscountSym) precontoDiscountSym.textContent = this._authorizedDiscount.type === 'percent' ? '%' : '€';
+        } else {
+            const noneRadio = document.querySelector('input[name="precontoDiscountType"][value="none"]');
+            if (noneRadio) noneRadio.checked = true;
+            if (precontoDiscountAmt) precontoDiscountAmt.value = 0;
+            if (precontoDiscountWrap) precontoDiscountWrap.style.display = 'none';
+        }
+        // Discount row is only shown for full bill (default selection)
+        if (discountRow) discountRow.style.display = '';
+
         // Show modal
         if (modal) modal.style.display = 'flex';
 
@@ -2772,6 +3194,9 @@ class TableOrdersManager {
                 // Show partial total row for full/split (items has its own via _updatePrecontoPartialTotal)
                 if (partialTotalRow) partialTotalRow.style.display = this.value !== 'items' ? 'block' : 'none';
                 if (this.value !== 'items') self._updateGlobalTotal();
+                // Discount only allowed on full bill
+                const discountRow = document.querySelector('.preconto-discount-row');
+                if (discountRow) discountRow.style.display = this.value === 'full' ? '' : 'none';
             };
         });
 

@@ -62,8 +62,9 @@ class CategoryController extends BaseController
     public function store(Request $request) : JsonResponse {
         try {
             $request->validate([
-                'label' => 'required',
+                'label'      => 'required',
                 'printer_id' => 'required',
+                'color'      => 'nullable|string|max:7',
             ]);
             $store = $request->all();
             $item = $this->interface->store($store);
@@ -90,8 +91,9 @@ class CategoryController extends BaseController
     public function edit(int $id, Request $request) : JsonResponse {
         try {
             $request->validate([
-                'label' => 'required',
+                'label'      => 'required',
                 'printer_id' => 'required',
+                'color'      => 'nullable|string|max:7',
             ]);
             $item = $this->interface->find($id);
             if ($item->id) {

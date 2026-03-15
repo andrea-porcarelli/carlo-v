@@ -23,11 +23,15 @@ $(document).ready(function() {
         const dishPrice = parseFloat($(this).data('price'));
 
         if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.openProductModal({
-                id: dishId,
-                name: dishName,
-                price: dishPrice
-            });
+            if (tableOrdersManager._changingDishForItemId) {
+                tableOrdersManager.selectDishForChange({ id: dishId, name: dishName, price: dishPrice });
+            } else {
+                tableOrdersManager.openProductModal({
+                    id: dishId,
+                    name: dishName,
+                    price: dishPrice
+                });
+            }
         }
     });
 
@@ -45,16 +49,6 @@ $(document).ready(function() {
                 tableOrdersManager.showNotification('Seleziona prima un tavolo occupato', 'error');
             }
         }
-    });
-
-    // Close modify overlay
-    $('#closeModifyBtn').click(function() {
-        // Clear temporary cart when closing modify overlay
-        if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.temporaryCart = [];
-            tableOrdersManager.updateCartDisplay();
-        }
-        $('#modifyOrderOverlay').fadeOut(300);
     });
 
     // Pay bill from modify overlay — show payment method modal (overlay hidden by _afterPaymentSuccess)
@@ -85,11 +79,10 @@ $(document).ready(function() {
         }
     });
 
-    // Free table from modify overlay
+    // Chiudi conto (contanti) + apri cassetto
     $('#btnModifyFreeTable').click(function() {
         if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.clearTable();
-            $('#modifyOrderOverlay').fadeOut(300);
+            tableOrdersManager.chiudiContoContanti();
         }
     });
 
@@ -248,24 +241,6 @@ $(document).ready(function() {
     $('#closePaymentMethodModal').click(function() {
         if (typeof tableOrdersManager !== 'undefined') {
             tableOrdersManager.closePaymentMethodModal();
-        }
-    });
-
-    $('#btnPayPos').click(function() {
-        if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.executePayment('pos');
-        }
-    });
-
-    $('#btnPayContanti').click(function() {
-        if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.executePayment('contanti');
-        }
-    });
-
-    $('#btnPayFattura').click(function() {
-        if (typeof tableOrdersManager !== 'undefined') {
-            tableOrdersManager.openInvoiceModal();
         }
     });
 

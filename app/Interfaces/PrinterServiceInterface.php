@@ -107,4 +107,20 @@ interface PrinterServiceInterface
      * @return bool True se la stampa è andata a buon fine, false altrimenti
      */
     public function printFilteredLogs(Printer $printer, Collection $logs, array $filters, ?int $operatorId = null): bool;
+
+    /**
+     * Send ESC/POS pulse to open cash drawer connected to the given printer.
+     */
+    public function openCashDrawer(Printer $printer): bool;
+
+    /**
+     * Stampa un cambio piatto: STORNO del vecchio piatto e AGGIUNTA del nuovo
+     *
+     * @param TableOrder $tableOrder L'ordine del tavolo
+     * @param OrderItem $newItem L'item aggiornato (con il nuovo piatto caricato)
+     * @param string $oldDishName Nome del vecchio piatto
+     * @param Printer|null $oldPrinter Stampante del vecchio piatto (null se non trovata)
+     * @return bool
+     */
+    public function printDishChange(TableOrder $tableOrder, OrderItem $newItem, string $oldDishName, ?Printer $oldPrinter): bool;
 }

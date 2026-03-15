@@ -7,6 +7,7 @@ use App\Interfaces\PrinterServiceInterface;
 use App\Models\Dish;
 use App\Models\MenuOption;
 use App\Models\OrderItem;
+use App\Models\PrecontoSplit;
 use App\Models\Printer;
 use App\Models\RestaurantTable;
 use App\Models\Setting;
@@ -76,6 +77,26 @@ class TableOrderController extends Controller
             ->orderBy('sort_order')->orderBy('label')
             ->get(['id', 'label']);
         return response()->json(['success' => true, 'data' => compact('extras', 'removals')]);
+    }
+
+    /**
+     * Return all active dishes grouped by category (for dish-change selector)
+     */
+    public function getDishes(): JsonResponse
+    {
+        $dishes = Dish::with('category')
+            ->where('is_active', true)
+            ->orderBy('label')
+            ->get()
+            ->map(fn($d) => [
+                'id'            => $d->id,
+                'name'          => $d->label,
+                'price'         => (float) $d->price,
+                'category_id'   => $d->category_id,
+                'category_name' => $d->category->name ?? 'N/D',
+            ]);
+
+        return response()->json(['success' => true, 'data' => $dishes]);
     }
 
     public function getTables(): JsonResponse
@@ -227,6 +248,14 @@ class TableOrderController extends Controller
                 $orderCreated = true;
             }
 
+            // If the order has a pending preconto, cancel all pending splits
+            if ($order->preconto_requested_at !== null) {
+                PrecontoSplit::where('table_order_id', $order->id)
+                    ->where('status', 'pending')
+                    ->delete();
+                $order->update(['preconto_requested_at' => null]);
+            }
+
             $addedItems = [];
             foreach ($validated['items'] as $itemData) {
                 $dish = Dish::findOrFail($itemData['dish_id']);
@@ -352,6 +381,14 @@ class TableOrderController extends Controller
                 $orderCreated = true;
             }
 
+            // If the order has a pending preconto, cancel all pending splits
+            if ($order->preconto_requested_at !== null) {
+                PrecontoSplit::where('table_order_id', $order->id)
+                    ->where('status', 'pending')
+                    ->delete();
+                $order->update(['preconto_requested_at' => null]);
+            }
+
             // Get dish information
             $dish = Dish::findOrFail($validated['dish_id']);
 
@@ -446,8 +483,11 @@ class TableOrderController extends Controller
         try {
             DB::beginTransaction();
 
-
             $order = $item->order;
+            $order->load('restaurantTable');
+
+            // Load relations needed for printing BEFORE deletion
+            $item->load('dish.category.printer', 'addedBy');
 
             $reason = request()->input('reason');
             // Log item removal before deletion
@@ -469,6 +509,16 @@ class TableOrderController extends Controller
             }
 
             DB::commit();
+
+            // Print removal notification to the relevant kitchen printer
+            try {
+                $this->printerService->setOperatorId($operatorId)->printOrderItems($order, collect([$item]), 'remove');
+            } catch (\Exception $e) {
+                Log::warning('Errore stampa rimozione piatto', [
+                    'order_id' => $order->id,
+                    'error'    => $e->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
@@ -628,7 +678,8 @@ class TableOrderController extends Controller
         }
 
         $paymentMethod = $request->input('payment_method', 'pos');
-        if (!in_array($paymentMethod, ['pos', 'contanti', 'fattura', 'misto'])) {
+        $allowedMethods = ['pos', 'contanti', 'fattura', 'fattura_contanti', 'fattura_pos', 'bonifico', 'assegno', 'misto'];
+        if (!in_array($paymentMethod, $allowedMethods)) {
             $paymentMethod = 'pos';
         }
 
@@ -680,7 +731,8 @@ class TableOrderController extends Controller
             'invoices.*.customer_name'   => 'nullable|string|max:255',
             'invoices.*.customer_tax_code' => 'nullable|string|max:50',
             'remaining_amount'           => 'required|numeric|min:0',
-            'remaining_method'           => 'nullable|string|in:pos,contanti',
+            'remaining_method'           => 'nullable|string|in:pos,contanti,bonifico,assegno',
+            'payment_method'             => 'nullable|string',
         ]);
 
         $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
@@ -728,7 +780,7 @@ class TableOrderController extends Controller
             if ($remaining > 0.01) {
                 $paymentMethod = 'misto'; // part invoice, part pos/contanti
             } else {
-                $paymentMethod = 'fattura';
+                $paymentMethod = $validated['payment_method'] ?? 'fattura';
             }
 
             $this->logger->logPayOrder($order, $paymentMethod, $operatorId);
@@ -992,7 +1044,8 @@ class TableOrderController extends Controller
         }
 
         $paymentMethod = $request->input('payment_method', 'pos');
-        if (!in_array($paymentMethod, ['pos', 'contanti', 'fattura', 'misto'])) {
+        $allowedMethods = ['pos', 'contanti', 'fattura', 'fattura_contanti', 'fattura_pos', 'bonifico', 'assegno', 'misto'];
+        if (!in_array($paymentMethod, $allowedMethods)) {
             $paymentMethod = 'pos';
         }
 
@@ -1192,6 +1245,57 @@ class TableOrderController extends Controller
     /**
      * Reprint all items of the current order, grouped by printer
      */
+    public function openCashDrawer(Request $request): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $printer = \App\Models\Setting::getPrecontoPrinter();
+        if (!$printer) {
+            return response()->json(['success' => false, 'message' => 'Nessuna stampante cassa configurata'], 422);
+        }
+
+        $opened = $this->printerService->openCashDrawer($printer);
+
+        return response()->json([
+            'success' => $opened,
+            'message' => $opened ? 'Cassetto aperto' : 'Impossibile aprire il cassetto',
+        ]);
+    }
+
+    public function applyDiscount(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $validated = $request->validate([
+            'discount_type'   => 'required|string|in:percent,value',
+            'discount_amount' => 'required|numeric|min:0',
+            'original_total'  => 'required|numeric|min:0',
+            'final_total'     => 'required|numeric|min:0',
+        ]);
+
+        $order = $table->activeOrder;
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Nessun ordine attivo'], 404);
+        }
+
+        $this->logger->logApplyDiscount(
+            $order,
+            $validated['discount_type'],
+            (float) $validated['discount_amount'],
+            (float) $validated['original_total'],
+            (float) $validated['final_total'],
+            $operatorId,
+        );
+
+        return response()->json(['success' => true]);
+    }
+
     public function reprintOrder(RestaurantTable $table): JsonResponse
     {
         $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
@@ -1764,6 +1868,73 @@ class TableOrderController extends Controller
             DB::rollBack();
             Log::error('Error updating item details: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Errore nell\'aggiornamento del piatto'], 500);
+        }
+    }
+
+    /**
+     * Change the dish of an existing order item and print a STORNO/AGGIUNTA slip
+     */
+    public function updateItemDish(Request $request, OrderItem $item): JsonResponse
+    {
+        $validated = $request->validate([
+            'dish_id' => 'required|integer|exists:dishes,id',
+        ]);
+
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Load item with old dish relations before changing
+            $item->load('dish.category.printer', 'addedBy');
+            $order = $item->order;
+            $order->load('restaurantTable');
+
+            $oldDishName  = $item->dish->label ?? $item->dish->name ?? 'N/D';
+            $oldPrinter   = $item->dish->category->printer ?? null;
+            $oldUnitPrice = $item->unit_price;
+
+            // Load new dish
+            $newDish = Dish::findOrFail($validated['dish_id']);
+
+            // Update item
+            $item->dish_id    = $newDish->id;
+            $item->unit_price = $newDish->price;
+            $extrasTotal = !empty($item->extras) ? array_sum($item->extras) : 0;
+            $item->subtotal = round(($newDish->price + $extrasTotal) * $item->quantity, 2);
+            $item->save();
+
+            $order->updateTotal();
+
+            $this->logger->logUpdateItem($item, [
+                'old_dish' => $oldDishName,
+                'old_price' => $oldUnitPrice,
+                'new_dish' => $newDish->label ?? $newDish->name,
+                'new_price' => $newDish->price,
+            ], $operatorId);
+
+            DB::commit();
+
+            // Print after commit
+            try {
+                $item->load('dish.category.printer', 'addedBy');
+                $this->printerService->setOperatorId($operatorId)->printDishChange($order, $item, $oldDishName, $oldPrinter);
+            } catch (\Exception $e) {
+                Log::warning('Errore stampa cambio piatto', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Piatto modificato',
+                'data'    => ['item' => $item->fresh(['dish']), 'order_total' => $order->fresh()->total_amount],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error updating item dish: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nel cambio piatto'], 500);
         }
     }
 

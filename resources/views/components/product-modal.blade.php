@@ -184,6 +184,9 @@
                 <button class="btn-red" style="flex: 1; padding: 11px; font-size: 14px;" id="addProductBtn">
                     <i class="fas fa-plus me-2"></i> AGGIUNGI
                 </button>
+                <button id="changeDishBtn" style="display:none; flex: 0 0 auto; padding: 11px 16px; font-size: 14px; background: #fd7e14; border: none; color: white; font-weight: 600; text-transform: uppercase; cursor: pointer;" onclick="tableOrdersManager.initiateChangeDish()">
+                    <i class="fas fa-exchange-alt me-1"></i> CAMBIA PIATTO
+                </button>
                 <button style="flex: 0 0 auto; padding: 11px 16px; font-size: 14px; background: #6c757d; border: none; color: white; font-weight: 600; text-transform: uppercase; cursor: pointer;" id="cancelProductBtn">
                     ANNULLA
                 </button>

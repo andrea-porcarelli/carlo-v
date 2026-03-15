@@ -487,7 +487,7 @@ body {
 }
 
 .table-info-card {
-    background: #000;
+    background: #888;
     color: white;
     padding: 25px;
     margin-bottom: 25px;
@@ -503,20 +503,20 @@ body {
 
 .table-info-status {
     font-size: 0.9rem;
-    color: #6c757d;
+    color: #bbb;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .total-section {
-    background: #000;
+    background: #888;
     color: white;
     padding: 20px;
     margin: 20px 0;
 }
 
 .dining-title {
-    color: #000;
+    color: #888;
     font-weight: 700;
     font-size: 1.4rem;
     text-transform: uppercase;
@@ -584,30 +584,11 @@ body {
 
 .mini-control-label {
     font-size: 0.8rem;
-    color: #000;
+    color: #888;
     font-weight: 600;
     text-transform: uppercase;
 }
 
-.quick-stats {
-    background: #000;
-    color: white;
-    padding: 15px;
-    margin-bottom: 15px;
-    text-align: center;
-}
-
-.quick-stats-number {
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: #dc3545;
-}
-
-.quick-stats-label {
-    font-size: 0.7rem;
-    color: #6c757d;
-    text-transform: uppercase;
-}
 
 /* Modify Overlay Styles */
 #modifyOrderOverlay {
@@ -771,28 +752,13 @@ body {
 /* ==========================================
    NEW LAYOUT: Main screen columns
    ========================================== */
-.col-sala { flex: 0 0 83.33%; max-width: 83.33%; }
-.col-summary { flex: 0 0 16.67%; max-width: 16.67%; background: white; border-left: 3px solid #dee2e6; }
-
-/* Summary panel */
-.summary-panel { height: calc(100vh - 60px); display: flex; flex-direction: column; padding: 15px; overflow: hidden; }
-.summary-header { font-weight:700; font-size:1rem; text-transform:uppercase; letter-spacing:1px; border-bottom:3px solid #dc3545; padding-bottom:8px; margin-bottom:12px; color:#000; }
-#occupiedSummary { flex: 1; overflow-y: auto; }
-.occupied-row { display:flex; align-items:center; gap:8px; padding:8px 10px; margin-bottom:5px; border-left:4px solid #28a745; background:#f8fff8; cursor:pointer; transition:all 0.2s; border-radius:0 4px 4px 0; }
-.occupied-row:hover { background:#e8f5e9; }
-.occupied-row.preconto { border-left-color:#ffc107; background:#fffdf0; }
-.occupied-row.preconto:hover { background:#fff8dc; }
-.occupied-row-number { font-size:1.4rem; font-weight:700; color:#000; min-width:30px; }
-.occupied-row-info { font-size:0.75rem; color:#6c757d; }
-.occupied-row-total { font-size:0.9rem; font-weight:700; color:#dc3545; margin-left:auto; white-space:nowrap; }
-.summary-stats { display:flex; gap:8px; padding-top:12px; border-top:2px solid #dee2e6; margin-top:8px; flex-shrink:0; }
-.summary-stats .quick-stats { flex:1; padding:8px 6px; }
+.col-sala { flex: 0 0 100%; max-width: 100%; }
 
 /* Overlay 3-column layout */
 .overlay-col-order { flex: 0 0 33.33%; background:white; border-radius:8px; display:flex; flex-direction:column; min-width:0; overflow:hidden; }
 .overlay-col-actions { flex: 0 0 90px; display:flex; flex-direction:column; gap:6px; padding-top:4px; }
 .overlay-col-menu { flex: 1; background:white; border-radius:8px; overflow-y:auto; padding:12px; min-width:0; }
-.overlay-order-header { background:#000; color:white; padding:10px 14px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+.overlay-order-header { background:#dc3545; color:white; padding:10px 14px; border-radius:8px 8px 0 0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
 
 /* Vertical action buttons */
 .action-btn-v { border:none; color:white; font-weight:600; padding:10px 4px; border-radius:4px; cursor:pointer; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.2px; display:flex; flex-direction:column; align-items:center; gap:4px; width:100%; transition:all 0.2s; line-height:1.2; }
@@ -837,4 +803,267 @@ body {
         padding: 13px 22px;
         font-size: 1rem;
     }
+}
+
+/* ==========================================
+   DISH SELECTOR – new split layout
+   ========================================== */
+
+/* Area piatti (centro) */
+.ds-dishes-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 8px;
+    min-width: 0;
+}
+
+.ds-search {
+    flex-shrink: 0;
+    margin-bottom: 8px;
+}
+
+.ds-dishes-grid {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 6px;
+    align-content: start;
+}
+
+/* Colonna categorie (destra) */
+.ds-categories-col {
+    width: 155px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    background: #2c3e50;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    border-left: 2px solid #1a2a38;
+}
+
+.ds-categories-col::-webkit-scrollbar { width: 4px; }
+.ds-categories-col::-webkit-scrollbar-track { background: #1e2d3d; }
+.ds-categories-col::-webkit-scrollbar-thumb { background: #4a6278; border-radius: 2px; }
+
+.ds-category-btn {
+    background: #34495e;
+    border: none;
+    color: #b8c9d8;
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 13px 8px;
+    cursor: pointer;
+    text-align: center;
+    border-radius: 4px;
+    transition: all 0.15s;
+    line-height: 1.3;
+    width: 100%;
+}
+
+.ds-category-btn:hover {
+    background: #3d566e;
+    color: white;
+}
+
+.ds-category-btn.active {
+    background: #dc3545;
+    color: white;
+    box-shadow: 0 2px 8px rgba(220,53,69,0.4);
+}
+
+/* Piatti nel nuovo grid (stile adattato dall'overlay precedente) */
+.ds-dishes-grid .menu-item {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 9px 10px;
+    font-size: 12px;
+    min-height: 56px;
+    border-radius: 4px;
+    margin-bottom: 0;
+}
+
+.ds-dishes-grid .menu-item-name {
+    font-size: 11.5px;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+.ds-dishes-grid .menu-item-price {
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+/* Barra azioni in basso nell'overlay */
+.overlay-actions-bar {
+    display: flex;
+    gap: 6px;
+    padding-top: 8px;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+}
+
+.overlay-actions-bar .action-btn-v {
+    flex-direction: column;
+    flex: 1;
+    padding: 10px 6px;
+    min-height: 62px;
+    max-width: 90px;
+    font-size: 0.68rem;
+    justify-content: center;
+    gap: 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.overlay-actions-bar .action-btn-v i {
+    font-size: 1.1rem;
+}
+
+/* ==========================================
+   OVERLAY ORDER FOOTER – sconto + totale
+   ========================================== */
+.overlay-order-footer {
+    flex-shrink: 0;
+    border-top: 2px solid #dee2e6;
+    background: #f8f9fa;
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+}
+
+/* Riga sconto */
+.overlay-discount-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #dee2e6;
+    gap: 8px;
+}
+
+.discount-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    white-space: nowrap;
+}
+
+.discount-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.discount-type-btn {
+    background: #e9ecef;
+    border: 1px solid #ced4da;
+    color: #555;
+    font-weight: 700;
+    font-size: 0.8rem;
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.discount-type-btn.active {
+    background: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.discount-apply-btn,
+.discount-reset-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    transition: all 0.15s;
+}
+
+.discount-apply-btn {
+    background: #28a745;
+    color: white;
+}
+
+.discount-apply-btn:hover { background: #218838; }
+
+.discount-reset-btn {
+    background: #dc3545;
+    color: white;
+}
+
+.discount-reset-btn:hover { background: #b02a37; }
+
+#modifyDiscountInput:disabled {
+    background: #e9ecef;
+    color: #888;
+    cursor: not-allowed;
+}
+
+#modifyDiscountInput {
+    width: 70px;
+    height: 30px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 0 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: right;
+    color: #333;
+    background: white;
+}
+
+#modifyDiscountInput:focus {
+    outline: none;
+    border-color: #dc3545;
+    box-shadow: 0 0 0 2px rgba(220,53,69,0.15);
+}
+
+/* Riga totale */
+.overlay-total-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #1e2535;
+}
+
+.original-total {
+    font-size: 0.9rem;
+    color: #6c8090;
+    text-decoration: line-through;
+    display: none;
+}
+
+.total-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #7a8fa0;
+}
+
+.total-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #dc3545;
+    line-height: 1;
 }

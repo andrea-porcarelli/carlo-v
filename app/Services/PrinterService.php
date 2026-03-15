@@ -163,6 +163,31 @@ class PrinterService implements PrinterServiceInterface
             // Linea separatrice
             $printer->text(str_repeat('-', 48) . "\n");
 
+            // Banner operazione
+            if ($operation === 'remove') {
+                $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+                $printer->setEmphasis(true);
+                $printer->setTextSize(2, 2);
+                $printer->setReverseColors(true);
+                $printer->text(str_pad('*** STORNO ***', 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->setReverseColors(false);
+                $printer->setTextSize(1, 1);
+                $printer->setEmphasis(false);
+                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            } elseif ($operation === 'update') {
+                $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+                $printer->setEmphasis(true);
+                $printer->setTextSize(2, 2);
+                $printer->setReverseColors(true);
+                $printer->text(str_pad('*** MODIFICA ***', 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->setReverseColors(false);
+                $printer->setTextSize(1, 1);
+                $printer->setEmphasis(false);
+                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            }
+
             // Stampa gli articoli
             foreach ($items as $item) {
                 $this->printItem($printer, $item);
@@ -172,9 +197,24 @@ class PrinterService implements PrinterServiceInterface
             $printer->text(str_repeat('-', 48) . "\n");
             $printer->feed(1);
 
-            // Stampa articoli delle altre stampanti in piccolo
-            $this->printOtherPrintersItems($printer, $printerObj, $tableOrder);
+            // Stampa articoli delle altre stampanti in piccolo (non per gli annullamenti/modifiche)
+            if ($operation !== 'remove' && $operation !== 'update') {
+                $this->printOtherPrintersItems($printer, $printerObj, $tableOrder);
+            }
 
+            // Banner ripetuto a fine scontrino per STORNO
+            if ($operation === 'remove') {
+                $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+                $printer->setEmphasis(true);
+                $printer->setTextSize(2, 2);
+                $printer->setReverseColors(true);
+                $printer->text(str_pad('*** STORNO ***', 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->setReverseColors(false);
+                $printer->setTextSize(1, 1);
+                $printer->setEmphasis(false);
+                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            }
             $printer->feed(2);
 
             // Taglia la carta (se supportato)
@@ -550,8 +590,7 @@ class PrinterService implements PrinterServiceInterface
             // MARCIA TAVOLO in grande
             $printer->setTextSize(3, 3);
             $printer->setEmphasis(true);
-            $printer->text("MARCIA\n");
-            $printer->text("TAVOLO\n");
+            $printer->text("MARCIA TAVOLO\n");
             $printer->setTextSize(1, 1);
             $printer->feed(1);
 
@@ -1650,6 +1689,156 @@ class PrinterService implements PrinterServiceInterface
             Log::error('Errore stampa spostamento su dispositivo', [
                 'printer_ip' => $printerObj->ip ?? 'N/D',
                 'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Send ESC/POS pulse command to open cash drawer connected to the printer.
+     */
+    public function openCashDrawer(Printer $printer): bool
+    {
+        try {
+            $connector = new NetworkPrintConnector($printer->ip, 9100, 3);
+            $dev = new EscposPrinter($connector);
+            $dev->pulse();
+            $dev->close();
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Errore apertura cassetto', [
+                'printer_ip' => $printer->ip ?? 'N/D',
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Stampa cambio piatto: STORNO vecchio / AGGIUNTA nuovo
+     * Se le stampanti sono diverse, stampa su entrambe; se uguali, un solo scontrino combinato.
+     */
+    public function printDishChange(TableOrder $tableOrder, OrderItem $newItem, string $oldDishName, ?Printer $oldPrinter): bool
+    {
+        $tableOrder->load('restaurantTable');
+        $newPrinter = $newItem->dish->category->printer ?? null;
+
+        if (!$newPrinter && !$oldPrinter) {
+            Log::warning('printDishChange: nessuna stampante trovata', ['order_id' => $tableOrder->id]);
+            return false;
+        }
+
+        $allSuccess = true;
+
+        // Same printer (or new printer only): one combined slip
+        if ($newPrinter && (!$oldPrinter || $newPrinter->id === $oldPrinter->id)) {
+            $allSuccess = $this->printDishChangeToDevice($tableOrder, $newPrinter, $oldDishName, $newItem);
+        } else {
+            // Different printers: storno on old, aggiunta on new
+            if ($oldPrinter) {
+                $allSuccess = $this->printDishChangeToDevice($tableOrder, $oldPrinter, $oldDishName, null) && $allSuccess;
+            }
+            if ($newPrinter) {
+                $allSuccess = $this->printDishChangeToDevice($tableOrder, $newPrinter, null, $newItem) && $allSuccess;
+            }
+        }
+
+        return $allSuccess;
+    }
+
+    /**
+     * Print dish-change slip to a single device.
+     * $oldDishName: if set, prints STORNO section
+     * $newItem: if set, prints AGGIUNTA section
+     */
+    protected function printDishChangeToDevice(TableOrder $tableOrder, Printer $printerObj, ?string $oldDishName, ?OrderItem $newItem): bool
+    {
+        try {
+            $printerIp = $printerObj->ip;
+
+            if (!$this->isPrinterReachable($printerIp)) {
+                Log::warning("Stampante non raggiungibile (cambio piatto)", ['ip' => $printerIp]);
+                return false;
+            }
+
+            $connector = new NetworkPrintConnector($printerIp, 9100, 5);
+            $printer   = new EscposPrinter($connector);
+            $printer->initialize();
+
+            $tableNumber = $tableOrder->restaurantTable->table_number ?? 'N/D';
+            $covers      = $tableOrder->covers ?? $tableOrder->restaurantTable->capacity ?? 'N/D';
+            $operatorName = $this->currentOperatorId ? (User::find($this->currentOperatorId)?->name ?? 'N/D') : 'N/D';
+
+            // Header
+            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $printer->setEmphasis(true);
+            $printer->text(now()->format('d/m/Y H:i:s') . ' ' . $operatorName . "\n");
+            $printer->feed(1);
+            $printer->setTextSize(2, 2);
+            if ((int) $tableNumber === 0) {
+                $printer->text("VENDITA AL BANCO\n\n");
+            } else {
+                $printer->text("TAVOLO $tableNumber | PAX $covers\n\n");
+            }
+            $printer->setEmphasis(false);
+            $printer->setTextSize(1, 1);
+            $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+
+            // STORNO section
+            if ($oldDishName !== null) {
+                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+                $printer->setEmphasis(true);
+                $printer->setTextSize(2, 2);
+                $printer->setReverseColors(true);
+                $printer->text(str_pad('*** STORNO ***', 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->setReverseColors(false);
+                $printer->setTextSize(1, 1);
+                $printer->setEmphasis(false);
+                $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+                $printer->text(str_repeat('-', 48) . "\n");
+                $qty = $newItem ? $newItem->quantity : 1;
+                $printer->setEmphasis(true);
+                $printer->setTextSize(2, 2);
+                $printer->text(str_pad($qty, 3, ' ', STR_PAD_RIGHT) . " $oldDishName\n");
+                $printer->setTextSize(1, 1);
+                $printer->setEmphasis(false);
+                $printer->feed(1);
+            }
+
+            // AGGIUNTA section
+            if ($newItem !== null) {
+                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+                $printer->setEmphasis(true);
+                $printer->setTextSize(2, 2);
+                $printer->setReverseColors(true);
+                $label = '*** AGGIUNTA ***';
+                $printer->text(str_pad($label, 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->setReverseColors(false);
+                $printer->setTextSize(1, 1);
+                $printer->setEmphasis(false);
+                $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+                $printer->text(str_repeat('-', 48) . "\n");
+                $this->printItem($printer, $newItem);
+            }
+
+            $printer->text(str_repeat('-', 48) . "\n");
+            $printer->feed(2);
+            $printer->cut();
+            $printer->close();
+
+            Log::info('Stampa cambio piatto completata', [
+                'table_order_id' => $tableOrder->id,
+                'printer_ip'     => $printerIp,
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Errore stampa cambio piatto su dispositivo', [
+                'table_order_id' => $tableOrder->id ?? null,
+                'printer_ip'     => $printerObj->ip ?? 'N/D',
+                'error'          => $e->getMessage(),
             ]);
             return false;
         }

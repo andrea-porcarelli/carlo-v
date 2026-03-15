@@ -15,6 +15,7 @@
                     <form class="needs-validation update-or-create-element" id="update-or-create-element">
                         <div class="row">
                             @include('backoffice.components.form.input',['name' => 'label', 'label' => 'Dai un nome alla categoria *', 'col' => 6])
+                            @include('backoffice.components.form.input',['name' => 'color', 'label' => 'Colore categoria', 'col' => 3, 'type' => 'color', 'value' => '#6c757d'])
                         </div>
                     </form>
                 </div>

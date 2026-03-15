@@ -379,6 +379,27 @@ class TableOrderLoggerService
     /**
      * Log per autoconsumo completo
      */
+    public function logApplyDiscount(TableOrder $order, string $discountType, float $discountAmount, float $originalTotal, float $finalTotal, int $operatorId = 0): TableOrderLog
+    {
+        $tableNum = $order->restaurantTable->table_number;
+        $typeLabel = $discountType === 'percent' ? "{$discountAmount}%" : "€" . number_format($discountAmount, 2);
+        $notes = "Sconto {$typeLabel} applicato al tavolo #{$tableNum}: €" . number_format($originalTotal, 2) . " → €" . number_format($finalTotal, 2);
+
+        return $this->log(
+            action: TableOrderLog::ACTION_APPLY_DISCOUNT,
+            entityType: 'table_order',
+            entity: $order,
+            dataBefore: ['total_amount' => $originalTotal],
+            dataAfter: [
+                'total_amount'    => $finalTotal,
+                'discount_type'   => $discountType,
+                'discount_amount' => $discountAmount,
+            ],
+            notes: $notes,
+            userId: $operatorId,
+        );
+    }
+
     public function logFreeAmount(TableOrder $order, int $operatorId = 0): TableOrderLog
     {
         return $this->log(

@@ -25,7 +25,7 @@
         <!-- Main Restaurant View -->
         <div id="mainView" class="page-content active">
             <div class="row g-0">
-                <!-- Center - Dining Area (10/12) -->
+                <!-- Dining Area (full width) -->
                 <div class="col-sala">
                     <div class="dining-area">
                         <h5 class="dining-title">SALA RISTORANTE</h5>
@@ -34,55 +34,28 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Right Panel - Occupied Summary (2/12) -->
-                <div class="col-summary">
-                    <div class="summary-panel">
-                        <div class="summary-header">TAVOLI OCCUPATI</div>
-                        <div id="occupiedSummary">
-                            <div style="text-align:center;color:#6c757d;padding:20px;">Nessun tavolo occupato</div>
-                        </div>
-                        <div class="summary-stats">
-                            <div class="quick-stats">
-                                <div class="quick-stats-number" id="occupiedCount">0</div>
-                                <div class="quick-stats-label">OCCUPATI</div>
-                            </div>
-                            <div class="quick-stats">
-                                <div class="quick-stats-number" id="freeCount">20</div>
-                                <div class="quick-stats-label">LIBERI</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Modify Order Overlay (Full View with Menu) -->
             <div id="modifyOrderOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000;">
-                <div style="position: relative; width: 100%; height: 100%; padding: 15px;">
-                    <!-- Close Button -->
-                    <button style="position: absolute; top: 15px; right: 15px; background: #dc3545; border: none; color: white; height: 36px; padding: 0 16px; cursor: pointer; font-size: 13px; font-weight: 700; z-index: 1001; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;" id="closeModifyBtn"><i class="fas fa-sign-out-alt"></i> Chiudi e invia</button>
-
-                    <!-- Header -->
-                    <div style="text-align: center; color: white; margin-bottom: 12px;">
-                        <h2 style="margin: 0; font-size: 1.4rem; font-weight: 700;">
-                            TAVOLO <span id="modifyTableNumber">-</span>
-                        </h2>
-                        <p style="margin: 2px 0 0 0; color: #6c757d; font-size: 0.85rem;" id="modifyCoversInfo">
-                            <i class="fas fa-users" id="modifyCoversIcon"></i> <span id="modifyCoversCount">0</span><span id="modifyCoversLabel"> coperti</span>
-                        </p>
+                <div style="width: 100%; height: 100%; padding: 15px; display:flex; flex-direction:column; gap:10px;">
+                    <!-- Top bar -->
+                    <div style="display:flex; justify-content:flex-end; flex-shrink:0;">
+                        <button style="background: #dc3545; border: none; color: white; height: 36px; padding: 0 16px; cursor: pointer; font-size: 13px; font-weight: 700; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;" id="closeModifyBtn"><i class="fas fa-sign-out-alt"></i> Chiudi e invia</button>
                     </div>
 
-                    <div style="display:flex; gap:10px; height:calc(100% - 80px);">
-                        <!-- 4/12: Ordine -->
+                    <div style="display:flex; gap:10px; flex:1; min-height:0;">
+                        <!-- Ordine corrente (sinistra) -->
                         <div class="overlay-col-order">
                             <div class="overlay-order-header">
                                 <div style="display:flex;align-items:center;gap:10px;">
-                                    <span style="font-size:1.5rem;font-weight:700;color:#dc3545;" id="modifySelectedTableNumber">-</span>
-                                    <span style="font-size:0.8rem;color:#6c757d;text-transform:uppercase;letter-spacing:1px;">ORDINE CORRENTE</span>
-                                </div>
-                                <div>
-                                    <span style="font-size:0.8rem;color:#6c757d;">TOTALE</span>
-                                    <span id="modifyTotalAmount" style="font-size:1.3rem;font-weight:700;color:#dc3545;margin-left:8px;">€0.00</span>
+                                    <span style="font-size:1.5rem;font-weight:700;color:white;" id="modifySelectedTableNumber">-</span>
+                                    <div>
+                                        <div style="font-size:0.8rem;color:rgba(255,255,255,0.75);text-transform:uppercase;letter-spacing:1px;">ORDINE CORRENTE</div>
+                                        <div style="font-size:0.75rem;color:rgba(255,255,255,0.6);" id="modifyCoversInfo">
+                                            <i class="fas fa-users" id="modifyCoversIcon"></i> <span id="modifyCoversCount">0</span><span id="modifyCoversLabel"> coperti</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div id="modifyReceiptItems" style="flex:1;overflow-y:auto;padding:12px;">
@@ -91,42 +64,73 @@
                                     <p>Nessun ordine</p>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- 7/12: Menu -->
-                        <div class="overlay-col-menu">
-                            <div id="modifyMenuContainer">
-                                @livewire('dish-selector')
+                            <!-- Footer: sconto + totale -->
+                            <div class="overlay-order-footer">
+                                <div class="overlay-discount-row">
+                                    <span class="discount-label"><i class="fas fa-tag me-1"></i>SCONTO</span>
+                                    <div class="discount-controls">
+                                        <button class="discount-type-btn active" id="discountTypePct"
+                                            onclick="if(!document.getElementById('modifyDiscountInput').disabled){ this.classList.add('active'); document.getElementById('discountTypeVal').classList.remove('active'); }">%</button>
+                                        <button class="discount-type-btn" id="discountTypeVal"
+                                            onclick="if(!document.getElementById('modifyDiscountInput').disabled){ this.classList.add('active'); document.getElementById('discountTypePct').classList.remove('active'); }">€</button>
+                                        <input type="number" id="modifyDiscountInput" min="0" step="0.5" placeholder="0">
+                                        <button id="btnApplyDiscount" class="discount-apply-btn"
+                                            onclick="tableOrdersManager.requestDiscountAuth()">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <button id="btnResetDiscount" class="discount-reset-btn" style="display:none;"
+                                            onclick="tableOrdersManager.resetDiscount()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="overlay-total-row">
+                                    <span id="modifyOriginalAmount" class="original-total"></span>
+                                    <div class="total-label">TOTALE</div>
+                                    <div id="modifyTotalAmount" class="total-value">€0.00</div>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- 1/12: Azioni verticali -->
-                        <div class="overlay-col-actions">
-                            <button class="action-btn-v" id="btnMarciaTavolo" style="background:#28a745;">
-                                <i class="fas fa-play-circle"></i> MARCIA
-                            </button>
-                            <button class="action-btn-v" id="btnPreconto" style="background:#17a2b8;">
-                                <i class="fas fa-receipt"></i> PRE-CONTO
-                            </button>
-                            <button class="action-btn-v" id="btnModifyPayBill" style="background:#dc3545;">
-                                <i class="fas fa-money-bill"></i> INCASSA
-                            </button>
-                            <button class="action-btn-v" id="btnModifyFreeAmount" style="background:#6c757d;">
-                                <i class="fas fa-eraser"></i> AUTO
-                            </button>
-                            <button class="action-btn-v" id="btnModifyFreeTable" style="background:#ffc107;color:#000;">
-                                <i class="fas fa-door-open"></i> LIBERA
-                            </button>
-                            <button class="action-btn-v" id="btnSpostaTavolo" style="background:#fd7e14;">
-                                <i class="fas fa-exchange-alt"></i> SPOSTA
-                            </button>
-                            <button class="action-btn-v" id="btnRistampaOrdine" style="background:#343a40;">
-                                <i class="fas fa-print"></i> RISTAMPA
-                            </button>
-                            <button class="action-btn-v" id="btnModifyComunica" style="background:#6f42c1;">
-                                <i class="fas fa-bullhorn"></i> COMUNICA
-                            </button>
+                        <!-- Menu con categorie integrate (centro + destra) -->
+                        <div class="overlay-col-menu" style="padding:0; overflow:hidden; position:relative;">
+                            <!-- Change-dish mode indicator -->
+                            <div id="changeDishIndicator" style="display:none; position:absolute; top:0; left:0; right:0; z-index:10; background:#fd7e14; color:#fff; padding:10px 16px; display:none; align-items:center; justify-content:space-between; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; font-size:0.9rem;">
+                                <span><i class="fas fa-exchange-alt me-2"></i>Seleziona il nuovo piatto</span>
+                                <button onclick="tableOrdersManager.cancelChangeDish()" style="background:#c45e00; border:none; color:#fff; padding:5px 12px; font-weight:700; cursor:pointer; border-radius:4px; font-size:0.85rem;">ANNULLA</button>
+                            </div>
+                            <div id="modifyMenuContainer" style="height:100%;">
+                                @livewire('dish-selector')
+                            </div>
                         </div>
+                    </div>
+
+                    <!-- Barra azioni in basso -->
+                    <div class="overlay-actions-bar">
+                        <button class="action-btn-v" id="btnMarciaTavolo" style="background:#28a745;">
+                            <i class="fas fa-play-circle"></i> MARCIA
+                        </button>
+                        <button class="action-btn-v" id="btnPreconto" style="background:#17a2b8;">
+                            <i class="fas fa-receipt"></i> PRE-CONTO
+                        </button>
+                        <button class="action-btn-v" id="btnModifyPayBill" style="background:#dc3545;">
+                            <i class="fas fa-money-bill"></i> INCASSA
+                        </button>
+                        <button class="action-btn-v" id="btnModifyFreeAmount" style="background:#6c757d;">
+                            <i class="fas fa-eraser"></i> AUTO
+                        </button>
+                        <button class="action-btn-v" id="btnModifyFreeTable" style="background:#20c997;color:#fff;">
+                            <i class="fas fa-cash-register"></i> CHIUDI CONTO
+                        </button>
+                        <button class="action-btn-v" id="btnSpostaTavolo" style="background:#fd7e14;">
+                            <i class="fas fa-exchange-alt"></i> SPOSTA
+                        </button>
+                        <button class="action-btn-v" id="btnRistampaOrdine" style="background:#343a40;">
+                            <i class="fas fa-print"></i> RISTAMPA
+                        </button>
+                        <button class="action-btn-v" id="btnModifyComunica" style="background:#6f42c1;">
+                            <i class="fas fa-bullhorn"></i> COMUNICA
+                        </button>
                     </div>
                 </div>
             </div>
