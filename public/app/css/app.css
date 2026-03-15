@@ -1104,7 +1104,7 @@ body {
     }
 
     /* — Colonna ordine (sinistra): larghezza fissa invece del 33% — */
-    .overlay-col-order { flex: 0 0 270px; }
+    .overlay-col-order { flex: 0 0 500px; }
     .overlay-order-header { padding: 8px 12px; }
 
     /* — Footer ordine: sconto e totale — */
