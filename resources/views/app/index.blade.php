@@ -126,6 +126,9 @@
                         <button class="action-btn-v" id="btnModifyComunica" style="background:#6f42c1;">
                             <i class="fas fa-bullhorn"></i> COMUNICA
                         </button>
+                        <button class="action-btn-v" id="btnAmministra" style="background:#1a1a2e;border:1px solid #ffc107;color:#ffc107;">
+                            <i class="fas fa-shield-alt"></i> AMMINISTRA
+                        </button>
                     </div>
                 </div>
             </div>
@@ -236,4 +239,25 @@
 
     <!-- Autoconsumo Modal -->
     <x-autoconsumo-modal />
+
+    <!-- Admin Auth Modal -->
+    <div id="adminAuthModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; align-items:center; justify-content:center;">
+        <div style="background:#1a1a1a; border:2px solid #ffc107; border-radius:8px; padding:30px; max-width:420px; width:90%; box-shadow:0 20px 60px rgba(255,193,7,0.2);">
+            <h4 style="margin:0 0 8px 0; font-weight:700; text-transform:uppercase; text-align:center; color:#ffc107;">
+                <i class="fas fa-shield-alt me-2"></i>Accesso Amministratore
+            </h4>
+            <p style="color:#aaa; font-size:0.85rem; margin-bottom:20px; text-align:center;">Inserisci la password admin per accedere al backoffice</p>
+            <div style="margin-bottom:12px;">
+                <input type="password" id="adminAuthPassword" placeholder="Password admin"
+                    style="width:100%; padding:12px 16px; background:#2a2a2a; border:1px solid #555; border-radius:4px; color:#fff; font-size:1rem; box-sizing:border-box;">
+            </div>
+            <div id="adminAuthError" style="display:none; background:rgba(255,193,7,0.1); border:1px solid #ffc107; border-radius:4px; padding:10px 14px; color:#ffc107; font-size:0.85rem; margin-bottom:14px;">
+                <i class="fas fa-exclamation-circle me-2"></i><span id="adminAuthErrorText"></span>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button id="cancelAdminAuth" style="flex:1; padding:12px; background:#444; border:none; color:white; font-weight:600; text-transform:uppercase; border-radius:6px; cursor:pointer;">ANNULLA</button>
+                <button id="confirmAdminAuth" style="flex:1; padding:12px; background:#ffc107; border:none; color:#000; font-weight:700; text-transform:uppercase; border-radius:6px; cursor:pointer;"><i class="fas fa-sign-in-alt me-1"></i>ACCEDI</button>
+            </div>
+        </div>
+    </div>
 @endsection

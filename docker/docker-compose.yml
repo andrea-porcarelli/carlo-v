@@ -32,6 +32,25 @@ services:
       - cv-carlov_redis
     restart: unless-stopped
 
+  cv-worker:
+    build: .
+    command: ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/laravel-worker.conf"]
+    volumes:
+      - ../:/var/www/html
+      - ./supervisord.conf:/etc/supervisor/conf.d/laravel-worker.conf:ro
+    environment:
+      DB_HOST: cv-mysql
+      DB_DATABASE: carlov
+      DB_USERNAME: root
+      DB_PASSWORD: password123
+      REDIS_HOST: cv-carlov_redis
+    # Accesso alla rete dell'host per stampanti POS (stesse opzioni di cv-app)
+    # network_mode: "host"
+    depends_on:
+      - cv-mysql
+      - cv-carlov_redis
+    restart: unless-stopped
+
   cv-mysql:
     image: mysql:8.0
     ports:

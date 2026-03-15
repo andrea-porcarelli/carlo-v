@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev libpng-dev libjpeg-dev \
     libicu-dev \
     libonig-dev \
+    supervisor \
+    default-mysql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Configura e installa estensioni PHP

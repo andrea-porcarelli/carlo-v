@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
@@ -111,6 +112,81 @@ class OperatorAuthController extends Controller
                 'user_name' => $user->name,
             ],
         ]);
+    }
+
+    /**
+     * Generate an operator token for the currently authenticated backoffice admin
+     */
+    public function getAdminToken(): JsonResponse
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Non autenticato'], 401);
+        }
+
+        $token = base64_encode($user->id . ':' . time() . ':' . bin2hex(random_bytes(16)));
+        session(['operator_token_' . $token => [
+            'user_id' => $user->id,
+            'timestamp' => time(),
+        ]]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'token' => $token,
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'role' => $user->role,
+            ],
+        ]);
+    }
+
+    /**
+     * Authenticate as admin and return a redirect URL for the backoffice
+     */
+    public function adminLoginRedirect(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'password' => 'required|string',
+            'order_id' => 'nullable|integer',
+        ]);
+
+        try {
+            $users = User::where('role', 'admin')->get();
+            $user = null;
+
+            foreach ($users as $potentialUser) {
+                if (Hash::check($validated['password'], $potentialUser->password)) {
+                    $user = $potentialUser;
+                    break;
+                }
+            }
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Password non corretta o utente non admin',
+                ], 401);
+            }
+
+            Auth::login($user);
+
+            $orderId = $validated['order_id'] ?? null;
+            $url = $orderId
+                ? route('restaurant.sales.show', $orderId)
+                : route('restaurant.sales.index');
+
+            return response()->json([
+                'success' => true,
+                'url' => $url,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in admin login redirect: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Errore durante l\'autenticazione',
+            ], 500);
+        }
     }
 
     /**

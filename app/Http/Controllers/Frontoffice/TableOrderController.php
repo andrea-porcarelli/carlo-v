@@ -4,6 +4,11 @@ namespace App\Http\Controllers\Frontoffice;
 
 use App\Http\Controllers\Controller;
 use App\Interfaces\PrinterServiceInterface;
+use App\Jobs\PrintComunicaJob;
+use App\Jobs\PrintDishChangeJob;
+use App\Jobs\PrintMarciaJob;
+use App\Jobs\PrintOrderItemsJob;
+use App\Jobs\PrintPrecontoJob;
 use App\Models\Dish;
 use App\Models\MenuOption;
 use App\Models\OrderItem;
@@ -294,20 +299,8 @@ class TableOrderController extends Controller
 
             $addedItemIds = collect($addedItems)->pluck('id')->toArray();
             $skipPrint = $request->input('skip_print', false);
-            if (!$skipPrint) {
-                // Stampa gli articoli aggiunti sulla stampante POS
-                try {
-                    $itemsWithRelations = OrderItem::with('dish.category.printer')
-                        ->whereIn('id', $addedItemIds)
-                        ->get();
-                    $this->printerService->setOperatorId($operatorId)->printOrderItems($order, $itemsWithRelations, 'add');
-                } catch (\Exception $e) {
-                    Log::warning('Errore durante la stampa POS multipla', [
-                        'table_order_id' => $order->id,
-                        'items_count' => count($addedItems),
-                        'error' => $e->getMessage()
-                    ]);
-                }
+            if (!$skipPrint && !empty($addedItemIds)) {
+                PrintOrderItemsJob::dispatch($order->id, $addedItemIds, 'add', $operatorId);
             }
 
             return response()->json([
@@ -427,17 +420,7 @@ class TableOrderController extends Controller
 
             $skipPrint = $request->input('skip_print', false);
             if (!$skipPrint) {
-                // Stampa l'articolo aggiunto sulla stampante POS
-                try {
-                    $item->load('dish.category.printer');
-                    $this->printerService->setOperatorId($operatorId)->printOrderItems($order, collect([$item]), 'add');
-                } catch (\Exception $e) {
-                    Log::warning('Errore durante la stampa POS', [
-                        'item_id' => $item->id,
-                        'table_order_id' => $order->id,
-                        'error' => $e->getMessage()
-                    ]);
-                }
+                PrintOrderItemsJob::dispatch($order->id, [$item->id], 'add', $operatorId);
             }
 
             return response()->json([
@@ -511,14 +494,7 @@ class TableOrderController extends Controller
             DB::commit();
 
             // Print removal notification to the relevant kitchen printer
-            try {
-                $this->printerService->setOperatorId($operatorId)->printOrderItems($order, collect([$item]), 'remove');
-            } catch (\Exception $e) {
-                Log::warning('Errore stampa rimozione piatto', [
-                    'order_id' => $order->id,
-                    'error'    => $e->getMessage(),
-                ]);
-            }
+            PrintOrderItemsJob::dispatch($order->id, [$item->id], 'remove', $operatorId);
 
             return response()->json([
                 'success' => true,
@@ -575,17 +551,7 @@ class TableOrderController extends Controller
 
             $skipPrint = $request->input('skip_print', false);
             if (!$skipPrint) {
-                // Stampa la modifica sulla stampante POS
-                try {
-                    $item->load('dish.category.printer');
-                    $this->printerService->setOperatorId($operatorId)->printOrderItems($order, collect([$item]), 'update');
-                } catch (\Exception $e) {
-                    Log::warning('Errore durante la stampa POS per modifica', [
-                        'item_id' => $item->id,
-                        'table_order_id' => $order->id,
-                        'error' => $e->getMessage()
-                    ]);
-                }
+                PrintOrderItemsJob::dispatch($order->id, [$item->id], 'update', $operatorId);
             }
 
             return response()->json([
@@ -837,23 +803,16 @@ class TableOrderController extends Controller
             // Load items with relationships
             $order->load(['items.dish.category.printer', 'restaurantTable']);
 
-            // Print marcia to all involved printers
-            $success = $this->printerService->printMarciaTavolo($order, $operatorId);
+            // Invia stampa marcia alla coda printers
+            PrintMarciaJob::dispatch($order->id, $operatorId);
 
             // Log stampa marcia
             $this->logger->logPrintMarcia($order, $operatorId);
 
-            if ($success) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Marcia tavolo inviata con successo',
-                ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Errore nell\'invio della marcia tavolo',
-                ], 500);
-            }
+            return response()->json([
+                'success' => true,
+                'message' => 'Marcia tavolo inviata con successo',
+            ]);
         } catch (\Exception $e) {
             Log::error('Error sending marcia tavolo: ' . $e->getMessage());
             return response()->json([
@@ -961,19 +920,14 @@ class TableOrderController extends Controller
                     'status'         => 'pending',
                 ]);
 
-                $success = $this->printerService->printPartialPreconto($order, $split, $operatorId);
+                PrintPrecontoJob::dispatch($order->id, $operatorId, null, null, 0, $split->id);
                 $this->logger->logPrintPreconto($order, $operatorId, null, ['split_id' => $split->id, 'label' => $label]);
-
-                if ($success) {
-                    $order->update(['preconto_requested_at' => now()]);
-                    return response()->json([
-                        'success' => true,
-                        'message' => "Preconto parziale \"$label\" stampato (€" . number_format($splitTotal, 2) . ")",
-                        'data'    => ['split_id' => $split->id, 'total' => $splitTotal],
-                    ]);
-                }
-
-                return response()->json(['success' => false, 'message' => 'Errore nella stampa del PreConto parziale'], 500);
+                $order->update(['preconto_requested_at' => now()]);
+                return response()->json([
+                    'success' => true,
+                    'message' => "Preconto parziale \"$label\" stampato (€" . number_format($splitTotal, 2) . ")",
+                    'data'    => ['split_id' => $split->id, 'total' => $splitTotal],
+                ]);
             }
 
             // ── Full or split-by-count preconto ──────────────────────────────
@@ -981,19 +935,14 @@ class TableOrderController extends Controller
             $discountType   = $validated['discount_type'] ?? 'none';
             $discountAmount = (float) ($validated['discount_amount'] ?? 0);
 
-            $success = $this->printerService->printPreconto($order, $operatorId, $splitCount, $discountType, $discountAmount);
+            PrintPrecontoJob::dispatch($order->id, $operatorId, $splitCount, $discountType, $discountAmount);
             $this->logger->logPrintPreconto($order, $operatorId, $splitCount);
-
-            if ($success) {
-                $order->update(['preconto_requested_at' => now()]);
-                $message = 'PreConto stampato con successo';
-                if ($splitCount && $splitCount > 1) {
-                    $message .= " (diviso per $splitCount persone)";
-                }
-                return response()->json(['success' => true, 'message' => $message]);
+            $order->update(['preconto_requested_at' => now()]);
+            $message = 'PreConto stampato con successo';
+            if ($splitCount && $splitCount > 1) {
+                $message .= " (diviso per $splitCount persone)";
             }
-
-            return response()->json(['success' => false, 'message' => 'Errore nella stampa del PreConto. Verificare la configurazione della stampante.'], 500);
+            return response()->json(['success' => true, 'message' => $message]);
 
         } catch (\Exception $e) {
             Log::error('Error printing preconto: ' . $e->getMessage());
@@ -1315,14 +1264,9 @@ class TableOrderController extends Controller
                 return response()->json(['success' => false, 'message' => 'Nessun articolo nell\'ordine'], 400);
             }
 
-            $this->printerService->setOperatorId($operatorId);
-            $success = $this->printerService->printOrderItems($order, $order->items, 'reprint');
-
-            if ($success) {
-                return response()->json(['success' => true, 'message' => 'Ordine ristampato con successo']);
-            } else {
-                return response()->json(['success' => false, 'message' => 'Errore nella ristampa. Verificare la configurazione della stampante.'], 500);
-            }
+            $itemIds = $order->items->pluck('id')->toArray();
+            PrintOrderItemsJob::dispatch($order->id, $itemIds, 'reprint', $operatorId);
+            return response()->json(['success' => true, 'message' => 'Ordine in coda per la ristampa']);
         } catch (\Exception $e) {
             Log::error('Error reprinting order: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Errore nella ristampa dell\'ordine'], 500);
@@ -1638,22 +1582,12 @@ class TableOrderController extends Controller
                 }
             }
 
-            // Print the communication
-            $success = $this->printerService
-                ->setOperatorId($operatorId)
-                ->printComunica($printer, $validated['message'], $operatorId, $tableOrder);
-
-            if ($success) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Comunicazione inviata con successo a ' . $printer->label,
-                ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Errore nell\'invio della comunicazione. Verificare la stampante.',
-                ], 500);
-            }
+            // Invia comunicazione alla coda printers
+            PrintComunicaJob::dispatch($printer->id, $validated['message'], $operatorId, $tableOrder?->id);
+            return response()->json([
+                'success' => true,
+                'message' => 'Comunicazione inviata in coda per ' . $printer->label,
+            ]);
         } catch (\Exception $e) {
             Log::error('Error sending communication: ' . $e->getMessage());
             return response()->json([
@@ -1926,12 +1860,7 @@ class TableOrderController extends Controller
             DB::commit();
 
             // Print after commit
-            try {
-                $item->load('dish.category.printer', 'addedBy');
-                $this->printerService->setOperatorId($operatorId)->printDishChange($order, $item, $oldDishName, $oldPrinter);
-            } catch (\Exception $e) {
-                Log::warning('Errore stampa cambio piatto', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-            }
+            PrintDishChangeJob::dispatch($order->id, $item->id, $oldDishName, $oldPrinter?->id, $operatorId);
 
             return response()->json([
                 'success' => true,
@@ -2166,20 +2095,11 @@ class TableOrderController extends Controller
         $newItemIds     = $request->input('new_item_ids', []);
         $updatedItemIds = $request->input('updated_item_ids', []);
 
-        try {
-            if (!empty($newItemIds)) {
-                $newItems = OrderItem::with('dish.category.printer')->whereIn('id', $newItemIds)->get();
-                $this->printerService->setOperatorId($operatorId)->printOrderItems($order, $newItems, 'add');
-            }
-            if (!empty($updatedItemIds)) {
-                $updatedItems = OrderItem::with('dish.category.printer')->whereIn('id', $updatedItemIds)->get();
-                $this->printerService->setOperatorId($operatorId)->printOrderItems($order, $updatedItems, 'update');
-            }
-        } catch (\Exception $e) {
-            Log::warning('Errore durante la stampa sessione', [
-                'table_order_id' => $order->id,
-                'error' => $e->getMessage()
-            ]);
+        if (!empty($newItemIds)) {
+            PrintOrderItemsJob::dispatch($order->id, $newItemIds, 'add', $operatorId);
+        }
+        if (!empty($updatedItemIds)) {
+            PrintOrderItemsJob::dispatch($order->id, $updatedItemIds, 'update', $operatorId);
         }
 
         return response()->json(['success' => true]);

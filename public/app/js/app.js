@@ -280,4 +280,66 @@ $(document).ready(function() {
             tableOrdersManager.closeInvoiceModal();
         }
     });
+
+    // ── Admin Auth Modal (AMMINISTRA button) ──────────────────────────────────
+
+    $('#btnAmministra').click(function() {
+        $('#adminAuthPassword').val('');
+        $('#adminAuthError').hide();
+        $('#adminAuthModal').css('display', 'flex');
+        setTimeout(function() { $('#adminAuthPassword').focus(); }, 100);
+    });
+
+    $('#cancelAdminAuth').click(function() {
+        $('#adminAuthModal').hide();
+    });
+
+    $('#adminAuthModal').click(function(e) {
+        if (e.target === this) $(this).hide();
+    });
+
+    $('#adminAuthPassword').on('keydown', function(e) {
+        if (e.key === 'Enter') $('#confirmAdminAuth').click();
+    });
+
+    $('#confirmAdminAuth').click(async function() {
+        const password = $('#adminAuthPassword').val();
+        if (!password) {
+            $('#adminAuthErrorText').text('Inserisci la password');
+            $('#adminAuthError').show();
+            return;
+        }
+
+        const $btn = $(this);
+        $btn.prop('disabled', true);
+
+        const orderId = (typeof tableOrdersManager !== 'undefined' && tableOrdersManager.currentTable?.order?.id)
+            ? tableOrdersManager.currentTable.order.id
+            : null;
+
+        try {
+            const response = await fetch('/api/admin/login-redirect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+                },
+                body: JSON.stringify({ password, order_id: orderId }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                window.location.href = data.url;
+            } else {
+                $('#adminAuthErrorText').text(data.message || 'Accesso non autorizzato');
+                $('#adminAuthError').show();
+            }
+        } catch (error) {
+            $('#adminAuthErrorText').text('Errore durante l\'autenticazione');
+            $('#adminAuthError').show();
+        } finally {
+            $btn.prop('disabled', false);
+        }
+    });
 });

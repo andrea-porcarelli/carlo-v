@@ -38,6 +38,12 @@ Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function(
     Route::post('/verify-token', [OperatorAuthController::class, 'verifyToken'])->name('verifyToken');
 });
 
+// Admin login from frontoffice → redirect to backoffice
+Route::post('/api/admin/login-redirect', [OperatorAuthController::class, 'adminLoginRedirect'])->name('api.admin.loginRedirect');
+
+// Operator token for already-authenticated backoffice admin
+Route::get('/api/admin/operator-token', [OperatorAuthController::class, 'getAdminToken'])->middleware('auth')->name('api.admin.operatorToken');
+
 // API Routes for Menu Options
 Route::get('/api/menu-options', [TableOrderController::class, 'getMenuOptions'])->name('api.menu-options');
 Route::get('/api/dishes', [TableOrderController::class, 'getDishes'])->name('api.dishes');

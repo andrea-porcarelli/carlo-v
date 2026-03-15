@@ -2631,9 +2631,55 @@ class TableOrdersManager {
     /**
      * Post-payment cleanup (hide overlays, reset state)
      */
+    /**
+     * Initialize the manager for a specific table when running inside the backoffice
+     */
+    async initForBackoffice(tableId) {
+        try {
+            // Get operator token for the logged-in admin
+            const tokenResp = await fetch('/api/admin/operator-token');
+            const tokenData = await tokenResp.json();
+            if (!tokenData.success) {
+                console.error('initForBackoffice: failed to get admin token');
+                return;
+            }
+
+            // Load current table data
+            const tableResp = await fetch(`${this.apiBase}/${tableId}`);
+            const tableResult = await tableResp.json();
+            if (!tableResult.success) {
+                console.error('initForBackoffice: failed to load table');
+                return;
+            }
+
+            this.currentTable = tableResult.data;
+            this.modifySession.token = tokenData.data.token;
+            if (tableResult.data.order) {
+                this.modifySession.active = true;
+                this._initSessionFromOrder(tableResult.data.order);
+            }
+
+            // Enable all backoffice action buttons
+            document.querySelectorAll('[data-bo-action]').forEach(btn => {
+                btn.disabled = false;
+            });
+
+            const statusSpan = document.getElementById('boStatusSpan');
+            if (statusSpan) statusSpan.style.display = 'none';
+        } catch (e) {
+            console.error('initForBackoffice error:', e);
+        }
+    }
+
     _afterPaymentSuccess() {
         this.currentTable = null;
         this.modifySession.active = false;
+
+        if (window._backofficeMode) {
+            window.location.reload();
+            return;
+        }
+
         this.loadTables();
 
         // Hide overlays
@@ -4273,4 +4319,7 @@ let tableOrdersManager;
 document.addEventListener('DOMContentLoaded', () => {
     const isMobile = window.innerWidth <= 768 || document.getElementById('mainViewMobile') !== null;
     tableOrdersManager = new TableOrdersManager(isMobile);
+    if (window._backofficeMode && window._backofficeTableId) {
+        tableOrdersManager.initForBackoffice(window._backofficeTableId);
+    }
 });

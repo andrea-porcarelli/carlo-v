@@ -1067,3 +1067,87 @@ body {
     color: #dc3545;
     line-height: 1;
 }
+
+/* ==========================================
+   OTTIMIZZAZIONI PER MONITOR 1280×1024
+   Attivo su schermi ≤ 1366px di larghezza
+   ========================================== */
+@media screen and (max-width: 1366px) {
+
+    /* — Navbar — */
+    .navbar { padding: 0.2rem 0; }
+    .navbar-brand { font-size: 1.2rem; }
+    .btn-red { padding: 7px 14px; font-size: 0.82rem; }
+    .btn-orange { padding: 5px 11px; font-size: 0.82rem; }
+
+    /* — Sala principale — */
+    .dining-area { padding: 14px 18px; min-height: 0; }
+    .dining-title { font-size: 1rem; margin-bottom: 10px; padding-bottom: 8px; }
+    .dining-grid { gap: 2px; }
+    .table-item { width: 82px; height: 82px; margin: 4px; }
+    .table-number { font-size: 15px; }
+    .table-status { font-size: 8px; }
+    .table-total { font-size: 11px; }
+    .table-timer { font-size: 7px; }
+
+    /* — Overlay: padding e gap interni (override inline style) — */
+    #modifyOrderOverlay > div {
+        padding: 10px !important;
+        gap: 7px !important;
+    }
+
+    /* Barra "Chiudi e invia" */
+    #closeModifyBtn {
+        height: 30px !important;
+        font-size: 11px !important;
+        padding: 0 12px !important;
+    }
+
+    /* — Colonna ordine (sinistra): larghezza fissa invece del 33% — */
+    .overlay-col-order { flex: 0 0 270px; }
+    .overlay-order-header { padding: 8px 12px; }
+
+    /* — Footer ordine: sconto e totale — */
+    .overlay-discount-row { padding: 5px 10px; }
+    .overlay-total-row { padding: 8px 12px; }
+    .total-value { font-size: 1.35rem; }
+    .discount-type-btn { width: 26px; height: 26px; font-size: 0.73rem; }
+    .discount-apply-btn,
+    .discount-reset-btn { width: 26px; height: 26px; font-size: 0.73rem; }
+    #modifyDiscountInput { width: 60px; height: 26px; font-size: 0.82rem; }
+
+    /* — Barra azioni in basso — */
+    .overlay-actions-bar { gap: 4px; padding-top: 4px; }
+    .overlay-actions-bar .action-btn-v {
+        min-height: 50px;
+        max-width: 95px;
+        font-size: 0.6rem;
+        padding: 6px 3px;
+        gap: 3px;
+    }
+    .overlay-actions-bar .action-btn-v i { font-size: 0.88rem; }
+
+    /* — Dish selector: colonna categorie — */
+    .ds-categories-col { width: 125px; padding: 6px; gap: 3px; }
+    .ds-category-btn { font-size: 0.65rem; padding: 9px 5px; }
+
+    /* — Dish selector: griglia piatti — */
+    .ds-dishes-area { padding: 6px; }
+    .ds-dishes-grid {
+        grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+        gap: 5px;
+    }
+    .ds-dishes-grid .menu-item { min-height: 50px; padding: 7px 8px; }
+    .ds-dishes-grid .menu-item-name { font-size: 11px; }
+    .ds-dishes-grid .menu-item-price { font-size: 11px; }
+
+    /* — Righe ordine corrente — */
+    .receipt-item { padding: 4px 8px; }
+    .btn-remove-item,
+    .btn-edit-item { width: 26px; height: 26px; font-size: 0.73rem; }
+    .receipt-item { padding-right: 66px; }
+
+    /* — Empty state (meno spazio verticale) — */
+    .empty-state { padding: 30px 20px; }
+    .empty-state i { font-size: 2.5rem; margin-bottom: 10px; }
+}

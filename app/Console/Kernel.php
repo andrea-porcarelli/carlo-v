@@ -14,6 +14,9 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('stock:check-low')->everySixHours();
         $schedule->command('sync:run')->everySixHours()->withoutOverlapping()->appendOutputTo(storage_path('logs/sync.log'));
+
+        // Backup del database ogni 2 ore dalle 8:00 alle 04:00 del giorno successivo
+        $schedule->command('db:backup')->cron('0 8,10,12,14,16,18,20,22,0,2,4 * * *');
     }
 
     /**
