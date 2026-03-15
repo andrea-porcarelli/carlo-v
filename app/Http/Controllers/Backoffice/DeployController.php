@@ -44,6 +44,13 @@ class DeployController extends BaseController
         try {
             $projectPath = base_path();
 
+            // Rimuove FETCH_HEAD se esiste e non è scrivibile dall'utente corrente
+            // (accade quando git pull precedente fu eseguito da un utente diverso)
+            $fetchHead = $projectPath . '/.git/FETCH_HEAD';
+            if (file_exists($fetchHead) && !is_writable($fetchHead)) {
+                @unlink($fetchHead);
+            }
+
             // Array per catturare l'output del comando
             $output = [];
             $returnVar = 0;
