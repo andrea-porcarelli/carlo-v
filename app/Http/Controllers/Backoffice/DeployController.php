@@ -11,10 +11,13 @@ use Illuminate\Support\Facades\Log;
 class DeployController extends BaseController
 {
     /**
-     * Hardcoded deploy key — keep this secret.
-     * Change it if it is ever exposed.
+     * Deploy key — read from env DEPLOY_KEY, fallback to hardcoded value.
+     * Set DEPLOY_KEY in .env to override without touching code.
      */
-    private const DEPLOY_KEY = 'cv-deploy-7Xm2pN9qR4wL8jE3tK';
+    private static function deployKey(): string
+    {
+        return env('DEPLOY_KEY', 'cv-deploy-7Xm2pN9qR4wL8jE3tK');
+    }
 
     /**
      * GET|POST /webhook/deploy?key=<key>
@@ -33,7 +36,7 @@ class DeployController extends BaseController
         // ── Key validation (constant-time comparison) ──────────────────────────
         $provided = $request->query('key') ?? $request->header('X-Deploy-Key', '');
 
-        if (!hash_equals(self::DEPLOY_KEY, (string) $provided)) {
+        if (!hash_equals(self::deployKey(), (string) $provided)) {
             Log::warning('Deploy webhook: invalid key attempt', ['ip' => $request->ip()]);
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -85,7 +88,7 @@ class DeployController extends BaseController
     {
         $provided = $request->query('key') ?? $request->header('X-Deploy-Key', '');
 
-        if (!hash_equals(self::DEPLOY_KEY, (string) $provided)) {
+        if (!hash_equals(self::deployKey(), (string) $provided)) {
             Log::warning('Deploy webhook: invalid key attempt on migrate', ['ip' => $request->ip()]);
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -170,7 +173,7 @@ class DeployController extends BaseController
 
         try {
             $response = Http::timeout(60)
-                ->post("{$carlovUrl}/webhook/deploy?key=" . self::DEPLOY_KEY);
+                ->post("{$carlovUrl}/webhook/deploy?key=" . self::deployKey());
 
             $json = $response->json();
             if ($json === null) {
@@ -205,7 +208,7 @@ class DeployController extends BaseController
 
         try {
             $response = Http::timeout(120)
-                ->post("{$carlovUrl}/webhook/migrate?key=" . self::DEPLOY_KEY);
+                ->post("{$carlovUrl}/webhook/migrate?key=" . self::deployKey());
 
             $json = $response->json();
             if ($json === null) {

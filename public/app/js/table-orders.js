@@ -2986,11 +2986,29 @@ class TableOrdersManager {
             return;
         }
 
-        // No new auth: use the token stored when the overlay was opened
-        const token = this.modifySession.token;
-        if (!token) {
-            this.showNotification('Sessione non valida, riautenticarsi', 'error');
-            return;
+        // If there are new items to add or items to remove, a new auth is required
+        // (these operations were not authenticated via CONFERMA).
+        // Modifications (pendingUpdate/pendingDishChange) are already authenticated at CONFERMA time.
+        const needsAuth =
+            this.modifySession.pendingAdd.length > 0 ||
+            this.modifySession.pendingRemove.length > 0;
+
+        let token;
+        if (needsAuth) {
+            let auth;
+            try {
+                auth = await operatorAuthManager.requestAuth();
+            } catch (e) {
+                return;
+            }
+            if (!auth) return;
+            token = auth.token;
+        } else {
+            token = this.modifySession.token;
+            if (!token) {
+                this.showNotification('Sessione non valida, riautenticarsi', 'error');
+                return;
+            }
         }
 
         try {
