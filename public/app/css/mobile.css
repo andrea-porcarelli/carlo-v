@@ -138,70 +138,37 @@
 
 .mobile-tables-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
     padding: 15px;
     background: white;
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-.mobile-table {
+/* Override desktop table-item size for mobile touch */
+.mobile-tables-grid .table-item {
+    width: 100%;
+    height: auto;
     aspect-ratio: 1;
-    border-radius: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-
-.mobile-table.free {
-    background: linear-gradient(135deg, #28a745, #20c997);
-    color: white;
-}
-
-.mobile-table.occupied {
-    background: linear-gradient(135deg, #dc3545, #c82333);
-    color: white;
-}
-
-.mobile-table-number {
-    font-size: 28px;
-    font-weight: 700;
-    margin-bottom: 5px;
-}
-
-.mobile-table-status {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    opacity: 0.9;
-}
-
-.mobile-table-total {
+    margin: 0;
     font-size: 14px;
-    font-weight: 700;
-    margin-top: 5px;
 }
 
-.mobile-table-timer {
-    font-size: 9px;
-    margin-top: 3px;
-    opacity: 0.7;
+.mobile-tables-grid .table-number {
+    font-size: 22px;
 }
 
-.mobile-table:active {
+.mobile-tables-grid .table-total {
+    font-size: 11px;
+}
+
+.mobile-tables-grid .table-timer {
+    font-size: 8px;
+}
+
+.mobile-tables-grid .table-item:active {
     transform: scale(0.95);
-}
-
-.mobile-table.selected {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 4px #ffc107, 0 4px 15px rgba(255, 193, 7, 0.5);
-    z-index: 10;
 }
 
 /* ===== MENU VIEW (MOBILE) ===== */
@@ -876,20 +843,25 @@ input, textarea, select {
 }
 
 /* ===== RESPONSIVE ADJUSTMENTS ===== */
-@media (min-width: 480px) {
+@media (min-width: 426px) {
     .mobile-tables-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        grid-template-columns: repeat(4, 1fr);
     }
+    .mobile-tables-grid .table-number {
+        font-size: 24px;
+    }
+}
 
-    .mobile-table-number {
-        font-size: 32px;
+@media (min-width: 600px) {
+    .mobile-tables-grid {
+        grid-template-columns: repeat(5, 1fr);
     }
 }
 
 @media (min-width: 768px) {
     .mobile-tables-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: 15px;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 12px;
     }
 }
 
@@ -1345,4 +1317,116 @@ input, textarea, select {
 
 .mobile-modal-footer .mobile-action-btn {
     flex: 1;
+}
+
+/* ===== OVERLAY TAB BAR (MOBILE) ===== */
+.mobile-overlay-tabs {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.mobile-overlay-tab {
+    flex: 1;
+    padding: 9px 6px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.mobile-overlay-tab.active {
+    background: white;
+    border-color: white;
+    color: #000;
+}
+
+.mobile-overlay-tab i {
+    font-size: 0.9rem;
+}
+
+/* ===== ACTION BAR – 9 BUTTONS (MOBILE) ===== */
+.mobile-actions-bar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.mobile-actions-bar .action-btn-v {
+    flex: none;
+    min-height: 52px;
+    font-size: 0.62rem;
+    padding: 7px 4px;
+    border-radius: 5px;
+    max-width: none;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.mobile-actions-bar .action-btn-v i {
+    font-size: 1rem;
+}
+
+/* ===== DISH SELECTOR INSIDE OVERLAY (MOBILE) ===== */
+#modifyMenuContainer .ds-categories-col {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    max-height: 52px;
+    min-height: 52px;
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+    padding: 6px 8px;
+    gap: 6px;
+    scrollbar-width: none;
+}
+
+#modifyMenuContainer .ds-categories-col::-webkit-scrollbar {
+    display: none;
+}
+
+#modifyMenuContainer .ds-category-btn {
+    flex-shrink: 0;
+    writing-mode: horizontal-tb;
+    padding: 4px 12px;
+    font-size: 0.72rem;
+}
+
+#modifyMenuContainer .ds-layout {
+    flex-direction: column;
+}
+
+#modifyMenuContainer .ds-dishes-panel {
+    flex: 1;
+    min-height: 0;
+}
+
+#modifyMenuContainer .ds-dishes-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+}
+
+#modifyMenuContainer .ds-dish-card {
+    min-height: 68px;
+    font-size: 0.72rem;
+    padding: 6px 4px;
+}
+
+/* ===== NOTIFICATION POSITION FIX (MOBILE) ===== */
+.mobile-body .notification {
+    top: 80px;
 }

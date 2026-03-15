@@ -156,61 +156,39 @@ class TableOrdersManager {
 
         if (!container) return;
 
-        // Different rendering for mobile vs desktop
-        if (this.isMobile) {
-            container.innerHTML = tables.map(table => `
-                <div class="mobile-table ${table.status === 'free' ? 'free' : 'occupied'}" data-table="${table.id}">
-                    <div class="mobile-table-number">${table.table_number}</div>
-                    <div class="mobile-table-status">${this.getStatusLabel(table.status)}</div>
+        container.innerHTML = tables
+            .filter(table => !table.is_banco)
+            .map(table => {
+                const tableClass = table.status === 'free' ? 'free' : (table.has_preconto ? 'preconto' : 'occupied');
+                return `
+                <div class="table-item table-${tableClass}" data-table="${table.id}">
+                    <div class="table-number">${table.table_number}</div>
                     ${table.has_active_order ? `
-                        <div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="mobile-table-total ${table.active_order.autoconsumo ? ' autoconsumo' : ''}">€${parseFloat(table.current_total).toFixed(2)}</div>
-                        <div class="mobile-table-timer" data-opened-at="${table.active_order.opened_at}">
-                            ${this.formatElapsedTime(table.active_order.opened_at)}
+                        <div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="table-total ${table.active_order.autoconsumo ? 'autoconsumo' : ''}">€${parseFloat(table.current_total).toFixed(2)}</div>
+                        <div class="table-timer" data-opened-at="${table.active_order.opened_at}">
+                            <i class="fas fa-clock"></i> ${this.formatElapsedTime(table.active_order.opened_at)}
                         </div>
                     ` : ''}
-                </div>
-            `).join('');
-        } else {
-            container.innerHTML = tables
-                .filter(table => !table.is_banco)
-                .map(table => {
-                    const tableClass = table.status === 'free' ? 'free' : (table.has_preconto ? 'preconto' : 'occupied');
-                    return `
-                    <div class="table-item table-${tableClass}" data-table="${table.id}">
-                        <div class="table-number">${table.table_number}</div>
-                        ${table.has_active_order ? `
-                            <div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="table-total ${table.active_order.autoconsumo ? ' autoconsumo' : ''}">€${parseFloat(table.current_total).toFixed(2)}</div>
-                            <div class="table-timer" data-opened-at="${table.active_order.opened_at}">
-                                <i class="fas fa-clock"></i> ${this.formatElapsedTime(table.active_order.opened_at)}
-                            </div>
-                        ` : ''}
-                    </div>`;
-                }).join('');
-        }
+                </div>`;
+            }).join('');
 
         // Attach click events to tables
-        const tableElements = container.querySelectorAll(this.isMobile ? '.mobile-table' : '.table-item');
+        const tableElements = container.querySelectorAll('.table-item');
         tableElements.forEach(card => {
             card.addEventListener('click', () => {
                 const tableId = card.dataset.table;
 
                 // Remove previous selection
-                tableElements.forEach(t => t.classList.remove('table-selected', 'selected'));
+                tableElements.forEach(t => t.classList.remove('table-selected'));
 
                 // Add selection to current table
-                card.classList.add(this.isMobile ? 'selected' : 'table-selected');
+                card.classList.add('table-selected');
 
                 this.selectTable(tableId);
 
-                // Mobile: show action bar
-                if (this.isMobile) {
-                    const actionBar = document.getElementById('mobileActionBar');
-                    if (actionBar) actionBar.style.display = 'block';
-
-                    // Haptic feedback
-                    if (navigator.vibrate) {
-                        navigator.vibrate(50);
-                    }
+                // Haptic feedback on mobile
+                if (this.isMobile && navigator.vibrate) {
+                    navigator.vibrate(50);
                 }
             });
         });
@@ -523,9 +501,9 @@ class TableOrdersManager {
                 </div>
                 <div class="receipt-item-actions">
                     <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
-                    <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
+                    ${items.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
                         <i class="fas fa-trash"></i>
-                    </button>
+                    </button>` : ''}
                 </div>
             </div>
         `).join('');
@@ -793,9 +771,9 @@ class TableOrdersManager {
                     <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica note/extra">
                         <i class="fas fa-pen"></i>
                     </button>
-                    <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
+                    ${items.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
                         <i class="fas fa-trash"></i>
-                    </button>
+                    </button>` : ''}
                 </div>
             </div>
         `).join('');
@@ -3822,7 +3800,7 @@ class TableOrdersManager {
      * Update all timers
      */
     updateTimers() {
-        const timers = document.querySelectorAll('.table-timer, .mobile-table-timer');
+        const timers = document.querySelectorAll('.table-timer');
         timers.forEach(timer => {
             const openedAt = timer.dataset.openedAt;
             if (openedAt) {

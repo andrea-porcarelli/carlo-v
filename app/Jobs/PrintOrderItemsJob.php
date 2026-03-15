@@ -10,7 +10,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 class PrintOrderItemsJob implements ShouldQueue
 {
@@ -31,15 +30,8 @@ class PrintOrderItemsJob implements ShouldQueue
 
     public function handle(PrinterServiceInterface $printerService): void
     {
-        Log::info('PrintOrderItemsJob started', [
-            'order_id' => $this->tableOrderId,
-            'item_ids' => $this->itemIds,
-            'operation' => $this->operation,
-        ]);
-
         $tableOrder = TableOrder::withTrashed()->with('restaurantTable')->find($this->tableOrderId);
         if (!$tableOrder) {
-            Log::warning('PrintOrderItemsJob: order not found', ['order_id' => $this->tableOrderId]);
             return;
         }
 
@@ -48,11 +40,8 @@ class PrintOrderItemsJob implements ShouldQueue
             ->get();
 
         if ($items->isEmpty()) {
-            Log::warning('PrintOrderItemsJob: items not found', ['item_ids' => $this->itemIds]);
             return;
         }
-
-        Log::info('PrintOrderItemsJob: items found', ['count' => $items->count()]);
 
         if ($this->operatorId) {
             $printerService->setOperatorId($this->operatorId);

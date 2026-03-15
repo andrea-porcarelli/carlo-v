@@ -359,11 +359,13 @@ window._boSale = {
                                                             title="Cambia piatto">
                                                         <i class="fas fa-exchange-alt"></i>
                                                     </button>
+                                                    @if($sale->items->where('status', '!=', 'cancelled')->count() > 1)
                                                     <button class="btn btn-xs btn-danger btn-item-remove"
                                                             data-item-id="{{ $item->id }}"
                                                             title="Rimuovi">
                                                         <i class="fas fa-trash"></i>
                                                     </button>
+                                                    @endif
                                                 </div>
                                                 @endif
                                             </td>

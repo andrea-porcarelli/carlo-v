@@ -496,14 +496,8 @@ class TableOrderController extends Controller
 
             DB::commit();
 
-            // Print removal notification to the relevant kitchen printer
-            Log::info('removeItem: dispatching print job', [
-                'order_id' => $order->id,
-                'item_id' => $item->id,
-                'operator_id' => $operatorId,
-            ]);
             PrintOrderItemsJob::dispatch($order->id, [$item->id], 'remove', $operatorId);
-            Log::info(__LINE__);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Prodotto rimosso con successo',
