@@ -53,13 +53,22 @@ $(document).ready(function() {
 
     // ===== TOUCH OPTIMIZATIONS =====
 
-    // Prevent pull-to-refresh on iOS
+    // Prevent pull-to-refresh on iOS only when scrolling UP at the top
+    let touchStartY = 0;
+    document.body.addEventListener('touchstart', function(e) {
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
     document.body.addEventListener('touchmove', function(e) {
-        if (e.target.closest('.mobile-modal-body') || e.target.closest('#modifyReceiptItems')) {
-            return; // Allow scrolling in scrollable containers
+        if (e.target.closest('.mobile-modal-body') ||
+            e.target.closest('#modifyReceiptItems') ||
+            e.target.closest('.dsm-categories-strip') ||
+            e.target.closest('.dsm-dishes-list')) {
+            return;
         }
-        if (document.body.scrollTop === 0) {
-            e.preventDefault();
+        const dy = e.touches[0].clientY - touchStartY;
+        if (document.body.scrollTop === 0 && dy > 0) {
+            e.preventDefault(); // blocca solo pull-to-refresh
         }
     }, { passive: false });
 
