@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @include('app.components.css')
-    <link href="{{ asset('/app/css/mobile.css') }}?v=1.0" rel="stylesheet">
+    <link href="{{ asset('/app/css/mobile.css') }}?v={{ time() }}" rel="stylesheet">
     @livewireStyles
 </head>
 <body class="mobile-body">
@@ -15,7 +15,7 @@
     @yield('main-content')
 
     @include('app.components.javascript')
-    <script src="{{ asset('app/js/mobile.js') }}?v=1.0"></script>
+    <script src="{{ asset('app/js/mobile.js') }}?v={{ time() }}"></script>
     @livewireScripts
 </body>
 </html>
