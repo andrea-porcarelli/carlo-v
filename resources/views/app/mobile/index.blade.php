@@ -9,24 +9,6 @@
                 <div class="mobile-logo">
                     <i class="fas fa-utensils"></i> CARLO V
                 </div>
-                <div class="mobile-header-stats">
-                    <div class="stat-badge stat-occupied">
-                        <span id="occupiedCountMobile">0</span>
-                    </div>
-                    <div class="stat-badge stat-free">
-                        <span id="freeCountMobile">0</span>
-                    </div>
-                </div>
-            </div>
-            <div class="mobile-header-nav">
-                <button class="mobile-nav-btn active" id="btnMainViewMobile">
-                    <i class="fas fa-home"></i>
-                    <span>SALA</span>
-                </button>
-                <button class="mobile-nav-btn" id="btnAddTableMobile">
-                    <i class="fas fa-plus"></i>
-                    <span>AGGIUNGI</span>
-                </button>
             </div>
         </header>
 
@@ -117,7 +99,7 @@
                 <!-- MENU tab -->
                 <div id="mobileOverlayMenuTab" style="height:100%; display:none; flex-direction:column; overflow:hidden;">
                     <div id="modifyMenuContainer" style="height:100%; background:white; border-radius:8px; overflow:hidden;">
-                        @livewire('dish-selector')
+                        @livewire('dish-selector-mobile')
                     </div>
                 </div>
 

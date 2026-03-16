@@ -112,7 +112,7 @@
 .mobile-page {
     display: none;
     padding: 15px;
-    padding-top: 125px;
+    padding-top: 85px;
 }
 
 .mobile-page.active {
@@ -1379,51 +1379,122 @@ input, textarea, select {
     font-size: 1rem;
 }
 
-/* ===== DISH SELECTOR INSIDE OVERLAY (MOBILE) ===== */
-#modifyMenuContainer .ds-categories-col {
+/* ===== DISH SELECTOR MOBILE (dsm-*) ===== */
+.dsm-categories-strip {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
     overflow-x: auto;
     overflow-y: hidden;
-    width: 100%;
-    max-height: 52px;
-    min-height: 52px;
-    border-right: none;
+    gap: 7px;
+    padding: 10px 12px;
+    background: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
-    padding: 6px 8px;
-    gap: 6px;
+    flex-shrink: 0;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
 }
 
-#modifyMenuContainer .ds-categories-col::-webkit-scrollbar {
+.dsm-categories-strip::-webkit-scrollbar {
     display: none;
 }
 
-#modifyMenuContainer .ds-category-btn {
+.dsm-cat-btn {
     flex-shrink: 0;
-    writing-mode: horizontal-tb;
-    padding: 4px 12px;
+    padding: 7px 14px;
+    border: 2px solid #dee2e6;
+    border-radius: 20px;
+    background: white;
+    color: #495057;
     font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
 }
 
-#modifyMenuContainer .ds-layout {
-    flex-direction: column;
+.dsm-cat-btn.active {
+    background: #000;
+    border-color: #000;
+    color: white;
 }
 
-#modifyMenuContainer .ds-dishes-panel {
+.dsm-search {
+    padding: 8px 12px;
+    flex-shrink: 0;
+    background: white;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.dsm-search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: #f8f9fa;
+    box-sizing: border-box;
+}
+
+.dsm-search-input:focus {
+    outline: none;
+    border-color: #adb5bd;
+}
+
+.dsm-dishes-list {
     flex: 1;
-    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: white;
 }
 
-#modifyMenuContainer .ds-dishes-grid {
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+.dsm-dish-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background 0.1s;
+    gap: 10px;
 }
 
-#modifyMenuContainer .ds-dish-card {
-    min-height: 68px;
-    font-size: 0.72rem;
-    padding: 6px 4px;
+.dsm-dish-row:active {
+    background: #f8f9fa;
+}
+
+.dsm-dish-name {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #212529;
+    flex: 1;
+}
+
+.dsm-dish-price {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #dc3545;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.dsm-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: #adb5bd;
+}
+
+.dsm-empty i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.dsm-empty p {
+    font-size: 0.88rem;
+    margin: 0;
 }
 
 /* ===== NOTIFICATION POSITION FIX (MOBILE) ===== */
