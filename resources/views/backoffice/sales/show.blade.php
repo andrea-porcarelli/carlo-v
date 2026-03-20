@@ -133,6 +133,66 @@ window._boSale = {
                                 </td>
                             </tr>
                             @endif
+                            @php
+                                $paidSplits    = $sale->precontoSplits->where('status', 'paid');
+                                $pendingSplits = $sale->precontoSplits->where('status', 'pending');
+                                $paidSplitsTotal   = round((float) $paidSplits->sum('total'), 2);
+                                $effectiveTotal    = $sale->hasDiscount() ? $sale->getDiscountedTotal() : (float) $sale->total_amount;
+                                $remainingTotal    = max(0, round($effectiveTotal - $paidSplitsTotal, 2));
+                            @endphp
+                            @if($paidSplits->count() > 0 || $pendingSplits->count() > 0)
+                            <tr>
+                                <td colspan="2" style="padding:0;">
+                                    <table class="table table-condensed" style="margin:0; font-size:12px; background:#fafafa;">
+                                        <thead>
+                                            <tr style="background:#e9ecef;">
+                                                <th colspan="3" style="padding:4px 8px;">
+                                                    <i class="fas fa-receipt"></i> Preconti
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($paidSplits as $split)
+                                            <tr>
+                                                <td style="padding:3px 8px;">
+                                                    <i class="fas fa-check-circle text-success"></i>
+                                                    {{ $split->label ?? 'Preconto' }}
+                                                </td>
+                                                <td style="padding:3px 8px; color:#666;">
+                                                    {{ $split->paid_at ? $split->paid_at->format('H:i') : '' }}
+                                                </td>
+                                                <td style="padding:3px 8px; text-align:right; color:#d9534f;">
+                                                    &minus;€{{ number_format($split->total, 2, ',', '.') }}
+                                                </td>
+                                            </tr>
+                                            @endforeach
+                                            @foreach($pendingSplits as $split)
+                                            <tr>
+                                                <td style="padding:3px 8px; color:#888;">
+                                                    <i class="fas fa-clock"></i>
+                                                    {{ $split->label ?? 'Preconto' }}
+                                                </td>
+                                                <td style="padding:3px 8px; color:#888;">in attesa</td>
+                                                <td style="padding:3px 8px; text-align:right; color:#888;">
+                                                    €{{ number_format($split->total, 2, ',', '.') }}
+                                                </td>
+                                            </tr>
+                                            @endforeach
+                                        </tbody>
+                                        @if($paidSplitsTotal > 0)
+                                        <tfoot>
+                                            <tr style="background:#fff3cd;">
+                                                <td colspan="2" style="padding:4px 8px;"><strong>Rimanente:</strong></td>
+                                                <td style="padding:4px 8px; text-align:right;">
+                                                    <strong class="text-success">€{{ number_format($remainingTotal, 2, ',', '.') }}</strong>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                        @endif
+                                    </table>
+                                </td>
+                            </tr>
+                            @endif
                             <tr>
                                 <td><strong>Metodo pagamento:</strong></td>
                                 <td>
@@ -433,6 +493,30 @@ window._boSale = {
                                             </td>
                                             <td class="text-end text-danger">
                                                 &minus;€{{ number_format($sale->discount_value, 2, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                    @endif
+                                    @if(isset($paidSplits) && $paidSplits->count() > 0)
+                                        @foreach($paidSplits as $split)
+                                        <tr style="color:#888; font-size:13px;">
+                                            <td colspan="4" class="text-end">
+                                                <i class="fas fa-check-circle text-success"></i>
+                                                Preconto pagato — {{ $split->label ?? '' }}
+                                                @if($split->paid_at)<small class="text-muted">({{ $split->paid_at->format('H:i') }})</small>@endif:
+                                            </td>
+                                            <td class="text-end text-danger">
+                                                &minus;€{{ number_format($split->total, 2, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                        <tr style="background:#fff3cd;">
+                                            <td colspan="4" class="text-end">
+                                                <strong>RIMANENTE DA PAGARE:</strong>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong style="font-size: 18px;" class="text-success">
+                                                    €{{ number_format($remainingTotal, 2, ',', '.') }}
+                                                </strong>
                                             </td>
                                         </tr>
                                     @endif

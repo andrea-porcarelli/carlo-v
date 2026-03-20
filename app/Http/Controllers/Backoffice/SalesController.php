@@ -101,7 +101,8 @@ class SalesController extends BaseController
             'restaurantTable',
             'items.dish.category',
             'items.dish.allergens',
-            'waiter'
+            'waiter',
+            'precontoSplits',
         ])->withTrashed()
             ->findOrFail($id);
 
