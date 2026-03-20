@@ -332,6 +332,7 @@ class TableOrdersManager {
         this.modifySession.pendingDishChange = [];
         this.modifySession.itemCounter = -1;
         this.modifySession.paidSplitsTotal = parseFloat(order?.paid_splits_total || 0);
+        this.modifySession.paidCoversTotal = parseFloat(order?.paid_covers_total || 0);
         this.modifySession.pendingSplits = order?.pending_splits ?? [];
 
         // Remove/reduce items already paid via preconto splits
@@ -664,14 +665,23 @@ class TableOrdersManager {
         const order = this.modifySession.active ? this.currentTable?.order : this.currentTable?.order;
 
         // Add cover charge row (editable)
-        if (order && order.has_cover_charge && order.cover_charge_total > 0) {
+        const paidCoversTotal = this.modifySession.paidCoversTotal || 0;
+        const coverChargeTotal = parseFloat(order?.cover_charge_total || 0);
+        const remainingCoverTotal = Math.max(0, coverChargeTotal - paidCoversTotal);
+        const coverPerPerson = parseFloat(order?.cover_charge_per_person || 0);
+        const remainingCovers = coverPerPerson > 0 ? Math.round(remainingCoverTotal / coverPerPerson) : 0;
+
+        if (order && order.has_cover_charge && coverChargeTotal > 0) {
+            const coverLabel = paidCoversTotal > 0
+                ? `${remainingCovers} x €${coverPerPerson.toFixed(2)} = <strong>€${remainingCoverTotal.toFixed(2)}</strong> <small style="color:#28a745;">(${order.covers - remainingCovers} già pagati)</small>`
+                : `${order.covers} x €${coverPerPerson.toFixed(2)} = <strong>€${coverChargeTotal.toFixed(2)}</strong>`;
             itemsHtml += `
                 <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #17a2b8; padding-left: 15px">
                     <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
                         <strong><i class="fas fa-utensils me-2"></i>Coperto</strong>
                         <span>
                             <span id="coversDisplay" style="cursor:pointer;" onclick="tableOrdersManager.editCovers()" title="Modifica coperti">
-                                ${order.covers} x €${parseFloat(order.cover_charge_per_person).toFixed(2)} = <strong>€${parseFloat(order.cover_charge_total).toFixed(2)}</strong>
+                                ${coverLabel}
                                 <i class="fas fa-pencil-alt" style="font-size:0.7rem;color:#6c757d;margin-left:4px;"></i>
                             </span>
                             <span id="coversEdit" style="display:none;">
@@ -734,7 +744,8 @@ class TableOrdersManager {
         let rawTotal;
         if (this.modifySession.active) {
             const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
-            const coverTotal = (order && order.has_cover_charge) ? parseFloat(order.cover_charge_total || 0) : 0;
+            // Use remainingCoverTotal (already computed above) — excludes covers paid via preconto splits
+            const coverTotal = (order && order.has_cover_charge) ? remainingCoverTotal : 0;
             rawTotal = itemsTotal + coverTotal;
         } else {
             rawTotal = parseFloat(order ? order.total_amount : 0);
@@ -2665,6 +2676,7 @@ class TableOrdersManager {
                     const paidItems = result.data?.paid_items ?? [];
                     const paidSplitTotal = result.data?.paid_split_total ?? 0;
                     this.modifySession.paidSplitsTotal = (this.modifySession.paidSplitsTotal || 0) + paidSplitTotal;
+                    this.modifySession.paidCoversTotal = (this.modifySession.paidCoversTotal || 0) + (result.data?.paid_cover_amount ?? 0);
                     // Remove the just-paid split from pending list
                     this.modifySession.pendingSplits = (this.modifySession.pendingSplits ?? []).filter(s => s.id !== splitId);
                     if (paidItems.length > 0) {

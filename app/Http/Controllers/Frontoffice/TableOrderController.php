@@ -186,6 +186,8 @@ class TableOrderController extends Controller
             if ($order) {
                 $allSplits = $order->precontoSplits()->orderBy('created_at')->get();
                 $paidSplitsTotal = round((float) $allSplits->where('status', 'paid')->sum('total'), 2);
+                $coverPerPerson  = $order->getCoverChargePerPerson();
+                $paidCoversTotal = round($allSplits->where('status', 'paid')->sum('covers') * $coverPerPerson, 2);
                 foreach ($allSplits->where('status', 'paid') as $split) {
                     foreach ($split->items ?? [] as $splitItem) {
                         $itemId = $splitItem['order_item_id'] ?? null;
@@ -231,6 +233,7 @@ class TableOrderController extends Controller
                         'discount_value'    => $order->discount_value ? (float) $order->discount_value : null,
                         'discounted_total'  => $order->getDiscountedTotal(),
                         'paid_splits_total' => $paidSplitsTotal,
+                        'paid_covers_total' => $paidCoversTotal ?? 0,
                         'pending_splits'    => $pendingSplitsData,
                         'paid_items'        => $paidItems,
                         'items' => $items,
@@ -1089,10 +1092,11 @@ class TableOrderController extends Controller
                 'success' => true,
                 'message' => $orderClosed ? 'Conto chiuso completamente' : "Pagato €" . number_format($split->total, 2),
                 'data'    => [
-                    'order_closed'    => $orderClosed,
-                    'remaining'       => max(0, $remaining),
-                    'paid_items'      => $splitPaidItems,
+                    'order_closed'     => $orderClosed,
+                    'remaining'        => max(0, $remaining),
+                    'paid_items'       => $splitPaidItems,
                     'paid_split_total' => (float) $split->total,
+                    'paid_cover_amount' => round((int) $split->covers * $order->getCoverChargePerPerson(), 2),
                 ],
             ]);
         } catch (\Exception $e) {

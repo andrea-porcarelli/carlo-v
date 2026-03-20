@@ -480,6 +480,18 @@ window._boSale = {
                                             </td>
                                         </tr>
                                     @endif
+                                    @if($sale->hasCoverCharge())
+                                        <tr>
+                                            <td colspan="4" class="text-end text-muted">
+                                                <i class="fas fa-utensils"></i>
+                                                Coperto
+                                                ({{ $sale->covers }} × €{{ number_format($sale->getCoverChargePerPerson(), 2, ',', '.') }}):
+                                            </td>
+                                            <td class="text-end">
+                                                <strong>€{{ number_format($sale->getCoverChargeAmount(), 2, ',', '.') }}</strong>
+                                            </td>
+                                        </tr>
+                                    @endif
                                     @if($sale->hasDiscount())
                                         <tr>
                                             <td colspan="4" class="text-end text-muted">
