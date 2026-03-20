@@ -182,10 +182,11 @@ class TableOrderController extends Controller
             // Aggregate paid preconto splits info
             $paidSplitsTotal = 0;
             $paidItemsMap = [];
+            $pendingSplitsData = [];
             if ($order) {
-                $paidSplits = $order->precontoSplits()->where('status', 'paid')->get();
-                $paidSplitsTotal = round((float) $paidSplits->sum('total'), 2);
-                foreach ($paidSplits as $split) {
+                $allSplits = $order->precontoSplits()->orderBy('created_at')->get();
+                $paidSplitsTotal = round((float) $allSplits->where('status', 'paid')->sum('total'), 2);
+                foreach ($allSplits->where('status', 'paid') as $split) {
                     foreach ($split->items ?? [] as $splitItem) {
                         $itemId = $splitItem['order_item_id'] ?? null;
                         $qty = (float) ($splitItem['quantity'] ?? $splitItem['qty'] ?? 1);
@@ -193,6 +194,13 @@ class TableOrderController extends Controller
                             $paidItemsMap[$itemId] = ($paidItemsMap[$itemId] ?? 0) + $qty;
                         }
                     }
+                }
+                foreach ($allSplits->where('status', 'pending') as $split) {
+                    $pendingSplitsData[] = [
+                        'id'    => $split->id,
+                        'label' => $split->label,
+                        'total' => (float) $split->total,
+                    ];
                 }
             }
             $paidItems = collect($paidItemsMap)
@@ -223,6 +231,7 @@ class TableOrderController extends Controller
                         'discount_value'    => $order->discount_value ? (float) $order->discount_value : null,
                         'discounted_total'  => $order->getDiscountedTotal(),
                         'paid_splits_total' => $paidSplitsTotal,
+                        'pending_splits'    => $pendingSplitsData,
                         'paid_items'        => $paidItems,
                         'items' => $items,
                     ] : null,
@@ -1047,7 +1056,7 @@ class TableOrderController extends Controller
                 return response()->json(['success' => false, 'message' => 'Split non valido per questo ordine'], 404);
             }
 
-            $split->update(['status' => 'paid', 'payment_method' => $paymentMethod, 'paid_at' => now()]);
+            Jo ->update(['status' => 'paid', 'payment_method' => $paymentMethod, 'paid_at' => now()]);
 
             // Check if all splits paid and no remaining balance
             $order->refresh();

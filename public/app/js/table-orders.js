@@ -332,6 +332,7 @@ class TableOrdersManager {
         this.modifySession.pendingDishChange = [];
         this.modifySession.itemCounter = -1;
         this.modifySession.paidSplitsTotal = parseFloat(order?.paid_splits_total || 0);
+        this.modifySession.pendingSplits = order?.pending_splits ?? [];
 
         // Remove/reduce items already paid via preconto splits
         const paidItems = order?.paid_items ?? [];
@@ -704,6 +705,27 @@ class TableOrdersManager {
                     </div>
                 </div>
             `;
+        }
+
+        // Pending preconto splits summary
+        const pendingSplits = this.modifySession.pendingSplits ?? [];
+        const paidSplitsTotal = this.modifySession.paidSplitsTotal || 0;
+        if (pendingSplits.length > 0 || paidSplitsTotal > 0) {
+            itemsHtml += `<div style="margin-top:8px;border-top:2px solid #fd7e14;padding-top:6px;">`;
+            itemsHtml += `<div style="font-size:0.7rem;font-weight:700;color:#fd7e14;letter-spacing:1px;margin-bottom:4px;text-transform:uppercase;"><i class="fas fa-receipt me-1"></i>Preconti emessi</div>`;
+            if (paidSplitsTotal > 0) {
+                itemsHtml += `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;color:#28a745;margin-bottom:2px;">
+                    <span><i class="fas fa-check-circle me-1"></i>Già pagati</span>
+                    <span>−€${paidSplitsTotal.toFixed(2)}</span>
+                </div>`;
+            }
+            pendingSplits.forEach(s => {
+                itemsHtml += `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;color:#6c757d;margin-bottom:2px;">
+                    <span><i class="fas fa-clock me-1"></i>${s.label || 'Preconto'}</span>
+                    <span style="background:#fd7e14;color:white;padding:1px 6px;border-radius:3px;font-size:0.75rem;">€${parseFloat(s.total).toFixed(2)} DA PAGARE</span>
+                </div>`;
+            });
+            itemsHtml += `</div>`;
         }
 
         itemsContainer.innerHTML = itemsHtml;
@@ -2575,6 +2597,8 @@ class TableOrdersManager {
             const result = await resp.json();
             if (result.success) {
                 this.showNotification('Preconto eliminato', 'success');
+                // Remove from pending splits in session
+                this.modifySession.pendingSplits = (this.modifySession.pendingSplits ?? []).filter(s => s.id !== splitId);
                 // Reload split view
                 const splitsResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
                     headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
@@ -2640,6 +2664,8 @@ class TableOrdersManager {
                     const paidItems = result.data?.paid_items ?? [];
                     const paidSplitTotal = result.data?.paid_split_total ?? 0;
                     this.modifySession.paidSplitsTotal = (this.modifySession.paidSplitsTotal || 0) + paidSplitTotal;
+                    // Remove the just-paid split from pending list
+                    this.modifySession.pendingSplits = (this.modifySession.pendingSplits ?? []).filter(s => s.id !== splitId);
                     if (paidItems.length > 0) {
                         this._applyPaidItemsToSession(paidItems);
                     }
