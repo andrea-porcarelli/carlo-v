@@ -12,9 +12,11 @@
                     <button class="btn btn-red active me-3" id="btnMainView">
                         <i class="fas fa-home me-2"></i> SALA PRINCIPALE
                     </button>
+                    @if($isAdmin)
                     <button class="btn btn-red me-3" id="btnAddTable">
                         <i class="fas fa-plus me-2"></i> AGGIUNGI TAVOLI
                     </button>
+                    @endif
                     <button class="btn btn-orange" id="btnBanco">
                         <i class="fas fa-store me-2"></i> VENDITA AL BANCO
                     </button>

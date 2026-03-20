@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Frontoffice;
 
 use App\Http\Controllers\Controller;
 use App\Traits\DetectsMobileDevice;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class AppController extends Controller
@@ -13,17 +14,18 @@ class AppController extends Controller
     public function index(): View
     {
         $deviceType = $this->getDeviceType();
+        $isAdmin = Auth::check() && Auth::user()->role === 'admin';
 
         // Route to the appropriate view based on device type
         if ($deviceType === 'mobile') {
-            return view('app.mobile.index')->with('deviceType', $deviceType);
+            return view('app.mobile.index')->with(['deviceType' => $deviceType, 'isAdmin' => $isAdmin]);
         }
 
         if ($deviceType === 'tablet') {
-            return view('app.tablet.index')->with('deviceType', $deviceType);
+            return view('app.tablet.index')->with(['deviceType' => $deviceType, 'isAdmin' => $isAdmin]);
         }
 
         // Desktop view (default)
-        return view('app.index')->with('deviceType', $deviceType);
+        return view('app.index')->with(['deviceType' => $deviceType, 'isAdmin' => $isAdmin]);
     }
 }
