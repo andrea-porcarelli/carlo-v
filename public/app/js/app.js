@@ -17,10 +17,13 @@ $(document).ready(function() {
     });
 
     // Menu item click - delegate to tableOrdersManager
+    // NOTA: si usa this.dataset invece di $(this).data() per evitare
+    // che la cache interna di jQuery restituisca valori stale dopo un
+    // aggiornamento morphdom di Livewire.
     $(document).on('click', '.menu-item', function() {
-        const dishId = $(this).data('dish-id');
-        const dishName = $(this).data('item');
-        const dishPrice = parseFloat($(this).data('price'));
+        const dishId = this.dataset.dishId;
+        const dishName = this.dataset.item;
+        const dishPrice = parseFloat(this.dataset.price);
 
         if (typeof tableOrdersManager !== 'undefined') {
             tableOrdersManager.openProductModal({

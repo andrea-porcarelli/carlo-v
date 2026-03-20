@@ -177,6 +177,27 @@ class TableOrderController extends Controller
 
             $order = $table->activeOrder;
 
+            // Aggregate paid preconto splits info
+            $paidSplitsTotal = 0;
+            $paidItemsMap = [];
+            if ($order) {
+                $paidSplits = $order->precontoSplits()->where('status', 'paid')->get();
+                $paidSplitsTotal = round((float) $paidSplits->sum('total'), 2);
+                foreach ($paidSplits as $split) {
+                    foreach ($split->items ?? [] as $splitItem) {
+                        $itemId = $splitItem['order_item_id'] ?? null;
+                        $qty = (float) ($splitItem['quantity'] ?? $splitItem['qty'] ?? 1);
+                        if ($itemId) {
+                            $paidItemsMap[$itemId] = ($paidItemsMap[$itemId] ?? 0) + $qty;
+                        }
+                    }
+                }
+            }
+            $paidItems = collect($paidItemsMap)
+                ->map(fn($qty, $id) => ['order_item_id' => (int) $id, 'paid_qty' => $qty])
+                ->values()
+                ->all();
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -194,11 +215,13 @@ class TableOrderController extends Controller
                         'cover_charge_per_person' => $order->getCoverChargePerPerson(),
                         'cover_charge_total' => $order->getCoverChargeAmount(),
                         'has_cover_charge' => $order->hasCoverCharge(),
-                        'total_amount'     => $order->total_amount,
-                        'discount_type'    => $order->discount_type,
-                        'discount_amount'  => $order->discount_amount ? (float) $order->discount_amount : null,
-                        'discount_value'   => $order->discount_value ? (float) $order->discount_value : null,
-                        'discounted_total' => $order->getDiscountedTotal(),
+                        'total_amount'      => $order->total_amount,
+                        'discount_type'     => $order->discount_type,
+                        'discount_amount'   => $order->discount_amount ? (float) $order->discount_amount : null,
+                        'discount_value'    => $order->discount_value ? (float) $order->discount_value : null,
+                        'discounted_total'  => $order->getDiscountedTotal(),
+                        'paid_splits_total' => $paidSplitsTotal,
+                        'paid_items'        => $paidItems,
                         'items' => $items,
                     ] : null,
                 ],
@@ -1026,10 +1049,24 @@ class TableOrderController extends Controller
 
             DB::commit();
 
+            $splitPaidItems = collect($split->items ?? [])
+                ->map(fn($item) => [
+                    'order_item_id' => $item['order_item_id'] ?? null,
+                    'paid_qty'      => (float) ($item['quantity'] ?? $item['qty'] ?? 1),
+                ])
+                ->filter(fn($item) => $item['order_item_id'] !== null)
+                ->values()
+                ->all();
+
             return response()->json([
                 'success' => true,
                 'message' => $orderClosed ? 'Conto chiuso completamente' : "Pagato €" . number_format($split->total, 2),
-                'data'    => ['order_closed' => $orderClosed, 'remaining' => max(0, $remaining)],
+                'data'    => [
+                    'order_closed'    => $orderClosed,
+                    'remaining'       => max(0, $remaining),
+                    'paid_items'      => $splitPaidItems,
+                    'paid_split_total' => (float) $split->total,
+                ],
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

@@ -331,6 +331,13 @@ class TableOrdersManager {
         this.modifySession.pendingUpdate = {};
         this.modifySession.pendingDishChange = [];
         this.modifySession.itemCounter = -1;
+        this.modifySession.paidSplitsTotal = parseFloat(order?.paid_splits_total || 0);
+
+        // Remove/reduce items already paid via preconto splits
+        const paidItems = order?.paid_items ?? [];
+        if (paidItems.length > 0) {
+            this._applyPaidItemsToSession(paidItems);
+        }
 
         // Restore persisted discount from DB
         if (order && order.discount_type && order.discount_amount) {
@@ -347,6 +354,27 @@ class TableOrdersManager {
             if (discountTypeVal) discountTypeVal.classList.toggle('active', order.discount_type === 'value');
         } else {
             this._authorizedDiscount = null;
+        }
+    }
+
+    /**
+     * Remove/reduce session items already paid via preconto splits.
+     * paidItems: [{order_item_id, paid_qty}, ...]
+     */
+    _applyPaidItemsToSession(paidItems) {
+        for (const paid of paidItems) {
+            const idx = this.modifySession.items.findIndex(i => i.id === paid.order_item_id);
+            if (idx === -1) continue;
+            const item = this.modifySession.items[idx];
+            const remaining = item.quantity - paid.paid_qty;
+            if (remaining <= 0) {
+                this.modifySession.items.splice(idx, 1);
+            } else {
+                item.quantity = remaining;
+                item.subtotal = parseFloat(
+                    ((item.unit_price + this._itemExtrasTotal(item)) * remaining).toFixed(2)
+                );
+            }
         }
     }
 
@@ -571,6 +599,9 @@ class TableOrdersManager {
                 ? Math.max(0, rawTotal - Math.round(rawTotal * Math.min(authorizedDiscount.value, 100) / 100 * 100) / 100)
                 : Math.max(0, rawTotal - Math.min(authorizedDiscount.value, rawTotal));
         }
+
+        // Subtract amounts already paid via preconto splits
+        finalTotal = Math.max(0, finalTotal - (this.modifySession.paidSplitsTotal || 0));
 
         // Show/hide original total (strikethrough)
         const originalAmountEl = document.getElementById('modifyOriginalAmount');
@@ -2484,6 +2515,19 @@ class TableOrdersManager {
                     this._afterPaymentSuccess();
                 } else {
                     this.showNotification(result.message || 'Quota pagata', 'success');
+
+                    // Update modify session: remove/reduce paid items, update total
+                    const paidItems = result.data?.paid_items ?? [];
+                    const paidSplitTotal = result.data?.paid_split_total ?? 0;
+                    this.modifySession.paidSplitsTotal = (this.modifySession.paidSplitsTotal || 0) + paidSplitTotal;
+                    if (paidItems.length > 0) {
+                        this._applyPaidItemsToSession(paidItems);
+                    }
+                    const modifyOverlay = document.getElementById('modifyOrderOverlay');
+                    if (modifyOverlay && modifyOverlay.style.display === 'block') {
+                        this.updateModifyReceiptItems();
+                    }
+
                     // Reload splits view
                     const splitsResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
                         headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }

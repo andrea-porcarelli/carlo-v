@@ -14,6 +14,7 @@
         <div class="ds-dishes-grid">
             @forelse($dishes as $dish)
                 <div class="menu-item"
+                     wire:key="dish-{{ $dish->id }}"
                      data-item="{{ $dish->label }}"
                      data-price="{{ number_format($dish->price, 2, '.', '') }}"
                      data-dish-id="{{ $dish->id }}"
