@@ -2541,6 +2541,9 @@ class TableOrdersManager {
                     <button class="split-docbtn fattura" onclick="tableOrdersManager._splitToggleType(this,'fattura')">
                         <i class="fas fa-file-invoice"></i> FATTURA
                     </button>
+                    <button class="split-docbtn" style="background:#6c757d;color:white;" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'chiusura_conto')">
+                        <i class="fas fa-times-circle"></i> CHIUSURA CONTO
+                    </button>
                 </div>
                 <div class="split-pay-btns" data-type="scontrino-btns" style="display:none;">
                     <button class="split-back-btn" onclick="tableOrdersManager._splitBack(this)"><i class="fas fa-arrow-left"></i></button>
@@ -2573,6 +2576,9 @@ class TableOrdersManager {
                     </button>
                     <button class="split-docbtn fattura" onclick="tableOrdersManager._splitToggleType(this,'fattura')">
                         <i class="fas fa-file-invoice"></i> FATTURA
+                    </button>
+                    <button class="split-docbtn" style="background:#6c757d;color:white;" onclick="tableOrdersManager.executePayment('chiusura_conto')">
+                        <i class="fas fa-times-circle"></i> CHIUSURA CONTO
                     </button>
                 </div>
                 <div class="split-pay-btns" data-type="scontrino-btns" style="display:none;">
@@ -3260,29 +3266,12 @@ class TableOrdersManager {
             return;
         }
 
-        // If there are new items to add or items to remove, a new auth is required
-        // (these operations were not authenticated via CONFERMA).
-        // Modifications (pendingUpdate/pendingDishChange) are already authenticated at CONFERMA time.
-        const needsAuth =
-            this.modifySession.pendingAdd.length > 0 ||
-            this.modifySession.pendingRemove.length > 0;
-
-        let token;
-        if (needsAuth) {
-            let auth;
-            try {
-                auth = await operatorAuthManager.requestAuth();
-            } catch (e) {
-                return;
-            }
-            if (!auth) return;
-            token = auth.token;
-        } else {
-            token = this.modifySession.token;
-            if (!token) {
-                this.showNotification('Sessione non valida, riautenticarsi', 'error');
-                return;
-            }
+        // Usa il token già acquisito all'apertura della sessione (o aggiornato da Comunica).
+        // Non si chiede nuova password: l'autenticazione è già avvenuta.
+        const token = this.modifySession.token;
+        if (!token) {
+            this.showNotification('Sessione non valida, riautenticarsi', 'error');
+            return;
         }
 
         try {
@@ -4377,6 +4366,10 @@ class TableOrdersManager {
 
             if (result.success) {
                 this.showNotification(result.message || 'Comunicazione inviata con successo', 'success');
+                // Riutilizza il token per "Chiudi e invia" così non serve reinserire la password
+                if (this.modifySession.active) {
+                    this.modifySession.token = auth.token;
+                }
                 this.closeComunicaModal();
             } else {
                 this.showNotification(result.message || 'Errore nell\'invio della comunicazione', 'error');

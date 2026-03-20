@@ -160,6 +160,11 @@ window._boSale = {
                                                 </td>
                                                 <td style="padding:3px 8px; color:#666;">
                                                     {{ $split->paid_at ? $split->paid_at->format('H:i') : '' }}
+                                                    @if($split->payment_method === 'chiusura_conto')
+                                                        <span class="label label-default" style="font-size:10px;">chiusura</span>
+                                                    @elseif($split->payment_method)
+                                                        <span class="label label-default" style="font-size:10px;">{{ $split->payment_method }}</span>
+                                                    @endif
                                                 </td>
                                                 <td style="padding:3px 8px; text-align:right; color:#d9534f;">
                                                     &minus;€{{ number_format($split->total, 2, ',', '.') }}
@@ -209,10 +214,11 @@ window._boSale = {
                                 <td>
                                     @php
                                         $pmLabels = [
-                                            'pos'      => ['label' => 'POS',         'icon' => 'fa-credit-card',  'class' => 'success'],
-                                            'contanti' => ['label' => 'Contanti',     'icon' => 'fa-coins',        'class' => 'info'],
-                                            'fattura'  => ['label' => 'Fattura',      'icon' => 'fa-file-invoice', 'class' => 'primary'],
-                                            'misto'    => ['label' => 'Misto',        'icon' => 'fa-layer-group',  'class' => 'warning'],
+                                            'pos'            => ['label' => 'POS',             'icon' => 'fa-credit-card',  'class' => 'success'],
+                                            'contanti'       => ['label' => 'Contanti',         'icon' => 'fa-coins',        'class' => 'info'],
+                                            'fattura'        => ['label' => 'Fattura',          'icon' => 'fa-file-invoice', 'class' => 'primary'],
+                                            'misto'          => ['label' => 'Misto',            'icon' => 'fa-layer-group',  'class' => 'warning'],
+                                            'chiusura_conto' => ['label' => 'Chiusura conto',   'icon' => 'fa-times-circle', 'class' => 'default'],
                                         ];
                                         $pm = $pmLabels[$sale->payment_method] ?? null;
                                     @endphp
@@ -1414,6 +1420,9 @@ window._boSale = {
                             </label>
                             <label class="radio-inline" style="margin-left:15px;">
                                 <input type="radio" name="split_payment_method" value="fattura"> Fattura
+                            </label>
+                            <label class="radio-inline" style="margin-left:15px;">
+                                <input type="radio" name="split_payment_method" value="chiusura_conto"> Chiusura conto
                             </label>
                         </div>
                     </div>

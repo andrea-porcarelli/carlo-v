@@ -708,7 +708,7 @@ class TableOrderController extends Controller
         }
 
         $paymentMethod = $request->input('payment_method', 'pos');
-        $allowedMethods = ['pos', 'contanti', 'fattura', 'fattura_contanti', 'fattura_pos', 'bonifico', 'assegno', 'misto'];
+        $allowedMethods = ['pos', 'contanti', 'fattura', 'fattura_contanti', 'fattura_pos', 'bonifico', 'assegno', 'misto', 'chiusura_conto'];
         if (!in_array($paymentMethod, $allowedMethods)) {
             $paymentMethod = 'pos';
         }
@@ -1058,7 +1058,7 @@ class TableOrderController extends Controller
         }
 
         $paymentMethod = $request->input('payment_method', 'pos');
-        $allowedMethods = ['pos', 'contanti', 'fattura', 'fattura_contanti', 'fattura_pos', 'bonifico', 'assegno', 'misto'];
+        $allowedMethods = ['pos', 'contanti', 'fattura', 'fattura_contanti', 'fattura_pos', 'bonifico', 'assegno', 'misto', 'chiusura_conto'];
         if (!in_array($paymentMethod, $allowedMethods)) {
             $paymentMethod = 'pos';
         }
