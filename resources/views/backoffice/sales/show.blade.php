@@ -319,12 +319,11 @@ window._boSale = {
                             <table class="table table-striped table-bordered">
                                 <thead class="thead-dark">
                                     <tr>
-                                        <th width="50">#</th>
+                                        <th width="60" class="text-center">Qta</th>
                                         <th>Prodotto</th>
                                         @if($sale->autoconsumo)
                                             <th>Addebitato a</th>
                                         @endif
-                                        <th width="80" class="text-center">Qta</th>
                                         <th width="120" class="text-end">Prezzo Unit.</th>
                                         <th width="120" class="text-end">Subtotale</th>
                                     </tr>
@@ -333,16 +332,18 @@ window._boSale = {
                                     @foreach($sale->items()->withTrashed()->orderBy('id', 'DESC')->get() as $index => $item)
                                         <tr class="@if($item->status == 'cancelled') trashed @endif" data-item-id="{{ $item->id }}">
                                             @if(!isset($item->dish))
-                                                <td colspan="6"> ----- SEGUE ----- </td>
+                                                <td colspan="5"> ----- SEGUE ----- </td>
                                             @else
-                                                <td>{{ $index + 1 }} </td>
+                                                <td class="text-center" style="vertical-align:middle;">
+                                                    <span style="display:inline-flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:50%; background:#1a1a2e; color:#fff; font-size:20px; font-weight:800; line-height:1;">{{ $item->quantity }}</span>
+                                                </td>
                                                 <td>
                                                     @php
                                                         $originalPrice = $item->dish->price ?? $item->unit_price;
                                                         $hasPriceChange = abs($item->unit_price - $originalPrice) > 0.001;
                                                     @endphp
                                                     <div>
-                                                        <strong style="font-size: 15px;">{{ $item->dish->label }}</strong>
+                                                        <strong style="font-size: 17px; letter-spacing: 0.2px;">{{ $item->dish->label }}</strong>
                                                         @if($hasPriceChange)
                                                             <span class="badge badge-warning ml-2" title="Prezzo modificato: da €{{ number_format($originalPrice, 2, ',', '.') }} a €{{ number_format($item->unit_price, 2, ',', '.') }}">
                                                             <i class="fas fa-euro-sign"></i> Modificato
@@ -442,9 +443,6 @@ window._boSale = {
                                                 @if($sale->autoconsumo)
                                                     <td>{{ $item->autoconsumoUser->name }}</td>
                                                 @endif
-                                                <td class="text-center">
-                                                    <strong style="font-size: 16px;">{{ $item->quantity }}</strong>
-                                                </td>
                                                 <td class="text-end" style="font-weight: bold">
                                                     @php
                                                         $originalPrice = $item->dish->price ?? $item->unit_price;
@@ -481,14 +479,14 @@ window._boSale = {
                                 <tfoot>
                                     @if($sale->autoconsumo)
                                         <tr class="table-success">
-                                            <td colspan="5" class="text-right" style="font-size: 16px">
+                                            <td colspan="4" class="text-right" style="font-size: 16px">
                                                 <b>AUTOCONSUMO</b>
                                             </td>
                                         </tr>
                                     @endif
                                     @if($sale->hasCoverCharge())
                                         <tr>
-                                            <td colspan="4" class="text-end text-muted">
+                                            <td colspan="3" class="text-end text-muted">
                                                 <i class="fas fa-utensils"></i>
                                                 Coperto
                                                 ({{ $sale->covers }} × €{{ number_format($sale->getCoverChargePerPerson(), 2, ',', '.') }}):
@@ -500,7 +498,7 @@ window._boSale = {
                                     @endif
                                     @if($sale->hasDiscount())
                                         <tr>
-                                            <td colspan="4" class="text-end text-muted">
+                                            <td colspan="3" class="text-end text-muted">
                                                 Subtotale:
                                             </td>
                                             <td class="text-end text-muted">
@@ -508,7 +506,7 @@ window._boSale = {
                                             </td>
                                         </tr>
                                         <tr class="warning">
-                                            <td colspan="4" class="text-end">
+                                            <td colspan="3" class="text-end">
                                                 <span class="text-danger">
                                                     <i class="fas fa-percent"></i>
                                                     Sconto
@@ -528,7 +526,7 @@ window._boSale = {
                                     @if(isset($paidSplits) && $paidSplits->count() > 0)
                                         @foreach($paidSplits as $split)
                                         <tr style="color:#888; font-size:13px;">
-                                            <td colspan="4" class="text-end">
+                                            <td colspan="3" class="text-end">
                                                 <i class="fas fa-check-circle text-success"></i>
                                                 Preconto pagato — {{ $split->label ?? '' }}
                                                 @if($split->paid_at)<small class="text-muted">({{ $split->paid_at->format('H:i') }})</small>@endif:
@@ -539,7 +537,7 @@ window._boSale = {
                                         </tr>
                                         @endforeach
                                         <tr style="background:#fff3cd;">
-                                            <td colspan="4" class="text-end">
+                                            <td colspan="3" class="text-end">
                                                 <strong>RIMANENTE DA PAGARE:</strong>
                                             </td>
                                             <td class="text-end">
@@ -550,7 +548,7 @@ window._boSale = {
                                         </tr>
                                     @endif
                                     <tr class="table-success">
-                                        <td colspan="4" class="text-end">
+                                        <td colspan="3" class="text-end">
                                             <strong style="font-size: 16px;" class="@if($sale->status == 'cancelled') trashed @endif">TOTALE:</strong>
                                         </td>
                                         <td class="text-end">
