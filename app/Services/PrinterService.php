@@ -468,48 +468,47 @@ class PrinterService implements PrinterServiceInterface
                 if ($lastPrinterId && isset($grouped[$lastPrinterId])) {
                     $grouped[$lastPrinterId]['items'][] = $item;
                 }
-                continue;
-            }
-
-            // Carica le relazioni necessarie se non già caricate
-            if (!$item->relationLoaded('dish')) {
-                $item->load('dish.category.printer', 'addedBy');
-            } elseif ($item->dish && !$item->dish->relationLoaded('category')) {
-                $item->dish->load('category.printer');
-                $item->load('addedBy');
-            } elseif ($item->dish && $item->dish->category && !$item->dish->category->relationLoaded('printer')) {
-                $item->dish->category->load('printer');
-                $item->load('addedBy');
             } else {
-                $item->load('addedBy');
-            }
 
-            // Skip items whose dish has been deleted
-            if (!$item->dish) {
-                continue;
-            }
-
-            // Ottieni la stampante dalla categoria del piatto
-            $printer = $item->dish->category->printer ?? null;
-
-            if ($printer && $printer->is_active && !empty($printer->ip)) {
-                $printerId = $printer->id;
-                $lastPrinterId = $printerId;
-
-                if (!isset($grouped[$printerId])) {
-                    $grouped[$printerId] = [
-                        'printer' => $printer,
-                        'items' => []
-                    ];
+                // Carica le relazioni necessarie se non già caricate
+                if (!$item->relationLoaded('dish')) {
+                    $item->load('dish.category.printer', 'addedBy');
+                } elseif ($item->dish && !$item->dish->relationLoaded('category')) {
+                    $item->dish->load('category.printer');
+                    $item->load('addedBy');
+                } elseif ($item->dish && $item->dish->category && !$item->dish->category->relationLoaded('printer')) {
+                    $item->dish->category->load('printer');
+                    $item->load('addedBy');
+                } else {
+                    $item->load('addedBy');
+                }
+                // Skip items whose dish has been deleted
+                if (!$item->dish) {
+                    continue;
                 }
 
-                $grouped[$printerId]['items'][] = $item;
-            } else {
-                Log::warning('Articolo senza stampante configurata', [
-                    'item_id' => $item->id,
-                    'dish_id' => $item->dish_id,
-                    'category_id' => $item->dish->category_id ?? null
-                ]);
+                // Ottieni la stampante dalla categoria del piatto
+                $printer = $item->dish->category->printer ?? null;
+
+                if ($printer && $printer->is_active && !empty($printer->ip)) {
+                    $printerId = $printer->id;
+                    $lastPrinterId = $printerId;
+
+                    if (!isset($grouped[$printerId])) {
+                        $grouped[$printerId] = [
+                            'printer' => $printer,
+                            'items' => []
+                        ];
+                    }
+
+                    $grouped[$printerId]['items'][] = $item;
+                } else {
+                    Log::warning('Articolo senza stampante configurata', [
+                        'item_id' => $item->id,
+                        'dish_id' => $item->dish_id,
+                        'category_id' => $item->dish->category_id ?? null
+                    ]);
+                }
             }
         }
 
