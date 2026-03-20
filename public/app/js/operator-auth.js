@@ -60,7 +60,7 @@ const operatorAuthManager = {
      */
     showModal(callback, resolve, reject) {
         this.pendingCallback = { callback, resolve, reject };
-        $('#operatorAuthModal').fadeIn(300);
+        $('#operatorAuthModal').show();
         $('#operatorPassword').focus();
         $('#operatorAuthError').hide();
         $('#operatorPassword').val('');
@@ -70,7 +70,7 @@ const operatorAuthManager = {
      * Close authentication modal
      */
     closeModal() {
-        $('#operatorAuthModal').fadeOut(300);
+        $('#operatorAuthModal').hide();
         $('#operatorPassword').val('');
         $('#operatorAuthError').hide();
 
@@ -125,7 +125,7 @@ const operatorAuthManager = {
                 const callback = this.pendingCallback;
 
                 // Close modal (this will set pendingCallback to null)
-                $('#operatorAuthModal').fadeOut(300);
+                $('#operatorAuthModal').hide();
                 $('#operatorPassword').val('');
                 $('#operatorAuthError').hide();
                 this.pendingCallback = null;
@@ -161,7 +161,7 @@ const operatorAuthManager = {
      */
     showError(message) {
         $('#operatorAuthErrorText').text(message);
-        $('#operatorAuthError').fadeIn(300);
+        $('#operatorAuthError').show();
     },
 
     /**

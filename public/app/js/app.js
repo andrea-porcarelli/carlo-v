@@ -111,7 +111,7 @@ $(document).ready(function() {
     // Show receipt - delegate to tableOrdersManager
     $('#showReceipt').click(function() {
         if (typeof tableOrdersManager !== 'undefined' && tableOrdersManager.currentTable) {
-            $('#receiptOverlay').fadeIn(300);
+            $('#receiptOverlay').show();
         } else {
             if (typeof tableOrdersManager !== 'undefined') {
                 tableOrdersManager.showNotification('Seleziona prima un tavolo', 'error');
@@ -121,7 +121,7 @@ $(document).ready(function() {
 
     // Close receipt
     $('#closeReceiptBtn').click(function() {
-        $('#receiptOverlay').fadeOut(300);
+        $('#receiptOverlay').hide();
     });
 
     // Pay bill - delegate to tableOrdersManager

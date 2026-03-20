@@ -64,7 +64,7 @@ const coversManager = {
      */
     showModal() {
         $('#coversTableNumber').text(`Tavolo ${this.tableNumber}`);
-        $('#coversModal').fadeIn(300);
+        $('#coversModal').show();
     },
 
     /**

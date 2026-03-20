@@ -439,10 +439,6 @@ class TableOrdersManager {
         const overlay = document.getElementById('modifyOrderOverlay');
         if (overlay) {
             overlay.style.display = 'block';
-            // Fade in effect
-            setTimeout(() => {
-                overlay.style.opacity = '1';
-            }, 10);
         }
     }
 
