@@ -521,7 +521,7 @@ window._boSale = {
                                         <tr style="color:#888; font-size:13px;">
                                             <td colspan="3" class="text-right">
                                                 <i class="fas fa-check-circle text-success"></i>
-                                                Preconto pagato — {{ $split->label ?? '' }}
+                                                Preconto pagato ( ) — {{ $split->label ?? '' }}
                                                 @if($split->paid_at)<small class="text-muted">({{ $split->paid_at->format('H:i') }})</small>@endif:
                                             </td>
                                             <td class="text-right text-danger">

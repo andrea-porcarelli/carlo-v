@@ -310,9 +310,13 @@ class PrinterService implements PrinterServiceInterface
         // Quantità e nome piatto
         $printer->setEmphasis(true);
         $printer->setTextSize(2, 2);
-        $quantity = str_pad($item->quantity, 3, ' ', STR_PAD_RIGHT);
-        $dishName = $item->dish->label ?? 'N/D';
-        $printer->text("$quantity $dishName\n");
+        if (isset($item->dish)) {
+            $quantity = str_pad($item->quantity, 3, ' ', STR_PAD_RIGHT);
+            $dishName = $item->dish->label ?? 'N/D';
+            $printer->text("$quantity $dishName\n");
+        } else {
+            $printer->text("*** SEGUE ***\n");
+        }
         $printer->setTextSize(1, 1);
         $printer->setEmphasis(false);
 
