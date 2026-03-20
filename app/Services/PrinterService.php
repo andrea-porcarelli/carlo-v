@@ -802,7 +802,7 @@ class PrinterService implements PrinterServiceInterface
             }
             // Stampa gli articoli
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
-            foreach ($tableOrder->items as $item) {
+            foreach ($tableOrder->items->filter(fn($item) => isset($item->dish)) as $item) {
                 $dishName = $item->dish->label ?? 'N/D';
                 $quantity = $item->quantity;
                 $subtotal = number_format($item->subtotal, 2, ',', '.');
