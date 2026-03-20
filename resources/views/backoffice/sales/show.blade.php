@@ -319,21 +319,6 @@ window._boSale = {
                                                     </div>
                                                 @endif
 
-                                                <!-- Allergens -->
-                                                @if($item->dish->allergens && $item->dish->allergens->count() > 0)
-                                                    <div class="mt-2">
-                                                        <span class="badge badge-danger">
-                                                            <i class="fas fa-exclamation-triangle"></i> Allergeni
-                                                        </span>
-                                                        <div style="padding-left: 15px; margin-top: 5px;">
-                                                            @foreach($item->dish->allergens as $allergen)
-                                                                <span class="badge badge-danger mr-1">
-                                                                    {{ $allergen->label }}
-                                                                </span>
-                                                            @endforeach
-                                                        </div>
-                                                    </div>
-                                                @endif
                                                 @if($isOpen && $item->status != 'cancelled')
                                                 <div class="btn-group btn-group-xs" style="margin-top: 8px;">
                                                     <button class="btn btn-xs btn-default btn-item-qty"
