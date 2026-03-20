@@ -217,6 +217,11 @@ window._boSale = {
                                 <i class="fas fa-user-check"></i> Autoconsumo
                             </button>
                         </div>
+                        <div class="col-xs-12" style="padding: 3px; margin-top: 6px;">
+                            <button class="btn btn-danger btn-block btn-sm" onclick="toggleModal('modalChiudiTavolo')">
+                                <i class="fas fa-times-circle"></i> Chiudi Tavolo
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1272,6 +1277,30 @@ window._boSale = {
         </div>
     </div>
 
+    <!-- Modal: Chiudi Tavolo -->
+    <div id="modalChiudiTavolo" class="log-modal" onclick="if(event.target===this)toggleModal('modalChiudiTavolo')">
+        <div class="log-modal-content" style="max-width:460px;">
+            <div class="log-modal-header" style="background:#d9534f;">
+                <h5><i class="fas fa-times-circle"></i> Chiudi Tavolo</h5>
+                <button type="button" onclick="toggleModal('modalChiudiTavolo')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <div class="alert alert-danger">
+                    <strong><i class="fas fa-exclamation-triangle"></i> Attenzione!</strong><br>
+                    Questa operazione <strong>elimina tutti i piatti</strong> e chiude il tavolo <strong>senza incassare</strong>.<br>
+                    L'azione non può essere annullata.
+                </div>
+                <p>Tavolo: <strong>{{ $sale->restaurantTable->table_number }}</strong> &mdash; Totale: <strong>€{{ number_format($sale->total_amount, 2, ',', '.') }}</strong></p>
+                <div style="display:flex;gap:10px;margin-top:15px;">
+                    <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalChiudiTavolo')">Annulla</button>
+                    <button type="button" class="btn btn-danger" style="flex:2" id="btnConfirmChiudiTavolo">
+                        <i class="fas fa-times-circle"></i> Conferma Chiusura
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Sposta Tavolo -->
     <div id="modalSposta" class="log-modal" onclick="if(event.target===this)toggleModal('modalSposta')">
         <div class="log-modal-content">
@@ -1738,6 +1767,18 @@ window._boSale = {
                 .fail(function(xhr) {
                     onError(xhr);
                     btn.prop('disabled', false).html('<i class="fas fa-user-check"></i> Autoconsumo');
+                });
+        });
+
+        // ---- Chiudi Tavolo ----
+        $('#btnConfirmChiudiTavolo').on('click', function() {
+            if (!requireToken()) return;
+            var btn = $(this).prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Chiusura...');
+            boApi('POST', '/api/tables/' + _boSale.tableId + '/clear')
+                .done(function() { toggleModal('modalChiudiTavolo'); onSuccess('Tavolo chiuso con successo!'); })
+                .fail(function(xhr) {
+                    onError(xhr);
+                    btn.prop('disabled', false).html('<i class="fas fa-times-circle"></i> Conferma Chiusura');
                 });
         });
 

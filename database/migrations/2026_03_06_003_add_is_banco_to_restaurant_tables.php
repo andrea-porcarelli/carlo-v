@@ -16,7 +16,7 @@ return new class extends Migration
         // Crea il tavolo banco se non esiste già
         if (!RestaurantTable::where('is_banco', true)->exists()) {
             RestaurantTable::create([
-                'table_number' => 0,
+                'table_number' => 999,
                 'capacity' => 0,
                 'status' => 'free',
                 'is_active' => true,
