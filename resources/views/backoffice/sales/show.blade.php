@@ -209,7 +209,7 @@ window._boSale = {
                             </tr>
                             @endif
                             <tr>
-                                <td><strong>Metodo pagamento:</strong></td>
+                                <td><strong>Pagamento:</strong></td>
                                 <td>
                                     @php
                                         $pmLabels = [
@@ -222,7 +222,7 @@ window._boSale = {
                                         $pm = $pmLabels[$sale->payment_method] ?? null;
                                     @endphp
                                     @if($pm)
-                                        <span class="badge badge-{{ $pm['class'] }}">
+                                        <span style="font-size: 15px" class="badge badge-{{ $pm['class'] }}">
                                             <i class="fas {{ $pm['icon'] }}"></i> {{ $pm['label'] }}
                                         </span>
                                     @else
