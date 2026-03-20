@@ -3708,7 +3708,7 @@ class TableOrdersManager {
             return;
         }
 
-        listEl.innerHTML = availableItems.map(item => {
+        listEl.innerHTML = availableItems.filter(item => !item.segue).map(item => {
             const name = item.dish_name || item.name || 'N/D';
             const avail = item._available;
             const unitPrice = parseFloat(item.unit_price || 0);
