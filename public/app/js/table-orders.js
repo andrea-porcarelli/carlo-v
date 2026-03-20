@@ -715,8 +715,8 @@ class TableOrdersManager {
             itemsHtml += `<div style="font-size:0.7rem;font-weight:700;color:#fd7e14;letter-spacing:1px;margin-bottom:4px;text-transform:uppercase;"><i class="fas fa-receipt me-1"></i>Preconti emessi</div>`;
             if (paidSplitsTotal > 0) {
                 itemsHtml += `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;color:#28a745;margin-bottom:2px;">
-                    <span><i class="fas fa-check-circle me-1"></i>Già pagati</span>
-                    <span>−€${paidSplitsTotal.toFixed(2)}</span>
+                    <span><i class="fas fa-check-circle me-1"></i>Già pagati con preconto</span>
+                    <span>€${paidSplitsTotal.toFixed(2)}</span>
                 </div>`;
             }
             pendingSplits.forEach(s => {
@@ -749,8 +749,9 @@ class TableOrdersManager {
                 : Math.max(0, rawTotal - Math.min(authorizedDiscount.value, rawTotal));
         }
 
-        // Subtract amounts already paid via preconto splits
-        finalTotal = Math.max(0, finalTotal - (this.modifySession.paidSplitsTotal || 0));
+        // Note: paidSplitsTotal is NOT subtracted here because _applyPaidItemsToSession
+        // already removes/reduces paid items from the session, so rawTotal already reflects
+        // the remaining amount. Subtracting again would double-count and show €0.00.
 
         // Show/hide original total (strikethrough)
         const originalAmountEl = document.getElementById('modifyOriginalAmount');
