@@ -1659,14 +1659,20 @@ class PrinterService implements PrinterServiceInterface
 
             // Articoli di questa stampante
             foreach ($items as $item) {
-                $quantity = str_pad($item->quantity, 3, ' ', STR_PAD_RIGHT);
-                $dishName = strtoupper($item->dish->label) ?? 'N/D';
-                $printer->setTextSize(1, 1);
-                $printer->text("$quantity $dishName\n");
-                $printer->setTextSize(1, 1);
+                if (isset($item->dish)) {
+                    $quantity = str_pad($item->quantity, 3, ' ', STR_PAD_RIGHT);
+                    $dishName = strtoupper($item->dish->label) ?? 'N/D';
+                    $printer->setTextSize(1, 1);
+                    $printer->text("$quantity $dishName\n");
+                    $printer->setTextSize(1, 1);
 
-                if (!empty($item->notes)) {
-                    $printer->text("  Note: " . $item->notes . "\n");
+                    if (!empty($item->notes)) {
+                        $printer->text("  Note: " . $item->notes . "\n");
+                    }
+                } else {
+                    $printer->setTextSize(1, 1);
+                    $printer->text("*** SEGUE ***\n");
+                    $printer->setTextSize(1, 1);
                 }
             }
 
