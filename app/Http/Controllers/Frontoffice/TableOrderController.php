@@ -1080,6 +1080,8 @@ class TableOrderController extends Controller
             $remaining = round($effectiveTotal - $paidTotal, 2);
             $orderClosed = false;
 
+            $this->logger->logPayPrecontoSplit($order, $split, $paymentMethod, $operatorId);
+
             if ($remaining <= 0.01) {
                 $this->logger->logPayOrder($order, $paymentMethod, $operatorId);
                 $this->logger->logCloseOrder($order, $operatorId);

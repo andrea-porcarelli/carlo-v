@@ -362,6 +362,36 @@ class TableOrderLoggerService
     /**
      * Log per pagamento ordine con metodo
      */
+    public function logPayPrecontoSplit(TableOrder $order, \App\Models\PrecontoSplit $split, string $paymentMethod, int $operatorId = 0): TableOrderLog
+    {
+        $methodLabels = [
+            'pos'            => 'POS',
+            'contanti'       => 'Contanti',
+            'fattura'        => 'Fattura',
+            'fattura_contanti' => 'Fattura + Contanti',
+            'fattura_pos'    => 'Fattura + POS',
+            'bonifico'       => 'Bonifico',
+            'assegno'        => 'Assegno',
+            'chiusura_conto' => 'Chiusura conto',
+            'misto'          => 'Misto',
+        ];
+        $label = $methodLabels[$paymentMethod] ?? $paymentMethod;
+
+        return $this->log(
+            action: 'pay_preconto_split',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: [
+                'split_id'       => $split->id,
+                'split_label'    => $split->label,
+                'amount'         => (float) $split->total,
+                'payment_method' => $paymentMethod,
+            ],
+            notes: "Incassato preconto «{$split->label}» €" . number_format($split->total, 2) . " — {$label}",
+            userId: $operatorId,
+        );
+    }
+
     public function logPayOrder(TableOrder $order, string $paymentMethod, int $operatorId = 0): TableOrderLog
     {
         $labels = ['pos' => 'POS', 'contanti' => 'Contanti', 'fattura' => 'Fattura', 'misto' => 'Misto (Fattura + altro)'];

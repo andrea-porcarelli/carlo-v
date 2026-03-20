@@ -819,6 +819,7 @@ window._boSale = {
                                             <td>
                                                 @if($dishName)
                                                     <strong class="text-primary">{{ $dishName }}</strong>
+                                                    <br />
                                                 @endif
 
                                                 @if($itemData)
@@ -840,8 +841,7 @@ window._boSale = {
                                                         <br><small class="text-muted"><i class="fa fa-sticky-note"></i> {{ $itemData['notes'] }}</small>
                                                     @endif
                                                 @else
-                                                    <br />
-                                                    <small class="text-muted">{{ $log->notes }}</small>
+                                                    <span style="font-size: 13px" class="text-muted">{{ $log->notes }}</span>
                                                 @endif
                                             </td>
                                             <td class="text-center">

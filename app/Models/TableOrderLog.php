@@ -41,6 +41,7 @@ class TableOrderLog extends Model
     const ACTION_AUTOCONSUMO_PARTIAL = 'autoconsumo_partial';
     const ACTION_APPLY_DISCOUNT = 'apply_discount';
     const ACTION_CHANGE_DISH = 'change_dish';
+    const ACTION_PAY_PRECONTO_SPLIT = 'pay_preconto_split';
 
     // Mapping azione -> categoria
     const ACTION_CATEGORY_MAP = [
@@ -66,6 +67,7 @@ class TableOrderLog extends Model
         self::ACTION_PRINT_PRECONTO => self::CATEGORY_PRINT,
         // Categoria 'order' - Pagamento e fatturazione
         self::ACTION_PAY_ORDER => self::CATEGORY_ORDER,
+        self::ACTION_PAY_PRECONTO_SPLIT => self::CATEGORY_ORDER,
         self::ACTION_CREATE_INVOICE => self::CATEGORY_ORDER,
         // Categoria 'order' - Autoconsumo
         self::ACTION_AUTOCONSUMO => self::CATEGORY_ORDER,
@@ -186,6 +188,7 @@ class TableOrderLog extends Model
             'autoconsumo' => 'Autoconsumo completo',
             'autoconsumo_partial' => 'Autoconsumo per operatore',
             'pay_order' => 'Pagamento ordine',
+            'pay_preconto_split' => 'Incasso preconto',
         ];
 
         return $descriptions[$this->action] ?? $this->action;
@@ -361,6 +364,7 @@ class TableOrderLog extends Model
             'update_item_quantity' => 'info',
             'print_marcia' => 'warning',
             'print_preconto' => 'warning',
+            'pay_preconto_split' => 'success',
         ];
         return $classes[$action] ?? 'secondary';
     }
@@ -382,6 +386,7 @@ class TableOrderLog extends Model
             'update_item_quantity' => 'sort-numeric-up',
             'print_marcia' => 'print',
             'print_preconto' => 'file-invoice',
+            'pay_preconto_split' => 'cash-register',
         ];
         return $icons[$action] ?? 'circle';
     }
