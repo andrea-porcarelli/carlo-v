@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustProxies(at: '*');   // ← aggiungi questa
         $middleware->append(SyncMaintenance::class);
         $middleware->append(DomainRedirect::class);
         $middleware->validateCsrfTokens(except: [
