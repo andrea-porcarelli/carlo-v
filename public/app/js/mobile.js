@@ -82,60 +82,9 @@ $(document).ready(function() {
         lastTouchEnd = now;
     }, false);
 
-    // ===== SEGUE TOGGLE =====
-
-    $(document).on('click', '#segueToggleMobile', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const checkbox = $('#productSegueMobile');
-        const isChecked = checkbox.prop('checked');
-        checkbox.prop('checked', !isChecked);
-
-        const toggle = $(this);
-        const switchEl = toggle.find('.segue-switch');
-        const handle = toggle.find('.segue-switch-handle');
-
-        if (!isChecked) {
-            switchEl.css('background', '#dc3545');
-            handle.css('transform', 'translateX(26px)');
-            toggle.css('border-color', '#dc3545');
-        } else {
-            switchEl.css('background', '#ccc');
-            handle.css('transform', 'translateX(0)');
-            toggle.css('border-color', '#dee2e6');
-        }
-
-        if (navigator.vibrate) navigator.vibrate(30);
-    });
-
-    // Reset segue toggle when product modal opens
-    function resetSegueToggle() {
-        $('#segueToggleMobile .segue-switch').css('background', '#ccc');
-        $('#segueToggleMobile .segue-switch-handle').css('transform', 'translateX(0)');
-        $('#segueToggleMobile').css('border-color', '#dee2e6');
-        $('#productSegueMobile').prop('checked', false);
-    }
-
     $(document).on('click', '.menu-item', function() {
-        setTimeout(resetSegueToggle, 100);
         hapticFeedback([50]);
     });
-
-    const productModalMobile = document.getElementById('productModalMobile');
-    if (productModalMobile) {
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.attributeName === 'style') {
-                    const display = productModalMobile.style.display;
-                    if (display === 'flex' || display === 'block') {
-                        setTimeout(resetSegueToggle, 50);
-                    }
-                }
-            });
-        });
-        observer.observe(productModalMobile, { attributes: true });
-    }
 
     // ===== WELCOME MESSAGE =====
 

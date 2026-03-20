@@ -23,6 +23,7 @@ class OrderItem extends Model
         'removals',
         'status',
         'segue',
+        'sort_order',
         'autoconsumo_user_id',
     ];
 
@@ -68,10 +69,23 @@ class OrderItem extends Model
     }
 
     /**
+     * Whether this item is a segue separator (no dish attached)
+     */
+    public function isSegueItem(): bool
+    {
+        return $this->segue && is_null($this->dish_id);
+    }
+
+    /**
      * Calculate subtotal based on quantity, unit price and extras
      */
     public function calculateSubtotal(): float
     {
+        // Segue items have no price
+        if ($this->isSegueItem()) {
+            return 0.0;
+        }
+
         $extrasTotal = 0;
         if ($this->extras && is_array($this->extras)) {
             $extrasTotal = array_sum($this->extras);
@@ -95,7 +109,21 @@ class OrderItem extends Model
     {
         parent::boot();
 
+        static::creating(function ($item) {
+            // Auto-assign sort_order if not explicitly set
+            if (is_null($item->sort_order) || $item->sort_order === 0) {
+                $max = static::where('table_order_id', $item->table_order_id)->max('sort_order') ?? 0;
+                $item->sort_order = $max + 1;
+            }
+        });
+
         static::saving(function ($item) {
+            // Segue items always have price 0
+            if (is_null($item->dish_id) && $item->segue) {
+                $item->unit_price = 0;
+                $item->subtotal = 0;
+                return;
+            }
             if (!$item->subtotal || $item->isDirty(['quantity', 'unit_price', 'extras'])) {
                 $item->subtotal = $item->calculateSubtotal();
             }

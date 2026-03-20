@@ -379,6 +379,56 @@ class TableOrdersManager {
     }
 
     /**
+     * Insert a segue separator after prevItemId (saved DB items only).
+     */
+    async addSegueAfter(prevItemId) {
+        try {
+            const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/add-segue`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                },
+                body: JSON.stringify({ after_item_id: prevItemId }),
+            });
+            const result = await resp.json();
+            if (!result.success) throw new Error(result.message);
+
+            const idx = this.modifySession.items.findIndex(i => i.id === prevItemId);
+            if (idx !== -1) {
+                this.modifySession.items.splice(idx + 1, 0, { ...result.data, _isNew: false });
+            }
+            this.updateModifyReceiptItems();
+        } catch (e) {
+            this.showNotification("Errore nell'inserimento del segue", 'error');
+        }
+    }
+
+    /**
+     * Remove a segue separator item (no operator auth required).
+     */
+    async removeSegueItem(segueItemId) {
+        this.modifySession.items = this.modifySession.items.filter(i => i.id !== segueItemId);
+        this.updateModifyReceiptItems();
+
+        if (segueItemId > 0) {
+            try {
+                const resp = await fetch(`${this.apiBase}/segue-items/${segueItemId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    },
+                });
+                const result = await resp.json();
+                if (!result.success) throw new Error(result.message);
+            } catch (e) {
+                this.showNotification('Errore nella rimozione del segue', 'error');
+            }
+        }
+    }
+
+    /**
      * Show table details
      */
     showTableDetails() {
@@ -498,7 +548,39 @@ class TableOrdersManager {
             return;
         }
 
-        let itemsHtml = items.map(item => `
+        const nonSegueItems = items.filter(i => !(i.segue && !i.dish_id));
+        let itemsHtml = '';
+        items.forEach((item, index) => {
+            const isSegueItem = item.segue && !item.dish_id;
+
+            if (isSegueItem) {
+                // This item IS the segue separator
+                itemsHtml += `
+                    <div style="display:flex;align-items:center;gap:6px;margin:2px 0;user-select:none;">
+                        <div style="flex:1;height:2px;background:#dc3545;"></div>
+                        <span style="font-size:0.7rem;font-weight:800;color:#dc3545;letter-spacing:1px;white-space:nowrap;">★ SEGUE ★</span>
+                        <div style="flex:1;height:2px;background:#dc3545;"></div>
+                        <button onclick="tableOrdersManager.removeSegueItem(${item.id})"
+                            style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:0.9rem;padding:0 2px;line-height:1;" title="Rimuovi segue">×</button>
+                    </div>`;
+                return;
+            }
+
+            // Show "+ segue" between two consecutive saved non-segue items
+            const prevItem = index > 0 ? items[index - 1] : null;
+            const prevIsRegularDish = prevItem && !(prevItem.segue && !prevItem.dish_id);
+            if (prevIsRegularDish && !item._isNew && !prevItem._isNew) {
+                itemsHtml += `
+                    <div onclick="tableOrdersManager.addSegueAfter(${prevItem.id})"
+                        style="display:flex;align-items:center;gap:6px;margin:2px 0;cursor:pointer;opacity:0.35;user-select:none;"
+                        title="Inserisci segue">
+                        <div style="flex:1;height:1px;background:#6c757d;"></div>
+                        <span style="font-size:0.65rem;color:#6c757d;white-space:nowrap;">+ segue</span>
+                        <div style="flex:1;height:1px;background:#6c757d;"></div>
+                    </div>`;
+            }
+
+            itemsHtml += `
             <div class="receipt-item${item._isNew ? ' receipt-item-new' : ''}" data-item-id="${item.id}" style="${item._isNew ? 'border-left:3px solid #28a745;' : ''}">
                 <div class="receipt-item-header">
                     <strong>${item.quantity} × ${item.dish_name}</strong>
@@ -525,12 +607,12 @@ class TableOrdersManager {
                 </div>
                 <div class="receipt-item-actions">
                     <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
-                    ${items.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
+                    ${nonSegueItems.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
                         <i class="fas fa-trash"></i>
                     </button>` : ''}
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        });
 
         // Cover charge and total: read from session or order
         const order = this.modifySession.active ? this.currentTable?.order : this.currentTable?.order;
@@ -845,11 +927,9 @@ class TableOrdersManager {
         // Reset form
         const quantityElement = this.getElement('productQuantity');
         const notesElement = this.getElement('productNotes');
-        const segueElement = this.getElement('productSegue');
 
         if (quantityElement) quantityElement.value = 1;
         if (notesElement) notesElement.value = '';
-        if (segueElement) segueElement.checked = false;
 
         // Populate extras and removals
         const extrasContainer = this.getElement('extrasContainer');
@@ -924,10 +1004,6 @@ class TableOrdersManager {
         // Notes
         const notesElement = this.getElement('productNotes');
         if (notesElement) notesElement.value = item.notes || '';
-
-        // Segue
-        const segueElement = this.getElement('productSegue');
-        if (segueElement) segueElement.checked = item.segue || false;
 
         // Extras — pre-check existing
         const extrasContainer = this.getElement('extrasContainer');
@@ -1220,14 +1296,15 @@ class TableOrdersManager {
             const quantityElement    = this.getElement('productQuantity');
             const customPriceElement = this.getElement('productCustomPrice');
             const notesElement       = this.getElement('productNotes');
-            const segueElement       = this.getElement('productSegue');
             const extrasContainer    = this.getElement('extrasContainer');
             const removalsContainer  = this.getElement('removalsContainer');
 
             const newQty   = parseInt(quantityElement?.value || 1);
             const newPrice = parseFloat(customPriceElement?.value);
             const notes    = notesElement?.value || null;
-            const segue    = segueElement?.checked || false;
+            // Preserve existing segue value — segue is managed from the list, not from the modal
+            const existingItem = this.modifySession.items.find(i => i.id === itemId);
+            const segue = existingItem?.segue || false;
             const extras   = {};
             extrasContainer?.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
                 extras[cb.dataset.name] = parseFloat(cb.value);
@@ -1341,7 +1418,6 @@ class TableOrdersManager {
 
         const quantityElement = this.getElement('productQuantity');
         const notesElement = this.getElement('productNotes');
-        const segueElement = this.getElement('productSegue');
         const customPriceElement = this.getElement('productCustomPrice');
         const extrasContainer = this.getElement('extrasContainer');
         const removalsContainer = this.getElement('removalsContainer');
@@ -1352,7 +1428,7 @@ class TableOrdersManager {
         const unitPrice = customPrice !== null ? customPrice : parseFloat(this.currentProduct.price);
         const quantity = parseInt(quantityElement?.value || 1);
         const notes = notesElement?.value || null;
-        const segue = segueElement?.checked || false;
+        const segue = false; // segue is set from the list separator, not from the modal
 
         const extras = {};
         const removals = [];
@@ -1416,7 +1492,6 @@ class TableOrdersManager {
 
         const quantityElement = this.getElement('productQuantity');
         const notesElement = this.getElement('productNotes');
-        const segueElement = this.getElement('productSegue');
         const customPriceElement = this.getElement('productCustomPrice');
         const extrasContainer = this.getElement('extrasContainer');
         const removalsContainer = this.getElement('removalsContainer');
@@ -1430,7 +1505,7 @@ class TableOrdersManager {
             dish_id: this.currentProduct.id,
             quantity: parseInt(quantityElement?.value || 1),
             notes: notesElement?.value || null,
-            segue: segueElement?.checked || false,
+            segue: false, // segue is set from the list separator, not from the modal
             custom_price: customPrice,
             extras: {},
             removals: [],
@@ -3592,16 +3667,16 @@ class TableOrdersManager {
             const name = item.dish_name || item.name || 'N/D';
             const avail = item._available;
             const unitPrice = parseFloat(item.unit_price || 0);
-            const subtotal = (unitPrice * avail).toFixed(2);
+            const subtotal = (0).toFixed(2);
             const alreadyBadge = item._assigned > 0
                 ? `<span style="font-size:0.72rem;color:#fd7e14;margin-left:4px;">(${item._assigned} già in preconto)</span>`
                 : '';
-            return `<div class="preconto-item-row selected" data-item-id="${item.id}">
+            return `<div class="preconto-item-row" data-item-id="${item.id}">
                 <span class="preconto-item-name">${name}${alreadyBadge}</span>
                 <div class="preconto-qty-ctrl">
                     <button type="button" class="pqi-dec" data-item-id="${item.id}">−</button>
                     <input type="number" class="preconto-item-qty-input"
-                           value="${avail}" min="0" max="${avail}"
+                           value="0" min="0" max="${avail}"
                            data-item-id="${item.id}" data-unit-price="${unitPrice}" data-max="${avail}">
                     <button type="button" class="pqi-inc" data-item-id="${item.id}">+</button>
                     <span class="pqi-max">/ ${avail}</span>
@@ -3885,7 +3960,6 @@ class TableOrdersManager {
 
         const quantityElement = this.getElement('productQuantity');
         const notesElement = this.getElement('productNotes');
-        const segueElement = this.getElement('productSegue');
         const customPriceElement = this.getElement('productCustomPrice');
         const extrasContainer = this.getElement('extrasContainer');
         const removalsContainer = this.getElement('removalsContainer');
@@ -3923,7 +3997,7 @@ class TableOrdersManager {
             custom_price: customPrice,
             quantity: parseInt(quantityElement?.value || 1),
             notes: notesElement?.value || null,
-            segue: segueElement?.checked || false,
+            segue: false, // segue is set from the list separator, not from the modal
             extras: Object.keys(extras).length > 0 ? extras : null,
             removals: removals.length > 0 ? removals : null,
         };

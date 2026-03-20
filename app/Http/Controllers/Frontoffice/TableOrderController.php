@@ -161,7 +161,7 @@ class TableOrderController extends Controller
                     return [
                         'id' => $item->id,
                         'dish_id' => $item->dish_id,
-                        'dish_name' => $item->dish->label,
+                        'dish_name' => $item->dish_id ? ($item->dish->label ?? 'N/D') : null,
                         'quantity' => $item->quantity,
                         'unit_price' => $item->unit_price,
                         'subtotal' => $item->subtotal,
@@ -169,6 +169,8 @@ class TableOrderController extends Controller
                         'extras' => $item->extras,
                         'removals' => $item->removals,
                         'status' => $item->status,
+                        'segue' => (bool) $item->segue,
+                        'sort_order' => $item->sort_order,
                         'autoconsumo_user_id' => $item->autoconsumo_user_id,
                         'autoconsumo_user_name' => $item->autoconsumoUser?->name,
                     ];
@@ -1862,6 +1864,83 @@ class TableOrderController extends Controller
             DB::rollBack();
             Log::error('Error updating item details: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Errore nell\'aggiornamento del piatto'], 500);
+        }
+    }
+
+    /**
+     * Insert a segue separator item after a given order item.
+     * No operator auth required — segue items carry no price.
+     */
+    public function addSegueItem(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $validated = $request->validate(['after_item_id' => 'required|integer']);
+
+        try {
+            $order = $table->activeOrder;
+            if (!$order) {
+                return response()->json(['success' => false, 'message' => 'Nessun ordine aperto'], 404);
+            }
+
+            $afterItem = OrderItem::where('table_order_id', $order->id)
+                ->where('id', $validated['after_item_id'])
+                ->firstOrFail();
+
+            // Shift all items with sort_order > afterItem->sort_order up by 1
+            OrderItem::where('table_order_id', $order->id)
+                ->where('sort_order', '>', $afterItem->sort_order)
+                ->increment('sort_order');
+
+            // Create the segue separator item
+            $segueItem = OrderItem::create([
+                'table_order_id' => $order->id,
+                'dish_id'        => null,
+                'quantity'       => 1,
+                'unit_price'     => 0,
+                'subtotal'       => 0,
+                'segue'          => true,
+                'status'         => 'pending',
+                'sort_order'     => $afterItem->sort_order + 1,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id'         => $segueItem->id,
+                    'dish_id'    => null,
+                    'dish_name'  => null,
+                    'quantity'   => 1,
+                    'unit_price' => 0,
+                    'subtotal'   => 0,
+                    'segue'      => true,
+                    'sort_order' => $segueItem->sort_order,
+                    'notes'      => null,
+                    'extras'     => null,
+                    'removals'   => null,
+                    'status'     => 'pending',
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error adding segue item: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nell\'aggiunta del segue'], 500);
+        }
+    }
+
+    /**
+     * Delete a segue separator item.
+     * No operator auth or print job — segue items carry no price.
+     */
+    public function removeSegueItem(OrderItem $item): JsonResponse
+    {
+        if (!$item->isSegueItem()) {
+            return response()->json(['success' => false, 'message' => 'Item non è un segue'], 400);
+        }
+
+        try {
+            $item->delete();
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            Log::error('Error removing segue item: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore nella rimozione del segue'], 500);
         }
     }
 

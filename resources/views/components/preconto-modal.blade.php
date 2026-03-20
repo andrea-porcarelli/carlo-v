@@ -160,6 +160,8 @@
 .preconto-modal-body {
     padding: 20px 25px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     flex: 1;
 }
 
@@ -289,7 +291,6 @@
     background: #f8f9fa;
     border-radius: 8px;
     margin-top: 10px;
-    overflow: hidden;
 }
 
 .items-select-header {
@@ -322,6 +323,8 @@
 .preconto-items-list {
     max-height: 220px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     padding: 8px 0;
 }
 
@@ -549,5 +552,43 @@
 
 .btn-preconto-print:hover {
     background: #138496;
+}
+
+@media (max-width: 600px) {
+    .preconto-modal-content {
+        max-height: 96vh;
+    }
+
+    .preconto-modal-body {
+        padding: 14px 14px;
+    }
+
+    .preconto-items-list {
+        max-height: 35vh;
+    }
+
+    /* Touch target più grandi su mobile */
+    .pqi-dec, .pqi-inc {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+    }
+
+    .preconto-item-qty-input {
+        width: 48px;
+        height: 40px;
+        font-size: 1rem;
+    }
+
+    .preconto-item-row {
+        padding: 10px 10px;
+        gap: 8px;
+    }
+
+    .items-select-all-btn {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+        min-height: 36px;
+    }
 }
 </style>

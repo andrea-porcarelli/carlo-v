@@ -106,7 +106,7 @@ class PrinterService implements PrinterServiceInterface
                     $operation,
                     [
                         'items' => collect($items)->map(fn($item) => [
-                            'dish_name' => $item->dish->label ?? 'N/D',
+                            'dish_name' => $item->dish_id ? ($item->dish->label ?? 'N/D') : null,
                             'quantity' => $item->quantity,
                             'notes' => $item->notes,
                             'extras' => $item->extras,
@@ -240,7 +240,7 @@ class PrinterService implements PrinterServiceInterface
                 $operation,
                 [
                     'items' => collect($items)->map(fn($item) => [
-                        'dish_name' => $item->dish->label ?? 'N/D',
+                        'dish_name' => $item->dish_id ? ($item->dish->label ?? 'N/D') : null,
                         'quantity' => $item->quantity,
                         'notes' => $item->notes,
                         'extras' => $item->extras,
@@ -271,7 +271,7 @@ class PrinterService implements PrinterServiceInterface
                 $operation,
                 [
                     'items' => collect($items)->map(fn($item) => [
-                        'dish_name' => $item->dish->label ?? 'N/D',
+                        'dish_name' => $item->dish_id ? ($item->dish->label ?? 'N/D') : null,
                         'quantity' => $item->quantity,
                         'notes' => $item->notes,
                         'extras' => $item->extras,
@@ -297,13 +297,14 @@ class PrinterService implements PrinterServiceInterface
      */
     protected function printItem(EscposPrinter $printer, OrderItem $item): void
     {
-        // Se l'articolo ha il flag "segue", stampa l'intestazione SEGUE
-        if ($item->segue) {
+        // Segue separator item: stampa solo il separatore e ritorna
+        if ($item->isSegueItem()) {
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
             $printer->setEmphasis(true);
             $printer->text("*** SEGUE ***\n");
             $printer->setEmphasis(false);
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            return;
         }
 
         // Quantità e nome piatto
@@ -1676,7 +1677,7 @@ class PrinterService implements PrinterServiceInterface
                     'source_table' => $sourceTableNumber,
                     'destination_table' => $destTableNumber,
                     'items' => collect($items)->map(fn($item) => [
-                        'dish_name' => $item->dish->label ?? 'N/D',
+                        'dish_name' => $item->dish_id ? ($item->dish->label ?? 'N/D') : null,
                         'quantity' => $item->quantity,
                     ])->toArray(),
                 ],

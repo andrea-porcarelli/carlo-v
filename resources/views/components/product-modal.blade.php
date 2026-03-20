@@ -107,34 +107,6 @@
                 ></textarea>
             </div>
 
-            <!-- Segue Option -->
-            <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
-                 style="{{ !$isMobile ? 'margin-bottom: 8px;' : '' }}"
-            >
-                @if($isMobile)
-                <div class="mobile-segue-toggle" id="segueToggleMobile" style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent;">
-                    <span style="font-weight: 700; color: #dc3545; font-size: 16px;">
-                        <i class="fas fa-clock me-2"></i>SEGUE (esce dopo)
-                    </span>
-                    <div class="segue-switch" style="width: 60px; height: 34px; background: #ccc; border-radius: 17px; position: relative; transition: background 0.3s;">
-                        <div class="segue-switch-handle" style="width: 26px; height: 26px; background: white; border-radius: 50%; position: absolute; top: 4px; left: 4px; transition: transform 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
-                    </div>
-                    <input type="checkbox" id="productSegueMobile" style="display: none;">
-                </div>
-                @else
-                <label class="segue-checkbox-container" style="display: flex; align-items: center; cursor: pointer; user-select: none;">
-                    <input
-                        type="checkbox"
-                        id="productSegue"
-                        style="width: 20px; height: 20px; margin-right: 10px; accent-color: #dc3545;"
-                    >
-                    <span style="font-weight: 700; color: #dc3545; text-transform: uppercase; font-size: 1rem;">
-                        <i class="fas fa-clock me-2"></i>SEGUE (esce dopo)
-                    </span>
-                </label>
-                @endif
-            </div>
-
             <!-- Extras -->
             <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
                  style="{{ !$isMobile ? 'margin-bottom: 10px;' : '' }}"

@@ -90,14 +90,22 @@ class PrintLogService
 
         $html .= '<div class="print-items">';
         foreach ($items as $item) {
-            $dishName = is_array($item) ? ($item['dish_name'] ?? 'N/D') : ($item->dish->label ?? 'N/D');
+            $dishName = is_array($item) ? ($item['dish_name'] ?? null) : ($item->dish_id ? ($item->dish->label ?? 'N/D') : null);
             $quantity = is_array($item) ? ($item['quantity'] ?? 1) : $item->quantity;
             $notes = is_array($item) ? ($item['notes'] ?? null) : $item->notes;
             $extras = is_array($item) ? ($item['extras'] ?? []) : $item->extras;
             $removals = is_array($item) ? ($item['removals'] ?? []) : $item->removals;
             $segue = is_array($item) ? ($item['segue'] ?? false) : ($item->segue ?? false);
 
+            // Segue separator: new-style (no dish_name) or old-style (dish_name + segue flag)
+            if ($segue && !$dishName) {
+                // New-style: the item itself is the separator
+                $html .= '<div class="item-segue">*** SEGUE ***</div>';
+                continue;
+            }
+
             if ($segue) {
+                // Old-style: segue flag on a dish item (backward compat for old log entries)
                 $html .= '<div class="item-segue">*** SEGUE ***</div>';
             }
 
