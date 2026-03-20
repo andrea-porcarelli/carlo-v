@@ -255,6 +255,10 @@ window._boSale = {
                                 <tbody>
                                     @foreach($sale->items()->withTrashed()->orderBy('id', 'DESC')->get() as $index => $item)
                                         <tr class="@if($item->status == 'cancelled') trashed @endif" data-item-id="{{ $item->id }}">
+                                            @if(!isset($item->dish))
+                                                <td colspan="6"> ----- SEGUE ----- </td>
+
+                                            @endif
                                             <td>{{ $index + 1 }} </td>
                                             <td>
                                                 @php
@@ -360,7 +364,7 @@ window._boSale = {
                                                 @endif
                                             </td>
                                             @if($sale->autoconsumo)
-                                                <th>{{ $item->autoconsumoUser->name }}</th>
+                                                <td>{{ $item->autoconsumoUser->name }}</td>
                                             @endif
                                             <td class="text-center">
                                                 <strong style="font-size: 16px;">{{ $item->quantity }}</strong>
