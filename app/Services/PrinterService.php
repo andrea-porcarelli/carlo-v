@@ -456,20 +456,37 @@ class PrinterService implements PrinterServiceInterface
     public function groupItemsByPrinter(Collection|array $items): array
     {
         $items = $items instanceof Collection ? $items : collect($items);
+        // Sort by sort_order so segue items are positioned correctly
+        $items = $items->sortBy('sort_order')->values();
+
         $grouped = [];
+        $lastPrinterId = null;
 
         foreach ($items as $item) {
+            // Segue separator: attach to the last printer group seen
+            if ($item->isSegueItem()) {
+                if ($lastPrinterId && isset($grouped[$lastPrinterId])) {
+                    $grouped[$lastPrinterId]['items'][] = $item;
+                }
+                continue;
+            }
+
             // Carica le relazioni necessarie se non già caricate
             if (!$item->relationLoaded('dish')) {
                 $item->load('dish.category.printer', 'addedBy');
-            } elseif (!$item->dish->relationLoaded('category')) {
+            } elseif ($item->dish && !$item->dish->relationLoaded('category')) {
                 $item->dish->load('category.printer');
                 $item->load('addedBy');
-            } elseif (!$item->dish->category->relationLoaded('printer')) {
+            } elseif ($item->dish && $item->dish->category && !$item->dish->category->relationLoaded('printer')) {
                 $item->dish->category->load('printer');
                 $item->load('addedBy');
             } else {
                 $item->load('addedBy');
+            }
+
+            // Skip items whose dish has been deleted
+            if (!$item->dish) {
+                continue;
             }
 
             // Ottieni la stampante dalla categoria del piatto
@@ -477,6 +494,7 @@ class PrinterService implements PrinterServiceInterface
 
             if ($printer && $printer->is_active && !empty($printer->ip)) {
                 $printerId = $printer->id;
+                $lastPrinterId = $printerId;
 
                 if (!isset($grouped[$printerId])) {
                     $grouped[$printerId] = [

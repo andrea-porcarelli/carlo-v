@@ -379,9 +379,50 @@ class TableOrdersManager {
     }
 
     /**
-     * Insert a segue separator after prevItemId (saved DB items only).
+     * Insert a segue separator after prevItemId.
+     * For saved items (id > 0): persists to DB immediately.
+     * For new items (id < 0): adds locally and queues in pendingAdd.
      */
     async addSegueAfter(prevItemId) {
+        const idx = this.modifySession.items.findIndex(i => i.id === prevItemId);
+        if (idx === -1) return;
+
+        if (prevItemId < 0) {
+            // Unsaved item: create local segue only
+            const localId = this.modifySession.itemCounter--;
+            const segueItem = {
+                id: localId,
+                _localId: localId,
+                dish_id: null,
+                dish_name: null,
+                quantity: 1,
+                unit_price: 0,
+                subtotal: 0,
+                segue: true,
+                _isNew: true,
+                notes: null,
+                extras: null,
+                removals: null,
+                status: 'pending',
+            };
+            this.modifySession.items.splice(idx + 1, 0, segueItem);
+            // Insert in pendingAdd right after prevItem
+            const paIdx = this.modifySession.pendingAdd.findIndex(i => i._localId === prevItemId);
+            this.modifySession.pendingAdd.splice(paIdx + 1, 0, {
+                _localId: localId,
+                dish_id: null,
+                quantity: 1,
+                notes: null,
+                segue: true,
+                custom_price: null,
+                extras: null,
+                removals: null,
+            });
+            this.updateModifyReceiptItems();
+            return;
+        }
+
+        // Saved item: persist to DB
         try {
             const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/add-segue`, {
                 method: 'POST',
@@ -394,10 +435,7 @@ class TableOrdersManager {
             const result = await resp.json();
             if (!result.success) throw new Error(result.message);
 
-            const idx = this.modifySession.items.findIndex(i => i.id === prevItemId);
-            if (idx !== -1) {
-                this.modifySession.items.splice(idx + 1, 0, { ...result.data, _isNew: false });
-            }
+            this.modifySession.items.splice(idx + 1, 0, { ...result.data, _isNew: false });
             this.updateModifyReceiptItems();
         } catch (e) {
             this.showNotification("Errore nell'inserimento del segue", 'error');
@@ -406,25 +444,32 @@ class TableOrdersManager {
 
     /**
      * Remove a segue separator item (no operator auth required).
+     * For saved items (id > 0): deletes from DB.
+     * For new items (id < 0): removes locally from session and pendingAdd.
      */
     async removeSegueItem(segueItemId) {
         this.modifySession.items = this.modifySession.items.filter(i => i.id !== segueItemId);
+
+        if (segueItemId < 0) {
+            this.modifySession.pendingAdd = this.modifySession.pendingAdd.filter(i => i._localId !== segueItemId);
+            this.updateModifyReceiptItems();
+            return;
+        }
+
         this.updateModifyReceiptItems();
 
-        if (segueItemId > 0) {
-            try {
-                const resp = await fetch(`${this.apiBase}/segue-items/${segueItemId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    },
-                });
-                const result = await resp.json();
-                if (!result.success) throw new Error(result.message);
-            } catch (e) {
-                this.showNotification('Errore nella rimozione del segue', 'error');
-            }
+        try {
+            const resp = await fetch(`${this.apiBase}/segue-items/${segueItemId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                },
+            });
+            const result = await resp.json();
+            if (!result.success) throw new Error(result.message);
+        } catch (e) {
+            this.showNotification('Errore nella rimozione del segue', 'error');
         }
     }
 
@@ -566,10 +611,10 @@ class TableOrdersManager {
                 return;
             }
 
-            // Show "+ segue" between two consecutive saved non-segue items
+            // Show "+ segue" between any two consecutive non-segue items (saved or new)
             const prevItem = index > 0 ? items[index - 1] : null;
             const prevIsRegularDish = prevItem && !(prevItem.segue && !prevItem.dish_id);
-            if (prevIsRegularDish && !item._isNew && !prevItem._isNew) {
+            if (prevIsRegularDish) {
                 itemsHtml += `
                     <div onclick="tableOrdersManager.addSegueAfter(${prevItem.id})"
                         style="display:flex;align-items:center;gap:6px;margin:2px 0;cursor:pointer;opacity:0.35;user-select:none;"

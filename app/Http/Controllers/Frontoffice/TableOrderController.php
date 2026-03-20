@@ -244,8 +244,8 @@ class TableOrderController extends Controller
     {
         $validated = $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.dish_id' => 'required|exists:dishes,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.dish_id' => 'nullable|integer|exists:dishes,id',
+            'items.*.quantity' => 'nullable|integer|min:1',
             'items.*.notes' => 'nullable|string',
             'items.*.extras' => 'nullable|array',
             'items.*.removals' => 'nullable|array',
@@ -292,6 +292,20 @@ class TableOrderController extends Controller
 
             $addedItems = [];
             foreach ($validated['items'] as $itemData) {
+                // Segue separator item (no dish)
+                if (is_null($itemData['dish_id'] ?? null) && ($itemData['segue'] ?? false)) {
+                    $item = OrderItem::create([
+                        'table_order_id' => $order->id,
+                        'dish_id'        => null,
+                        'quantity'       => 1,
+                        'unit_price'     => 0,
+                        'segue'          => true,
+                        'status'         => 'pending',
+                    ]);
+                    $addedItems[] = $item;
+                    continue;
+                }
+
                 $dish = Dish::findOrFail($itemData['dish_id']);
 
                 // Use custom price if provided, otherwise use dish price
@@ -308,7 +322,7 @@ class TableOrderController extends Controller
                     'notes' => $itemData['notes'] ?? null,
                     'extras' => $itemData['extras'] ?? null,
                     'removals' => $itemData['removals'] ?? null,
-                    'segue' => $itemData['segue'] ?? false,
+                    'segue' => false,
                 ]);
 
                 $this->logger->logAddItem($item, $operatorId);
