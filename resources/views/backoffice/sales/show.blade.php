@@ -323,8 +323,8 @@ window._boSale = {
                                         @if($sale->autoconsumo)
                                             <th>Addebitato a</th>
                                         @endif
-                                        <th width="120" class="text-end">Prezzo Unit.</th>
-                                        <th width="120" class="text-end">Subtotale</th>
+                                        <th width="120" class="text-right">Prezzo Unit.</th>
+                                        <th width="120" class="text-right">Subtotale</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -436,7 +436,7 @@ window._boSale = {
                                                 @if($sale->autoconsumo)
                                                     <td>{{ $item->autoconsumoUser->name }}</td>
                                                 @endif
-                                                <td class="text-end" style="font-weight: bold">
+                                                <td class="text-right" style="font-weight: bold">
                                                     @php
                                                         $originalPrice = $item->dish->price ?? $item->unit_price;
                                                         $hasPriceChange = abs($item->unit_price - $originalPrice) > 0.001;
@@ -459,7 +459,7 @@ window._boSale = {
                                                         €{{ number_format($item->unit_price, 2, ',', '.') }}
                                                     @endif
                                                 </td>
-                                                <td class="text-end">
+                                                <td class="text-right">
                                                     <strong style="font-size: 15px;">
                                                         €{{ number_format($item->subtotal, 2, ',', '.') }}
                                                     </strong>
@@ -479,27 +479,27 @@ window._boSale = {
                                     @endif
                                     @if($sale->hasCoverCharge())
                                         <tr>
-                                            <td colspan="3" class="text-end text-muted">
+                                            <td colspan="3" class="text-right text-muted">
                                                 <i class="fas fa-utensils"></i>
                                                 Coperto
                                                 ({{ $sale->covers }} × €{{ number_format($sale->getCoverChargePerPerson(), 2, ',', '.') }}):
                                             </td>
-                                            <td class="text-end">
+                                            <td class="text-right">
                                                 <strong>€{{ number_format($sale->getCoverChargeAmount(), 2, ',', '.') }}</strong>
                                             </td>
                                         </tr>
                                     @endif
                                     @if($sale->hasDiscount())
                                         <tr>
-                                            <td colspan="3" class="text-end text-muted">
+                                            <td colspan="3" class="text-right text-muted">
                                                 Subtotale:
                                             </td>
-                                            <td class="text-end text-muted">
+                                            <td class="text-right text-muted">
                                                 €{{ number_format($sale->total_amount, 2, ',', '.') }}
                                             </td>
                                         </tr>
                                         <tr class="warning">
-                                            <td colspan="3" class="text-end">
+                                            <td colspan="3" class="text-right">
                                                 <span class="text-danger">
                                                     <i class="fas fa-percent"></i>
                                                     Sconto
@@ -511,7 +511,7 @@ window._boSale = {
                                                     :
                                                 </span>
                                             </td>
-                                            <td class="text-end text-danger">
+                                            <td class="text-right text-danger">
                                                 &minus;€{{ number_format($sale->discount_value, 2, ',', '.') }}
                                             </td>
                                         </tr>
@@ -519,21 +519,21 @@ window._boSale = {
                                     @if(isset($paidSplits) && $paidSplits->count() > 0)
                                         @foreach($paidSplits as $split)
                                         <tr style="color:#888; font-size:13px;">
-                                            <td colspan="3" class="text-end">
+                                            <td colspan="3" class="text-right">
                                                 <i class="fas fa-check-circle text-success"></i>
                                                 Preconto pagato — {{ $split->label ?? '' }}
                                                 @if($split->paid_at)<small class="text-muted">({{ $split->paid_at->format('H:i') }})</small>@endif:
                                             </td>
-                                            <td class="text-end text-danger">
+                                            <td class="text-right text-danger">
                                                 &minus;€{{ number_format($split->total, 2, ',', '.') }}
                                             </td>
                                         </tr>
                                         @endforeach
                                         <tr style="background:#fff3cd;">
-                                            <td colspan="3" class="text-end">
+                                            <td colspan="3" class="text-right">
                                                 <strong>RIMANENTE DA PAGARE:</strong>
                                             </td>
-                                            <td class="text-end">
+                                            <td class="text-right">
                                                 <strong style="font-size: 18px;" class="text-success">
                                                     €{{ number_format($remainingTotal, 2, ',', '.') }}
                                                 </strong>
@@ -541,10 +541,10 @@ window._boSale = {
                                         </tr>
                                     @endif
                                     <tr class="table-success">
-                                        <td colspan="3" class="text-end">
+                                        <td colspan="3" class="text-right">
                                             <strong style="font-size: 16px;" class="@if($sale->status == 'cancelled') trashed @endif">TOTALE:</strong>
                                         </td>
-                                        <td class="text-end">
+                                        <td class="text-right">
                                             <strong style="font-size: 18px; @if($sale->autoconsumo) text-decoration:line-through @endif"  class="@if($sale->status == 'cancelled') text-danger @else text-success @endif @if($sale->status == 'cancelled') trashed @endif">
                                                 €{{ number_format($sale->hasDiscount() ? $sale->getDiscountedTotal() : $sale->total_amount, 2, ',', '.') }}
                                             </strong>
@@ -617,7 +617,7 @@ window._boSale = {
                             <thead>
                                 <tr class="active">
                                     <th width="140">Data/Ora</th>
-                                    <th width="120" class="text-end">Importo</th>
+                                    <th width="120" class="text-right">Importo</th>
                                     <th>Descrizione</th>
                                     <th width="200">Intestatario</th>
                                     <th width="150">Cod. Fiscale / P.IVA</th>
@@ -641,7 +641,7 @@ window._boSale = {
                                                 <strong>{{ $inv->created_at->format('H:i:s') }}</strong>
                                             </small>
                                         </td>
-                                        <td class="text-end">
+                                        <td class="text-right">
                                             <strong style="font-size: 1rem;">€{{ number_format($d['amount'] ?? 0, 2, ',', '.') }}</strong>
                                         </td>
                                         <td>{{ $d['description'] ?? 'Pasto completo' }}</td>
@@ -698,7 +698,7 @@ window._boSale = {
                             <tfoot>
                                 <tr class="active">
                                     <td colspan="1"><strong>Totale fatturato</strong></td>
-                                    <td class="text-end">
+                                    <td class="text-right">
                                         <strong>€{{ number_format($totalInvoiced, 2, ',', '.') }}</strong>
                                     </td>
                                     <td colspan="6">
