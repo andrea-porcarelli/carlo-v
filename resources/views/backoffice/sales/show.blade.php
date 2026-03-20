@@ -257,146 +257,147 @@ window._boSale = {
                                         <tr class="@if($item->status == 'cancelled') trashed @endif" data-item-id="{{ $item->id }}">
                                             @if(!isset($item->dish))
                                                 <td colspan="6"> ----- SEGUE ----- </td>
-
-                                            @endif
-                                            <td>{{ $index + 1 }} </td>
-                                            <td>
-                                                @php
-                                                    $originalPrice = $item->dish->price ?? $item->unit_price;
-                                                    $hasPriceChange = abs($item->unit_price - $originalPrice) > 0.001;
-                                                @endphp
-                                                <div>
-                                                    <strong style="font-size: 15px;">{{ $item->dish->label }}</strong>
-                                                    @if($hasPriceChange)
-                                                        <span class="badge badge-warning ml-2" title="Prezzo modificato: da €{{ number_format($originalPrice, 2, ',', '.') }} a €{{ number_format($item->unit_price, 2, ',', '.') }}">
+                                            @else
+                                                <td>{{ $index + 1 }} </td>
+                                                <td>
+                                                    @php
+                                                        $originalPrice = $item->dish->price ?? $item->unit_price;
+                                                        $hasPriceChange = abs($item->unit_price - $originalPrice) > 0.001;
+                                                    @endphp
+                                                    <div>
+                                                        <strong style="font-size: 15px;">{{ $item->dish->label }}</strong>
+                                                        @if($hasPriceChange)
+                                                            <span class="badge badge-warning ml-2" title="Prezzo modificato: da €{{ number_format($originalPrice, 2, ',', '.') }} a €{{ number_format($item->unit_price, 2, ',', '.') }}">
                                                             <i class="fas fa-euro-sign"></i> Modificato
                                                         </span>
-                                                    @endif
-                                                    @if($item->dish->category)
-                                                        <br>
-                                                        <small class="text-muted">
-                                                            <i class="fas fa-tag"></i> {{ $item->dish->category->label }}
-                                                        </small>
-                                                    @endif
-                                                </div>
+                                                        @endif
+                                                        @if($item->dish->category)
+                                                            <br>
+                                                            <small class="text-muted">
+                                                                <i class="fas fa-tag"></i> {{ $item->dish->category->label }}
+                                                            </small>
+                                                        @endif
+                                                    </div>
 
-                                                <!-- Extras -->
-                                                @if($item->extras && is_array($item->extras) && count($item->extras) > 0)
-                                                    <div class="mt-2">
+                                                    <!-- Extras -->
+                                                    @if($item->extras && is_array($item->extras) && count($item->extras) > 0)
+                                                        <div class="mt-2">
                                                         <span class="badge badge-info">
                                                             <i class="fas fa-plus-circle"></i> Supplementi
                                                         </span>
-                                                        <ul class="list-unstyled mb-0 mt-1" style="padding-left: 15px;">
-                                                            @foreach($item->extras as $extraName => $extraPrice)
-                                                                <li class="text-success">
-                                                                    <i class="fas fa-check"></i>
-                                                                    <strong>{{ $extraName }}</strong>
-                                                                    <span class="text-muted">(+€{{ number_format($extraPrice, 2) }})</span>
-                                                                </li>
-                                                            @endforeach
-                                                        </ul>
-                                                    </div>
-                                                @endif
+                                                            <ul class="list-unstyled mb-0 mt-1" style="padding-left: 15px;">
+                                                                @foreach($item->extras as $extraName => $extraPrice)
+                                                                    <li class="text-success">
+                                                                        <i class="fas fa-check"></i>
+                                                                        <strong>{{ $extraName }}</strong>
+                                                                        <span class="text-muted">(+€{{ number_format($extraPrice, 2) }})</span>
+                                                                    </li>
+                                                                @endforeach
+                                                            </ul>
+                                                        </div>
+                                                    @endif
 
-                                                <!-- Removals -->
-                                                @if($item->removals && is_array($item->removals) && count($item->removals) > 0)
-                                                    <div class="mt-2">
+                                                    <!-- Removals -->
+                                                    @if($item->removals && is_array($item->removals) && count($item->removals) > 0)
+                                                        <div class="mt-2">
                                                         <span class="badge badge-warning">
                                                             <i class="fas fa-minus-circle"></i> Rimozioni
                                                         </span>
-                                                        <ul class="list-unstyled mb-0 mt-1" style="padding-left: 15px;">
-                                                            @foreach($item->removals as $removal)
-                                                                <li class="text-danger">
-                                                                    <i class="fas fa-times"></i>
-                                                                    {{ $removal }}
-                                                                </li>
-                                                            @endforeach
-                                                        </ul>
-                                                    </div>
-                                                @endif
+                                                            <ul class="list-unstyled mb-0 mt-1" style="padding-left: 15px;">
+                                                                @foreach($item->removals as $removal)
+                                                                    <li class="text-danger">
+                                                                        <i class="fas fa-times"></i>
+                                                                        {{ $removal }}
+                                                                    </li>
+                                                                @endforeach
+                                                            </ul>
+                                                        </div>
+                                                    @endif
 
-                                                <!-- Notes -->
-                                                @if($item->notes)
-                                                    <div class="mt-2">
+                                                    <!-- Notes -->
+                                                    @if($item->notes)
+                                                        <div class="mt-2">
                                                         <span class="badge badge-secondary">
                                                             <i class="fas fa-sticky-note"></i> Note
                                                         </span>
-                                                        <div class="alert alert-warning mt-1 mb-0 p-2">
-                                                            <i class="fas fa-comment-dots"></i>
-                                                            <em>{{ $item->notes }}</em>
+                                                            <div class="alert alert-warning mt-1 mb-0 p-2">
+                                                                <i class="fas fa-comment-dots"></i>
+                                                                <em>{{ $item->notes }}</em>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                @endif
-
-                                                @if($isOpen && $item->status != 'cancelled')
-                                                <div class="btn-group btn-group-xs" style="margin-top: 8px;">
-                                                    <button class="btn btn-xs btn-default btn-item-qty"
-                                                            data-item-id="{{ $item->id }}"
-                                                            data-qty="{{ $item->quantity }}"
-                                                            title="Modifica quantità">
-                                                        <i class="fas fa-hashtag"></i>
-                                                    </button>
-                                                    <button class="btn btn-xs btn-default btn-item-price"
-                                                            data-item-id="{{ $item->id }}"
-                                                            data-price="{{ $item->unit_price }}"
-                                                            title="Modifica prezzo">
-                                                        <i class="fas fa-euro-sign"></i>
-                                                    </button>
-                                                    <button class="btn btn-xs btn-info btn-item-details"
-                                                            data-item-id="{{ $item->id }}"
-                                                            data-notes="{{ $item->notes }}"
-                                                            title="Modifica note">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button class="btn btn-xs btn-warning btn-item-change-dish"
-                                                            data-item-id="{{ $item->id }}"
-                                                            title="Cambia piatto">
-                                                        <i class="fas fa-exchange-alt"></i>
-                                                    </button>
-                                                    @if($sale->items->where('status', '!=', 'cancelled')->count() > 1)
-                                                    <button class="btn btn-xs btn-danger btn-item-remove"
-                                                            data-item-id="{{ $item->id }}"
-                                                            title="Rimuovi">
-                                                        <i class="fas fa-trash"></i>
-                                                    </button>
                                                     @endif
-                                                </div>
+
+                                                    @if($isOpen && $item->status != 'cancelled')
+                                                        <div class="btn-group btn-group-xs" style="margin-top: 8px;">
+                                                            <button class="btn btn-xs btn-default btn-item-qty"
+                                                                    data-item-id="{{ $item->id }}"
+                                                                    data-qty="{{ $item->quantity }}"
+                                                                    title="Modifica quantità">
+                                                                <i class="fas fa-hashtag"></i>
+                                                            </button>
+                                                            <button class="btn btn-xs btn-default btn-item-price"
+                                                                    data-item-id="{{ $item->id }}"
+                                                                    data-price="{{ $item->unit_price }}"
+                                                                    title="Modifica prezzo">
+                                                                <i class="fas fa-euro-sign"></i>
+                                                            </button>
+                                                            <button class="btn btn-xs btn-info btn-item-details"
+                                                                    data-item-id="{{ $item->id }}"
+                                                                    data-notes="{{ $item->notes }}"
+                                                                    title="Modifica note">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                            <button class="btn btn-xs btn-warning btn-item-change-dish"
+                                                                    data-item-id="{{ $item->id }}"
+                                                                    title="Cambia piatto">
+                                                                <i class="fas fa-exchange-alt"></i>
+                                                            </button>
+                                                            @if($sale->items->where('status', '!=', 'cancelled')->count() > 1)
+                                                                <button class="btn btn-xs btn-danger btn-item-remove"
+                                                                        data-item-id="{{ $item->id }}"
+                                                                        title="Rimuovi">
+                                                                    <i class="fas fa-trash"></i>
+                                                                </button>
+                                                            @endif
+                                                        </div>
+                                                    @endif
+                                                </td>
+                                                @if($sale->autoconsumo)
+                                                    <td>{{ $item->autoconsumoUser->name }}</td>
                                                 @endif
-                                            </td>
-                                            @if($sale->autoconsumo)
-                                                <td>{{ $item->autoconsumoUser->name }}</td>
-                                            @endif
-                                            <td class="text-center">
-                                                <strong style="font-size: 16px;">{{ $item->quantity }}</strong>
-                                            </td>
-                                            <td class="text-end" style="font-weight: bold">
-                                                @php
-                                                    $originalPrice = $item->dish->price ?? $item->unit_price;
-                                                    $hasPriceChange = abs($item->unit_price - $originalPrice) > 0.001;
-                                                @endphp
-                                                @if($hasPriceChange)
-                                                     €{{ number_format($item->unit_price, 2, ',', '.') }}
-                                                <hr style="margin: 5px 0"/>
-                                                    <span class="badge badge-danger" style="text-decoration: line-through; font-size: 12px;">
+                                                <td class="text-center">
+                                                    <strong style="font-size: 16px;">{{ $item->quantity }}</strong>
+                                                </td>
+                                                <td class="text-end" style="font-weight: bold">
+                                                    @php
+                                                        $originalPrice = $item->dish->price ?? $item->unit_price;
+                                                        $hasPriceChange = abs($item->unit_price - $originalPrice) > 0.001;
+                                                    @endphp
+                                                    @if($hasPriceChange)
+                                                        €{{ number_format($item->unit_price, 2, ',', '.') }}
+                                                        <hr style="margin: 5px 0"/>
+                                                        <span class="badge badge-danger" style="text-decoration: line-through; font-size: 12px;">
                                                         <i class="fas fa-edit"></i> €{{ number_format($originalPrice, 2, ',', '.') }}
                                                     </span>
-                                                    <br>
-                                                    <small class="text-muted" style="font-weight: normal; font-size: 11px;">
-                                                        @if($item->addedBy)
-                                                            <i class="fas fa-user"></i> {{ $item->addedBy->name }}
-                                                        @endif
                                                         <br>
-                                                        <i class="fas fa-clock"></i> {{ $item->created_at->format('H:i') }}
-                                                    </small>
-                                                @else
-                                                    €{{ number_format($item->unit_price, 2, ',', '.') }}
-                                                @endif
-                                            </td>
-                                            <td class="text-end">
-                                                <strong style="font-size: 15px;">
-                                                    €{{ number_format($item->subtotal, 2, ',', '.') }}
-                                                </strong>
-                                            </td>
+                                                        <small class="text-muted" style="font-weight: normal; font-size: 11px;">
+                                                            @if($item->addedBy)
+                                                                <i class="fas fa-user"></i> {{ $item->addedBy->name }}
+                                                            @endif
+                                                            <br>
+                                                            <i class="fas fa-clock"></i> {{ $item->created_at->format('H:i') }}
+                                                        </small>
+                                                    @else
+                                                        €{{ number_format($item->unit_price, 2, ',', '.') }}
+                                                    @endif
+                                                </td>
+                                                <td class="text-end">
+                                                    <strong style="font-size: 15px;">
+                                                        €{{ number_format($item->subtotal, 2, ',', '.') }}
+                                                    </strong>
+                                                </td>
+                                            @endif
+
                                         </tr>
                                     @endforeach
                                 </tbody>
