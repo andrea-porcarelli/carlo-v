@@ -323,8 +323,8 @@ window._boSale = {
                                         @if($sale->autoconsumo)
                                             <th>Addebitato a</th>
                                         @endif
-                                        <th width="120" class="text-right">Prezzo Unit.</th>
-                                        <th width="120" class="text-right">Subtotale</th>
+                                        <th width="100" class="text-right">Prezzo Unit.</th>
+                                        <th width="100" class="text-right">Subtotale</th>
                                     </tr>
                                 </thead>
                                 <tbody>
