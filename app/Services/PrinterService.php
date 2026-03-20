@@ -1245,7 +1245,7 @@ class PrinterService implements PrinterServiceInterface
         $this->currentOperatorId = $printLog->user_id;
 
         return match ($printLog->print_type) {
-            'order' => $this->printToDevice($tableOrder, $printer, $tableOrder->items->toArray(), $printLog->operation),
+            'order' => $this->printToDevice($tableOrder, $printer, $tableOrder->items->all(), $printLog->operation),
             'marcia' => $this->printMarciaToDevice($tableOrder, $printer, $printLog->user_id),
             'preconto' => $this->printPrecontoToDevice($tableOrder, $printer, $printLog->user_id, $printLog->print_data['split_count'] ?? null),
             default => false,
