@@ -164,7 +164,18 @@ class TableOrdersManager {
                 <div class="table-item table-${tableClass}" data-table="${table.id}">
                     <div class="table-number">${table.table_number}</div>
                     ${table.has_active_order ? `
-                        <div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="table-total ${table.active_order.autoconsumo ? 'autoconsumo' : ''}">€${parseFloat(table.current_total).toFixed(2)}</div>
+                        ${(() => {
+                            const current = parseFloat(table.current_total);
+                            const remaining = parseFloat(table.remaining_total ?? current);
+                            const hasPaid = remaining < current - 0.005;
+                            if (hasPaid) {
+                                return `<div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="table-total ${table.active_order.autoconsumo ? 'autoconsumo' : ''}" style="line-height:1.2;">
+                                    <span style="text-decoration:line-through;font-size:0.75em;opacity:0.6;">€${current.toFixed(2)}</span><br>
+                                    <span>€${remaining.toFixed(2)}</span>
+                                </div>`;
+                            }
+                            return `<div title="${table.active_order.autoconsumo ? ' Autoconsumo' : ''}" class="table-total ${table.active_order.autoconsumo ? 'autoconsumo' : ''}">€${current.toFixed(2)}</div>`;
+                        })()}
                         <div class="table-timer" data-opened-at="${table.active_order.opened_at}">
                             <i class="fas fa-clock"></i> ${this.formatElapsedTime(table.active_order.opened_at)}
                         </div>

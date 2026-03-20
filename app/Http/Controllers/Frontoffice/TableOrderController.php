@@ -107,11 +107,21 @@ class TableOrderController extends Controller
     public function getTables(): JsonResponse
     {
         try {
-            $tables = RestaurantTable::with(['activeOrder.items.dish'])
+            $tables = RestaurantTable::with(['activeOrder.items.dish', 'activeOrder.precontoSplits'])
                 ->where('is_active', true)
                 ->orderBy('table_number')
                 ->get()
                 ->map(function ($table) {
+                    $order = $table->activeOrder;
+                    $currentTotal = $table->getCurrentTotal();
+                    $remainingTotal = $currentTotal;
+                    if ($order) {
+                        $paidSplits = $order->precontoSplits->where('status', 'paid');
+                        $paidSplitsTotal = round((float) $paidSplits->sum('total'), 2);
+                        $paidCoversTotal = round($paidSplits->sum('covers') * $order->getCoverChargePerPerson(), 2);
+                        $effectiveTotal = $order->hasDiscount() ? $order->getDiscountedTotal() : $currentTotal;
+                        $remainingTotal = max(0, round($effectiveTotal - $paidSplitsTotal, 2));
+                    }
                     return [
                         'id' => $table->id,
                         'table_number' => $table->table_number,
@@ -121,15 +131,16 @@ class TableOrderController extends Controller
                         'status' => $table->status,
                         'is_banco' => (bool) $table->is_banco,
                         'has_active_order' => $table->hasActiveOrder(),
-                        'current_total' => $table->getCurrentTotal(),
-                        'has_preconto' => $table->activeOrder?->preconto_requested_at !== null,
-                        'active_order' => $table->activeOrder ? [
-                            'id' => $table->activeOrder->id,
-                            'items_count' => $table->activeOrder->items->count(),
-                            'total_amount' => $table->activeOrder->total_amount,
-                            'opened_at' => $table->activeOrder->opened_at->toIso8601String(),
-                            'covers' => $table->activeOrder->covers,
-                            'autoconsumo' => $table->activeOrder->autoconsumo,
+                        'current_total' => $currentTotal,
+                        'remaining_total' => $remainingTotal,
+                        'has_preconto' => $order?->preconto_requested_at !== null,
+                        'active_order' => $order ? [
+                            'id' => $order->id,
+                            'items_count' => $order->items->count(),
+                            'total_amount' => $order->total_amount,
+                            'opened_at' => $order->opened_at->toIso8601String(),
+                            'covers' => $order->covers,
+                            'autoconsumo' => $order->autoconsumo,
                         ] : null,
                     ];
                 });
