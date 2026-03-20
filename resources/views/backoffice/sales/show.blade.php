@@ -1953,7 +1953,7 @@ window._boSale = {
                 sel.empty().append('<option value="">-- Seleziona tavolo --</option>');
                 if (Array.isArray(tables)) {
                     tables.forEach(function(t) {
-                        if (t.id != _boSale.tableId) {
+                        if (t.id != _boSale.tableId && t.status === 'free') {
                             var label = 'Tavolo ' + t.table_number;
                             if (t.status === 'open') label += ' (occupato)';
                             sel.append('<option value="' + t.id + '">' + label + '</option>');
