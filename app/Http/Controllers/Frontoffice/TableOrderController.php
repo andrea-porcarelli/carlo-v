@@ -1012,7 +1012,8 @@ class TableOrderController extends Controller
 
         $splits = $order->precontoSplits()->orderBy('created_at')->get();
         $paidTotal = $splits->where('status', 'paid')->sum('total');
-        $remaining = max(0, round((float) $order->total_amount - $paidTotal, 2));
+        $effectiveTotal = $order->hasDiscount() ? $order->getDiscountedTotal() : (float) $order->total_amount;
+        $remaining = max(0, round($effectiveTotal - $paidTotal, 2));
 
         return response()->json([
             'success' => true,
@@ -1056,12 +1057,13 @@ class TableOrderController extends Controller
                 return response()->json(['success' => false, 'message' => 'Split non valido per questo ordine'], 404);
             }
 
-            Jo ->update(['status' => 'paid', 'payment_method' => $paymentMethod, 'paid_at' => now()]);
+            $split->update(['status' => 'paid', 'payment_method' => $paymentMethod, 'paid_at' => now()]);
 
             // Check if all splits paid and no remaining balance
             $order->refresh();
             $paidTotal = $order->precontoSplits->where('status', 'paid')->sum('total');
-            $remaining = round((float) $order->total_amount - $paidTotal, 2);
+            $effectiveTotal = $order->hasDiscount() ? $order->getDiscountedTotal() : (float) $order->total_amount;
+            $remaining = round($effectiveTotal - $paidTotal, 2);
             $orderClosed = false;
 
             if ($remaining <= 0.01) {

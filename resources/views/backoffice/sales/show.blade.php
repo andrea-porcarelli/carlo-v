@@ -146,7 +146,7 @@ window._boSale = {
                                     <table class="table table-condensed" style="margin:0; font-size:12px; background:#fafafa;">
                                         <thead>
                                             <tr style="background:#e9ecef;">
-                                                <th colspan="3" style="padding:4px 8px;">
+                                                <th colspan="{{ $isOpen ? 4 : 3 }}" style="padding:4px 8px;">
                                                     <i class="fas fa-receipt"></i> Preconti
                                                 </th>
                                             </tr>
@@ -164,6 +164,7 @@ window._boSale = {
                                                 <td style="padding:3px 8px; text-align:right; color:#d9534f;">
                                                     &minus;€{{ number_format($split->total, 2, ',', '.') }}
                                                 </td>
+                                                @if($isOpen)<td></td>@endif
                                             </tr>
                                             @endforeach
                                             @foreach($pendingSplits as $split)
@@ -176,6 +177,16 @@ window._boSale = {
                                                 <td style="padding:3px 8px; text-align:right; color:#888;">
                                                     €{{ number_format($split->total, 2, ',', '.') }}
                                                 </td>
+                                                @if($isOpen)
+                                                <td style="padding:3px 8px;">
+                                                    <button class="btn btn-xs btn-success btn-incassa-split"
+                                                        data-split-id="{{ $split->id }}"
+                                                        data-split-total="{{ number_format($split->total, 2, ',', '.') }}"
+                                                        data-split-label="{{ $split->label ?? 'Preconto' }}">
+                                                        <i class="fas fa-cash-register"></i> Incassa
+                                                    </button>
+                                                </td>
+                                                @endif
                                             </tr>
                                             @endforeach
                                         </tbody>
@@ -1366,6 +1377,43 @@ window._boSale = {
         </div>
     </div>
 
+    <!-- Modal: Incassa Preconto Split -->
+    <div id="modalIncassaSplit" class="log-modal" onclick="if(event.target===this)toggleModal('modalIncassaSplit')">
+        <div class="log-modal-content" style="max-width:420px;">
+            <div class="log-modal-header" style="background:#5cb85c;">
+                <h5><i class="fas fa-cash-register"></i> Incassa Preconto</h5>
+                <button type="button" onclick="toggleModal('modalIncassaSplit')" class="log-modal-close">&times;</button>
+            </div>
+            <div class="log-modal-body">
+                <div class="alert alert-info" style="text-align:center;margin-bottom:15px;">
+                    <span id="splitModalLabel"></span><br>
+                    <strong>Importo: €<span id="splitModalTotal"></span></strong>
+                </div>
+                <form id="formIncassaSplit">
+                    <input type="hidden" id="splitModalId">
+                    <div class="form-group">
+                        <label><strong>Metodo di pagamento</strong></label>
+                        <div>
+                            <label class="radio-inline">
+                                <input type="radio" name="split_payment_method" value="contanti"> Contanti
+                            </label>
+                            <label class="radio-inline" style="margin-left:15px;">
+                                <input type="radio" name="split_payment_method" value="pos"> POS
+                            </label>
+                            <label class="radio-inline" style="margin-left:15px;">
+                                <input type="radio" name="split_payment_method" value="fattura"> Fattura
+                            </label>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalIncassaSplit')">Annulla</button>
+                        <button type="submit" class="btn btn-success" style="flex:2"><i class="fas fa-cash-register"></i> Conferma</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Chiudi Tavolo -->
     <div id="modalChiudiTavolo" class="log-modal" onclick="if(event.target===this)toggleModal('modalChiudiTavolo')">
         <div class="log-modal-content" style="max-width:460px;">
@@ -2189,6 +2237,40 @@ window._boSale = {
             boApi('PUT', '/api/tables/' + _boSale.tableId + '/covers', { covers: covers })
                 .done(function() { toggleModal('modalCoperti'); onSuccess('Coperti aggiornati!'); })
                 .fail(onError);
+        });
+
+        // ---- Incassa Preconto Split ----
+        $(document).on('click', '.btn-incassa-split', function() {
+            var splitId = $(this).data('split-id');
+            var splitTotal = $(this).data('split-total');
+            var splitLabel = $(this).data('split-label');
+            $('#splitModalId').val(splitId);
+            $('#splitModalLabel').text(splitLabel);
+            $('#splitModalTotal').text(splitTotal);
+            $('input[name="split_payment_method"]').prop('checked', false);
+            toggleModal('modalIncassaSplit');
+        });
+
+        $('#formIncassaSplit').on('submit', function(e) {
+            e.preventDefault();
+            if (!requireToken()) return;
+            var splitId = $('#splitModalId').val();
+            var method = $('input[name="split_payment_method"]:checked').val();
+            if (!method) { alert('Seleziona il metodo di pagamento'); return; }
+            var btn = $(this).find('[type=submit]').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+            boApi('POST', '/api/tables/' + _boSale.tableId + '/pay-split/' + splitId, { payment_method: method })
+                .done(function(data) {
+                    toggleModal('modalIncassaSplit');
+                    if (data.data && data.data.order_closed) {
+                        onSuccess('Conto chiuso completamente!');
+                    } else {
+                        onSuccess('Preconto incassato! Rimanente: €' + parseFloat(data.data.remaining || 0).toFixed(2));
+                    }
+                })
+                .fail(function(xhr) {
+                    onError(xhr);
+                    btn.prop('disabled', false).html('<i class="fas fa-cash-register"></i> Conferma');
+                });
         });
 
         // ---- Helper: carica piatti ----
