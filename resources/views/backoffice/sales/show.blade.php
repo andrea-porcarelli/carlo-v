@@ -46,8 +46,17 @@ window._boSale = {
         <div class="col-lg-4">
             <div class="panel panel-primary">
                 <div class="panel-heading">
-                    <h4 class="panel-title">
-                        <i class="fas fa-info-circle"></i> Informazioni Vendita
+                    <h4 class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="fas fa-info-circle"></i> Informazioni Vendita</span>
+                        @isset($sale->closed_at)
+                        @php
+                            $mins = $sale->opened_at->diffInMinutes($sale->closed_at);
+                            $durLabel = $mins < 60
+                                ? $mins . ' min'
+                                : (floor($mins / 60) . 'h' . ($mins % 60 > 0 ? ' ' . ($mins % 60) . 'min' : ''));
+                        @endphp
+                        <small style="font-weight:400; opacity:0.85;"><i class="fas fa-clock"></i> {{ $durLabel }}</small>
+                        @endisset
                     </h4>
                 </div>
                 <div class="panel-body">
@@ -81,16 +90,6 @@ window._boSale = {
                             <tr>
                                 <td><strong>Data Chiusura:</strong></td>
                                 <td>{{ $sale->closed_at->format('d/m/Y H:i:s') }}</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Durata:</strong></td>
-                                <td>
-                                    <strong>{{ $sale->opened_at->diffInMinutes($sale->closed_at) }} minuti</strong>
-                                    <br>
-                                    <small class="text-muted">
-                                        ({{ $sale->opened_at->diffForHumans($sale->closed_at, true) }})
-                                    </small>
-                                </td>
                             </tr>
                             @endisset
                             <tr>
@@ -335,25 +334,19 @@ window._boSale = {
                                                 <td colspan="5"> ----- SEGUE ----- </td>
                                             @else
                                                 <td class="text-center" style="vertical-align:middle;">
-                                                    <span style="display:inline-flex; align-items:center; justify-content:center; width:42px; height:42px; border-radius:50%; background:#1a1a2e; color:#fff; font-size:20px; font-weight:800; line-height:1;">{{ $item->quantity }}</span>
+                                                    <span style="font-size:18px; font-weight:700; color:#333;">{{ $item->quantity }}</span>
                                                 </td>
-                                                <td>
+                                                <td style="padding-top:10px; padding-bottom:10px;">
                                                     @php
                                                         $originalPrice = $item->dish->price ?? $item->unit_price;
                                                         $hasPriceChange = abs($item->unit_price - $originalPrice) > 0.001;
                                                     @endphp
                                                     <div>
-                                                        <strong style="font-size: 17px; letter-spacing: 0.2px;">{{ $item->dish->label }}</strong>
+                                                        <strong style="font-size: 15px;">{{ $item->dish->label }}</strong>
                                                         @if($hasPriceChange)
                                                             <span class="badge badge-warning ml-2" title="Prezzo modificato: da €{{ number_format($originalPrice, 2, ',', '.') }} a €{{ number_format($item->unit_price, 2, ',', '.') }}">
                                                             <i class="fas fa-euro-sign"></i> Modificato
                                                         </span>
-                                                        @endif
-                                                        @if($item->dish->category)
-                                                            <br>
-                                                            <small class="text-muted">
-                                                                <i class="fas fa-tag"></i> {{ $item->dish->category->label }}
-                                                            </small>
                                                         @endif
                                                     </div>
 
