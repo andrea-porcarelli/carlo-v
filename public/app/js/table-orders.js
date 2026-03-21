@@ -3751,15 +3751,17 @@ class TableOrdersManager {
                 : '';
             return `<div class="preconto-item-row" data-item-id="${item.id}">
                 <span class="preconto-item-name">${name}${alreadyBadge}</span>
-                <div class="preconto-qty-ctrl">
-                    <button type="button" class="pqi-dec" data-item-id="${item.id}">−</button>
-                    <input type="number" class="preconto-item-qty-input"
-                           value="0" min="0" max="${avail}"
-                           data-item-id="${item.id}" data-unit-price="${unitPrice}" data-max="${avail}">
-                    <button type="button" class="pqi-inc" data-item-id="${item.id}">+</button>
-                    <span class="pqi-max">/ ${avail}</span>
+                <div style="display: flex; flex-direction: column">
+                    <div class="preconto-qty-ctrl">
+                        <button type="button" class="pqi-dec" data-item-id="${item.id}">−</button>
+                        <input type="number" class="preconto-item-qty-input"
+                               value="0" min="0" max="${avail}"
+                               data-item-id="${item.id}" data-unit-price="${unitPrice}" data-max="${avail}">
+                        <button type="button" class="pqi-inc" data-item-id="${item.id}">+</button>
+                        <span class="pqi-max">/ ${avail}</span>
+                    </div>
+                    <span class="preconto-item-price" id="pcp_${item.id}">€${subtotal}</span>
                 </div>
-                <span class="preconto-item-price" id="pcp_${item.id}">€${subtotal}</span>
             </div>`;
         }).join('');
 
