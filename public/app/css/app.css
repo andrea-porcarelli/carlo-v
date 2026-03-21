@@ -572,9 +572,8 @@ body {
 .receipt-item-notes {
     font-style: italic;
     color: #856404;
-    margin-top: 6px;
     font-size: 0.75rem;
-    padding: 4px 8px;
+    padding: 3px 6px;
     background: #fff3cd;
     border-left: 3px solid #ffc107;
     border-radius: 3px;
@@ -651,18 +650,16 @@ body {
 .btn-edit-item:hover { background: #138496; }
 
 .receipt-item-actions {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
     display: flex;
     gap: 4px;
     align-items: center;
+    justify-content: flex-end;
 }
 
 .receipt-item {
-    position: relative;
-    padding-right: 76px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 /* Compact action buttons for modify overlay */
@@ -1085,7 +1082,6 @@ body {
     .receipt-item { padding: 4px 8px; }
     .btn-remove-item,
     .btn-edit-item { width: 26px; height: 26px; font-size: 0.73rem; }
-    .receipt-item { padding-right: 66px; }
 
     /* — Empty state (meno spazio verticale) — */
     .empty-state { padding: 30px 20px; }
