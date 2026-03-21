@@ -321,8 +321,6 @@
 }
 
 .preconto-items-list {
-    max-height: 220px;
-    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     padding: 8px 0;
@@ -563,9 +561,6 @@
         padding: 14px 14px;
     }
 
-    .preconto-items-list {
-        max-height: 35vh;
-    }
 
     /* Touch target più grandi su mobile */
     .pqi-dec, .pqi-inc {
