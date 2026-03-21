@@ -140,6 +140,7 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    touch-action: pan-y;
     flex: 1;
 }
 
@@ -358,6 +359,7 @@
     justify-content: center;
     line-height: 1;
     padding: 0;
+    touch-action: manipulation;
 }
 
 .pqi-dec:hover, .pqi-inc:hover {
