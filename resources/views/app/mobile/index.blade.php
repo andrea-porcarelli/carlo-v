@@ -69,7 +69,7 @@
 
                 <!-- ORDINE tab -->
                 <div id="mobileOverlayOrderTab" style="height:100%; display:flex; flex-direction:column; overflow:hidden;">
-                    <div style="flex:1; background:white; border-radius:8px 8px 0 0; padding:10px;" id="modifyReceiptItems">
+                    <div style="flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:white; border-radius:8px 8px 0 0; padding:10px;" id="modifyReceiptItems">
                         <div class="empty-state">
                             <i class="fas fa-shopping-cart"></i>
                             <p>Nessun ordine</p>

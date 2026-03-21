@@ -1365,14 +1365,14 @@ input, textarea, select {
 
 .mobile-actions-bar .action-btn-v {
     flex: none;
-    min-height: 52px;
-    font-size: 0.62rem;
+    min-height: 45px;
+    font-size: 0.60rem;
     padding: 7px 4px;
-    border-radius: 5px;
+    border-radius: 2px;
     max-width: none;
     white-space: normal;
     text-align: center;
-    line-height: 1.2;
+    line-height: 1;
 }
 
 .mobile-actions-bar .action-btn-v i {
