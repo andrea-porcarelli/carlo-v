@@ -642,7 +642,7 @@ class TableOrdersManager {
             <div class="receipt-item" data-item-id="${item.id}">
                 <div style="font-size:13px;font-weight:600;line-height:1.3; color:#3d3d3d;">
                     ${item.quantity} × ${item.dish_name}
-                    ${item.notes ? `<br /><div class="receipt-item-notes"><i class="fas fa-sticky-note me-1"></i>${item.notes}</div>` : ''}
+                    ${item.notes ? `<br /><div class="receipt-item-notes"> ${item.notes}</div>` : ''}
                     ${item.extras && Object.keys(item.extras).length > 0 ? `
                         <div class="receipt-item-extras">
                             ${Object.entries(item.extras).map(([name, price]) =>
