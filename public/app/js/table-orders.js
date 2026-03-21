@@ -616,7 +616,7 @@ class TableOrdersManager {
                 itemsHtml += `
                     <div style="display:flex;align-items:center;gap:6px;margin:2px 0;user-select:none;">
                         <div style="flex:1;height:2px;background:#dc3545;"></div>
-                        <span style="font-size:0.7rem;font-weight:800;color:#dc3545;letter-spacing:1px;white-space:nowrap;">★ SEGUE ★</span>
+                        <span style="font-size:1.2rem;font-weight:800;color:#dc3545;letter-spacing:1px;white-space:nowrap;">★ SEGUE ★</span>
                         <div style="flex:1;height:2px;background:#dc3545;"></div>
                         <button onclick="tableOrdersManager.removeSegueItem(${item.id})"
                             style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:0.9rem;padding:0 2px;line-height:1;" title="Rimuovi segue">×</button>
