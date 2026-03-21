@@ -1501,3 +1501,7 @@ input, textarea, select {
 .mobile-body .notification {
     top: 80px;
 }
+.preconto-option-label {
+    padding: 6px;
+    transition: none;
+}

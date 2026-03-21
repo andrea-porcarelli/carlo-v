@@ -184,7 +184,7 @@
             </h4>
             <p style="color:#aaa; font-size:0.83rem; margin-bottom:18px; text-align:center;">Inserisci la password admin per accedere al backoffice</p>
             <div style="margin-bottom:10px;">
-                <input type="password" id="adminAuthPassword" placeholder="Password admin"
+                <input type="password" id="adminAuthPassword" placeholder="Password admin" inputmode="numeric"
                     style="width:100%; padding:11px 14px; background:#2a2a2a; border:1px solid #555; border-radius:4px; color:#fff; font-size:1rem; box-sizing:border-box;">
             </div>
             <div id="adminAuthError" style="display:none; background:rgba(255,193,7,0.1); border:1px solid #ffc107; border-radius:4px; padding:9px 13px; color:#ffc107; font-size:0.83rem; margin-bottom:12px;">
