@@ -639,10 +639,9 @@ class TableOrdersManager {
             }
 
             itemsHtml += `
-            <div class="receipt-item${item._isNew ? ' receipt-item-new' : ''}" data-item-id="${item.id}" style="${item._isNew ? 'border-left:3px solid #28a745;' : ''}">
-                <div style="font-size:13px;font-weight:600;line-height:1.3;">
+            <div class="receipt-item" data-item-id="${item.id}">
+                <div style="font-size:13px;font-weight:600;line-height:1.3; color:#3d3d3d;">
                     ${item.quantity} × ${item.dish_name}
-                    ${item._isNew ? '<span style="background:#28a745;color:#3d3d3d;font-size:0.6rem;padding:1px 4px;border-radius:3px;margin-left:4px;">NUOVO</span>' : ''}
                     ${item.notes ? `<br /><div class="receipt-item-notes"><i class="fas fa-sticky-note me-1"></i>${item.notes}</div>` : ''}
                     ${item.extras && Object.keys(item.extras).length > 0 ? `
                         <div class="receipt-item-extras">
