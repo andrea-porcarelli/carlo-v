@@ -80,18 +80,6 @@
     width: 90%;
     max-width: 500px;
     box-shadow: 0 10px 40px rgba(220, 53, 69, 0.3);
-    animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-    from {
-        transform: translateY(-50px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
 }
 
 .operator-modal-header {
