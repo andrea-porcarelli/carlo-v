@@ -60,7 +60,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div id="modifyReceiptItems" style="flex:1;overflow-y:auto;padding:12px;">
+                            <div id="modifyReceiptItems" style="flex:1;padding:12px;">
                                 <div class="empty-state">
                                     <i class="fas fa-shopping-cart"></i>
                                     <p>Nessun ordine</p>
@@ -149,7 +149,7 @@
                         <button style="position: absolute; top: 10px; right: 10px; background: #dc3545; border: none; color: white; width: 30px; height: 30px; cursor: pointer;" id="closeReceiptBtn">×</button>
                     </div>
 
-                    <div style="padding: 20px; max-height: 300px; overflow-y: auto;" id="receiptItems">
+                    <div style="padding: 20px;" id="receiptItems">
                         <div class="empty-state">
                             <i class="fas fa-shopping-cart"></i>
                             <p>Nessun ordine</p>
