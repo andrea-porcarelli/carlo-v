@@ -1502,6 +1502,6 @@ input, textarea, select {
     top: 80px;
 }
 .preconto-option-label {
-    padding: 6px;
-    transition: none;
+    padding: 6px !important;
+    transition: none !important;
 }

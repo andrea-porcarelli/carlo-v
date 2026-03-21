@@ -66,28 +66,6 @@
                 </div>
             </div>
 
-            <!-- Abbuono — visibile per tutti i tipi di preconto -->
-            <div class="preconto-discount-row">
-                <span style="font-weight:600;font-size:0.9rem;">Abbuono:</span>
-                <div class="preconto-discount-type-btns">
-                    <label class="preconto-discount-type-label">
-                        <input type="radio" name="precontoDiscountType" value="none" checked> Nessuno
-                    </label>
-                    <label class="preconto-discount-type-label">
-                        <input type="radio" name="precontoDiscountType" value="value"> € Valore
-                    </label>
-                    <label class="preconto-discount-type-label">
-                        <input type="radio" name="precontoDiscountType" value="percent"> % Percentuale
-                    </label>
-                </div>
-                <div id="precontoDiscountInputWrap" style="display:none;margin-top:6px;align-items:center;gap:6px;">
-                    <input type="number" id="preconto_discount_amount" value="0" min="0" step="0.01"
-                           style="width:90px;text-align:center;border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;"
-                           oninput="if(this.value<0)this.value=0;">
-                    <span id="precontoDiscountSymbol" style="font-weight:600;color:#dc3545;">€</span>
-                </div>
-            </div>
-
             <div id="precontoPartialTotalRow" class="preconto-partial-total" style="display:none;">
                 Totale parziale: <strong id="precontoPartialTotal">€0.00</strong>
             </div>
