@@ -633,7 +633,7 @@ class TableOrdersManager {
                         style="display:flex;align-items:center;gap:6px;margin:2px 0;cursor:pointer;opacity:0.35;user-select:none;"
                         title="Inserisci segue">
                         <div style="flex:1;height:1px;background:#6c757d;"></div>
-                        <span style="font-size:0.75rem;color:#6c757d;white-space:nowrap;">+ segue</span>
+                        <span style="font-size:0.75rem;color:#565e65;white-space:nowrap;">+ segue</span>
                         <div style="flex:1;height:1px;background:#6c757d;"></div>
                     </div>`;
             }
