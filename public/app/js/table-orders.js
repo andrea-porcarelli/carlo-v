@@ -642,21 +642,21 @@ class TableOrdersManager {
             <div class="receipt-item${item._isNew ? ' receipt-item-new' : ''}" data-item-id="${item.id}" style="${item._isNew ? 'border-left:3px solid #28a745;' : ''}">
                 <div style="font-size:13px;font-weight:600;line-height:1.3;">
                     ${item.quantity} × ${item.dish_name}
-                    ${item._isNew ? '<span style="background:#28a745;color:white;font-size:0.6rem;padding:1px 4px;border-radius:3px;margin-left:4px;">NUOVO</span>' : ''}
+                    ${item._isNew ? '<span style="background:#28a745;color:#3d3d3d;font-size:0.6rem;padding:1px 4px;border-radius:3px;margin-left:4px;">NUOVO</span>' : ''}
+                    ${item.notes ? `<br /><div class="receipt-item-notes"><i class="fas fa-sticky-note me-1"></i>${item.notes}</div>` : ''}
+                    ${item.extras && Object.keys(item.extras).length > 0 ? `
+                        <div class="receipt-item-extras">
+                            ${Object.entries(item.extras).map(([name, price]) =>
+                    `<span><i class="fas fa-plus-circle me-1"></i>${name} (+€${parseFloat(price).toFixed(2)})</span>`
+                     ).join(' ')}
+                        </div>
+                    ` : ''}
+                    ${item.removals && item.removals.length > 0 ? `
+                        <div class="receipt-item-removals">
+                            ${item.removals.map(removal => `<span><i class="fas fa-minus-circle me-1"></i>${removal}</span>`).join(' ')}
+                        </div>
+                        ` : ''}
                 </div>
-                ${item.notes ? `<div class="receipt-item-notes"><i class="fas fa-sticky-note me-1"></i>${item.notes}</div>` : ''}
-                ${item.extras && Object.keys(item.extras).length > 0 ? `
-                    <div class="receipt-item-extras">
-                        ${Object.entries(item.extras).map(([name, price]) =>
-                            `<span><i class="fas fa-plus-circle me-1"></i>${name} (+€${parseFloat(price).toFixed(2)})</span>`
-                        ).join(' ')}
-                    </div>
-                ` : ''}
-                ${item.removals && item.removals.length > 0 ? `
-                    <div class="receipt-item-removals">
-                        ${item.removals.map(removal => `<span><i class="fas fa-minus-circle me-1"></i>${removal}</span>`).join(' ')}
-                    </div>
-                ` : ''}
                 <div class="receipt-item-actions">
                     <div style="display:flex;gap:4px;">
                         <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
