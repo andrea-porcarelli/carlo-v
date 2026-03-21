@@ -646,6 +646,13 @@ class TableOrdersManager {
                     ${item.notes ? `<br /><div class="receipt-item-notes"><i class="fas fa-sticky-note me-1"></i>${item.notes}</div>` : ''}
                 </div>
                 <div class="receipt-item-details">
+
+                    <div class="receipt-item-actions">
+                        <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
+                        ${nonSegueItems.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>` : ''}
+                    </div>
                     <div class="quantity-controls">
                         <span class="receipt-item-price">€${parseFloat(item.subtotal).toFixed(2)}</span>
                         <br />
@@ -662,12 +669,6 @@ class TableOrdersManager {
                             ${item.removals.map(removal => `<span><i class="fas fa-minus-circle me-1"></i>${removal}</span>`).join(', ')}
                         </div>
                     ` : ''}
-                </div>
-                <div class="receipt-item-actions">
-                    <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
-                    ${nonSegueItems.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
-                        <i class="fas fa-trash"></i>
-                    </button>` : ''}
                 </div>
             </div>`;
         });
