@@ -640,33 +640,29 @@ class TableOrdersManager {
 
             itemsHtml += `
             <div class="receipt-item${item._isNew ? ' receipt-item-new' : ''}" data-item-id="${item.id}" style="${item._isNew ? 'border-left:3px solid #28a745;' : ''}">
-                <div style="display:flex;align-items:baseline;gap:6px;">
-                    <span style="font-size:13px;font-weight:600;flex:1;line-height:1.3;">${item.quantity} × ${item.dish_name}</span>
-                    ${item._isNew ? '<span style="background:#28a745;color:white;font-size:0.6rem;padding:1px 4px;border-radius:3px;white-space:nowrap;flex-shrink:0;">NUOVO</span>' : ''}
+                <div style="font-size:13px;font-weight:600;line-height:1.3;">
+                    ${item.quantity} × ${item.dish_name}
+                    ${item._isNew ? '<span style="background:#28a745;color:white;font-size:0.6rem;padding:1px 4px;border-radius:3px;margin-left:4px;">NUOVO</span>' : ''}
                 </div>
-                <div style="display:flex;align-items:flex-start;gap:8px;">
-                    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">
-                        ${item.notes ? `<div class="receipt-item-notes"><i class="fas fa-sticky-note me-1"></i>${item.notes}</div>` : ''}
-                        ${item.extras && Object.keys(item.extras).length > 0 ? `
-                            <div class="receipt-item-extras">
-                                ${Object.entries(item.extras).map(([name, price]) =>
-                                    `<span><i class="fas fa-plus-circle me-1"></i>${name} (+€${parseFloat(price).toFixed(2)})</span>`
-                                ).join(' ')}
-                            </div>
-                        ` : ''}
-                        ${item.removals && item.removals.length > 0 ? `
-                            <div class="receipt-item-removals">
-                                ${item.removals.map(removal => `<span><i class="fas fa-minus-circle me-1"></i>${removal}</span>`).join(' ')}
-                            </div>
-                        ` : ''}
+                ${item.notes ? `<div class="receipt-item-notes"><i class="fas fa-sticky-note me-1"></i>${item.notes}</div>` : ''}
+                ${item.extras && Object.keys(item.extras).length > 0 ? `
+                    <div class="receipt-item-extras">
+                        ${Object.entries(item.extras).map(([name, price]) =>
+                            `<span><i class="fas fa-plus-circle me-1"></i>${name} (+€${parseFloat(price).toFixed(2)})</span>`
+                        ).join(' ')}
                     </div>
-                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
-                        <div class="receipt-item-actions">
-                            <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
-                            ${nonSegueItems.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})" title="Rimuovi piatto"><i class="fas fa-trash"></i></button>` : ''}
-                        </div>
-                        <span class="receipt-item-price">€${parseFloat(item.subtotal).toFixed(2)}</span>
+                ` : ''}
+                ${item.removals && item.removals.length > 0 ? `
+                    <div class="receipt-item-removals">
+                        ${item.removals.map(removal => `<span><i class="fas fa-minus-circle me-1"></i>${removal}</span>`).join(' ')}
                     </div>
+                ` : ''}
+                <div class="receipt-item-actions">
+                    <div style="display:flex;gap:4px;">
+                        <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
+                        ${nonSegueItems.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})" title="Rimuovi piatto"><i class="fas fa-trash"></i></button>` : ''}
+                    </div>
+                    <span class="receipt-item-price">€${parseFloat(item.subtotal).toFixed(2)}</span>
                 </div>
             </div>`;
         });
