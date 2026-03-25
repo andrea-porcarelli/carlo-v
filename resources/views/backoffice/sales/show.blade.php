@@ -1078,6 +1078,128 @@ window._boSale = {
         </div>
     </div>
 
+    <!-- Cash Drawer Logs Section -->
+    <div class="row mt-4">
+        <div class="col-xs-12">
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h4 class="panel-title">
+                        <i class="fa fa-money"></i> Log Cassa Automatica
+                        <span class="label label-default" style="margin-left: 8px;">{{ $cashDrawerLogs->count() }} eventi</span>
+                        @if($cashDrawerLogs->where('event_type', 'error')->count() > 0)
+                            <span class="label label-danger" style="margin-left: 4px;">{{ $cashDrawerLogs->where('event_type', 'error')->count() }} errori</span>
+                        @endif
+                        @if($cashDrawerLogs->where('event_type', 'completed')->count() > 0)
+                            <span class="label label-success" style="margin-left: 4px;"><i class="fa fa-check"></i> Pagato</span>
+                        @endif
+                        @if($cashDrawerLogs->where('event_type', 'cancel')->count() > 0)
+                            <span class="label label-warning" style="margin-left: 4px;"><i class="fa fa-ban"></i> Annullato</span>
+                        @endif
+                    </h4>
+                </div>
+                <div class="panel-body p-0">
+                    @if($cashDrawerLogs->count() > 0)
+                        <div class="table-responsive">
+                            <table class="table table-condensed table-hover table-striped">
+                                <thead>
+                                    <tr class="active">
+                                        <th width="140">Data/Ora</th>
+                                        <th width="200">Operation ID</th>
+                                        <th width="120" class="text-center">Evento</th>
+                                        <th>Dettagli</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($cashDrawerLogs as $cdLog)
+                                        @php
+                                            $badgeClass = match($cdLog->event_type) {
+                                                'start'     => 'label-info',
+                                                'completed' => 'label-success',
+                                                'cancel'    => 'label-warning',
+                                                'error'     => 'label-danger',
+                                                default     => 'label-default',
+                                            };
+                                            $badgeIcon = match($cdLog->event_type) {
+                                                'start'     => 'fa-play-circle',
+                                                'completed' => 'fa-check-circle',
+                                                'cancel'    => 'fa-ban',
+                                                'error'     => 'fa-exclamation-triangle',
+                                                default     => 'fa-circle',
+                                            };
+                                            $payload = $cdLog->payload ?? [];
+                                        @endphp
+                                        <tr>
+                                            <td>
+                                                <span>{{ $cdLog->created_at->format('d/m/Y') }}</span><br>
+                                                <strong>{{ $cdLog->created_at->format('H:i:s') }}</strong>
+                                            </td>
+                                            <td>
+                                                <code style="font-size:11px; word-break:break-all;">
+                                                    {{ $cdLog->operation_id ?? '—' }}
+                                                </code>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="label {{ $badgeClass }}">
+                                                    <i class="fa {{ $badgeIcon }}"></i>
+                                                    {{ ucfirst($cdLog->event_type) }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if($cdLog->event_type === 'start')
+                                                    @php $amount = $payload['amount'] ?? null; @endphp
+                                                    @if($amount !== null)
+                                                        Importo richiesto: <strong>€{{ number_format($amount, 2) }}</strong>
+                                                    @endif
+
+                                                @elseif($cdLog->event_type === 'completed')
+                                                    @php $details = $payload['payment_details'] ?? []; @endphp
+                                                    @if(!empty($details))
+                                                        Inserito: <strong>€{{ number_format(($details['inserted'] ?? 0) / 100, 2) }}</strong>
+                                                        &nbsp;·&nbsp;
+                                                        Resto: <strong>€{{ number_format(($details['rest'] ?? 0) / 100, 2) }}</strong>
+                                                        @if(isset($details['status']))
+                                                            &nbsp;·&nbsp;
+                                                            <span class="label label-success">{{ $details['status'] }}</span>
+                                                        @endif
+                                                    @else
+                                                        Pagamento completato
+                                                    @endif
+
+                                                @elseif($cdLog->event_type === 'cancel')
+                                                    Transazione annullata dall'operatore
+
+                                                @elseif($cdLog->event_type === 'error')
+                                                    @php $resp = $payload['response'] ?? []; @endphp
+                                                    <span class="text-danger">
+                                                        <i class="fa fa-exclamation-triangle"></i>
+                                                        Errore comunicazione con la cassa
+                                                        @if(!empty($resp))
+                                                            &nbsp;—&nbsp;<small>{{ json_encode($resp) }}</small>
+                                                        @endif
+                                                    </span>
+
+                                                @else
+                                                    @if(!empty($payload))
+                                                        <small><code>{{ json_encode($payload) }}</code></small>
+                                                    @endif
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="alert alert-success text-center" style="margin: 15px;">
+                            <i class="fa fa-info-circle"></i>
+                            Nessun log cassa automatica registrato per questa vendita.
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Print History Modal -->
     <div id="printHistoryModal" class="log-modal" onclick="if(event.target === this) toggleModal('printHistoryModal')">
         <div class="log-modal-content">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Backoffice;
 
 use App\Facades\Utils;
+use App\Models\CashDrawerLog;
 use App\Models\PrintLog;
 use App\Models\TableOrder;
 use App\Services\TableOrderLoggerService;
@@ -116,7 +117,12 @@ class SalesController extends BaseController
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('backoffice.sales.show', compact('sale', 'logs', 'printLogs'));
+        // Load cash drawer logs for this sale
+        $cashDrawerLogs = CashDrawerLog::where('table_order_id', $id)
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        return view('backoffice.sales.show', compact('sale', 'logs', 'printLogs', 'cashDrawerLogs'));
     }
 
     /**
