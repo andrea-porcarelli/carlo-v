@@ -111,7 +111,6 @@ interface PrinterServiceInterface
     /**
      * Send ESC/POS pulse to open cash drawer connected to the given printer.
      */
-    public function openCashDrawer(Printer $printer, float $amount, string $opName): array;
 
     public function pollCashDrawer(Printer $printer, string $operationId): array;
 

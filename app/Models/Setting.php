@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Facades\Utils;
 use App\Models\Printer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -25,7 +26,7 @@ class Setting extends Model
     public static function get(string $key, mixed $default = null): mixed
     {
         $setting = self::where('key', $key)->first();
-
+        Utils::queryLog(self::where('key', $key));
         if (!$setting) {
             return $default;
         }
