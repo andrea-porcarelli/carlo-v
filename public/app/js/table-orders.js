@@ -1659,6 +1659,14 @@ class TableOrdersManager {
             const reason = await this._showRemoveReasonModal();
             if (!reason) return; // user cancelled
 
+            let auth;
+            try {
+                auth = await operatorAuthManager.requestAuth();
+                if (!auth) return;
+            } catch {
+                return;
+            }
+
             const item = this.modifySession.items.find(i => i.id === itemId);
             if (!item) return;
 
@@ -1666,7 +1674,7 @@ class TableOrdersManager {
                 this.modifySession.items = this.modifySession.items.filter(i => i.id !== itemId);
                 this.modifySession.pendingAdd = this.modifySession.pendingAdd.filter(i => i._localId !== itemId);
             } else {
-                this.modifySession.pendingRemove.push({ id: itemId, reason });
+                this.modifySession.pendingRemove.push({ id: itemId, reason, authToken: auth.token });
                 this.modifySession.items = this.modifySession.items.filter(i => i.id !== itemId);
             }
 
@@ -3532,7 +3540,7 @@ class TableOrdersManager {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': csrfToken,
-                    'X-Operator-Token': token,
+                    'X-Operator-Token': removal.authToken ?? token,
                 },
                 body: JSON.stringify({ reason: removal.reason }),
             });
