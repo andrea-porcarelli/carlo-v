@@ -509,9 +509,13 @@ class PrinterService implements PrinterServiceInterface
                     $grouped[$printerId]['items'][] = $item;
                 } else {
                     Log::warning('Articolo senza stampante configurata', [
-                        'item_id' => $item->id,
-                        'dish_id' => $item->dish_id,
-                        'category_id' => $item->dish->category_id ?? null
+                        'item_id'     => $item->id,
+                        'dish_id'     => $item->dish_id,
+                        'category_id' => $item->dish->category_id ?? null,
+                        'category'    => $item->dish->category?->toArray(),
+                        'printer'     => $printer?->toArray(),
+                        'is_active'   => $printer?->is_active,
+                        'ip'          => $printer?->ip,
                     ]);
                 }
             }
