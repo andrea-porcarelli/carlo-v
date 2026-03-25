@@ -495,7 +495,7 @@ class PrinterService implements PrinterServiceInterface
                 // Ottieni la stampante dalla categoria del piatto
                 $printer = $item->dish->category->printer ?? null;
 
-                if ($printer && $printer->is_active && !empty($ip)) {
+                if ($printer && $printer->is_active && !empty($printer->ip)) {
                     $printerId = $printer->id;
                     $lastPrinterId = $printerId;
 
