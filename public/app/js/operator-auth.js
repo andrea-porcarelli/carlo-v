@@ -38,7 +38,7 @@ const operatorAuthManager = {
         });
 
         // Hide error on input change
-        $('#operatorPassword').on('input', function() {
+        $('#operatorPin').on('input', function() {
             $('#operatorAuthError').hide();
         });
     },
@@ -61,9 +61,9 @@ const operatorAuthManager = {
     showModal(callback, resolve, reject) {
         this.pendingCallback = { callback, resolve, reject };
         $('#operatorAuthModal').show();
-        $('#operatorPassword').focus();
+        $('#operatorPin').focus();
         $('#operatorAuthError').hide();
-        $('#operatorPassword').val('');
+        $('#operatorPin').val('');
     },
 
     /**
@@ -71,7 +71,7 @@ const operatorAuthManager = {
      */
     closeModal() {
         $('#operatorAuthModal').hide();
-        $('#operatorPassword').val('');
+        $('#operatorPin').val('');
         $('#operatorAuthError').hide();
 
         if (this.pendingCallback && this.pendingCallback.reject) {
@@ -84,7 +84,7 @@ const operatorAuthManager = {
      * Handle authentication form submission
      */
     async handleAuthentication() {
-        const password = $('#operatorPassword').val();
+        const password = $('#operatorPin').val();
 
         if (!password) {
             this.showError('Inserisci la password');
@@ -126,7 +126,7 @@ const operatorAuthManager = {
 
                 // Close modal (this will set pendingCallback to null)
                 $('#operatorAuthModal').hide();
-                $('#operatorPassword').val('');
+                $('#operatorPin').val('');
                 $('#operatorAuthError').hide();
                 this.pendingCallback = null;
 

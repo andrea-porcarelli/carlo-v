@@ -23,11 +23,12 @@
                     </label>
                     <input
                         type="password"
-                        id="operatorPassword"
+                        id="operatorPin"
+                        name="operatorPin"
                         class="operator-form-control"
                         placeholder="Inserisci la tua password"
                         required
-                        autocomplete="off"
+                        autocomplete="new-password"
                     >
                 </div>
 

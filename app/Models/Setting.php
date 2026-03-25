@@ -30,7 +30,7 @@ class Setting extends Model
         if (!$setting) {
             return $default;
         }
-        Log::info($setting->value);
+        Log::info(__LINE__ . ' ' . $key . ' : ' . $setting->value);
 
         return self::castValue($setting->value, $setting->type);
     }
