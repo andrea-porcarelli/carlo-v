@@ -495,7 +495,7 @@ class PrinterService implements PrinterServiceInterface
                 // Ottieni la stampante dalla categoria del piatto
                 $printer = $item->dish->category->printer ?? null;
 
-                if ($printer && $printer->is_active && !empty($printer->ip)) {
+                if ($printer && $printer->is_active && !empty($ip)) {
                     $printerId = $printer->id;
                     $lastPrinterId = $printerId;
 
@@ -705,7 +705,7 @@ class PrinterService implements PrinterServiceInterface
                 return false;
             }
 
-            if (!$printer->is_active || empty($printer->ip)) {
+            if (!$printer->is_active || empty($ip)) {
                 Log::error('Stampante PreConto non attiva o senza IP', ['printer_id' => $printer->id]);
                 return false;
             }
@@ -964,13 +964,13 @@ class PrinterService implements PrinterServiceInterface
                 Log::error('Stampante PreConto non configurata');
                 return false;
             }
-            if (!$printer->is_active || empty($printer->ip)) {
+            if (!$printer->is_active || empty($ip)) {
                 Log::error('Stampante PreConto non attiva o senza IP', ['printer_id' => $printer->id]);
                 return false;
             }
 
             $tableOrder->load(['restaurantTable']);
-            $printerIp = $printer->ip;
+            $printerIp = $ip;
             $operator = User::find($operatorId);
             $operatorName = $operator?->name ?? 'N/D';
             $tableNumber = $tableOrder->restaurantTable->table_number ?? 'N/D';
@@ -1090,7 +1090,7 @@ class PrinterService implements PrinterServiceInterface
     public function printComunica(Printer $printer, string $message, int $operatorId, ?TableOrder $tableOrder = null): bool
     {
         try {
-            $printerIp = $printer->ip;
+            $printerIp = $ip;
 
             // Verifica se la stampante è raggiungibile
             if (!$this->isPrinterReachable($printerIp)) {
@@ -1203,7 +1203,7 @@ class PrinterService implements PrinterServiceInterface
 
         } catch (\Exception $e) {
             Log::error('Errore durante la stampa comunicazione', [
-                'printer_ip' => $printer->ip ?? 'N/D',
+                'printer_ip' => $ip ?? 'N/D',
                 'error' => $e->getMessage()
             ]);
 
@@ -1726,12 +1726,12 @@ class PrinterService implements PrinterServiceInterface
     /**
      * Send "Apertura porta" command (tipo=55) to VNE Automatic Cash via HTTPS POST.
      */
-    public function openCashDrawer(Printer $printer, float $amount, string $opName): array
+    public function openCashDrawer(string $ip, float $amount, string $opName): array
     {
         try {
             $response = Http::withoutVerifying()
                 ->timeout(5)
-                ->post("https://{$printer->ip}/selfcashapi/", [
+                ->post("https://{$ip   }/selfcashapi/", [
                     'tipo'       => 1,
                     'importo'    => (int) round($amount * 100),
                     'opName'     => $opName,
@@ -1742,7 +1742,7 @@ class PrinterService implements PrinterServiceInterface
 
             if (($data['req_status'] ?? null) !== 1) {
                 Log::error('Errore apertura cassetto: risposta negativa', [
-                    'printer_ip' => $printer->ip ?? 'N/D',
+                    'printer_ip' => $ip    ?? 'N/D',
                     'response'   => $data,
                 ]);
                 return [
@@ -1756,7 +1756,7 @@ class PrinterService implements PrinterServiceInterface
             ];
         } catch (\Exception $e) {
             Log::error('Errore apertura cassetto', [
-                'printer_ip' => $printer->ip ?? 'N/D',
+                'printer_ip' => $ip ?? 'N/D',
                 'error'      => $e->getMessage(),
             ]);
             return [
@@ -1765,12 +1765,12 @@ class PrinterService implements PrinterServiceInterface
         }
     }
 
-    public function pollCashDrawer(Printer $printer, string $operationId): array
+    public function pollCashDrawer(string $ip, string $operationId): array
     {
         try {
             $response = Http::withoutVerifying()
                 ->timeout(5)
-                ->post("https://{$printer->ip}/selfcashapi/", [
+                ->post("https://{$ip}/selfcashapi/", [
                     'tipo' => 2,
                     'id'   => $operationId,
                 ]);
@@ -1779,7 +1779,7 @@ class PrinterService implements PrinterServiceInterface
 
             if (($data['req_status'] ?? null) !== 1) {
                 Log::error('Errore polling cassetto', [
-                    'printer_ip'   => $printer->ip,
+                    'printer_ip'   => $ip,
                     'operation_id' => $operationId,
                     'response'     => $data,
                 ]);
@@ -1793,7 +1793,7 @@ class PrinterService implements PrinterServiceInterface
             ];
         } catch (\Exception $e) {
             Log::error('Eccezione polling cassetto', [
-                'printer_ip'   => $printer->ip,
+                'printer_ip'   => $ip,
                 'operation_id' => $operationId,
                 'error'        => $e->getMessage(),
             ]);
@@ -1801,12 +1801,12 @@ class PrinterService implements PrinterServiceInterface
         }
     }
 
-    public function cancelCashDrawer(Printer $printer, string $operationId, int $tipoAnnullamento = 2): array
+    public function cancelCashDrawer(string $ip, string $operationId, int $tipoAnnullamento = 2): array
     {
         try {
             $response = Http::withoutVerifying()
                 ->timeout(5)
-                ->post("https://{$printer->ip}/selfcashapi/", [
+                ->post("https://{$ip}/selfcashapi/", [
                     'tipo'              => 3,
                     'id'                => $operationId,
                     'tipo_annullamento' => $tipoAnnullamento,
@@ -1816,7 +1816,7 @@ class PrinterService implements PrinterServiceInterface
 
             if (($data['req_status'] ?? null) !== 1) {
                 Log::error('Errore annullamento cassetto', [
-                    'printer_ip'   => $printer->ip,
+                    'printer_ip'   => $ip,
                     'operation_id' => $operationId,
                     'response'     => $data,
                 ]);
@@ -1826,7 +1826,7 @@ class PrinterService implements PrinterServiceInterface
             return ['success' => true];
         } catch (\Exception $e) {
             Log::error('Eccezione annullamento cassetto', [
-                'printer_ip'   => $printer->ip,
+                'printer_ip'   => $ip,
                 'operation_id' => $operationId,
                 'error'        => $e->getMessage(),
             ]);

@@ -107,7 +107,6 @@ class Setting extends Model
     private static function getPrinterBySettingKey(string $idKey): ?Printer
     {
         $id = self::get($idKey, null);
-        Log::info(__LINE__ . ' : ' . $id);
         return $id ? Printer::find((int) $id) : null;
     }
 
@@ -118,7 +117,7 @@ class Setting extends Model
 
     public static function getCashDrawerPrinter(): ?Printer
     {
-        Log::info(__LINE__ . ' : ' . self::getPrinterBySettingKey('cash_drawer_printer_id'));
-        return self::getPrinterBySettingKey('cash_drawer_printer_id');
+        $rawSetting = self::where('key', 'cash_drawer_printer_id')->first();
+        return $rawSetting->value;
     }
 }
