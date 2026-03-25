@@ -107,6 +107,7 @@ class Setting extends Model
     private static function getPrinterBySettingKey(string $idKey): ?Printer
     {
         $id = self::get($idKey, null);
+        Log::info(__LINE__ . ' : ' . $id);
         return $id ? Printer::find((int) $id) : null;
     }
 
