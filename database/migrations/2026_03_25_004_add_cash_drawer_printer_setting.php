@@ -10,7 +10,7 @@ return new class extends Migration
         DB::table('settings')->insertOrIgnore([
             'key'         => 'cash_drawer_printer_id',
             'value'       => null,
-            'type'        => 'integer',
+            'type'        => 'string',
             'description' => 'ID della stampante/cassa automatica VNE Automatic Cash',
             'created_at'  => now(),
             'updated_at'  => now(),

@@ -6,6 +6,7 @@ use App\Facades\Utils;
 use App\Models\Printer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class Setting extends Model
 {
@@ -26,11 +27,9 @@ class Setting extends Model
     public static function get(string $key, mixed $default = null): mixed
     {
         $setting = self::where('key', $key)->first();
-        Utils::queryLog(self::where('key', $key));
         if (!$setting) {
             return $default;
         }
-
         return self::castValue($setting->value, $setting->type);
     }
 
