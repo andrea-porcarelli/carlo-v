@@ -74,6 +74,8 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::post('/{table}/apply-discount', [TableOrderController::class, 'applyDiscount'])->name('applyDiscount');
     Route::post('/{table}/reset-discount', [TableOrderController::class, 'resetDiscount'])->name('resetDiscount');
     Route::post('/open-cash-drawer', [TableOrderController::class, 'openCashDrawer'])->name('openCashDrawer');
+    Route::post('/cash-drawer/poll', [TableOrderController::class, 'pollCashDrawer'])->name('cashDrawer.poll');
+    Route::post('/cash-drawer/cancel', [TableOrderController::class, 'cancelCashDrawer'])->name('cashDrawer.cancel');
     Route::post('/{table}/move', [TableOrderController::class, 'moveTable'])->name('move');
     Route::post('/{table}/reprint', [TableOrderController::class, 'reprintOrder'])->name('reprint');
     Route::post('/{table}/print-session', [TableOrderController::class, 'printSession'])->name('printSession');

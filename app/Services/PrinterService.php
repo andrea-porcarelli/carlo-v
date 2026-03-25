@@ -10,6 +10,7 @@ use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Mike42\Escpos\PrintConnectors\NetworkPrintConnector;
 use Mike42\Escpos\Printer as EscposPrinter;
@@ -1723,22 +1724,113 @@ class PrinterService implements PrinterServiceInterface
     }
 
     /**
-     * Send ESC/POS pulse command to open cash drawer connected to the printer.
+     * Send "Apertura porta" command (tipo=55) to VNE Automatic Cash via HTTPS POST.
      */
-    public function openCashDrawer(Printer $printer): bool
+    public function openCashDrawer(Printer $printer, float $amount, string $opName): array
     {
         try {
-            $connector = new NetworkPrintConnector($printer->ip, 9100, 3);
-            $dev = new EscposPrinter($connector);
-            $dev->pulse();
-            $dev->close();
-            return true;
+            $response = Http::withoutVerifying()
+                ->timeout(5)
+                ->post("https://{$printer->ip}/selfcashapi/", [
+                    'tipo'       => 1,
+                    'importo'    => (int) round($amount * 100),
+                    'opName'     => $opName,
+                    'refundable' => 1,
+                ]);
+
+            $data = $response->json();
+
+            if (($data['req_status'] ?? null) !== 1) {
+                Log::error('Errore apertura cassetto: risposta negativa', [
+                    'printer_ip' => $printer->ip ?? 'N/D',
+                    'response'   => $data,
+                ]);
+                return [
+                    'response' => false,
+                ];
+            }
+
+            return [
+                'response' => true,
+                'operation_id' => $data['id'],
+            ];
         } catch (\Exception $e) {
             Log::error('Errore apertura cassetto', [
                 'printer_ip' => $printer->ip ?? 'N/D',
-                'error' => $e->getMessage(),
+                'error'      => $e->getMessage(),
             ]);
-            return false;
+            return [
+                'response' => false,
+            ];
+        }
+    }
+
+    public function pollCashDrawer(Printer $printer, string $operationId): array
+    {
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(5)
+                ->post("https://{$printer->ip}/selfcashapi/", [
+                    'tipo' => 2,
+                    'id'   => $operationId,
+                ]);
+
+            $data = $response->json();
+
+            if (($data['req_status'] ?? null) !== 1) {
+                Log::error('Errore polling cassetto', [
+                    'printer_ip'   => $printer->ip,
+                    'operation_id' => $operationId,
+                    'response'     => $data,
+                ]);
+                return ['success' => false, 'payment_status' => null];
+            }
+
+            return [
+                'success'         => true,
+                'payment_status'  => $data['payment_status'] ?? null,
+                'payment_details' => $data['payment_details'] ?? null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Eccezione polling cassetto', [
+                'printer_ip'   => $printer->ip,
+                'operation_id' => $operationId,
+                'error'        => $e->getMessage(),
+            ]);
+            return ['success' => false, 'payment_status' => null];
+        }
+    }
+
+    public function cancelCashDrawer(Printer $printer, string $operationId, int $tipoAnnullamento = 2): array
+    {
+        try {
+            $response = Http::withoutVerifying()
+                ->timeout(5)
+                ->post("https://{$printer->ip}/selfcashapi/", [
+                    'tipo'              => 3,
+                    'id'                => $operationId,
+                    'tipo_annullamento' => $tipoAnnullamento,
+                ]);
+
+            $data = $response->json();
+
+            if (($data['req_status'] ?? null) !== 1) {
+                Log::error('Errore annullamento cassetto', [
+                    'printer_ip'   => $printer->ip,
+                    'operation_id' => $operationId,
+                    'response'     => $data,
+                ]);
+                return ['success' => false];
+            }
+
+            return ['success' => true];
+        } catch (\Exception $e) {
+            Log::error('Eccezione annullamento cassetto', [
+                'printer_ip'   => $printer->ip,
+                'operation_id' => $operationId,
+                'error'        => $e->getMessage(),
+            ]);
+            return ['success' => false];
         }
     }
 

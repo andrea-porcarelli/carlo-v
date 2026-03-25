@@ -9,6 +9,7 @@ use App\Jobs\PrintDishChangeJob;
 use App\Jobs\PrintMarciaJob;
 use App\Jobs\PrintOrderItemsJob;
 use App\Jobs\PrintPrecontoJob;
+use App\Models\CashDrawerLog;
 use App\Models\Dish;
 use App\Models\MenuOption;
 use App\Models\OrderItem;
@@ -737,6 +738,7 @@ class TableOrderController extends Controller
                 'message' => 'Conto incassato con successo',
                 'data' => [
                     'total_paid' => $order->total_amount,
+                    'table_order_id' => $order->id,
                 ],
             ]);
         } catch (\Exception $e) {
@@ -1105,10 +1107,11 @@ class TableOrderController extends Controller
                 'success' => true,
                 'message' => $orderClosed ? 'Conto chiuso completamente' : "Pagato €" . number_format($split->total, 2),
                 'data'    => [
-                    'order_closed'     => $orderClosed,
-                    'remaining'        => max(0, $remaining),
-                    'paid_items'       => $splitPaidItems,
-                    'paid_split_total' => (float) $split->total,
+                    'order_closed'      => $orderClosed,
+                    'table_order_id'    => $order->id,
+                    'remaining'         => max(0, $remaining),
+                    'paid_items'        => $splitPaidItems,
+                    'paid_split_total'  => (float) $split->total,
                     'paid_cover_amount' => round((int) $split->covers * $order->getCoverChargePerPerson(), 2),
                 ],
             ]);
@@ -1283,18 +1286,87 @@ class TableOrderController extends Controller
         if (!$operatorId) {
             return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
         }
-
-        $printer = \App\Models\Setting::getPrecontoPrinter();
+        $amount = $request->input('amount');
+        $table_order_id = $request->input('table_order_id');
+        $printer = Setting::getCashDrawerPrinter();
         if (!$printer) {
             return response()->json(['success' => false, 'message' => 'Nessuna stampante cassa configurata'], 422);
         }
 
-        $opened = $this->printerService->openCashDrawer($printer);
+        $opName = User::find($operatorId)?->name ?? 'auth_login';
+        $opened = $this->printerService->openCashDrawer($printer, $amount, $opName);
+
+        CashDrawerLog::create([
+            'table_order_id' => $table_order_id ?: null,
+            'operation_id'   => $opened['operation_id'] ?? null,
+            'event_type'     => $opened['response'] ? 'start' : 'error',
+            'payload'        => ['amount' => $amount, 'response' => $opened],
+        ]);
+
+        if ($opened['response'] && $table_order_id) {
+            TableOrder::where('id', $table_order_id)
+                ->update(['cash_drawer_operation_id' => $opened['operation_id']]);
+        }
 
         return response()->json([
-            'success' => $opened,
-            'message' => $opened ? 'Cassetto aperto' : 'Impossibile aprire il cassetto',
+            'success'      => $opened['response'],
+            'operation_id' => $opened['operation_id'] ?? null,
+            'message'      => $opened['response'] ? 'Pagamento avviato' : 'Impossibile avviare il pagamento',
         ]);
+    }
+
+    public function pollCashDrawer(Request $request): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $operationId = $request->input('operation_id');
+        $printer = Setting::getCashDrawerPrinter();
+        if (!$printer) {
+            return response()->json(['success' => false, 'message' => 'Nessuna stampante cassa configurata'], 422);
+        }
+
+        $result = $this->printerService->pollCashDrawer($printer, $operationId);
+
+        if ($result['payment_status'] === 1) {
+            CashDrawerLog::create([
+                'operation_id' => $operationId,
+                'event_type'   => 'completed',
+                'payload'      => $result,
+            ]);
+        }
+
+        return response()->json([
+            'success'         => $result['success'],
+            'payment_status'  => $result['payment_status'],
+            'payment_details' => $result['payment_details'] ?? null,
+        ]);
+    }
+
+    public function cancelCashDrawer(Request $request): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $operationId = $request->input('operation_id');
+        $printer = Setting::getCashDrawerPrinter();
+        if (!$printer) {
+            return response()->json(['success' => false, 'message' => 'Nessuna stampante cassa configurata'], 422);
+        }
+
+        $result = $this->printerService->cancelCashDrawer($printer, $operationId);
+
+        CashDrawerLog::create([
+            'operation_id' => $operationId,
+            'event_type'   => 'cancel',
+            'payload'      => $result,
+        ]);
+
+        return response()->json(['success' => $result['success']]);
     }
 
     public function applyDiscount(Request $request, RestaurantTable $table): JsonResponse

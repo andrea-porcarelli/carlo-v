@@ -99,18 +99,25 @@ class Setting extends Model
         $id = self::get('preconto_printer_id', null);
         return $id ? (int) $id : null;
     }
+    public static function getCashDrawerPrinterId(): ?int
+    {
+        $id = self::get('cash_drawer_printer_id', null);
+        return $id ? (int) $id : null;
+    }
 
-    /**
-     * Get preconto printer
-     *
-     * @return Printer|null
-     */
+    private static function getPrinterBySettingKey(string $idKey): ?Printer
+    {
+        $id = self::get($idKey, null);
+        return $id ? Printer::find((int) $id) : null;
+    }
+
     public static function getPrecontoPrinter(): ?Printer
     {
-        $printerId = self::getPrecontoPrinterId();
-        if (!$printerId) {
-            return null;
-        }
-        return Printer::find($printerId);
+        return self::getPrinterBySettingKey('preconto_printer_id');
+    }
+
+    public static function getCashDrawerPrinter(): ?Printer
+    {
+        return self::getPrinterBySettingKey('cash_drawer_printer_id');
     }
 }

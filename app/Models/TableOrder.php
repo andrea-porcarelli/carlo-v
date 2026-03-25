@@ -22,6 +22,7 @@ class TableOrder extends Model
         'opened_at',
         'closed_at',
         'waiter_id',
+        'cash_drawer_operation_id',
         'preconto_requested_at',
         'discount_type',
         'discount_amount',

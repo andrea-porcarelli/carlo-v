@@ -25,6 +25,14 @@ class TableOrdersManager {
         this._dishCache = null;
         this._dishChangeSelectedDish = null;
         this._dishChangeActiveCategoryId = null;
+        this._cashDrawerOperationId = null;
+        this._cashDrawerPollInterval = null;
+        this._cashDrawerToken = null;
+        this._cashDrawerOnComplete = null;
+        this._beforeUnloadHandler = (e) => {
+            e.preventDefault();
+            e.returnValue = 'Pagamento in corso. Sei sicuro di voler uscire?';
+        };
 
         this.menuOptions = { extras: [], removals: [] };
 
@@ -2679,7 +2687,11 @@ class TableOrdersManager {
                 if (result.data?.order_closed) {
                     this.showNotification('Conto chiuso completamente', 'success');
                     this.closePaymentMethodModal();
-                    this._afterPaymentSuccess();
+                    if (method === 'contanti') {
+                        await this.startCashDrawerFlow(result.data.paid_split_total, result.data.table_order_id, auth.token);
+                    } else {
+                        this._afterPaymentSuccess();
+                    }
                 } else {
                     this.showNotification(result.message || 'Quota pagata', 'success');
 
@@ -2688,7 +2700,6 @@ class TableOrdersManager {
                     const paidSplitTotal = result.data?.paid_split_total ?? 0;
                     this.modifySession.paidSplitsTotal = (this.modifySession.paidSplitsTotal || 0) + paidSplitTotal;
                     this.modifySession.paidCoversTotal = (this.modifySession.paidCoversTotal || 0) + (result.data?.paid_cover_amount ?? 0);
-                    // Remove the just-paid split from pending list
                     this.modifySession.pendingSplits = (this.modifySession.pendingSplits ?? []).filter(s => s.id !== splitId);
                     if (paidItems.length > 0) {
                         this._applyPaidItemsToSession(paidItems);
@@ -2698,13 +2709,20 @@ class TableOrdersManager {
                         this.updateModifyReceiptItems();
                     }
 
-                    // Reload splits view
-                    const splitsResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
-                        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
-                    });
-                    const splitsData = await splitsResp.json();
-                    if (splitsData.success) {
-                        this._showSplitPaymentView(splitsData.data.splits, splitsData.data.remaining, splitsData.data.order_total);
+                    const reloadSplits = async () => {
+                        const splitsResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
+                            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+                        });
+                        const splitsData = await splitsResp.json();
+                        if (splitsData.success) {
+                            this._showSplitPaymentView(splitsData.data.splits, splitsData.data.remaining, splitsData.data.order_total);
+                        }
+                    };
+
+                    if (method === 'contanti') {
+                        await this.startCashDrawerFlow(result.data.paid_split_total, result.data.table_order_id, auth.token, reloadSplits);
+                    } else {
+                        await reloadSplits();
                     }
                 }
             } else {
@@ -2729,6 +2747,112 @@ class TableOrdersManager {
     /**
      * Chiudi conto con pagamento contanti e apri il cassetto.
      */
+    async startCashDrawerFlow(amount, tableOrderId, authToken, onComplete = null) {
+        const overlay = document.getElementById('cashDrawerOverlay');
+        const statusEl = document.getElementById('cashDrawerStatus');
+        const amountEl = document.getElementById('cashDrawerAmount');
+        const cancelBtn = document.getElementById('cashDrawerCancelBtn');
+
+        if (!overlay) return;
+
+        amountEl.textContent = `€${parseFloat(amount).toFixed(2)}`;
+        statusEl.textContent = 'Avvio pagamento sulla cassa automatica...';
+        cancelBtn.disabled = false;
+        overlay.style.display = 'flex';
+        window.addEventListener('beforeunload', this._beforeUnloadHandler);
+
+        this._cashDrawerToken = authToken;
+
+        try {
+            const resp = await fetch(`${this.apiBase}/open-cash-drawer`, {
+                method: 'POST',
+                body: JSON.stringify({ amount, table_order_id: tableOrderId }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': authToken,
+                },
+            });
+            const data = await resp.json();
+
+            if (!data.success) {
+                this._hideCashDrawerOverlay();
+                this._afterPaymentSuccess();
+                return;
+            }
+
+            this._cashDrawerOperationId = data.operation_id;
+            this._cashDrawerOnComplete = onComplete ?? (() => this._afterPaymentSuccess());
+            statusEl.textContent = 'In attesa del pagamento dalla cassa automatica...';
+            this._cashDrawerPollInterval = setInterval(() => this._pollCashDrawer(), 250);
+
+        } catch (e) {
+            console.error('Cash drawer start error:', e);
+            this._hideCashDrawerOverlay();
+            (onComplete ?? (() => this._afterPaymentSuccess()))();
+        }
+    }
+
+    async _pollCashDrawer() {
+        try {
+            const resp = await fetch(`${this.apiBase}/cash-drawer/poll`, {
+                method: 'POST',
+                body: JSON.stringify({ operation_id: this._cashDrawerOperationId }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': this._cashDrawerToken,
+                },
+            });
+            const data = await resp.json();
+
+            if (data.payment_status === 1) {
+                clearInterval(this._cashDrawerPollInterval);
+                this._cashDrawerPollInterval = null;
+                this._hideCashDrawerOverlay();
+                await this._cashDrawerOnComplete();
+            }
+            // payment_status === 2 → in corso, continua
+        } catch (e) {
+            const statusEl = document.getElementById('cashDrawerStatus');
+            if (statusEl) statusEl.textContent = 'Errore di comunicazione, riprovo...';
+        }
+    }
+
+    async cancelCashDrawerTransaction() {
+        const cancelBtn = document.getElementById('cashDrawerCancelBtn');
+        if (cancelBtn) cancelBtn.disabled = true;
+
+        clearInterval(this._cashDrawerPollInterval);
+        this._cashDrawerPollInterval = null;
+
+        try {
+            await fetch(`${this.apiBase}/cash-drawer/cancel`, {
+                method: 'POST',
+                body: JSON.stringify({ operation_id: this._cashDrawerOperationId }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': this._cashDrawerToken,
+                },
+            });
+        } catch (e) {
+            console.error('Cash drawer cancel error:', e);
+        }
+
+        this._hideCashDrawerOverlay();
+        await this._cashDrawerOnComplete();
+    }
+
+    _hideCashDrawerOverlay() {
+        const overlay = document.getElementById('cashDrawerOverlay');
+        if (overlay) overlay.style.display = 'none';
+        window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+        this._cashDrawerOperationId = null;
+        this._cashDrawerToken = null;
+        this._cashDrawerOnComplete = null;
+    }
+
     async chiudiContoContanti() {
         if (!this.currentTable) return;
 
@@ -2760,18 +2884,8 @@ class TableOrdersManager {
             }
 
             this.showNotification(`Conto chiuso: €${parseFloat(result.data.total_paid).toFixed(2)}`);
-
-            // Open cash drawer (non-blocking — failure is non-fatal)
-            fetch(`${this.apiBase}/open-cash-drawer`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    'X-Operator-Token': auth.token,
-                },
-            }).catch(() => {});
-
-            this._afterPaymentSuccess();
+            await this.startCashDrawerFlow(result.data.total_paid, result.data.table_order_id, auth.token);
+            // _afterPaymentSuccess() è chiamato dentro startCashDrawerFlow al completamento
         } catch (error) {
             console.error('Error chiudi conto contanti:', error);
             this.showNotification('Errore nell\'incasso', 'error');
@@ -2846,7 +2960,11 @@ class TableOrdersManager {
 
             if (result.success) {
                 this.showNotification(`Conto incassato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
-                this._afterPaymentSuccess();
+                if (method === 'contanti') {
+                    await this.startCashDrawerFlow(result.data.total_paid, result.data.table_order_id, auth.token);
+                } else {
+                    this._afterPaymentSuccess();
+                }
             } else {
                 this.showNotification(result.message || 'Errore nell\'incasso', 'error');
             }

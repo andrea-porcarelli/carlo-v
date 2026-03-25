@@ -111,7 +111,11 @@ interface PrinterServiceInterface
     /**
      * Send ESC/POS pulse to open cash drawer connected to the given printer.
      */
-    public function openCashDrawer(Printer $printer): bool;
+    public function openCashDrawer(Printer $printer, float $amount, string $opName): array;
+
+    public function pollCashDrawer(Printer $printer, string $operationId): array;
+
+    public function cancelCashDrawer(Printer $printer, string $operationId, int $tipoAnnullamento = 2): array;
 
     /**
      * Stampa un cambio piatto: STORNO del vecchio piatto e AGGIUNTA del nuovo
