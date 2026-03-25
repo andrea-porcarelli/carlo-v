@@ -30,7 +30,6 @@ class Setting extends Model
         if (!$setting) {
             return $default;
         }
-        Log::info(__LINE__ . ' ' . $key . ' : ' . $setting->value);
 
         return self::castValue($setting->value, $setting->type);
     }
@@ -118,6 +117,7 @@ class Setting extends Model
 
     public static function getCashDrawerPrinter(): ?Printer
     {
+        Log::info(__LINE__ . ' : ' . self::getPrinterBySettingKey('cash_drawer_printer_id'));
         return self::getPrinterBySettingKey('cash_drawer_printer_id');
     }
 }

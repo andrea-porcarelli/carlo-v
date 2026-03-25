@@ -18,6 +18,7 @@ use App\Models\Printer;
 use App\Models\RestaurantTable;
 use App\Models\Setting;
 use App\Models\TableOrder;
+use App\Models\User;
 use App\Services\FattureInCloudService;
 use App\Services\TableOrderLoggerService;
 use App\Services\VegaPosService;
