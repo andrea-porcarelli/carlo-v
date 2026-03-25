@@ -115,9 +115,9 @@ class Setting extends Model
         return self::getPrinterBySettingKey('preconto_printer_id');
     }
 
-    public static function getCashDrawerPrinter(): ?Printer
+    public static function getCashDrawerPrinter(): ?string
     {
         $rawSetting = self::where('key', 'cash_drawer_printer_id')->first();
-        return $rawSetting->value;
+        return $rawSetting->value ?? null;
     }
 }
