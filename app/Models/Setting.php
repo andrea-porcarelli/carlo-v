@@ -24,9 +24,7 @@ class Setting extends Model
      */
     public static function get(string $key, mixed $default = null): mixed
     {
-        $setting = Cache::remember("setting_{$key}", 360, function () use ($key) {
-            return self::where('key', $key)->first();
-        });
+        $setting = self::where('key', $key)->first();
 
         if (!$setting) {
             return $default;
