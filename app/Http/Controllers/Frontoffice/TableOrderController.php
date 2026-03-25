@@ -1330,12 +1330,17 @@ class TableOrderController extends Controller
         }
 
         $result = $this->printerService->pollCashDrawer($printer, $operationId);
-
+        $last_log = CashDrawerLog::where('operation_id', $operationId)
+            ->whereNotNull('table_order_id')
+            ->orderBy('created_at', 'desc')
+            ->first();
+        $table_order_id = $last_log->table_order_id ?? null;
         if ($result['payment_status'] === 1) {
             CashDrawerLog::create([
                 'operation_id' => $operationId,
                 'event_type'   => 'completed',
                 'payload'      => $result,
+                'table_order_id' => $table_order_id,
             ]);
         }
 
@@ -1360,11 +1365,17 @@ class TableOrderController extends Controller
         }
 
         $result = $this->printerService->cancelCashDrawer($printer, $operationId);
+        $last_log = CashDrawerLog::where('operation_id', $operationId)
+            ->whereNotNull('table_order_id')
+            ->orderBy('created_at', 'desc')
+            ->first();
+        $table_order_id = $last_log->table_order_id ?? null;
 
         CashDrawerLog::create([
             'operation_id' => $operationId,
             'event_type'   => 'cancel',
             'payload'      => $result,
+            'table_order_id' => $table_order_id,
         ]);
 
         return response()->json(['success' => $result['success']]);

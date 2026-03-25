@@ -2518,6 +2518,7 @@ class TableOrdersManager {
     }
 
     _showSplitPaymentView(splits, remaining, orderTotal) {
+        this._splitsData = splits;
         document.getElementById('normalPaymentView').style.display = 'none';
         const view = document.getElementById('splitPaymentView');
         view.style.display = 'block';
@@ -2671,45 +2672,41 @@ class TableOrdersManager {
             return;
         }
 
-        try {
-            const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay-split/${splitId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    'X-Operator-Token': auth.token
-                },
-                body: JSON.stringify({ payment_method: method })
-            });
-            const result = await resp.json();
+        const doPaySplit = async () => {
+            try {
+                const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay-split/${splitId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'X-Operator-Token': auth.token
+                    },
+                    body: JSON.stringify({ payment_method: method })
+                });
+                const result = await resp.json();
 
-            if (result.success) {
-                if (result.data?.order_closed) {
-                    this.showNotification('Conto chiuso completamente', 'success');
-                    this.closePaymentMethodModal();
-                    if (method === 'contanti') {
-                        await this.startCashDrawerFlow(result.data.paid_split_total, result.data.table_order_id, auth.token);
-                    } else {
+                if (result.success) {
+                    if (result.data?.order_closed) {
+                        this.showNotification('Conto chiuso completamente', 'success');
+                        this.closePaymentMethodModal();
                         this._afterPaymentSuccess();
-                    }
-                } else {
-                    this.showNotification(result.message || 'Quota pagata', 'success');
+                    } else {
+                        this.showNotification(result.message || 'Quota pagata', 'success');
 
-                    // Update modify session: remove/reduce paid items, update total
-                    const paidItems = result.data?.paid_items ?? [];
-                    const paidSplitTotal = result.data?.paid_split_total ?? 0;
-                    this.modifySession.paidSplitsTotal = (this.modifySession.paidSplitsTotal || 0) + paidSplitTotal;
-                    this.modifySession.paidCoversTotal = (this.modifySession.paidCoversTotal || 0) + (result.data?.paid_cover_amount ?? 0);
-                    this.modifySession.pendingSplits = (this.modifySession.pendingSplits ?? []).filter(s => s.id !== splitId);
-                    if (paidItems.length > 0) {
-                        this._applyPaidItemsToSession(paidItems);
-                    }
-                    const modifyOverlay = document.getElementById('modifyOrderOverlay');
-                    if (modifyOverlay && modifyOverlay.style.display === 'block') {
-                        this.updateModifyReceiptItems();
-                    }
+                        // Update modify session: remove/reduce paid items, update total
+                        const paidItems = result.data?.paid_items ?? [];
+                        const paidSplitTotal = result.data?.paid_split_total ?? 0;
+                        this.modifySession.paidSplitsTotal = (this.modifySession.paidSplitsTotal || 0) + paidSplitTotal;
+                        this.modifySession.paidCoversTotal = (this.modifySession.paidCoversTotal || 0) + (result.data?.paid_cover_amount ?? 0);
+                        this.modifySession.pendingSplits = (this.modifySession.pendingSplits ?? []).filter(s => s.id !== splitId);
+                        if (paidItems.length > 0) {
+                            this._applyPaidItemsToSession(paidItems);
+                        }
+                        const modifyOverlay = document.getElementById('modifyOrderOverlay');
+                        if (modifyOverlay && modifyOverlay.style.display === 'block') {
+                            this.updateModifyReceiptItems();
+                        }
 
-                    const reloadSplits = async () => {
                         const splitsResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
                             headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
                         });
@@ -2717,22 +2714,24 @@ class TableOrdersManager {
                         if (splitsData.success) {
                             this._showSplitPaymentView(splitsData.data.splits, splitsData.data.remaining, splitsData.data.order_total);
                         }
-                    };
-
-                    if (method === 'contanti') {
-                        await this.startCashDrawerFlow(result.data.paid_split_total, result.data.table_order_id, auth.token, reloadSplits);
-                    } else {
-                        await reloadSplits();
                     }
+                } else {
+                    this.showNotification(result.message || 'Errore nel pagamento', 'error');
+                    document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
                 }
-            } else {
-                this.showNotification(result.message || 'Errore nel pagamento', 'error');
+            } catch (e) {
+                console.error('Error paying split:', e);
+                this.showNotification('Errore nel pagamento', 'error');
                 document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
             }
-        } catch (e) {
-            console.error('Error paying split:', e);
-            this.showNotification('Errore nel pagamento', 'error');
-            document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+        };
+
+        if (method === 'contanti') {
+            const splitData = this._splitsData?.find(s => s.id === splitId);
+            const amount = parseFloat(splitData?.total ?? 0);
+            await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, doPaySplit);
+        } else {
+            await doPaySplit();
         }
     }
 
@@ -2865,31 +2864,30 @@ class TableOrdersManager {
             return;
         }
 
-        // Pay with contanti
-        try {
-            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    'X-Operator-Token': auth.token,
-                },
-                body: JSON.stringify({ payment_method: 'contanti' }),
-            });
-
-            const result = await response.json();
-            if (!result.success) {
-                this.showNotification(result.message || 'Errore nell\'incasso', 'error');
-                return;
+        const amount = parseFloat(this.currentTable.order.discounted_total ?? this.currentTable.order.total_amount ?? 0);
+        await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, async () => {
+            try {
+                const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'X-Operator-Token': auth.token,
+                    },
+                    body: JSON.stringify({ payment_method: 'contanti' }),
+                });
+                const result = await response.json();
+                if (result.success) {
+                    this.showNotification(`Conto chiuso: €${parseFloat(result.data.total_paid).toFixed(2)}`);
+                    this._afterPaymentSuccess();
+                } else {
+                    this.showNotification(result.message || 'Errore nell\'incasso', 'error');
+                }
+            } catch (error) {
+                console.error('Error chiudi conto contanti:', error);
+                this.showNotification('Errore nell\'incasso', 'error');
             }
-
-            this.showNotification(`Conto chiuso: €${parseFloat(result.data.total_paid).toFixed(2)}`);
-            await this.startCashDrawerFlow(result.data.total_paid, result.data.table_order_id, auth.token);
-            // _afterPaymentSuccess() è chiamato dentro startCashDrawerFlow al completamento
-        } catch (error) {
-            console.error('Error chiudi conto contanti:', error);
-            this.showNotification('Errore nell\'incasso', 'error');
-        }
+        });
     }
 
     /**
@@ -2944,7 +2942,36 @@ class TableOrdersManager {
             return;
         }
 
-        // ── Close the order ────────────────────────────────────────────────────
+        // ── Contanti: apri cassetto prima di chiudere il conto ────────────────
+        if (method === 'contanti') {
+            const amount = parseFloat(this.currentTable.order.discounted_total ?? this.currentTable.order.total_amount ?? 0);
+            await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, async () => {
+                try {
+                    const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                            'X-Operator-Token': auth.token,
+                        },
+                        body: JSON.stringify({ payment_method: 'contanti' }),
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        this.showNotification(`Conto incassato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
+                        this._afterPaymentSuccess();
+                    } else {
+                        this.showNotification(result.message || 'Errore nell\'incasso', 'error');
+                    }
+                } catch (e) {
+                    console.error('Error paying table after cash drawer:', e);
+                    this.showNotification('Errore nell\'incasso', 'error');
+                }
+            });
+            return;
+        }
+
+        // ── Close the order (non-contanti) ────────────────────────────────────
         try {
             const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
                 method: 'POST',
@@ -2960,11 +2987,7 @@ class TableOrdersManager {
 
             if (result.success) {
                 this.showNotification(`Conto incassato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
-                if (method === 'contanti') {
-                    await this.startCashDrawerFlow(result.data.total_paid, result.data.table_order_id, auth.token);
-                } else {
-                    this._afterPaymentSuccess();
-                }
+                this._afterPaymentSuccess();
             } else {
                 this.showNotification(result.message || 'Errore nell\'incasso', 'error');
             }
