@@ -102,4 +102,20 @@ class Utils
         })->toArray();
     }
 
+
+    public static function map_array($items) : array {
+        return collect($items)->map(function ($item, $key) {
+            return ['id' => $key, 'label' => $item];
+        })->values()->toArray();
+    }
+
+    public static function map_simple_array(array $elements): array
+    {
+        if (count($elements) == 0) {
+            return [];
+        }
+        return collect($elements)->map(function ($item) {
+            return ['id' => $item, 'label' => $item];
+        })->toArray();
+    }
 }

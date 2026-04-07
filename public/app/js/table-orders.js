@@ -2754,7 +2754,7 @@ class TableOrdersManager {
     /**
      * Chiudi conto con pagamento contanti e apri il cassetto.
      */
-    async startCashDrawerFlow(amount, tableOrderId, authToken, onComplete = null) {
+    async startCashDrawerFlow(amount, tableOrderId, authToken, onComplete = null, onReady = null) {
         const overlay = document.getElementById('cashDrawerOverlay');
         const statusEl = document.getElementById('cashDrawerStatus');
         const amountEl = document.getElementById('cashDrawerAmount');
@@ -2789,6 +2789,17 @@ class TableOrdersManager {
             }
 
             this._cashDrawerOperationId = data.operation_id;
+
+            // Hook opzionale eseguito dopo l'apertura del cassetto, prima del polling.
+            // Se restituisce false il flusso viene interrotto.
+            if (onReady) {
+                const proceed = await onReady();
+                if (proceed === false) {
+                    this._hideCashDrawerOverlay();
+                    return;
+                }
+            }
+
             this._cashDrawerOnComplete = onComplete ?? (() => this._afterPaymentSuccess());
             statusEl.textContent = 'In attesa del pagamento dalla cassa automatica...';
             this._cashDrawerPollInterval = setInterval(() => this._pollCashDrawer(), 250);
@@ -2873,29 +2884,38 @@ class TableOrdersManager {
         }
 
         const amount = parseFloat(this.currentTable.order.discounted_total ?? this.currentTable.order.total_amount ?? 0);
-        await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, async () => {
-            try {
-                const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                        'X-Operator-Token': auth.token,
-                    },
-                    body: JSON.stringify({ payment_method: 'contanti' }),
-                });
-                const result = await response.json();
-                if (result.success) {
-                    this.showNotification(`Conto chiuso: €${parseFloat(result.data.total_paid).toFixed(2)}`);
-                    this._afterPaymentSuccess();
-                } else {
-                    this.showNotification(result.message || 'Errore nell\'incasso', 'error');
+        await this.startCashDrawerFlow(
+            amount,
+            this.currentTable.order.id,
+            auth.token,
+            // onComplete: chiamato quando il poll del cassetto conferma l'operazione
+            () => this._afterPaymentSuccess(),
+            // onReady: chiamato subito dopo l'apertura del cassetto, prima del polling
+            async () => {
+                try {
+                    const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                            'X-Operator-Token': auth.token,
+                        },
+                        body: JSON.stringify({ payment_method: 'contanti' }),
+                    });
+                    const result = await response.json();
+                    if (!result.success) {
+                        this.showNotification(result.message || 'Errore nell\'incasso', 'error');
+                        return false;
+                    }
+                    this.showNotification(`Conto registrato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
+                    return true;
+                } catch (error) {
+                    console.error('Error chiudi conto contanti:', error);
+                    this.showNotification('Errore nell\'incasso', 'error');
+                    return false;
                 }
-            } catch (error) {
-                console.error('Error chiudi conto contanti:', error);
-                this.showNotification('Errore nell\'incasso', 'error');
             }
-        });
+        );
     }
 
     /**

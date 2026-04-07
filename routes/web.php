@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Backoffice\AllergenController;
+use App\Http\Controllers\Backoffice\ExternalInvoiceController;
 use App\Http\Controllers\Backoffice\MenuOptionController;
 use App\Http\Controllers\Backoffice\DeployController;
 use App\Http\Controllers\Backoffice\CategoryController;
@@ -131,6 +132,7 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::post('/import', [InvoiceController::class, 'import_invoice']);
             Route::get('/{id}/mapping-products', [InvoiceController::class, 'mapping_products'])->name('invoices.mapping_products');
             Route::post('/{id}/store-mapping-products', [InvoiceController::class, 'store_mapping_products']);
+            Route::get('/failed/{id}/download', [InvoiceController::class, 'download_failed_file'])->name('invoices.download-failed-file');
         });
 
         Route::resource('invoices', InvoiceController::class);
@@ -225,6 +227,17 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/export', [TableOrderLogController::class, 'export'])->name('export');
             Route::get('/activity-summary', [TableOrderLogController::class, 'activitySummary'])->name('activity-summary');
             Route::get('/category-stats', [TableOrderLogController::class, 'categoryStats'])->name('category-stats');
+        });
+
+
+
+        Route::prefix('external-invoices')->group(function () {
+            Route::get('/', [ExternalInvoiceController::class, 'index'])->name('external-invoices.index');
+            Route::get('/datatable', [ExternalInvoiceController::class, 'datatable'])->name('external-invoices.datatable');
+            Route::get('/{id}/mapping', [ExternalInvoiceController::class, 'mapping'])->name('external-invoices.mapping');
+            Route::post('/{id}/mapping', [ExternalInvoiceController::class, 'store_mapping'])->name('external-invoices.store-mapping');
+            Route::get('/{id}/confirm-stock', [ExternalInvoiceController::class, 'confirm_stock'])->name('external-invoices.confirm-stock');
+            Route::post('/{id}/confirm-stock', [ExternalInvoiceController::class, 'store_stock'])->name('external-invoices.store-stock');
         });
     });
 });

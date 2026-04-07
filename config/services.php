@@ -34,5 +34,10 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'mysond' => [
+        'codice_azienda' => env('MYSOND_AZIENDA'),
+        'username' => env('MYSOND_USER'),
+        'password' => env('MYSOND_PASS'),
+    ],
 
 ];

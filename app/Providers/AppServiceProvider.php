@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\ExternalInvoice;
+use App\Observers\ExternalInvoiceObserver;
 use App\Services\StockService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -27,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        ExternalInvoice::observe(ExternalInvoiceObserver::class);
+
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(600);
         });

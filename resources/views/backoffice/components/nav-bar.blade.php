@@ -16,6 +16,16 @@
                 @include('backoffice.components.nav-bar-restaurant')
                 @include('backoffice.components.nav-bar-supplier')
                 @include('backoffice.components.nav-bar-item', ['route' => 'users.index', 'icon' => 'fa-users', 'label' => 'Utenti'])
+                <li class="{{ (Request::is('external-invoices*')) ? 'active' : '' }}">
+                    <a href="#">
+                        <i class="fas fa-money-bill"></i>
+                        <span class="nav-label">Contabilità</span>
+                        <i class="far fa-arrow-alt-circle-down"></i>
+                    </a>
+                    <ul class="nav nav-second-level collapse">
+                        @include('backoffice.components.nav-bar-item', ['route' => 'external-invoices.index', 'icon' => 'fa-cog', 'label' => 'Fatture ricevute'])
+                    </ul>
+                </li>
                 <li class="{{ (Request::is('backoffice/restaurant/settings*')) ? 'active' : '' }}">
                     <a href="{{ route('restaurant.settings.index') }}">
                         <i class="fas fa-cog"></i> Settaggi

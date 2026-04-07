@@ -2,18 +2,35 @@ FROM php:8.3-fpm
 
 # Installa dipendenze sistema (incluse librerie per estensioni PHP)
 RUN apt-get update && apt-get install -y \
-    libzip-dev zip unzip git curl \
-    libxml2-dev libpng-dev libjpeg-dev \
+    libzip-dev \
+    zlib1g-dev \
+    zip \
+    unzip \
+    git \
+    curl \
+    libxml2-dev \
+    libpng-dev \
+    libjpeg-dev \
     libicu-dev \
     libonig-dev \
     supervisor \
     default-mysql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Configura e installa estensioni PHP
+# Configura le estensioni che richiedono parametri specifici
 RUN docker-php-ext-configure gd --with-jpeg \
-    && docker-php-ext-configure intl \
-    && docker-php-ext-install pdo pdo_mysql zip gd mbstring intl
+    && docker-php-ext-configure intl
+
+# Installa le estensioni PHP
+# Nota: zip e soap ora funzioneranno perché abbiamo le relative librerie -dev
+RUN docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    zip \
+    gd \
+    mbstring \
+    intl \
+    soap
 
 # Installa Redis - FIX per "Class Redis not found"
 RUN pecl install redis \

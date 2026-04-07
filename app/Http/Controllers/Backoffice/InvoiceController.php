@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backoffice;
 use App\Facades\Utils;
 use App\Interfaces\SupplierInterface;
 use App\Interfaces\SupplierInvoiceInterface;
+use App\Models\ExternalInvoice;
 use App\Models\MappingProduct;
 use App\Models\Material;
 use App\Models\MaterialStock;
@@ -40,15 +41,31 @@ class InvoiceController extends BaseController
         $suppliers = Supplier::orderBy('company_name')->get()
             ->map(fn($s) => ['id' => $s->id, 'label' => $s->company_name])
             ->toArray();
-        return view('backoffice.' . $this->name . '.index', compact('suppliers'));
+
+        $failedInvoices = ExternalInvoice::where('status', 'import_error')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('backoffice.' . $this->name . '.index', compact('suppliers', 'failedInvoices'));
+    }
+
+    public function download_failed_file(int $id): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $externalInvoice = ExternalInvoice::findOrFail($id);
+
+        abort_if(!$externalInvoice->file_path, 404);
+
+        $fullPath = storage_path('app/' . $externalInvoice->file_path);
+
+        abort_unless(file_exists($fullPath), 404);
+
+        return response()->download($fullPath, $externalInvoice->file_name);
     }
 
     public function datatable(Request $request) : JsonResponse {
         try {
             $filters = $request->get('filters') ?? [];
 
-            // Associa material_stocks ai prodotti delle fatture mappate
-            $this->associateMaterialStocks();
 
             $elements = $this->interface->filters($filters);
             return $this->editColumns(datatables()->of($elements), $this->name, ['edit', 'mapping-product'])
@@ -71,27 +88,16 @@ class InvoiceController extends BaseController
                     $total     = $item->products_count;
                     $daMappare = $item->products()->whereDoesntHave('material')->where('ignore_mapping', 0)->count();
                     $mappati   = $item->products()->whereHas('material')->count();
-                    $importati = $item->products()->whereHas('stock')->count();
                     $ignorati  = $item->products()->where('ignore_mapping', 1)->count();
 
-                    $effective = $total - $ignorati;
-                    $perc = $effective > 0 ? round(($importati / $effective) * 100) : 100;
-                    $barClass = $perc === 100 ? 'progress-bar-success' : ($perc > 0 ? 'progress-bar-info' : 'progress-bar-warning');
-
                     $html  = '<div class="mapping-summary">';
-                    $html .= '<div style="font-size:11px; color:#888; margin-bottom:3px;">Totale: <strong>' . $total . '</strong> prodotti &nbsp;·&nbsp; Caricati: <strong>' . $perc . '%</strong></div>';
-                    $html .= '<div class="progress" style="height:6px; margin-bottom:6px; margin-top:0;">';
-                    $html .= '<div class="progress-bar ' . $barClass . '" style="width:' . $perc . '%; min-width:2px;"></div>';
-                    $html .= '</div>';
+                    $html .= '<div style="font-size:11px; color:#888; margin-bottom:3px;">Totale: <strong>' . $total . '</strong> prodotti</div>';
                     $html .= '<div class="mapping-badges">';
                     if ($daMappare > 0) {
                         $html .= '<span class="label label-warning"><span class="glyphicon glyphicon-exclamation-sign"></span> ' . $daMappare . ' da mappare</span> ';
                     }
                     if ($mappati > 0) {
                         $html .= '<span class="label label-primary"><span class="glyphicon glyphicon-link"></span> ' . $mappati . ' mappati</span> ';
-                    }
-                    if ($importati > 0) {
-                        $html .= '<span class="label label-success"><span class="glyphicon glyphicon-ok-circle"></span> ' . $importati . ' in stock</span> ';
                     }
                     if ($ignorati > 0) {
                         $html .= '<span class="label label-default"><span class="glyphicon glyphicon-minus-sign"></span> ' . $ignorati . ' ignorati</span>';

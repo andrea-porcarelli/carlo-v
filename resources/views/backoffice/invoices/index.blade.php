@@ -5,6 +5,41 @@
     ])
 @endsection
 @section('main-content')
+    @if(isset($failedInvoices) && $failedInvoices->isNotEmpty())
+    <div class="row" id="failed-invoices-alert">
+        <div class="col-lg-12">
+            <div class="alert alert-warning alert-dismissible">
+                <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+                <h4><i class="fa fa-exclamation-triangle"></i> Fatture non importate automaticamente ({{ $failedInvoices->count() }})</h4>
+                <p>Le seguenti fatture ricevute da Mysond non sono state importate e richiedono attenzione manuale:</p>
+                <table class="table table-condensed table-bordered" style="margin-bottom:0; background:rgba(255,255,255,0.5);">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Errore</th>
+                            <th style="width:40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($failedInvoices as $fi)
+                        <tr>
+                            <td><small>{{ $fi->file_name }}</small></td>
+                            <td><small class="text-danger">{{ \Illuminate\Support\Str::limit($fi->import_error, 100) }}</small></td>
+                            <td class="text-center">
+                                @if($fi->file_path)
+                                <a href="{{ route('invoices.download-failed-file', $fi->id) }}" class="btn btn-xs btn-default" title="Scarica file originale">
+                                    <i class="fa fa-download"></i>
+                                </a>
+                                @endif
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    @endif
     <div class="row">
         <div class="col-lg-12">
             <div class="panel panel-default">

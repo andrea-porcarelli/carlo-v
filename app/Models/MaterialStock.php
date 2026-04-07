@@ -7,15 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MaterialStock extends Model
 {
-
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
-    public $fillable = [
+    protected $fillable = [
         'material_id',
-        'supplier_invoice_product_id',
+        'external_invoice_line_id',
         'stock',
         'purchase_date',
         'purchase_price',
@@ -23,15 +17,18 @@ class MaterialStock extends Model
     ];
 
     protected $casts = [
-        'purchase_date' => 'date',
+        'purchase_date'  => 'date',
         'purchase_price' => 'decimal:2',
+        'stock'          => 'decimal:4',
     ];
 
-    public function material() : BelongsTo {
+    public function material(): BelongsTo
+    {
         return $this->belongsTo(Material::class);
     }
-    public function supplier_invoice_product() : BelongsTo {
-        return $this->belongsTo(SupplierInvoiceProduct::class);
-    }
 
+    public function external_invoice_line(): BelongsTo
+    {
+        return $this->belongsTo(ExternalInvoiceLine::class);
+    }
 }
