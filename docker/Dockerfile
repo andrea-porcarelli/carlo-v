@@ -55,7 +55,7 @@ WORKDIR /var/www/html
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY supervisord.conf /etc/supervisor/conf.d/laravel-worker.conf
 
 EXPOSE 9000
 ENTRYPOINT ["entrypoint.sh"]
