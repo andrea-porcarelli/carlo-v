@@ -97,7 +97,7 @@ class StockService
                 'material_stocks.purchase_date',
                 'material_stocks.purchase_price',
                 'material_stocks.notes',
-                'external_invoice_lines.description as invoice_product',
+                'supplier_invoice_products.product_name as invoice_product',
                 DB::raw("'load' as type")
             )
             ->get();
