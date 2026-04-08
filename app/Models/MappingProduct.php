@@ -16,6 +16,7 @@ class MappingProduct extends Model
     public $fillable = [
         'material_id',
         'product_name',
+        'quantity_multiplier',
     ];
 
     public function material(): BelongsTo {

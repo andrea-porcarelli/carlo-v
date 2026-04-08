@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Facades\Utils;
 use SoapClient;
 use Exception;
 use Illuminate\Support\Facades\Log;
@@ -10,14 +11,24 @@ class MysondFatturaService
 {
     protected $client;
     protected $auth;
+    public $wsdl;
+    protected $authAde;
     protected $endpoint = "https://cloud.mysond.it/service-ejb/FatturaElettronicaService?wsdl";
 
     public function __construct()
     {
+        $this->wsdl = 'mysond';
         $this->auth = [
             'codiceAzienda' => config('services.mysond.codice_azienda'),
             'username'      => config('services.mysond.username'),
             'password'      => config('services.mysond.password'),
+        ];
+        $this->authAde = [
+            'tipoUtenza'    => 0,
+            'username'      => Utils::setting('agenzia_entrate.username'),
+            'password'      => Utils::setting('agenzia_entrate.password'),
+            'pincode'      => Utils::setting('agenzia_entrate.pincode'),
+            'utenza1'      => Utils::setting('agenzia_entrate.utenza'),
         ];
 
         $this->client = $this->initSoapClient();
@@ -28,7 +39,7 @@ class MysondFatturaService
         ini_set('soap.wsdl_cache_enabled', 0);
         ini_set('soap.wsdl_cache_ttl', 0);
 
-        $wsdl = base_path('resources/wsdl/mysond.wsdl');
+        $wsdl = base_path('resources/wsdl/' .  $this->wsdl . '.wsdl');
         $location = $this->endpoint;
 
         $context = stream_context_create([
@@ -168,6 +179,45 @@ class MysondFatturaService
         }
     }
 
+    public function inviaCorrispettivo($item)
+    {
+        $params = [
+            'CorrispettivoElettronicoItem' => [
+                'utenteAdeItem'     => $this->authAde,
+                'utenteItem'        => $this->auth,
+                'tipoTrasmissione'  => 1,
+                'corrispettivoTestataItem' => $item
+            ]
+        ];
+
+        try {
+            $response = $this->client->inviaCorrispettivo($params);
+            return $response->return ?? [];
+        } catch (\Exception $e) {
+            $this->logDebug("inviaCorrispettivo", $params, null, $e);
+            throw $e;
+        }
+    }
+
+    public function annullaCorrispettivo($progressivoSdi)
+    {
+        $params = [
+            'CorrispettivoElettronicoItem' => [
+                'utenteAdeItem'     => $this->authAde,
+                'utenteItem'        => $this->auth,
+                'progressivoSdi'    => $progressivoSdi,
+            ]
+        ];
+
+        try {
+            $response = $this->client->annullaCorrispettivo($params);
+            return $response->return ?? [];
+        } catch (\Exception $e) {
+            $this->logDebug("inviaCorrispettivo", $params, null, $e);
+            throw $e;
+        }
+    }
+
     public function exportWsdlStructure()
     {
         $types = $this->client->__getTypes();
@@ -182,5 +232,10 @@ class MysondFatturaService
         file_put_contents($path, $content);
 
         return $path;
+    }
+
+    public function setWsdl($wsdl)
+    {
+        $this->wsdl = $wsdl;
     }
 }

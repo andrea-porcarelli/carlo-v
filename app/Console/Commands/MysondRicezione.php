@@ -3,8 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Models\ExternalInvoice;
+use App\Models\MappingProduct;
+use App\Models\MaterialStock;
 use App\Models\Supplier;
 use App\Models\SupplierInvoice;
+use App\Models\SupplierInvoiceImportLog;
 use Carbon\Carbon;
 use Deved\FatturaElettronica\FatturaElettronica;
 use Illuminate\Console\Command;
@@ -57,10 +60,7 @@ class MysondRicezione extends Command
                 case 'azienda':
                     $this->testLista('getDatiAzienda', "Dati azienda", $dal, $al);
                     break;
-                case 'inspect':
-                    $this->service->exportWsdlStructure();
-                    break;
-                case 'sccontrino':
+                case 'scontrino':
                     $item = [
                         'dataDoc' => Carbon::now()->format('Y-m-d\TH:i:s'),
                         'importoTotaleIva' => 0.022,
@@ -86,8 +86,14 @@ class MysondRicezione extends Command
                             ]
                         ]
                     ];
+                    $this->service->setWsdl('CorrispettivoElettronicoService');
                     $this->service->inviaCorrispettivo($item);
                     break;
+                case 'annulla_scontrino':
+                    $progressivoSdi = '';
+                    $this->service->setWsdl('CorrispettivoElettronicoService');
+                    $this->service->annullaCorrispettivo($progressivoSdi);
+                break;
                 default:
                     $this->error("Azione non valida. Usa: invia, inviate o ricevute.");
             }
@@ -160,7 +166,6 @@ class MysondRicezione extends Command
                 if (str_ends_with($doc->docName, '.p7m')) {
                     $xmlPath = self::estraiXmlDaP7m($tempPath);
                 }
-                echo $xmlPath . PHP_EOL;
                 self::importaFattura($xmlPath);
             } catch (\Exception $e) {
                 // Salva il file in una cartella persistente per il download
@@ -382,19 +387,90 @@ class MysondRicezione extends Command
             ]);
 
             foreach ($lines as $line) {
+                $product = null;
                 try {
-                    $invoice->products()->create([
+                    $product = $invoice->products()->create([
                         'product_name' => $line['description'],
-                        'quantity' => $line['quantity'],
-                        'price' => $line['unit_price'],
-                        'iva' => $line['vat_rate'],
+                        'quantity'     => $line['quantity'],
+                        'price'        => $line['unit_price'],
+                        'iva'          => $line['vat_rate'],
                     ]);
                 } catch (\Illuminate\Database\QueryException $e) {
                     Log::info($e->getMessage());
                 }
+
+                if ($product) {
+                    try {
+                        self::autoMapProduct($invoice, $product, $line);
+                    } catch (\Exception $e) {
+                        Log::error('Auto-mapping fallito per "' . $line['description'] . '": ' . $e->getMessage());
+                    }
+                }
             }
 
         });
+    }
+
+    private static function autoMapProduct(SupplierInvoice $invoice, $product, array $line): void
+    {
+        $mapping = MappingProduct::where('product_name', $line['description'])
+            ->with('material')
+            ->first();
+
+        // Caso: nessuna mappatura nota
+        if (!$mapping || !$mapping->material) {
+            SupplierInvoiceImportLog::create([
+                'supplier_invoice_id'         => $invoice->id,
+                'supplier_invoice_product_id' => $product->id,
+                'status'                      => 'to_map',
+                'product_name'                => $line['description'],
+                'qty_invoice'                 => $line['quantity'],
+                'notes'                       => 'Nessuna mappatura nota. Richede intervento manuale.',
+            ]);
+            return;
+        }
+
+        // Caso: materiale noto ma multiplier non ancora impostato
+        if (!$mapping->quantity_multiplier) {
+            SupplierInvoiceImportLog::create([
+                'supplier_invoice_id'         => $invoice->id,
+                'supplier_invoice_product_id' => $product->id,
+                'material_id'                 => $mapping->material_id,
+                'status'                      => 'partial_mapping',
+                'product_name'                => $line['description'],
+                'material_name'               => $mapping->material->label,
+                'qty_invoice'                 => $line['quantity'],
+                'notes'                       => 'Materiale noto ma quantity_multiplier non impostato. Stock NON aggiornato. Richede intervento manuale.',
+            ]);
+            return;
+        }
+
+        // Caso: mappatura completa — auto-importa
+        $multiplier = (float) $mapping->quantity_multiplier;
+        $stockAdded = round($line['quantity'] * $multiplier, 4);
+
+        $product->update(['quantity_multiplier' => $multiplier]);
+
+        MaterialStock::create([
+            'material_id'    => $mapping->material_id,
+            'stock'          => $stockAdded,
+            'purchase_date'  => $invoice->invoice_date,
+            'purchase_price' => $line['unit_price'],
+            'notes'          => 'Auto-import fattura ' . $invoice->invoice_number,
+        ]);
+
+        SupplierInvoiceImportLog::create([
+            'supplier_invoice_id'         => $invoice->id,
+            'supplier_invoice_product_id' => $product->id,
+            'material_id'                 => $mapping->material_id,
+            'status'                      => 'auto_mapped',
+            'product_name'                => $line['description'],
+            'material_name'               => $mapping->material->label,
+            'qty_invoice'                 => $line['quantity'],
+            'quantity_multiplier'         => $multiplier,
+            'stock_added'                 => $stockAdded,
+            'stock_unit'                  => $mapping->material->stock_type,
+        ]);
     }
 
     private static function parseParty(\XMLReader $reader): array

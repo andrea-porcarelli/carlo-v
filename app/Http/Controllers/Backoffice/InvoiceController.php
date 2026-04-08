@@ -222,11 +222,10 @@ class InvoiceController extends BaseController
                     $product->update(['quantity_multiplier' => $multiplier]);
 
                     if ($materialId) {
-                        MappingProduct::firstOrCreate([
-                            'product_name' => $product->product_name,
-                        ], [
-                            'material_id' => $materialId,
-                        ]);
+                        MappingProduct::updateOrCreate(
+                            ['product_name' => $product->product_name],
+                            ['material_id' => $materialId, 'quantity_multiplier' => $multiplier]
+                        );
                     }
                 }
             }

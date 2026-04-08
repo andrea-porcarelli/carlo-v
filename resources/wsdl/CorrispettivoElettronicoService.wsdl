@@ -1,0 +1,232 @@
+<wsdl:definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="http://corrispettivoelettronico.ws.mysond.it/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:ns1="http://schemas.xmlsoap.org/soap/http" name="CorrispettivoElettronicoServiceService" targetNamespace="http://corrispettivoelettronico.ws.mysond.it/">
+<wsdl:types>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://www.mysond.it/utente" targetNamespace="http://www.mysond.it/utente" version="1.0">
+<xs:complexType name="corrispettivoElettronicoItem">
+<xs:sequence>
+<xs:element minOccurs="0" name="corrispettivoTestataItem" type="tns:corrispettivoTestataItem"/>
+<xs:element minOccurs="0" name="dataAl" type="xs:dateTime"/>
+<xs:element minOccurs="0" name="dataDal" type="xs:dateTime"/>
+<xs:element minOccurs="0" name="from" type="xs:byte"/>
+<xs:element minOccurs="0" name="progressivoSdi" type="xs:string"/>
+<xs:element minOccurs="0" name="tipoOperazione" type="xs:string"/>
+<xs:element name="tipoTrasmissione" type="xs:byte"/>
+<xs:element minOccurs="0" name="tracciato" type="xs:base64Binary"/>
+<xs:element minOccurs="0" name="utenteAdeItem" type="tns:utenteAdeItem"/>
+<xs:element minOccurs="0" name="utenteItem" type="tns:utenteItem"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="corrispettivoTestataItem">
+<xs:sequence>
+<xs:element minOccurs="0" name="ammontareComplessivo" type="xs:double"/>
+<xs:element minOccurs="0" name="cfCessionarioCommittente" type="xs:string"/>
+<xs:element maxOccurs="unbounded" minOccurs="0" name="corrispettivoRigaItemList" nillable="true" type="tns:corrispettivoRigaItem"/>
+<xs:element minOccurs="0" name="dataDoc" type="xs:dateTime"/>
+<xs:element minOccurs="0" name="descrizione" type="xs:string"/>
+<xs:element minOccurs="0" name="id" type="xs:long"/>
+<xs:element minOccurs="0" name="importoTotaleIva" type="xs:double"/>
+<xs:element minOccurs="0" name="incasso" type="xs:double"/>
+<xs:element minOccurs="0" name="pagamento" type="xs:string"/>
+<xs:element minOccurs="0" name="progressivoCollegato" type="xs:string"/>
+<xs:element minOccurs="0" name="progressivoSdi" type="xs:string"/>
+<xs:element minOccurs="0" name="resto" type="xs:double"/>
+<xs:element minOccurs="0" name="scontoAbbuono" type="xs:double"/>
+<xs:element minOccurs="0" name="scontoTotale" type="xs:double"/>
+<xs:element minOccurs="0" name="scontoTotaleLordo" type="xs:double"/>
+<xs:element minOccurs="0" name="stato" type="xs:byte"/>
+<xs:element minOccurs="0" name="tipo" type="xs:byte"/>
+<xs:element minOccurs="0" name="tipoDoc" type="xs:string"/>
+<xs:element minOccurs="0" name="totaleImponibile" type="xs:double"/>
+<xs:element minOccurs="0" name="utenteLog_id" type="xs:long"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="corrispettivoRigaItem">
+<xs:sequence>
+<xs:element minOccurs="0" name="aliquotaIva" type="xs:string"/>
+<xs:element minOccurs="0" name="codice" type="xs:string"/>
+<xs:element minOccurs="0" name="descrizione" type="xs:string"/>
+<xs:element minOccurs="0" name="imponibile" type="xs:double"/>
+<xs:element minOccurs="0" name="imponibileNetto" type="xs:double"/>
+<xs:element minOccurs="0" name="importoIva" type="xs:double"/>
+<xs:element minOccurs="0" name="prezzoLordo" type="xs:double"/>
+<xs:element minOccurs="0" name="prezzoUnitario" type="xs:double"/>
+<xs:element minOccurs="0" name="quantita" type="xs:double"/>
+<xs:element minOccurs="0" name="scontoLordo" type="xs:double"/>
+<xs:element minOccurs="0" name="scontoUnitario" type="xs:double"/>
+<xs:element minOccurs="0" name="totale" type="xs:double"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="utenteAdeItem">
+<xs:sequence>
+<xs:element minOccurs="0" name="password" type="xs:string"/>
+<xs:element minOccurs="0" name="pincode" type="xs:string"/>
+<xs:element minOccurs="0" name="tipoUtenza" type="xs:byte"/>
+<xs:element minOccurs="0" name="username" type="xs:string"/>
+<xs:element minOccurs="0" name="utenza1" type="xs:string"/>
+<xs:element minOccurs="0" name="utenza2" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="utenteItem">
+<xs:sequence>
+<xs:element minOccurs="0" name="codiceAzienda" type="xs:string"/>
+<xs:element minOccurs="0" name="password" type="xs:string"/>
+<xs:element minOccurs="0" name="username" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="mysondInfoItem">
+<xs:sequence>
+<xs:element minOccurs="0" name="codice" type="xs:string"/>
+<xs:element maxOccurs="unbounded" minOccurs="0" name="corrispettivoTestataItemList" nillable="true" type="tns:corrispettivoTestataItem"/>
+<xs:element minOccurs="0" name="descrizione" type="xs:string"/>
+<xs:element minOccurs="0" name="esito" type="xs:byte"/>
+<xs:element minOccurs="0" name="messaggio" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="cambioPasswordAdeItem">
+<xs:sequence>
+<xs:element minOccurs="0" name="confermaPassword" type="xs:string"/>
+<xs:element minOccurs="0" name="nuovaPassword" type="xs:string"/>
+<xs:element minOccurs="0" name="utenteItem" type="tns:utenteItem"/>
+<xs:element minOccurs="0" name="utenza" type="xs:string"/>
+<xs:element minOccurs="0" name="vecchiaPassword" type="xs:string"/>
+</xs:sequence>
+</xs:complexType>
+</xs:schema>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://corrispettivoelettronico.ws.mysond.it/" xmlns:ns1="http://www.mysond.it/utente" elementFormDefault="unqualified" targetNamespace="http://corrispettivoelettronico.ws.mysond.it/" version="1.0">
+<xs:import namespace="http://www.mysond.it/utente"/>
+<xs:element name="annullaCorrispettivo" type="tns:annullaCorrispettivo"/>
+<xs:element name="annullaCorrispettivoResponse" type="tns:annullaCorrispettivoResponse"/>
+<xs:element name="cambiaPasswordAde" type="tns:cambiaPasswordAde"/>
+<xs:element name="cambiaPasswordAdeResponse" type="tns:cambiaPasswordAdeResponse"/>
+<xs:element name="inviaCorrispettivo" type="tns:inviaCorrispettivo"/>
+<xs:element name="inviaCorrispettivoResponse" type="tns:inviaCorrispettivoResponse"/>
+<xs:element name="listaCorrispettivo" type="tns:listaCorrispettivo"/>
+<xs:element name="listaCorrispettivoResponse" type="tns:listaCorrispettivoResponse"/>
+<xs:complexType name="annullaCorrispettivo">
+<xs:sequence>
+<xs:element minOccurs="0" name="arg0" type="ns1:corrispettivoElettronicoItem"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="annullaCorrispettivoResponse">
+<xs:sequence>
+<xs:element minOccurs="0" name="return" type="ns1:mysondInfoItem"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="listaCorrispettivo">
+<xs:sequence>
+<xs:element minOccurs="0" name="arg0" type="ns1:corrispettivoElettronicoItem"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="listaCorrispettivoResponse">
+<xs:sequence>
+<xs:element minOccurs="0" name="return" type="ns1:mysondInfoItem"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="cambiaPasswordAde">
+<xs:sequence>
+<xs:element minOccurs="0" name="arg0" type="ns1:cambioPasswordAdeItem"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="cambiaPasswordAdeResponse">
+<xs:sequence>
+<xs:element minOccurs="0" name="return" type="ns1:mysondInfoItem"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="inviaCorrispettivo">
+<xs:sequence>
+<xs:element minOccurs="0" name="arg0" type="ns1:corrispettivoElettronicoItem"/>
+</xs:sequence>
+</xs:complexType>
+<xs:complexType name="inviaCorrispettivoResponse">
+<xs:sequence>
+<xs:element minOccurs="0" name="return" type="ns1:mysondInfoItem"/>
+</xs:sequence>
+</xs:complexType>
+</xs:schema>
+</wsdl:types>
+<wsdl:message name="listaCorrispettivoResponse">
+<wsdl:part element="tns:listaCorrispettivoResponse" name="parameters"> </wsdl:part>
+</wsdl:message>
+<wsdl:message name="listaCorrispettivo">
+<wsdl:part element="tns:listaCorrispettivo" name="parameters"> </wsdl:part>
+</wsdl:message>
+<wsdl:message name="inviaCorrispettivoResponse">
+<wsdl:part element="tns:inviaCorrispettivoResponse" name="parameters"> </wsdl:part>
+</wsdl:message>
+<wsdl:message name="cambiaPasswordAde">
+<wsdl:part element="tns:cambiaPasswordAde" name="parameters"> </wsdl:part>
+</wsdl:message>
+<wsdl:message name="inviaCorrispettivo">
+<wsdl:part element="tns:inviaCorrispettivo" name="parameters"> </wsdl:part>
+</wsdl:message>
+<wsdl:message name="annullaCorrispettivoResponse">
+<wsdl:part element="tns:annullaCorrispettivoResponse" name="parameters"> </wsdl:part>
+</wsdl:message>
+<wsdl:message name="annullaCorrispettivo">
+<wsdl:part element="tns:annullaCorrispettivo" name="parameters"> </wsdl:part>
+</wsdl:message>
+<wsdl:message name="cambiaPasswordAdeResponse">
+<wsdl:part element="tns:cambiaPasswordAdeResponse" name="parameters"> </wsdl:part>
+</wsdl:message>
+<wsdl:portType name="CorrispettivoElettronicoService">
+<wsdl:operation name="annullaCorrispettivo">
+<wsdl:input message="tns:annullaCorrispettivo" name="annullaCorrispettivo"> </wsdl:input>
+<wsdl:output message="tns:annullaCorrispettivoResponse" name="annullaCorrispettivoResponse"> </wsdl:output>
+</wsdl:operation>
+<wsdl:operation name="listaCorrispettivo">
+<wsdl:input message="tns:listaCorrispettivo" name="listaCorrispettivo"> </wsdl:input>
+<wsdl:output message="tns:listaCorrispettivoResponse" name="listaCorrispettivoResponse"> </wsdl:output>
+</wsdl:operation>
+<wsdl:operation name="cambiaPasswordAde">
+<wsdl:input message="tns:cambiaPasswordAde" name="cambiaPasswordAde"> </wsdl:input>
+<wsdl:output message="tns:cambiaPasswordAdeResponse" name="cambiaPasswordAdeResponse"> </wsdl:output>
+</wsdl:operation>
+<wsdl:operation name="inviaCorrispettivo">
+<wsdl:input message="tns:inviaCorrispettivo" name="inviaCorrispettivo"> </wsdl:input>
+<wsdl:output message="tns:inviaCorrispettivoResponse" name="inviaCorrispettivoResponse"> </wsdl:output>
+</wsdl:operation>
+</wsdl:portType>
+<wsdl:binding name="CorrispettivoElettronicoServiceServiceSoapBinding" type="tns:CorrispettivoElettronicoService">
+<soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+<wsdl:operation name="annullaCorrispettivo">
+<soap:operation soapAction="" style="document"/>
+<wsdl:input name="annullaCorrispettivo">
+<soap:body use="literal"/>
+</wsdl:input>
+<wsdl:output name="annullaCorrispettivoResponse">
+<soap:body use="literal"/>
+</wsdl:output>
+</wsdl:operation>
+<wsdl:operation name="listaCorrispettivo">
+<soap:operation soapAction="" style="document"/>
+<wsdl:input name="listaCorrispettivo">
+<soap:body use="literal"/>
+</wsdl:input>
+<wsdl:output name="listaCorrispettivoResponse">
+<soap:body use="literal"/>
+</wsdl:output>
+</wsdl:operation>
+<wsdl:operation name="cambiaPasswordAde">
+<soap:operation soapAction="" style="document"/>
+<wsdl:input name="cambiaPasswordAde">
+<soap:body use="literal"/>
+</wsdl:input>
+<wsdl:output name="cambiaPasswordAdeResponse">
+<soap:body use="literal"/>
+</wsdl:output>
+</wsdl:operation>
+<wsdl:operation name="inviaCorrispettivo">
+<soap:operation soapAction="" style="document"/>
+<wsdl:input name="inviaCorrispettivo">
+<soap:body use="literal"/>
+</wsdl:input>
+<wsdl:output name="inviaCorrispettivoResponse">
+<soap:body use="literal"/>
+</wsdl:output>
+</wsdl:operation>
+</wsdl:binding>
+<wsdl:service name="CorrispettivoElettronicoServiceService">
+<wsdl:port binding="tns:CorrispettivoElettronicoServiceServiceSoapBinding" name="CorrispettivoElettronicoServicePort">
+<soap:address location="https://api-cassa.eportale.eu/service-ejb/CorrispettivoElettronicoService"/>
+</wsdl:port>
+</wsdl:service>
+</wsdl:definitions>
