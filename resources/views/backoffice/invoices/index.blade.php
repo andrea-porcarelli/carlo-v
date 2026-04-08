@@ -84,13 +84,12 @@
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Cerca', 'class' => 'btn-find'])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Carica fattura', 'class' => 'btn-load-invoice', 'dataset' => ['path' => route('invoices.import')]])
                                 @if($importLogsCount > 0)
-                                <div class="col-lg-2">
-                                    <label>&nbsp;</label>
-                                    <button type="button" class="btn btn-info btn-block btn-show-import-logs">
-                                        <i class="fa fa-list-alt"></i> Log import
-                                        <span class="badge" style="background:#fff;color:#31708f;">{{ $importLogsCount }}</span>
-                                    </button>
-                                </div>
+                                    <div class="col-lg-2">
+                                        <button type="button" class="btn btn-info btn-block btn-show-import-logs">
+                                            <i class="fa fa-list-alt"></i> Log import
+                                            <span class="badge" style="background:#fff;color:#31708f;">{{ $importLogsCount }}</span>
+                                        </button>
+                                    </div>
                                 @endif
                             </div>
                         </div>
