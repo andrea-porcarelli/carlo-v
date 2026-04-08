@@ -165,6 +165,85 @@ class DeployController extends BaseController
     }
 
     /**
+     * POST /backoffice/local-deploy
+     *
+     * Runs "git pull" directly on this machine (local role).
+     * Protected by auth middleware — no deploy key required.
+     */
+    public function localDeploy(): JsonResponse
+    {
+        try {
+            $projectPath = base_path();
+
+            $fetchHead = $projectPath . '/.git/FETCH_HEAD';
+            if (file_exists($fetchHead) && !is_writable($fetchHead)) {
+                @unlink($fetchHead);
+            }
+
+            $output = [];
+            $returnVar = 0;
+            exec("git -C " . escapeshellarg($projectPath) . " -c safe.directory=" . escapeshellarg($projectPath) . " pull 2>&1", $output, $returnVar);
+
+            Log::info("Git pull executed (local)", ['output' => implode("\n", $output), 'return_code' => $returnVar]);
+
+            if ($returnVar === 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Git pull completato con successo',
+                    'lines'   => array_values(array_filter($output, fn($l) => trim($l) !== '')),
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Errore durante git pull',
+                    'lines'   => array_values(array_filter($output, fn($l) => trim($l) !== '')),
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error('Git pull error (local): ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /backoffice/local-migrate
+     *
+     * Runs "php artisan migrate --force" directly on this machine (local role).
+     * Protected by auth middleware — no deploy key required.
+     */
+    public function localMigrate(): JsonResponse
+    {
+        try {
+            $artisanPath = base_path('artisan');
+
+            if (!file_exists($artisanPath)) {
+                return response()->json(['success' => false, 'message' => 'artisan non trovato in ' . $artisanPath], 500);
+            }
+
+            $php     = '/usr/local/bin/php';
+            $artisan = escapeshellarg($artisanPath);
+            $command = "{$php} {$artisan} migrate --force 2>&1";
+
+            $output    = [];
+            $returnVar = 0;
+            exec($command, $output, $returnVar);
+
+            Log::info('Artisan migrate executed (local)', ['output' => implode("\n", $output), 'return_code' => $returnVar]);
+
+            $lines = array_values(array_filter($output, fn($l) => trim($l) !== ''));
+
+            if ($returnVar === 0) {
+                return response()->json(['success' => true,  'message' => 'Migrate completato con successo', 'lines' => $lines]);
+            } else {
+                return response()->json(['success' => false, 'message' => 'Errore durante migrate',          'lines' => $lines], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error('Artisan migrate error (local): ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * POST /backoffice/remote-deploy
      *
      * Proxy: chiama il webhook deploy sul peer carlov (carlov_url).

@@ -9,7 +9,7 @@
             <li>
                 <span class="m-r-sm text-muted welcome-message"></span>
             </li>
-            @if(Auth::id() == 1 && config('sync.role') === 'web')
+            @if(Auth::id() == 1 && in_array(config('sync.role'), ['web', 'local']))
             <li>
                 <a href="#" onclick="triggerDeploy(); return false;" title="Deploy (git pull)">
                     <i class="fa fa-code-branch"></i>

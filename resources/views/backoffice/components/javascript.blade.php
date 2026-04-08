@@ -14,12 +14,16 @@
     function triggerDeploy() {
         @if(config('sync.role') === 'web')
         runDeployAction('{{ route("backoffice.remote.deploy") }}', 'Deploy Carlov (git pull)');
+        @elseif(config('sync.role') === 'local')
+        runDeployAction('{{ route("backoffice.local.deploy") }}', 'Deploy locale (git pull)');
         @endif
     }
 
     function triggerMigrate() {
         @if(config('sync.role') === 'web')
         runDeployAction('{{ route("backoffice.remote.migrate") }}', 'Migrate Carlov');
+        @elseif(config('sync.role') === 'local')
+        runDeployAction('{{ route("backoffice.local.migrate") }}', 'Migrate locale');
         @endif
     }
 

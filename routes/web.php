@@ -108,6 +108,10 @@ Route::group(['prefix' => '/backoffice'], function() {
         Route::post('/remote-deploy', [DeployController::class, 'remoteTrigger'])->name('backoffice.remote.deploy');
         Route::post('/remote-migrate', [DeployController::class, 'remoteMigrate'])->name('backoffice.remote.migrate');
 
+        // Local deploy/migrate (local role only — runs commands directly on this machine)
+        Route::post('/local-deploy', [DeployController::class, 'localDeploy'])->name('backoffice.local.deploy');
+        Route::post('/local-migrate', [DeployController::class, 'localMigrate'])->name('backoffice.local.migrate');
+
         Route::post('/upload', [UploadController::class, 'start'])->name('upload');
 
         // Users Management
