@@ -329,39 +329,45 @@ class MysondRicezione extends Command
                     Log::info($e->getMessage());
                 }
             }
+            $exist = SupplierInvoice::where('supplier_id', $supplier->id)
+                ->where('invoice_number', $invoiceData['number'])
+                ->where('invoice_date', $invoiceData['date'])
+                ->first();
+            if (!$exist) {
+                $invoice = SupplierInvoice::create([
+                    'supplier_id' => $supplier->id,
+                    'invoice_number' => $invoiceData['number'],
+                    'invoice_date' => $invoiceData['date'],
+                ], [
+                    'supplier_id' => $supplier->id,
+                    'invoice_number' => $invoiceData['number'],
+                    'invoice_date' => $invoiceData['date'],
+                    'amount' => $invoiceData['total_amount'],
+                ]);
 
-            $invoice = SupplierInvoice::updateOrCreate([
-                'supplier_id' => $supplier->id,
-                'invoice_number' => $invoiceData['number'],
-                'invoice_date' => $invoiceData['date'],
-            ], [
-                'supplier_id' => $supplier->id,
-                'invoice_number' => $invoiceData['number'],
-                'invoice_date' => $invoiceData['date'],
-                'amount' => $invoiceData['total_amount'],
-            ]);
-
-            foreach ($lines as $line) {
-                $product = null;
-                try {
-                    $product = $invoice->products()->create([
-                        'product_name' => $line['description'],
-                        'quantity'     => $line['quantity'],
-                        'price'        => $line['unit_price'],
-                        'iva'          => $line['vat_rate'],
-                    ]);
-                } catch (\Illuminate\Database\QueryException $e) {
-                    Log::info($e->getMessage());
-                }
-
-                if ($product) {
+                foreach ($lines as $line) {
+                    $product = null;
                     try {
-                        self::autoMapProduct($invoice, $product, $line);
-                    } catch (\Exception $e) {
-                        Log::error('Auto-mapping fallito per "' . $line['description'] . '": ' . $e->getMessage());
+                        $product = $invoice->products()->create([
+                            'product_name' => $line['description'],
+                            'quantity'     => $line['quantity'],
+                            'price'        => $line['unit_price'],
+                            'iva'          => $line['vat_rate'],
+                        ]);
+                    } catch (\Illuminate\Database\QueryException $e) {
+                        Log::info($e->getMessage());
+                    }
+
+                    if ($product) {
+                        try {
+                            self::autoMapProduct($invoice, $product, $line);
+                        } catch (\Exception $e) {
+                            Log::error('Auto-mapping fallito per "' . $line['description'] . '": ' . $e->getMessage());
+                        }
                     }
                 }
             }
+
 
         });
     }
