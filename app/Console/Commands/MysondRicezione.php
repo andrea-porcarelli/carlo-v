@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\ExternalInvoice;
 use App\Models\Supplier;
 use App\Models\SupplierInvoice;
+use Carbon\Carbon;
 use Deved\FatturaElettronica\FatturaElettronica;
 use Illuminate\Console\Command;
 use App\Services\MysondFatturaService;
@@ -58,6 +59,34 @@ class MysondRicezione extends Command
                     break;
                 case 'inspect':
                     $this->service->exportWsdlStructure();
+                    break;
+                case 'sccontrino':
+                    $item = [
+                        'dataDoc' => Carbon::now()->format('Y-m-d\TH:i:s'),
+                        'importoTotaleIva' => 0.022,
+                        'scontoTotale' => 0,
+                        'scontoTotaleLordo' => 0,
+                        'scontoAbbuono' => 0,
+                        'totaleImponibile' => 0.078,
+                        'ammontareComplessivo' => 0.10,
+                        'pagamento' => 'PE',
+                        'corrispettivoRigaItemList' => [
+                            [
+                                'quantita' => 1,
+                                'descrizione' => 'Piatto',
+                                'prezzoLordo' => 0.10,
+                                'prezzoUnitario' => 0.10,
+                                'scontoUnitario' => 0,
+                                'scontoLordo' => 0,
+                                'aliquotaIva' => 22,
+                                'importoIva' => 0.022,
+                                'imponibile' => 0.078,
+                                'imponibileNetto' => 0.078,
+                                'totale' => 0.10
+                            ]
+                        ]
+                    ];
+                    $this->service->inviaCorrispettivo($item);
                     break;
                 default:
                     $this->error("Azione non valida. Usa: invia, inviate o ricevute.");
@@ -146,23 +175,27 @@ class MysondRicezione extends Command
                 try {
                     $basicInfo = self::extractBasicInfo($xmlPath);
                 } catch (\Throwable $ignored) {}
+                $exist = ExternalInvoice::where('file_name', $doc->docName)->first();
+                if ($exist && $exist->status !== 'ignored') {
+                    continue;
+                } else {
+                    $record = ExternalInvoice::updateOrCreate(
+                        ['file_name' => $doc->docName],
+                        [
+                            'file_name'      => $doc->docName,
+                            'sdi_identifier' => $doc->code ?? null,
+                            'status'         => 'import_error',
+                            'import_error'   => $e->getMessage(),
+                            'supplier_name'  => $basicInfo['supplier_name'] ?? null,
+                            'date'           => $basicInfo['date'] ?? null,
+                            'total_amount'   => $basicInfo['total_amount'] ?? null,
+                            'number'         => $basicInfo['number'] ?? null,
+                            'file_path'      => 'failed_invoices/' . $doc->docName,
+                        ]
+                    );
 
-                $record = ExternalInvoice::updateOrCreate(
-                    ['file_name' => $doc->docName],
-                    [
-                        'file_name'      => $doc->docName,
-                        'sdi_identifier' => $doc->code ?? null,
-                        'status'         => 'import_error',
-                        'import_error'   => $e->getMessage(),
-                        'supplier_name'  => $basicInfo['supplier_name'] ?? null,
-                        'date'           => $basicInfo['date'] ?? null,
-                        'total_amount'   => $basicInfo['total_amount'] ?? null,
-                        'number'         => $basicInfo['number'] ?? null,
-                        'file_path'      => 'failed_invoices/' . $doc->docName,
-                    ]
-                );
-
-                $failed[] = $record;
+                    $failed[] = $record;
+                }
             }
         }
 
