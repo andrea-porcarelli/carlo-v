@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('material_stocks', function (Blueprint $table) {
-            $table->dropColumn('external_invoice_line_id');
+            $table->dropConstrainedForeignId('external_invoice_line_id');
             $table->foreignId('supplier_invoice_product_id')
                 ->nullable()
                 ->after('material_id')
