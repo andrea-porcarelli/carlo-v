@@ -338,10 +338,6 @@ class MysondRicezione extends Command
                     'supplier_id' => $supplier->id,
                     'invoice_number' => $invoiceData['number'],
                     'invoice_date' => $invoiceData['date'],
-                ], [
-                    'supplier_id' => $supplier->id,
-                    'invoice_number' => $invoiceData['number'],
-                    'invoice_date' => $invoiceData['date'],
                     'amount' => $invoiceData['total_amount'],
                 ]);
 
