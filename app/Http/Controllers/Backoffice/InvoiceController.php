@@ -14,9 +14,11 @@ use App\Models\SupplierInvoice;
 use App\Models\SupplierInvoiceImportLog;
 use App\Models\SupplierInvoiceProduct;
 use App\Traits\DatatableTrait;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -127,7 +129,7 @@ class InvoiceController extends BaseController
 
 
             $elements = $this->interface->filters($filters);
-            return $this->editColumns(datatables()->of($elements), $this->name, ['mapping-product', 'ignore-invoice'])
+            return $this->editColumns(datatables()->of($elements), $this->name, ['pdf-invoice', 'mapping-product', 'ignore-invoice'])
                 ->addColumn('supplier_name', function ($item) {
                    return $item->supplier->extended_name;
                 })
@@ -325,6 +327,131 @@ class InvoiceController extends BaseController
                 ? "Caricate {$created} giacenze."
                 : 'Nessuna nuova giacenza da caricare.',
         ]);
+    }
+
+    public function downloadPdf(int $id): Response
+    {
+        $invoice = SupplierInvoice::findOrFail($id);
+
+        abort_if(!$invoice->filename, 404, 'Nessun file XML associato a questa fattura.');
+
+        $xmlPath = storage_path('app/private/invoices/' . $invoice->filename);
+        abort_unless(file_exists($xmlPath), 404, 'File XML non trovato.');
+
+        $content = file_get_contents($xmlPath);
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($content);
+        abort_if($xml === false, 422, 'File XML non valido.');
+
+        // Prova a estrarre il PDF allegato (copia di cortesia)
+        $body = $xml->FatturaElettronicaBody;
+        if (isset($body->Allegati)) {
+            foreach ($body->Allegati as $allegato) {
+                if (strtoupper((string)$allegato->FormatoAttachment) === 'PDF') {
+                    $pdfBytes = base64_decode((string)$allegato->Attachment);
+                    if ($pdfBytes && str_starts_with($pdfBytes, '%PDF')) {
+                        $filename = preg_replace('/[^a-zA-Z0-9_\-.]/', '_', $invoice->filename);
+                        $filename = preg_replace('/\.xml$/i', '.pdf', $filename);
+                        return response($pdfBytes, 200, [
+                            'Content-Type'        => 'application/pdf',
+                            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+                        ]);
+                    }
+                }
+            }
+        }
+
+        // Fallback: genera PDF da dati XML tramite dompdf
+        $header    = $xml->FatturaElettronicaHeader;
+        $cedente   = $header->CedentePrestatore;
+        $committente = $header->CessionarioCommittente;
+        $datiDoc   = $body->DatiGenerali->DatiGeneraliDocumento;
+
+        $cedenteName = (string)($cedente->DatiAnagrafici->Anagrafica->Denominazione ?? '');
+        if (!$cedenteName) {
+            $cedenteName = trim(
+                (string)($cedente->DatiAnagrafici->Anagrafica->Nome ?? '') . ' ' .
+                (string)($cedente->DatiAnagrafici->Anagrafica->Cognome ?? '')
+            );
+        }
+
+        $committenteName = (string)($committente->DatiAnagrafici->Anagrafica->Denominazione ?? '');
+        if (!$committenteName) {
+            $committenteName = trim(
+                (string)($committente->DatiAnagrafici->Anagrafica->Nome ?? '') . ' ' .
+                (string)($committente->DatiAnagrafici->Anagrafica->Cognome ?? '')
+            );
+        }
+
+        $linee = [];
+        foreach ($body->DatiBeniServizi->DettaglioLinee as $linea) {
+            $linee[] = [
+                'numero'          => (string)$linea->NumeroLinea,
+                'descrizione'     => (string)$linea->Descrizione,
+                'quantita'        => (float)($linea->Quantita ?? 0),
+                'unita'           => (string)($linea->UnitaMisura ?? ''),
+                'prezzo_unitario' => (float)($linea->PrezzoUnitario ?? 0),
+                'prezzo_totale'   => (float)($linea->PrezzoTotale ?? 0),
+                'iva'             => (float)($linea->AliquotaIVA ?? 0),
+            ];
+        }
+
+        $riepilogo = [];
+        foreach ($body->DatiBeniServizi->DatiRiepilogo as $r) {
+            $riepilogo[] = [
+                'aliquota'   => (float)$r->AliquotaIVA,
+                'imponibile' => (float)$r->ImponibileImporto,
+                'imposta'    => (float)$r->Imposta,
+            ];
+        }
+
+        $pagamento = null;
+        if (isset($body->DatiPagamento->DettaglioPagamento)) {
+            $dp = $body->DatiPagamento->DettaglioPagamento;
+            $pagamento = [
+                'modalita' => (string)($dp->ModalitaPagamento ?? ''),
+                'scadenza'  => (string)($dp->DataScadenzaPagamento ?? ''),
+                'importo'   => (float)($dp->ImportoPagamento ?? 0),
+            ];
+        }
+
+        $data = [
+            'invoice'     => $invoice,
+            'cedente'     => [
+                'nome'      => $cedenteName,
+                'piva'      => (string)($cedente->DatiAnagrafici->IdFiscaleIVA->IdCodice ?? ''),
+                'indirizzo' => (string)($cedente->Sede->Indirizzo ?? ''),
+                'cap'       => (string)($cedente->Sede->CAP ?? ''),
+                'comune'    => (string)($cedente->Sede->Comune ?? ''),
+                'provincia' => (string)($cedente->Sede->Provincia ?? ''),
+            ],
+            'committente' => [
+                'nome'      => $committenteName,
+                'piva'      => (string)($committente->DatiAnagrafici->IdFiscaleIVA->IdCodice ?? ''),
+                'indirizzo' => (string)($committente->Sede->Indirizzo ?? ''),
+                'cap'       => (string)($committente->Sede->CAP ?? ''),
+                'comune'    => (string)($committente->Sede->Comune ?? ''),
+                'provincia' => (string)($committente->Sede->Provincia ?? ''),
+            ],
+            'documento'   => [
+                'numero' => (string)$datiDoc->Numero,
+                'data'   => (string)$datiDoc->Data,
+                'tipo'   => (string)($datiDoc->TipoDocumento ?? 'TD01'),
+                'divisa' => (string)($datiDoc->Divisa ?? 'EUR'),
+                'totale' => (float)($datiDoc->ImportoTotaleDocumento ?? 0),
+            ],
+            'linee'      => $linee,
+            'riepilogo'  => $riepilogo,
+            'pagamento'  => $pagamento,
+        ];
+
+        $filename = preg_replace('/[^a-zA-Z0-9_\-.]/', '_', $invoice->filename);
+        $filename = preg_replace('/\.xml$/i', '.pdf', $filename);
+
+        $pdf = Pdf::loadView('backoffice.invoices.pdf', $data)
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->stream($filename);
     }
 
     public function checkPriceAlerts(): JsonResponse

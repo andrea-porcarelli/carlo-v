@@ -11,6 +11,7 @@
         "ext-libxml": "*",
         "ext-simplexml": "*",
         "barryvdh/laravel-debugbar": "^3.16",
+        "barryvdh/laravel-dompdf": "*",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^3.6",

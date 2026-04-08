@@ -26,6 +26,13 @@
             <span class="fa {{ (!$item->is_active) ? 'fa-times' : 'fa-check' }}"></span>
         </button>
     @endif
+    @if (in_array('pdf-invoice', $options) && $item->filename)
+        <a href="{{ route('invoices.pdf', $item->id) }}" target="_blank" title="Scarica PDF fattura">
+            <button class="btn btn-xs btn-danger">
+                <i class="fa fa-file-pdf-o"></i>
+            </button>
+        </a>
+    @endif
     @if (in_array('ignore-invoice', $options))
         <button
             class="btn btn-xs {{ $item->ignored_at ? 'btn-warning' : 'btn-default' }} btn-toggle-ignore-invoice"

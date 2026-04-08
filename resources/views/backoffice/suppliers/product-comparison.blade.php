@@ -150,7 +150,15 @@
                                                             @if($isBest)<i class="fa fa-trophy text-success"></i>@endif
                                                             {{ $purchase->invoice->supplier->company_name ?? '—' }}
                                                         </td>
-                                                        <td><small>{{ $purchase->invoice->invoice_number }}</small></td>
+                                                        <td>
+
+                                                            <small>{{ $purchase->invoice->invoice_number }}</small>
+                                                            <a href="{{ route('invoices.pdf', $purchase->invoice->id) }}" target="_blank" title="Apri PDF fattura">
+                                                                <button class="btn btn-xs btn-danger">
+                                                                    <i class="fa fa-file-pdf-o"></i>
+                                                                </button>
+                                                            </a>
+                                                        </td>
                                                         <td class="text-center">
                                                             <small>{{ $purchase->invoice->invoice_date?->format('d/m/Y') }}</small>
                                                         </td>
