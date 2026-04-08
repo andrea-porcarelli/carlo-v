@@ -127,6 +127,7 @@ Route::group(['prefix' => '/backoffice'], function() {
 
         Route::group(['prefix' => '/suppliers'], function() {
             Route::get('/datatable', [SupplierController::class, 'datatable'])->name('suppliers.datatable');
+            Route::get('/product-comparison', [SupplierController::class, 'productComparison'])->name('suppliers.product-comparison');
         });
         Route::resource('suppliers', SupplierController::class);
 

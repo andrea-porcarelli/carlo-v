@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Backoffice;
 
 use App\Facades\Utils;
 use App\Interfaces\SupplierInterface;
+use App\Models\MappingProduct;
+use App\Models\SupplierInvoiceProduct;
 use App\Traits\DatatableTrait;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -28,6 +30,61 @@ class SupplierController extends BaseController
 
     public function index() : View {
         return view('backoffice.suppliers.index');
+    }
+
+    public function productComparison(): View
+    {
+        // Raggruppa le mappature per material_id
+        $mappings = MappingProduct::with('material')
+            ->whereNotNull('material_id')
+            ->get()
+            ->groupBy('material_id');
+
+        $rows = $mappings->map(function ($materialMappings) {
+            $material    = $materialMappings->first()->material;
+            if (!$material) return null;
+
+            $productNames = $materialMappings->pluck('product_name');
+
+            // Tutti gli acquisti validi per questo materiale
+            $purchases = SupplierInvoiceProduct::whereIn('product_name', $productNames)
+                ->where('quantity_multiplier', '>', 0)
+                ->where('ignore_mapping', 0)
+                ->whereHas('invoice', fn($q) => $q->whereNull('ignored_at'))
+                ->with(['invoice.supplier'])
+                ->get()
+                ->map(function ($p) {
+                    $p->price_per_unit = round($p->price / $p->quantity_multiplier, 4);
+                    return $p;
+                })
+                ->sortBy('price_per_unit')
+                ->values();
+
+            if ($purchases->isEmpty()) return null;
+
+            $prices = $purchases->pluck('price_per_unit');
+            $best   = $purchases->first(); // già ordinato per price_per_unit ASC
+
+            return [
+                'material'        => $material,
+                'purchases_count' => $purchases->count(),
+                'avg_price'       => round($prices->avg(), 4),
+                'min_price'       => $prices->min(),
+                'max_price'       => $prices->max(),
+                'best'            => [
+                    'supplier_name'  => $best->invoice->supplier->company_name ?? '—',
+                    'invoice_number' => $best->invoice->invoice_number,
+                    'invoice_date'   => $best->invoice->invoice_date?->format('d/m/Y'),
+                    'price_per_unit' => $best->price_per_unit,
+                ],
+                'purchases' => $purchases,
+            ];
+        })
+        ->filter()
+        ->sortBy(fn($r) => $r['material']->label)
+        ->values();
+
+        return view('backoffice.suppliers.product-comparison', compact('rows'));
     }
 
     public function datatable(Request $request) : JsonResponse {

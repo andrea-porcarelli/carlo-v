@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Backoffice;
 
 use App\Facades\Utils;
 use App\Models\ExternalInvoice;
-use App\Models\ExternalInvoiceLine;
 use App\Models\MappingProduct;
 use App\Models\Material;
 use App\Models\MaterialStock;

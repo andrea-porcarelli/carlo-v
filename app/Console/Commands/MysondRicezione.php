@@ -414,6 +414,7 @@ class MysondRicezione extends Command
         $product->update(['quantity_multiplier' => $multiplier]);
 
         MaterialStock::create([
+            'supplier_invoice_product_id' => $product->id,
             'material_id'    => $mapping->material_id,
             'stock'          => $stockAdded,
             'purchase_date'  => $invoice->invoice_date,

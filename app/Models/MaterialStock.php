@@ -9,7 +9,7 @@ class MaterialStock extends Model
 {
     protected $fillable = [
         'material_id',
-        'external_invoice_line_id',
+        'supplier_invoice_product_id',
         'stock',
         'purchase_date',
         'purchase_price',

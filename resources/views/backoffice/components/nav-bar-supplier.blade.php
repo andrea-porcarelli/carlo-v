@@ -15,5 +15,10 @@
                 <i class="fas fa-file-alt"></i> Ordini / Fatture
             </a>
         </li>
+        <li class="{{ (Request::is('backoffice/suppliers/product-comparison*')) ? 'active' : '' }}">
+            <a href="{{ route('suppliers.product-comparison') }}">
+                <i class="fas fa-balance-scale"></i> Comparazione prodotti
+            </a>
+        </li>
     </ul>
 </li>
