@@ -19,6 +19,13 @@ class SupplierInvoiceRepository extends CrudRepository implements SupplierInvoic
     {
         $builder = $this->builder();
 
+        // Filtro ignorate: mostra solo le ignorate; di default le esclude sempre
+        if (!empty($filters['ignored']) && $filters['ignored'] === 'ignorate') {
+            $builder->whereNotNull('ignored_at');
+        } else {
+            $builder->whereNull('ignored_at');
+        }
+
         if (!empty($filters['invoice_number'])) {
             $builder->where('invoice_number', 'like', '%' . $filters['invoice_number'] . '%');
         }

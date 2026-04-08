@@ -70,6 +70,17 @@
                                         ['id' => 'effettuata',    'label' => 'Effettuata'],
                                     ],
                                 ])
+                                @include('backoffice.components.form.select', [
+                                    'label' => 'Visualizza',
+                                    'name' => 'ignored',
+                                    'col' => 2,
+                                    'class' => 'ignored',
+                                    'hide_first' => true,
+                                    'first_value_text' => 'Attive',
+                                    'options' => [
+                                        ['id' => 'ignorate', 'label' => 'Ignorate'],
+                                    ],
+                                ])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Cerca', 'class' => 'btn-find'])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Carica fattura', 'class' => 'btn-load-invoice', 'dataset' => ['path' => route('invoices.import')]])
                                 @if($importLogsCount > 0)
@@ -163,6 +174,25 @@
 @endsection
 @section('custom-script')
     <script>
+        $(document).on('click', '.btn-toggle-ignore-invoice', function() {
+            var btn = $(this);
+            var isIgnored = btn.hasClass('btn-warning');
+            var msg = isIgnored
+                ? 'Ripristinare questa fattura? Tornerà visibile nella lista normale.'
+                : 'Ignorare questa fattura? Sarà nascosta dalla lista normale.';
+            if (!confirm(msg)) return;
+            $.ajax({
+                url: btn.data('url'),
+                type: 'PATCH',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function() {
+                    if (window.dataTable) window.dataTable.ajax.reload();
+                    else window.location.reload();
+                },
+                error: function() { alert('Errore durante l\'operazione.'); }
+            });
+        });
+
         $(document).on('click', '.btn-ignore-failed', function() {
             var btn = $(this);
             var url = btn.data('url');
@@ -265,7 +295,7 @@
                         {data: 'mapping', class: 'text-center'},
                     ],
                     order: [[1, 'desc']],
-                    dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'mapping'],
+                    dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'mapping', 'ignored'],
                     serverSide: false,
                 }]);
             }, 500);

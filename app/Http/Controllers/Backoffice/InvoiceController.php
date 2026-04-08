@@ -52,6 +52,19 @@ class InvoiceController extends BaseController
         return view('backoffice.' . $this->name . '.index', compact('suppliers', 'failedInvoices', 'importLogsCount'));
     }
 
+    public function toggleIgnore(int $id): JsonResponse
+    {
+        $invoice = SupplierInvoice::findOrFail($id);
+
+        $invoice->update([
+            'ignored_at' => $invoice->ignored_at ? null : now(),
+        ]);
+
+        return response()->json([
+            'ignored' => (bool) $invoice->ignored_at,
+        ]);
+    }
+
     public function importLogs(): JsonResponse
     {
         $logs = SupplierInvoiceImportLog::with('invoice.supplier')
@@ -114,7 +127,7 @@ class InvoiceController extends BaseController
 
 
             $elements = $this->interface->filters($filters);
-            return $this->editColumns(datatables()->of($elements), $this->name, ['edit', 'mapping-product'])
+            return $this->editColumns(datatables()->of($elements), $this->name, ['mapping-product', 'ignore-invoice'])
                 ->addColumn('supplier_name', function ($item) {
                    return $item->supplier->extended_name;
                 })

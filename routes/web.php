@@ -139,6 +139,7 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/failed/{id}/download', [InvoiceController::class, 'download_failed_file'])->name('invoices.download-failed-file');
             Route::patch('/failed/{id}/ignore', [InvoiceController::class, 'ignore_failed'])->name('invoices.ignore-failed');
             Route::get('/import-logs', [InvoiceController::class, 'importLogs'])->name('invoices.import-logs');
+            Route::patch('/{id}/toggle-ignore', [InvoiceController::class, 'toggleIgnore'])->name('invoices.toggle-ignore');
         });
 
         Route::resource('invoices', InvoiceController::class);

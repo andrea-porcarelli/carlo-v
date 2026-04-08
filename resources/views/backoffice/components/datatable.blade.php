@@ -26,6 +26,16 @@
             <span class="fa {{ (!$item->is_active) ? 'fa-times' : 'fa-check' }}"></span>
         </button>
     @endif
+    @if (in_array('ignore-invoice', $options))
+        <button
+            class="btn btn-xs {{ $item->ignored_at ? 'btn-warning' : 'btn-default' }} btn-toggle-ignore-invoice"
+            title="{{ $item->ignored_at ? 'Ripristina fattura' : 'Ignora fattura' }}"
+            data-id="{{ $item->id }}"
+            data-url="{{ route('invoices.toggle-ignore', $item->id) }}"
+        >
+            <span class="fa {{ $item->ignored_at ? 'fa-undo' : 'fa-eye-slash' }}"></span>
+        </button>
+    @endif
     @if (in_array('mapping-product', $options))
         @if ($item->products()->whereDoesntHave('material')->count() > 0)
             <a href="{{ route('invoices.mapping_products', $item->id) }}">

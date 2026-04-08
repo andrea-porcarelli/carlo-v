@@ -22,12 +22,14 @@ class SupplierInvoice extends LogsModel
         'filename',
         'amount',
         'invoice_date',
+        'ignored_at',
     ];
 
     protected $withCount = ['products'];
 
     protected $casts = [
         'invoice_date' => 'datetime',
+        'ignored_at'   => 'datetime',
     ];
 
     public function supplier() : BelongsTo
