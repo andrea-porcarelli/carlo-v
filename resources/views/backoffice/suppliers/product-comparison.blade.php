@@ -157,7 +157,13 @@
                                                         <td class="text-right">
                                                             € {{ number_format($purchase->price, 2, ',', '.') }}
                                                         </td>
-                                                        <td class="text-right">{{ $purchase->quantity }}</td>
+                                                        <td>
+                                                            <input type="number"
+                                                                   class="form-control input-sm quantity-input"
+                                                                   value="{{ $purchase->quantity }}"
+                                                                   step="0.001" min="0.001"
+                                                                   style="width:80px;">
+                                                        </td>
                                                         <td>
                                                             <input type="number"
                                                                    class="form-control input-sm multiplier-input"
@@ -258,13 +264,20 @@
     <script>
         var updateUrl = '{{ rtrim(route('suppliers.invoice-products.update', ['id' => 0]), '0') }}';
 
-        // Espandi / chiudi dettaglio
+        // Espandi / chiudi dettaglio + inizializza select2
         $(document).on('click', '.btn-expand-row', function () {
             var id = $(this).data('id');
             var $detail = $('.detail-row-' + id);
             var visible = $detail.is(':visible');
             $detail.toggle(!visible);
             $(this).toggleClass('expanded', !visible);
+            if (!visible) {
+                $detail.find('.material-select').each(function () {
+                    if (!$(this).hasClass('select2-hidden-accessible')) {
+                        $(this).select2({ width: '220px', dropdownAutoWidth: true });
+                    }
+                });
+            }
         });
 
         // Filtro per nome materiale
@@ -290,6 +303,7 @@
 
             var payload = {
                 _token:              '{{ csrf_token() }}',
+                quantity:            $row.find('.quantity-input').val(),
                 quantity_multiplier: $row.find('.multiplier-input').val(),
                 ignore_mapping:      $row.find('.ignore-checkbox').is(':checked') ? 1 : 0,
                 material_id:         $row.find('.material-select').val(),

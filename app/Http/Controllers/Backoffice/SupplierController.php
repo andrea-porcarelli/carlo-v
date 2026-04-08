@@ -113,6 +113,7 @@ class SupplierController extends BaseController
     {
         try {
             $request->validate([
+                'quantity'            => 'nullable|numeric|min:0.0001',
                 'quantity_multiplier' => 'nullable|numeric|min:0.0001',
                 'ignore_mapping'      => 'nullable|boolean',
                 'material_id'         => 'nullable|exists:materials,id',
@@ -121,6 +122,9 @@ class SupplierController extends BaseController
             $product = SupplierInvoiceProduct::findOrFail($id);
 
             $productData = [];
+            if ($request->has('quantity')) {
+                $productData['quantity'] = (float) $request->quantity;
+            }
             if ($request->has('quantity_multiplier')) {
                 $productData['quantity_multiplier'] = (float) $request->quantity_multiplier;
             }
