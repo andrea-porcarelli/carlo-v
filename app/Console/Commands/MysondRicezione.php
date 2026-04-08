@@ -311,6 +311,10 @@ class MysondRicezione extends Command
             $reader->close();
             if ($supplier) {
                 try {
+                    $company_name = $supplier['company_name'];
+                    if(strlen($company_name) == 0) {
+                        $company_name = $supplier['first_name'] . ' ' . $supplier['last_name'];
+                    }
                     $supplier = Supplier::updateOrCreate([
                         'fiscal_code' => $supplier['tax_code'],
                         'vat_number' => $supplier['vat_number'],
@@ -318,7 +322,7 @@ class MysondRicezione extends Command
                         'fiscal_code' => $supplier['tax_code'],
                         'vat_number' => $supplier['vat_number'],
                         'address' => $supplier['address'],
-                        'company_name' => $supplier['company_name'],
+                        'company_name' => $company_name,
                         'street_number' => $supplier['street_number'],
                         'zip_code' => $supplier['zip_code'],
                         'city' => $supplier['city'],
@@ -339,6 +343,7 @@ class MysondRicezione extends Command
                     'invoice_number' => $invoiceData['number'],
                     'invoice_date' => $invoiceData['date'],
                     'amount' => $invoiceData['total_amount'],
+                    'filename' => basename($path),
                 ]);
 
                 foreach ($lines as $line) {
