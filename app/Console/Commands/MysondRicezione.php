@@ -48,17 +48,11 @@ class MysondRicezione extends Command
 
         try {
             switch ($azione) {
-                case 'invia':
-                    $this->testInvio();
-                    break;
                 case 'inviate':
                     $this->testLista('getFattureInviate', "Fatture ATTIVE inviate", $dal, $al);
                     break;
                 case 'ricevute':
                     $this->testLista('riceviFatture', "Fatture PASSIVE ricevute", $dal, $al);
-                    break;
-                case 'azienda':
-                    $this->testLista('getDatiAzienda', "Dati azienda", $dal, $al);
                     break;
                 case 'scontrino':
                     $item = [
@@ -105,25 +99,6 @@ class MysondRicezione extends Command
             }
         }
     }
-
-    private function testInvio()
-    {
-        $path = $this->option('file');
-        if (!$path || !file_exists($path)) {
-            $this->error("Errore: devi specificare un file valido con --file=/percorso/file.xml");
-            return;
-        }
-
-        $xml = file_get_contents($path);
-        $nomeFile = basename($path);
-
-        $this->info("Invio in corso di $nomeFile...");
-        $res = $this->service->inviaFatturaAttiva($xml, $nomeFile);
-
-        $this->success("Richiesta completata!");
-        dump($res);
-    }
-
     private function testLista($metodo, $titolo, $dal, $al)
     {
         $this->info("$titolo $dal al $al..");
@@ -147,13 +122,13 @@ class MysondRicezione extends Command
             ];
         }
         if ($metodo === 'riceviFatture') {
-            self::import_fatture($risultati);
+            self::import_fatture($risultati, $this->service);
         }
 
         $this->table($headers, $rows);
     }
 
-    private static function import_fatture($risultati) {
+    private static function import_fatture($risultati, $service) {
         $failed = [];
 
         foreach ($risultati as $doc) {
@@ -164,7 +139,8 @@ class MysondRicezione extends Command
 
             try {
                 if (str_ends_with($doc->docName, '.p7m')) {
-                    $xmlPath = self::estraiXmlDaP7m($tempPath);
+                    $xml_extract_content = self::estraiXmlDaP7m($tempPath, $service);
+                    file_put_contents($tempPath, $xml_extract_content);
                 }
                 self::importaFattura($xmlPath);
             } catch (\Exception $e) {
@@ -204,9 +180,9 @@ class MysondRicezione extends Command
             }
         }
 
-        if (!empty($failed)) {
-            self::notificaTelegram($failed);
-        }
+//        if (!empty($failed)) {
+//            self::notificaTelegram($failed);
+//        }
     }
 
     private static function notificaTelegram(array $failedInvoices): void
@@ -274,31 +250,10 @@ class MysondRicezione extends Command
         ];
     }
 
-    private static function estraiXmlDaP7m($path)
+    private static function estraiXmlDaP7m($path, $service)
     {
-
         $content = file_get_contents($path);
-
-        // Se il file è già XML
-        if (str_starts_with(trim($content), '<?xml')) {
-            return $path;
-        }
-
-        $output = str_replace('.p7m', '.xml', $path);
-
-        // openssl in DER mode
-        $command = "openssl smime -inform DER -verify -noverify -in "
-            . escapeshellarg($path)
-            . " -out "
-            . escapeshellarg($output);
-
-        exec($command, $out, $code);
-
-        if ($code !== 0 || !file_exists($output)) {
-            throw new \Exception("Errore estrazione p7m: verifica che il file sia valido DER");
-        }
-
-        return $output;
+        return $service->getXmlFromP7m($content);
     }
 
     private static function importaFattura($path)

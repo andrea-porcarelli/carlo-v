@@ -238,4 +238,25 @@ class MysondFatturaService
     {
         $this->wsdl = $wsdl;
     }
+
+    public function getXmlFromP7m(string $xml) : string
+    {
+        $params = [
+            'arg0' => [
+                'dataDal'        => '',
+                'dataAl'        => '',
+                'signAndSand' => false, // Obbligatorio per docImportPaItem
+                'utente'      => $this->auth,
+                'xmlDoc'        => base64_encode($xml),
+            ]
+        ];
+
+        try {
+            $response = $this->client->getXmlFromP7m($params);
+            return $response->return->xmlDoc ?? '';
+        } catch (\Exception $e) {
+            $this->logDebug("getXmlFromP7m", $params, null, $e);
+            throw $e;
+        }
+    }
 }
