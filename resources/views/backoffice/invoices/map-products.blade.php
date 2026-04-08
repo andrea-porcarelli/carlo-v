@@ -812,7 +812,7 @@
         }
 
         /* ── Barra fissa in fondo ── */
-        body { padding-bottom: 70px; }
+        body { padding-bottom: 85px; }
 
         .mapping-fixed-bar {
             position: fixed;
@@ -829,31 +829,41 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px 24px;
+            padding: 12px 24px;
+        }
+
+        .mapping-fixed-left .btn {
+            font-size: 16px;
+            padding: 8px 18px;
         }
 
         .mapping-fixed-right {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 18px;
         }
 
         .mapping-progress-label {
-            font-size: 15px;
+            font-size: 18px;
             white-space: nowrap;
         }
 
         .mapping-progress-counts strong {
-            font-size: 18px;
+            font-size: 22px;
             color: #333;
         }
 
         .mapping-progress-bar-wrap {
-            width: 140px;
-            height: 8px;
+            width: 168px;
+            height: 10px;
             background: #e9e9e9;
             border-radius: 4px;
             overflow: hidden;
+        }
+
+        .mapping-fixed-right .btn-primary {
+            font-size: 16px;
+            padding: 8px 20px;
         }
 
         .mapping-progress-bar-fill {
