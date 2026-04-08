@@ -176,21 +176,46 @@
     <script>
         $(document).on('click', '.btn-load-stocks', function() {
             var btn = $(this);
-            if (!confirm('Caricare tutte le giacenze non ancora importate?')) return;
-            btn.prop('disabled', true);
+            btn.prop('disabled', true).text('Controllo prezzi...');
+
             $.ajax({
-                url: '{{ route("invoices.load-stocks") }}',
-                type: 'POST',
-                data: { _token: '{{ csrf_token() }}' },
+                url: '{{ route("invoices.check-price-alerts") }}',
+                type: 'GET',
                 success: function(data) {
-                    alert(data.data.message);
-                    btn.prop('disabled', false);
-                    if (window.dataTable) window.dataTable.ajax.reload();
-                    else window.location.reload();
+                    btn.prop('disabled', false).text('Carica giacenze');
+
+                    if (data.data.has_alerts) {
+                        var n = data.data.count;
+                        var msg = 'Attenzione: ' + n + ' materiale' + (n > 1 ? 'i' : '') +
+                            ' tra quelli da caricare ha' + (n > 1 ? 'nno' : '') +
+                            ' una variazione di prezzo superiore al 20%.\n\n' +
+                            'Verifica le mappature prima di caricare le giacenze.';
+                        alert(msg);
+                        window.location.href = '{{ route("suppliers.product-comparison") }}';
+                        return;
+                    }
+
+                    if (!confirm('Caricare tutte le giacenze non ancora importate?')) return;
+                    btn.prop('disabled', true);
+                    $.ajax({
+                        url: '{{ route("invoices.load-stocks") }}',
+                        type: 'POST',
+                        data: { _token: '{{ csrf_token() }}' },
+                        success: function(res) {
+                            alert(res.data.message);
+                            btn.prop('disabled', false);
+                            if (window.dataTable) window.dataTable.ajax.reload();
+                            else window.location.reload();
+                        },
+                        error: function() {
+                            alert('Errore durante il caricamento delle giacenze.');
+                            btn.prop('disabled', false);
+                        }
+                    });
                 },
                 error: function() {
-                    alert('Errore durante il caricamento delle giacenze.');
-                    btn.prop('disabled', false);
+                    btn.prop('disabled', false).text('Carica giacenze');
+                    alert('Errore durante il controllo dei prezzi. Riprova.');
                 }
             });
         });

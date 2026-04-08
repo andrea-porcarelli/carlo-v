@@ -51,12 +51,11 @@
                                     $variationClass = $row['variation'] > 20 ? 'danger' : ($row['variation'] > 10 ? 'warning' : 'success');
                                 @endphp
                                 <tr class="comparison-row {{ $hasAlert ? 'has-price-alert' : '' }}"
-                                    data-material="{{ strtolower($row['material']->label) }}"
-                                    data-material-id="{{ $row['material']->id }}"
-                                    data-material-label="{{ $row['material']->label }}"
-                                    data-mappings="{{ json_encode($row['mappings']) }}">
+                                    data-material="{{ strtolower($row['material']->label) }}">
                                     <td class="text-center">
-                                        <button class="btn btn-xs btn-default btn-expand-row" data-id="{{ $row['material']->id }}" title="Dettaglio acquisti">
+                                        <button class="btn btn-xs btn-default btn-expand-row"
+                                                data-id="{{ $row['material']->id }}"
+                                                title="Dettaglio acquisti">
                                             <i class="fa fa-chevron-down"></i>
                                         </button>
                                     </td>
@@ -66,13 +65,6 @@
                                         @if($hasAlert)
                                             <i class="fa fa-exclamation-triangle text-danger" style="margin-left:6px;" title="Variazione prezzo &gt;20%"></i>
                                         @endif
-                                        <button class="btn btn-xs btn-default btn-edit-mapping"
-                                                style="margin-left:6px;"
-                                                title="Modifica mappature"
-                                                data-toggle="modal"
-                                                data-target="#mappingModal">
-                                            <i class="fa fa-pencil"></i>
-                                        </button>
                                     </td>
                                     <td class="text-center">
                                         <span class="label label-default">{{ $row['material']->stock_type }}</span>
@@ -110,68 +102,119 @@
                                         </small>
                                     </td>
                                 </tr>
-                                {{-- Riga espandibile con storico acquisti --}}
+
+                                {{-- Riga espandibile con storico acquisti e editing inline --}}
                                 <tr class="detail-row detail-row-{{ $row['material']->id }}" style="display:none;">
                                     <td colspan="9" style="padding:0; background:#f9f9f9;">
-                                        <table class="table table-condensed" style="margin:0; border:none;">
-                                            <thead style="background:#eef2f7;">
-                                                <tr>
-                                                    <th style="padding-left:40px;">Fornitore</th>
-                                                    <th>Fattura</th>
-                                                    <th class="text-center">Data</th>
-                                                    <th class="text-right">Prezzo fattura</th>
-                                                    <th class="text-right">Quantità</th>
-                                                    <th class="text-right">Moltiplicatore</th>
-                                                    <th class="text-right">Prezzo/u.b.</th>
-                                                    <th class="text-right">Δ rispetto al min</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($row['purchases'] as $i => $purchase)
-                                                @php
-                                                    $delta = $row['min_price'] > 0
-                                                        ? round(($purchase->price_per_unit - $row['min_price']) / $row['min_price'] * 100, 1)
-                                                        : 0;
-                                                    $purchaseAlert = $delta > 20;
-                                                @endphp
-                                                <tr class="{{ $i === 0 ? 'best-purchase-row' : '' }} {{ $purchaseAlert ? 'purchase-alert-row' : '' }}">
-                                                    <td style="padding-left:40px;">
-                                                        @if($i === 0)
-                                                            <i class="fa fa-trophy text-success"></i>
-                                                        @endif
-                                                        {{ $purchase->invoice->supplier->company_name ?? '—' }}
-                                                    </td>
-                                                    <td>
-                                                        <small>{{ $purchase->invoice->invoice_number }}</small>
-                                                    </td>
-                                                    <td class="text-center">
-                                                        <small>{{ $purchase->invoice->invoice_date?->format('d/m/Y') }}</small>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        € {{ number_format($purchase->price, 2, ',', '.') }}
-                                                    </td>
-                                                    <td class="text-right">{{ $purchase->quantity }}</td>
-                                                    <td class="text-right text-muted">
-                                                        <small>×{{ number_format($purchase->quantity_multiplier, 4, ',', '.') }}</small>
-                                                    </td>
-                                                    <td class="text-right {{ $i === 0 ? 'text-success' : '' }}">
-                                                        <strong>€ {{ number_format($purchase->price_per_unit, 4, ',', '.') }}</strong>
-                                                        <small>/{{ $row['material']->stock_type }}</small>
-                                                    </td>
-                                                    <td class="text-right">
-                                                        @if($i === 0)
-                                                            <span class="text-success"><i class="fa fa-check"></i> miglior prezzo</span>
-                                                        @else
-                                                            <span class="{{ $purchaseAlert ? 'text-danger' : 'text-warning' }}">
-                                                                @if($purchaseAlert)<i class="fa fa-exclamation-triangle"></i>@endif
-                                                                +{{ number_format($delta, 1, ',', '.') }}%
+                                        <div style="padding:8px 8px 8px 40px;">
+                                            <div class="table-responsive">
+                                            <table class="table table-condensed table-detail" style="margin:0; border:none; background:transparent;">
+                                                <thead style="background:#eef2f7;">
+                                                    <tr>
+                                                        <th style="width:60px;">#ID</th>
+                                                        <th style="width:180px;">Nome prodotto</th>
+                                                        <th>Fornitore</th>
+                                                        <th style="width:90px;">Fattura</th>
+                                                        <th class="text-center" style="width:80px;">Data</th>
+                                                        <th class="text-right" style="width:90px;">Prezzo</th>
+                                                        <th class="text-right" style="width:70px;">Qtà</th>
+                                                        <th style="width:160px;">Moltiplicatore</th>
+                                                        <th class="text-right" style="width:110px;">Prezzo/u.b.</th>
+                                                        <th class="text-right" style="width:80px;">Δ min</th>
+                                                        <th style="width:200px;">Materiale</th>
+                                                        <th class="text-center" style="width:60px;">Ignora</th>
+                                                        <th style="width:70px;"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach($row['purchases'] as $purchase)
+                                                    @php
+                                                        $isIgnored = (bool) $purchase->ignore_mapping;
+                                                        $isBest = !$isIgnored && $purchase->price_per_unit == $row['min_price'];
+                                                        $delta = (!$isIgnored && $row['min_price'] > 0 && $purchase->price_per_unit !== null)
+                                                            ? round(($purchase->price_per_unit - $row['min_price']) / $row['min_price'] * 100, 1)
+                                                            : null;
+                                                        $purchaseAlert = $delta !== null && $delta > 20;
+                                                    @endphp
+                                                    <tr class="purchase-row {{ $isBest ? 'best-purchase-row' : '' }} {{ $isIgnored ? 'ignored-row' : '' }} {{ $purchaseAlert ? 'purchase-alert-row' : '' }}"
+                                                        data-id="{{ $purchase->id }}">
+                                                        <td>
+                                                            <code class="text-muted" style="font-size:11px;">#{{ $purchase->id }}</code>
+                                                        </td>
+                                                        <td>
+                                                            <span class="product-name-badge" title="{{ $purchase->product_name }}">
+                                                                {{ Str::limit($purchase->product_name, 30) }}
                                                             </span>
-                                                        @endif
-                                                    </td>
-                                                </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
+                                                        </td>
+                                                        <td>
+                                                            @if($isBest)<i class="fa fa-trophy text-success"></i>@endif
+                                                            {{ $purchase->invoice->supplier->company_name ?? '—' }}
+                                                        </td>
+                                                        <td><small>{{ $purchase->invoice->invoice_number }}</small></td>
+                                                        <td class="text-center">
+                                                            <small>{{ $purchase->invoice->invoice_date?->format('d/m/Y') }}</small>
+                                                        </td>
+                                                        <td class="text-right">
+                                                            € {{ number_format($purchase->price, 2, ',', '.') }}
+                                                        </td>
+                                                        <td class="text-right">{{ $purchase->quantity }}</td>
+                                                        <td>
+                                                            <input type="number"
+                                                                   class="form-control input-sm multiplier-input"
+                                                                   value="{{ $purchase->quantity_multiplier }}"
+                                                                   step="0.0001" min="0.0001"
+                                                                   style="width:110px; display:inline-block;">
+                                                        </td>
+                                                        <td class="text-right price-per-unit-cell">
+                                                            @if($purchase->price_per_unit !== null)
+                                                                <strong class="{{ $isBest ? 'text-success' : '' }}">
+                                                                    € {{ number_format($purchase->price_per_unit, 4, ',', '.') }}
+                                                                </strong>
+                                                                <small>/{{ $row['material']->stock_type }}</small>
+                                                            @else
+                                                                <span class="text-muted">—</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="text-right">
+                                                            @if($isIgnored)
+                                                                <span class="text-muted">ignorato</span>
+                                                            @elseif($delta === null)
+                                                                <span class="text-muted">—</span>
+                                                            @elseif($delta == 0)
+                                                                <span class="text-success"><i class="fa fa-check"></i></span>
+                                                            @else
+                                                                <span class="{{ $purchaseAlert ? 'text-danger' : 'text-warning' }}">
+                                                                    @if($purchaseAlert)<i class="fa fa-exclamation-triangle"></i>@endif
+                                                                    +{{ number_format($delta, 1, ',', '.') }}%
+                                                                </span>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            <select class="form-control input-sm material-select" style="min-width:180px;">
+                                                                @foreach($materials as $mat)
+                                                                    <option value="{{ $mat->id }}"
+                                                                        {{ $mat->id == $row['material']->id ? 'selected' : '' }}>
+                                                                        #{{ $mat->id }} {{ $mat->label }}
+                                                                    </option>
+                                                                @endforeach
+                                                            </select>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <input type="checkbox"
+                                                                   class="ignore-checkbox"
+                                                                   {{ $isIgnored ? 'checked' : '' }}>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <button class="btn btn-xs btn-primary btn-save-row" title="Salva">
+                                                                <i class="fa fa-save"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                                 @endforeach
@@ -183,58 +226,37 @@
             </div>
         </div>
     </div>
-
-    {{-- Modal modifica mappature --}}
-    <div class="modal fade" id="mappingModal" tabindex="-1" role="dialog">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-                    <h4 class="modal-title">
-                        Mappature — <span id="mappingModalMaterial"></span>
-                        <small class="text-muted" id="mappingModalMaterialId"></small>
-                    </h4>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted" style="font-size:12px;">
-                        Modifica il materiale associato a ciascun nome prodotto. La modifica si applica a tutti gli acquisti futuri con quel nome.
-                    </p>
-                    <table class="table table-condensed" id="mappingModalTable">
-                        <thead>
-                            <tr>
-                                <th>Nome prodotto</th>
-                                <th>Materiale</th>
-                            </tr>
-                        </thead>
-                        <tbody id="mappingModalBody"></tbody>
-                    </table>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">Annulla</button>
-                    <button type="button" class="btn btn-primary" id="saveMappingsBtn">
-                        <i class="fa fa-save"></i> Salva
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 @endsection
 @section('custom-css')
     <style>
         .best-purchase-row td { background: #f0faf5; }
         .purchase-alert-row td { background: #fff8f8; }
-        .has-price-alert > td:first-child { border-left: 3px solid #d9534f; }
+        .ignored-row td { opacity: 0.55; }
+        .has-price-alert > td:nth-child(2) { border-left: 3px solid #d9534f; padding-left: 6px; }
         .detail-row td { border-top: none !important; }
         .comparison-row td { vertical-align: middle !important; }
         .btn-expand-row.expanded i { transform: rotate(180deg); }
         .btn-expand-row i { transition: transform 0.2s; }
-        .btn-edit-mapping { padding: 1px 5px; }
+        .table-detail td { vertical-align: middle !important; }
+        .product-name-badge {
+            font-family: monospace;
+            font-size: 11px;
+            background: #eee;
+            border-radius: 3px;
+            padding: 1px 4px;
+            display: inline-block;
+            max-width: 175px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .btn-save-row.saving { opacity: 0.6; pointer-events: none; }
+        .btn-save-row.saved { background-color: #5cb85c; border-color: #4cae4c; }
     </style>
 @endsection
 @section('custom-script')
     <script>
-        var allMaterials = @json($materials->map(fn($m) => ['id' => $m->id, 'label' => $m->label]));
-        var updateMappingUrl = '{{ route('suppliers.mappings.update', ['id' => '__ID__']) }}';
+        var updateUrl = '{{ rtrim(route('suppliers.invoice-products.update', ['id' => 0]), '0') }}';
 
         // Espandi / chiudi dettaglio
         $(document).on('click', '.btn-expand-row', function () {
@@ -245,7 +267,7 @@
             $(this).toggleClass('expanded', !visible);
         });
 
-        // Filtro per nome materiale (client-side)
+        // Filtro per nome materiale
         $('#filterMaterial').on('input', function () {
             var q = $(this).val().toLowerCase().trim();
             var visible = 0;
@@ -260,62 +282,45 @@
             $('#visibleCount').text(visible);
         });
 
-        // Apri modal mappature
-        $(document).on('click', '.btn-edit-mapping', function () {
-            var $row = $(this).closest('.comparison-row');
-            var label = $row.data('material-label');
-            var matId = $row.data('material-id');
-            var mappings = $row.data('mappings');
+        // Salva singola riga
+        $(document).on('click', '.btn-save-row', function () {
+            var $btn = $(this);
+            var $row = $btn.closest('.purchase-row');
+            var id = $row.data('id');
 
-            $('#mappingModalMaterial').text(label);
-            $('#mappingModalMaterialId').text('#' + matId);
+            var payload = {
+                _token:              '{{ csrf_token() }}',
+                quantity_multiplier: $row.find('.multiplier-input').val(),
+                ignore_mapping:      $row.find('.ignore-checkbox').is(':checked') ? 1 : 0,
+                material_id:         $row.find('.material-select').val(),
+            };
 
-            var tbody = $('#mappingModalBody').empty();
-            $.each(mappings, function (_, m) {
-                var options = allMaterials.map(function (mat) {
-                    var sel = mat.id === matId ? ' selected' : '';
-                    return '<option value="' + mat.id + '"' + sel + '>' + mat.label + ' #' + mat.id + '</option>';
-                }).join('');
-                tbody.append(
-                    '<tr>' +
-                    '<td><code>' + m.product_name + '</code></td>' +
-                    '<td>' +
-                    '<select class="form-control input-sm mapping-select" data-mapping-id="' + m.id + '">' +
-                    options +
-                    '</select>' +
-                    '</td>' +
-                    '</tr>'
-                );
+            $btn.addClass('saving').html('<i class="fa fa-spinner fa-spin"></i>');
+
+            $.ajax({
+                url:    updateUrl + id,
+                method: 'PUT',
+                data:   payload,
+            })
+            .done(function () {
+                $btn.removeClass('saving').addClass('saved').html('<i class="fa fa-check"></i>');
+                // Aggiorna prezzo/u.b. live
+                var price = parseFloat($row.find('td:nth-child(6)').text().replace('€','').replace('.','').replace(',','.'));
+                var mult  = parseFloat(payload.quantity_multiplier);
+                if (mult > 0) {
+                    var ppu = (price / mult).toFixed(4).replace('.', ',');
+                    $row.find('.price-per-unit-cell strong').text('€ ' + ppu);
+                }
+                $row.toggleClass('ignored-row', payload.ignore_mapping == 1);
+                setTimeout(function () {
+                    $btn.removeClass('saved').html('<i class="fa fa-save"></i>');
+                }, 2000);
+            })
+            .fail(function (xhr) {
+                $btn.removeClass('saving').html('<i class="fa fa-save"></i>');
+                var msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Errore nel salvataggio.';
+                alert(msg);
             });
-        });
-
-        // Salva mappature
-        $('#saveMappingsBtn').on('click', function () {
-            var $btn = $(this).prop('disabled', true).text('Salvataggio...');
-            var requests = [];
-
-            $('#mappingModalBody .mapping-select').each(function () {
-                var mappingId = $(this).data('mapping-id');
-                var materialId = $(this).val();
-                var url = updateMappingUrl.replace('__ID__', mappingId);
-                requests.push(
-                    $.ajax({
-                        url: url,
-                        method: 'PUT',
-                        data: { _token: '{{ csrf_token() }}', material_id: materialId },
-                    })
-                );
-            });
-
-            $.when.apply($, requests)
-                .done(function () {
-                    $('#mappingModal').modal('hide');
-                    location.reload();
-                })
-                .fail(function () {
-                    alert('Errore durante il salvataggio. Riprova.');
-                    $btn.prop('disabled', false).html('<i class="fa fa-save"></i> Salva');
-                });
         });
     </script>
 @endsection

@@ -48,35 +48,40 @@ class SupplierController extends BaseController
 
                 $productNames = $materialMappings->pluck('product_name');
 
-                // Tutti gli acquisti validi per questo materiale
-                $purchases = SupplierInvoiceProduct::whereIn('product_name', $productNames)
-                    ->where('quantity_multiplier', '>', 0)
-                    ->where('ignore_mapping', 0)
+                // Tutti gli acquisti (inclusi ignorati) per fatture non scartate
+                $allPurchases = SupplierInvoiceProduct::whereIn('product_name', $productNames)
                     ->whereHas('invoice', fn($q) => $q->whereNull('ignored_at'))
                     ->with(['invoice.supplier'])
+                    ->orderBy('id')
                     ->get()
                     ->map(function ($p) {
-                        $p->price_per_unit = round($p->price / $p->quantity_multiplier, 4);
+                        $p->price_per_unit = ($p->quantity_multiplier > 0)
+                            ? round($p->price / $p->quantity_multiplier, 4)
+                            : null;
                         return $p;
-                    })
+                    });
+
+                // Solo quelli validi per le statistiche
+                $statPurchases = $allPurchases
+                    ->where('ignore_mapping', 0)
+                    ->where('quantity_multiplier', '>', 0)
                     ->sortBy('price_per_unit')
                     ->values();
 
-                if ($purchases->isEmpty()) return null;
+                if ($statPurchases->isEmpty()) return null;
 
-                $prices = $purchases->pluck('price_per_unit');
-                $best = $purchases->first(); // già ordinato per price_per_unit ASC
+                $prices = $statPurchases->pluck('price_per_unit');
+                $best = $statPurchases->first();
 
                 $minPrice = $prices->min();
                 $maxPrice = $prices->max();
-                $variation = ($minPrice > 0 && $purchases->count() > 1)
+                $variation = ($minPrice > 0 && $statPurchases->count() > 1)
                     ? round(($maxPrice - $minPrice) / $minPrice * 100, 1)
                     : 0;
 
                 return [
                     'material' => $material,
-                    'mappings' => $materialMappings->map(fn($m) => ['id' => $m->id, 'product_name' => $m->product_name]),
-                    'purchases_count' => $purchases->count(),
+                    'purchases_count' => $statPurchases->count(),
                     'avg_price' => round($prices->avg(), 4),
                     'min_price' => $minPrice,
                     'max_price' => $maxPrice,
@@ -87,7 +92,8 @@ class SupplierController extends BaseController
                         'invoice_date' => $best->invoice->invoice_date?->format('d/m/Y'),
                         'price_per_unit' => $best->price_per_unit,
                     ],
-                    'purchases' => $purchases,
+                    'purchases' => $allPurchases->values(),
+                    'best_price' => $minPrice,
                 ];
             })
                 ->filter()
@@ -103,14 +109,38 @@ class SupplierController extends BaseController
         }
     }
 
-    public function updateMapping(Request $request, int $id): JsonResponse
+    public function updateInvoiceProduct(Request $request, int $id): JsonResponse
     {
         try {
             $request->validate([
-                'material_id' => 'required|exists:materials,id',
+                'quantity_multiplier' => 'nullable|numeric|min:0.0001',
+                'ignore_mapping'      => 'nullable|boolean',
+                'material_id'         => 'nullable|exists:materials,id',
             ]);
-            $mapping = MappingProduct::findOrFail($id);
-            $mapping->update(['material_id' => $request->material_id]);
+
+            $product = SupplierInvoiceProduct::findOrFail($id);
+
+            $productData = [];
+            if ($request->has('quantity_multiplier')) {
+                $productData['quantity_multiplier'] = (float) $request->quantity_multiplier;
+            }
+            if ($request->has('ignore_mapping')) {
+                $productData['ignore_mapping'] = (bool) $request->ignore_mapping;
+            }
+            if (!empty($productData)) {
+                $product->update($productData);
+            }
+
+            if ($request->filled('material_id')) {
+                $multiplier = isset($productData['quantity_multiplier'])
+                    ? $productData['quantity_multiplier']
+                    : $product->quantity_multiplier;
+                MappingProduct::updateOrCreate(
+                    ['product_name' => $product->product_name],
+                    ['material_id' => $request->material_id, 'quantity_multiplier' => $multiplier]
+                );
+            }
+
             return $this->success();
         } catch (Exception $e) {
             return $this->exception($e, $request);

@@ -327,6 +327,51 @@ class InvoiceController extends BaseController
         ]);
     }
 
+    public function checkPriceAlerts(): JsonResponse
+    {
+        // Materiali dei prodotti in attesa di carico
+        $pendingMaterialIds = SupplierInvoiceProduct::whereHas('material')
+            ->whereDoesntHave('stock')
+            ->where('ignore_mapping', 0)
+            ->with('material')
+            ->get()
+            ->pluck('material.id')
+            ->unique()
+            ->filter()
+            ->values();
+
+        if ($pendingMaterialIds->isEmpty()) {
+            return $this->success(['has_alerts' => false, 'count' => 0]);
+        }
+
+        $alertCount = 0;
+        $mappings = MappingProduct::whereIn('material_id', $pendingMaterialIds)
+            ->get()
+            ->groupBy('material_id');
+
+        foreach ($mappings as $materialId => $materialMappings) {
+            $productNames = $materialMappings->pluck('product_name');
+
+            $prices = SupplierInvoiceProduct::whereIn('product_name', $productNames)
+                ->where('quantity_multiplier', '>', 0)
+                ->where('ignore_mapping', 0)
+                ->whereHas('invoice', fn($q) => $q->whereNull('ignored_at'))
+                ->get()
+                ->map(fn($p) => $p->price / $p->quantity_multiplier)
+                ->filter(fn($p) => $p > 0);
+
+            if ($prices->count() < 2) continue;
+
+            $min = $prices->min();
+            $max = $prices->max();
+            if ($min > 0 && (($max - $min) / $min * 100) > 20) {
+                $alertCount++;
+            }
+        }
+
+        return $this->success(['has_alerts' => $alertCount > 0, 'count' => $alertCount]);
+    }
+
     private function extract_invoice_data($file) : array
     {
         try {
