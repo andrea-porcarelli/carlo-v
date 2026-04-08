@@ -167,6 +167,7 @@ class InvoiceController extends BaseController
                 ->rawColumns(['invoice_number', 'supplier_name', 'mapping'])
                 ->toJson();
         } catch (\Exception $e) {
+            dd($e);
             return $this->exception($e);
         }
     }
