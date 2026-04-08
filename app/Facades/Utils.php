@@ -39,8 +39,7 @@ class Utils
     }
 
     public static function setting(string $name) : string {
-        $settings = Setting::where('company_id', Session::get('company_id'))
-            ->get()
+        $settings = Setting::query()->get()
             ->mapWithKeys(function ($setting) {
                 return [$setting->parameter => $setting->content];
             })->toArray();
