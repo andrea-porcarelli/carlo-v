@@ -88,7 +88,7 @@ class StockService
     {
         // Carichi (material_stocks)
         $loads = DB::table('material_stocks')
-            ->leftJoin('external_invoice_lines', 'material_stocks.external_invoice_line_id', '=', 'external_invoice_lines.id')
+            ->leftJoin('supplier_invoice_products', 'material_stocks.supplier_invoice_product_id', '=', 'supplier_invoice_products.id')
             ->where('material_stocks.material_id', $materialId)
             ->select(
                 'material_stocks.id',
