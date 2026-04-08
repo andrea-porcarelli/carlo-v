@@ -112,7 +112,7 @@
                                                 <thead style="background:#eef2f7;">
                                                     <tr>
                                                         <th style="width:60px;">#ID</th>
-                                                        <th style="width:180px;">Nome prodotto</th>
+                                                        <th>Nome prodotto</th>
                                                         <th>Fornitore</th>
                                                         <th style="width:90px;">Fattura</th>
                                                         <th class="text-center" style="width:80px;">Data</th>
@@ -142,9 +142,7 @@
                                                             <code class="text-muted" style="font-size:11px;">#{{ $purchase->id }}</code>
                                                         </td>
                                                         <td>
-                                                            <span class="product-name-badge" title="{{ $purchase->product_name }}">
-                                                                {{ Str::limit($purchase->product_name, 30) }}
-                                                            </span>
+                                                            <span class="product-name-badge">{{ $purchase->product_name }}</span>
                                                         </td>
                                                         <td>
                                                             @if($isBest)<i class="fa fa-trophy text-success"></i>@endif
@@ -152,10 +150,10 @@
                                                         </td>
                                                         <td>
 
-                                                            <small>{{ $purchase->invoice->invoice_number }}</small>
+                                                            <small>{{ $purchase->invoice->invoice_number }}</small><br />
                                                             <a href="{{ route('invoices.pdf', $purchase->invoice->id) }}" target="_blank" title="Apri PDF fattura">
                                                                 <button class="btn btn-xs btn-danger">
-                                                                    <i class="fa fa-file-pdf-o"></i>
+                                                                    Apri fattura
                                                                 </button>
                                                             </a>
                                                         </td>
@@ -259,9 +257,6 @@
             border-radius: 3px;
             padding: 1px 4px;
             display: inline-block;
-            max-width: 175px;
-            overflow: hidden;
-            text-overflow: ellipsis;
             white-space: nowrap;
         }
         .btn-save-row.saving { opacity: 0.6; pointer-events: none; }

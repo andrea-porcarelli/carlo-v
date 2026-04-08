@@ -335,8 +335,13 @@ class InvoiceController extends BaseController
 
         abort_if(!$invoice->filename, 404, 'Nessun file XML associato a questa fattura.');
 
-        $xmlPath = storage_path('app/private/invoices/' . $invoice->filename);
-        abort_unless(file_exists($xmlPath), 404, 'File XML non trovato.');
+        $candidates = [
+            storage_path('app/private/invoices/' . $invoice->filename),
+            storage_path('app/temp/' . $invoice->filename),
+            storage_path('app/failed_invoices/' . $invoice->filename),
+        ];
+        $xmlPath = collect($candidates)->first(fn($p) => file_exists($p));
+        abort_unless($xmlPath, 404, 'File XML non trovato.');
 
         $content = file_get_contents($xmlPath);
         libxml_use_internal_errors(true);
