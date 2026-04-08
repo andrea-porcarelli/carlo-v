@@ -180,9 +180,9 @@ class MysondRicezione extends Command
             }
         }
 
-//        if (!empty($failed)) {
-//            self::notificaTelegram($failed);
-//        }
+        if (!empty($failed)) {
+            self::notificaTelegram($failed);
+        }
     }
 
     private static function notificaTelegram(array $failedInvoices): void
