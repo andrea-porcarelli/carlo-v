@@ -11,6 +11,7 @@ use App\Models\Material;
 use App\Models\MaterialStock;
 use App\Models\Supplier;
 use App\Models\SupplierInvoice;
+use App\Models\SupplierInvoiceImportLog;
 use App\Models\SupplierInvoiceProduct;
 use App\Traits\DatatableTrait;
 use Exception;
@@ -46,7 +47,42 @@ class InvoiceController extends BaseController
             ->orderByDesc('created_at')
             ->get();
 
-        return view('backoffice.' . $this->name . '.index', compact('suppliers', 'failedInvoices'));
+        $importLogsCount = SupplierInvoiceImportLog::count();
+
+        return view('backoffice.' . $this->name . '.index', compact('suppliers', 'failedInvoices', 'importLogsCount'));
+    }
+
+    public function importLogs(): JsonResponse
+    {
+        $logs = SupplierInvoiceImportLog::with('invoice.supplier')
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('supplier_invoice_id')
+            ->map(function ($rows) {
+                $invoice = $rows->first()->invoice;
+                return [
+                    'invoice_id'     => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
+                    'supplier_name'  => $invoice->supplier->company_name ?? '—',
+                    'invoice_date'   => $invoice->invoice_date?->format('d/m/Y'),
+                    'auto_mapped'    => $rows->where('status', 'auto_mapped')->count(),
+                    'partial'        => $rows->where('status', 'partial_mapping')->count(),
+                    'to_map'         => $rows->where('status', 'to_map')->count(),
+                    'rows'           => $rows->map(fn($r) => [
+                        'status'              => $r->status,
+                        'product_name'        => $r->product_name,
+                        'material_name'       => $r->material_name,
+                        'qty_invoice'         => $r->qty_invoice,
+                        'quantity_multiplier' => $r->quantity_multiplier,
+                        'stock_added'         => $r->stock_added,
+                        'stock_unit'          => $r->stock_unit,
+                        'notes'               => $r->notes,
+                    ])->values(),
+                ];
+            })
+            ->values();
+
+        return response()->json($logs);
     }
 
     public function ignore_failed(int $id): JsonResponse
