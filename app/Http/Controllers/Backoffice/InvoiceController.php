@@ -289,6 +289,44 @@ class InvoiceController extends BaseController
         }
     }
 
+    public function load_stocks(): JsonResponse
+    {
+        $products = SupplierInvoiceProduct::whereHas('material')
+            ->whereDoesntHave('stock')
+            ->where('ignore_mapping', 0)
+            ->with(['material', 'invoice'])
+            ->get();
+
+        $created = 0;
+        foreach ($products as $product) {
+            $material = $product->material;
+            if (!$material) continue;
+
+            $realQuantity = $product->quantity * ($product->quantity_multiplier ?? 1);
+
+            $stock = MaterialStock::firstOrCreate(
+                ['supplier_invoice_product_id' => $product->id],
+                [
+                    'material_id'    => $material->id,
+                    'stock'          => $realQuantity,
+                    'purchase_date'  => $product->invoice?->invoice_date,
+                    'purchase_price' => $product->price,
+                ]
+            );
+
+            if ($stock->wasRecentlyCreated) {
+                $created++;
+            }
+        }
+
+        return $this->success([
+            'created' => $created,
+            'message' => $created > 0
+                ? "Caricate {$created} giacenze."
+                : 'Nessuna nuova giacenza da caricare.',
+        ]);
+    }
+
     private function extract_invoice_data($file) : array
     {
         try {

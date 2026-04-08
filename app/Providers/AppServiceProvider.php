@@ -7,6 +7,7 @@ use App\Observers\ExternalInvoiceObserver;
 use App\Services\StockService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -38,6 +39,13 @@ class AppServiceProvider extends ServiceProvider
         View::composer('backoffice.components.nav-bar-restaurant', function ($view) {
             $lowStockCount = app(StockService::class)->getLowStockMaterials()->count();
             $view->with('lowStockCount', $lowStockCount);
+        });
+
+        Gate::define('viewLogViewer', function ($user = null) {
+            if (!$user) {
+                return false;
+            }
+            return $user->role === 'admin';
         });
     }
 }

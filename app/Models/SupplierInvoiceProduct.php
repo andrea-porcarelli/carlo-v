@@ -4,6 +4,7 @@ namespace App\Models;
 
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class SupplierInvoiceProduct extends LogsModel
@@ -19,6 +20,11 @@ class SupplierInvoiceProduct extends LogsModel
         'ignore_mapping',
         'iva',
     ];
+
+    public function stock(): HasOne
+    {
+        return $this->hasOne(MaterialStock::class, 'supplier_invoice_product_id');
+    }
 
     public function invoice() : BelongsTo
     {

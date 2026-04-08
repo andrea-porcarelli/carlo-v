@@ -83,6 +83,7 @@
                                 ])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Cerca', 'class' => 'btn-find'])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Carica fattura', 'class' => 'btn-load-invoice', 'dataset' => ['path' => route('invoices.import')]])
+                                @include('backoffice.components.form.button', ['col' => 2, 'label' => 'Carica giacenze', 'class' => 'btn-load-stocks btn-success'])
                                 @if($importLogsCount > 0)
                                     <div class="col-lg-2">
                                         <button type="button" class="btn btn-info btn-block btn-show-import-logs">
@@ -173,6 +174,27 @@
 @endsection
 @section('custom-script')
     <script>
+        $(document).on('click', '.btn-load-stocks', function() {
+            var btn = $(this);
+            if (!confirm('Caricare tutte le giacenze non ancora importate?')) return;
+            btn.prop('disabled', true);
+            $.ajax({
+                url: '{{ route("invoices.load-stocks") }}',
+                type: 'POST',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function(data) {
+                    alert(data.data.message);
+                    btn.prop('disabled', false);
+                    if (window.dataTable) window.dataTable.ajax.reload();
+                    else window.location.reload();
+                },
+                error: function() {
+                    alert('Errore durante il caricamento delle giacenze.');
+                    btn.prop('disabled', false);
+                }
+            });
+        });
+
         $(document).on('click', '.btn-toggle-ignore-invoice', function() {
             var btn = $(this);
             var isIgnored = btn.hasClass('btn-warning');

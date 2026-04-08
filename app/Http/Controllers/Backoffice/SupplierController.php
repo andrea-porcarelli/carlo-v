@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Backoffice;
 use App\Facades\Utils;
 use App\Interfaces\SupplierInterface;
 use App\Models\MappingProduct;
+use App\Models\Material;
 use App\Models\SupplierInvoiceProduct;
 use App\Traits\DatatableTrait;
 use Exception;
@@ -66,12 +67,20 @@ class SupplierController extends BaseController
                 $prices = $purchases->pluck('price_per_unit');
                 $best = $purchases->first(); // già ordinato per price_per_unit ASC
 
+                $minPrice = $prices->min();
+                $maxPrice = $prices->max();
+                $variation = ($minPrice > 0 && $purchases->count() > 1)
+                    ? round(($maxPrice - $minPrice) / $minPrice * 100, 1)
+                    : 0;
+
                 return [
                     'material' => $material,
+                    'mappings' => $materialMappings->map(fn($m) => ['id' => $m->id, 'product_name' => $m->product_name]),
                     'purchases_count' => $purchases->count(),
                     'avg_price' => round($prices->avg(), 4),
-                    'min_price' => $prices->min(),
-                    'max_price' => $prices->max(),
+                    'min_price' => $minPrice,
+                    'max_price' => $maxPrice,
+                    'variation' => $variation,
                     'best' => [
                         'supplier_name' => $best->invoice->supplier->company_name ?? '—',
                         'invoice_number' => $best->invoice->invoice_number,
@@ -85,10 +94,26 @@ class SupplierController extends BaseController
                 ->sortBy(fn($r) => $r['material']->label)
                 ->values();
 
-            return view('backoffice.suppliers.product-comparison', compact('rows'));
+            $materials = Material::orderBy('label')->get(['id', 'label']);
+
+            return view('backoffice.suppliers.product-comparison', compact('rows', 'materials'));
         } catch (Exception $e) {
             dd($e);
             return $this->exception($e);
+        }
+    }
+
+    public function updateMapping(Request $request, int $id): JsonResponse
+    {
+        try {
+            $request->validate([
+                'material_id' => 'required|exists:materials,id',
+            ]);
+            $mapping = MappingProduct::findOrFail($id);
+            $mapping->update(['material_id' => $request->material_id]);
+            return $this->success();
+        } catch (Exception $e) {
+            return $this->exception($e, $request);
         }
     }
 

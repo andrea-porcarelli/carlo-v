@@ -128,6 +128,7 @@ Route::group(['prefix' => '/backoffice'], function() {
         Route::group(['prefix' => '/suppliers'], function() {
             Route::get('/datatable', [SupplierController::class, 'datatable'])->name('suppliers.datatable');
             Route::get('/product-comparison', [SupplierController::class, 'productComparison'])->name('suppliers.product-comparison');
+            Route::put('/mappings/{id}', [SupplierController::class, 'updateMapping'])->name('suppliers.mappings.update');
         });
         Route::resource('suppliers', SupplierController::class);
 
@@ -135,6 +136,7 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/datatable', [InvoiceController::class, 'datatable'])->name('invoices.datatable');
             Route::get('/import', [InvoiceController::class, 'import_form'])->name('invoices.import');
             Route::post('/import', [InvoiceController::class, 'import_invoice']);
+            Route::post('/load-stocks', [InvoiceController::class, 'load_stocks'])->name('invoices.load-stocks');
             Route::get('/{id}/mapping-products', [InvoiceController::class, 'mapping_products'])->name('invoices.mapping_products');
             Route::post('/{id}/store-mapping-products', [InvoiceController::class, 'store_mapping_products']);
             Route::get('/failed/{id}/download', [InvoiceController::class, 'download_failed_file'])->name('invoices.download-failed-file');
