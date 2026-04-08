@@ -181,33 +181,37 @@
                             </div>
                         </div>
 
-                        <div class="row" style="margin-top: 20px;">
-                            <div class="col-xs-12">
-                                <div class="clearfix">
-                                    <div class="pull-left">
-                                        <a href="{{ route('invoices.index') }}" class="btn btn-default">
-                                            <span class="glyphicon glyphicon-arrow-left"></span> Indietro
-                                        </a>
-                                    </div>
-                                    <div class="pull-right">
-                                        <span style="margin-right: 15px; line-height: 34px; display: inline-block;" class="text-muted">
-                                            <strong id="mappedCount">0</strong>
-                                            su
-                                            <strong>{{ $supplierInvoiceProducts->count() }}</strong>
-                                            completi
-                                        </span>
-                                        <button type="button" class="btn btn-primary btn-store-map-products" disabled data-invoice-id="{{ $invoice->id }}">
-                                            <span class="glyphicon glyphicon-floppy-disk"></span> Salva Mappatura
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
+    {{-- Barra fissa in fondo --}}
+    <div class="mapping-fixed-bar">
+        <div class="mapping-fixed-bar-inner">
+            <div class="mapping-fixed-left">
+                <a href="{{ route('invoices.index') }}" class="btn btn-default">
+                    <span class="glyphicon glyphicon-arrow-left"></span> Indietro
+                </a>
+            </div>
+            <div class="mapping-fixed-right">
+                <span class="mapping-progress-label">
+                    <span class="mapping-progress-counts">
+                        <strong id="mappedCount">0</strong>
+                        <span class="text-muted"> / {{ $supplierInvoiceProducts->count() }}</span>
+                    </span>
+                    <span class="text-muted mapping-progress-text"> completati</span>
+                </span>
+                <div class="mapping-progress-bar-wrap">
+                    <div class="mapping-progress-bar-fill" id="mappingProgressBar" style="width:0%"></div>
+                </div>
+                <button type="button" class="btn btn-primary btn-store-map-products" disabled data-invoice-id="{{ $invoice->id }}">
+                    <span class="glyphicon glyphicon-floppy-disk"></span> Salva Mappatura
+                </button>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal nuovo ingrediente --}}
     <div class="modal fade" id="newMaterialModal" tabindex="-1" role="dialog">
         <div class="modal-dialog" role="document">
@@ -442,6 +446,9 @@
                 });
                 $('#mappedCount').text(complete);
                 $('.btn-store-map-products').prop('disabled', complete < total);
+                var pct = total > 0 ? Math.round(complete / total * 100) : 0;
+                $('#mappingProgressBar').css('width', pct + '%')
+                    .toggleClass('mapping-progress-bar-done', complete === total);
             }
 
             // ─── Auto-detect al caricamento pagina ───────────────────────────────
@@ -802,6 +809,62 @@
 
         .btn-open-new-material:hover {
             text-decoration: underline;
+        }
+
+        /* ── Barra fissa in fondo ── */
+        body { padding-bottom: 70px; }
+
+        .mapping-fixed-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: #fff;
+            border-top: 2px solid #e7eaec;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+        }
+
+        .mapping-fixed-bar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 24px;
+        }
+
+        .mapping-fixed-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .mapping-progress-label {
+            font-size: 15px;
+            white-space: nowrap;
+        }
+
+        .mapping-progress-counts strong {
+            font-size: 18px;
+            color: #333;
+        }
+
+        .mapping-progress-bar-wrap {
+            width: 140px;
+            height: 8px;
+            background: #e9e9e9;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .mapping-progress-bar-fill {
+            height: 100%;
+            background: #337ab7;
+            border-radius: 4px;
+            transition: width 0.3s ease, background 0.3s ease;
+        }
+
+        .mapping-progress-bar-fill.mapping-progress-bar-done {
+            background: #1ab394;
         }
     </style>
 @endsection
