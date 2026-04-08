@@ -39,6 +39,9 @@ class SupplierController extends BaseController
                 ->addColumn('invoices', function ($item) {
                    return $item->invoices()->count();
                 })
+                ->addColumn('fiscal_code', function ($item) {
+                   return $item->fiscal_code . ' / ' . $item->vat_number;
+                })
                 ->rawColumns(['referer'])
                 ->toJson();
         } catch (\Exception $e) {

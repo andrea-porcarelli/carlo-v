@@ -33,7 +33,7 @@
                                         <th class="all no-sort"></th>
                                         <th class="all">#</th>
                                         <th class="all">Ragione sociale</th>
-                                        <th class="all">Partita IVA</th>
+                                        <th class="all">Cod. Fiscale / Partita IVA</th>
                                         <th class="all text-center">Fatture</th>
                                     </tr>
                                     </tfoot>
