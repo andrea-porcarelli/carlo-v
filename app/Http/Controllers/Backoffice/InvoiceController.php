@@ -49,6 +49,16 @@ class InvoiceController extends BaseController
         return view('backoffice.' . $this->name . '.index', compact('suppliers', 'failedInvoices'));
     }
 
+    public function ignore_failed(int $id): JsonResponse
+    {
+        $externalInvoice = ExternalInvoice::findOrFail($id);
+        abort_if($externalInvoice->status !== 'import_error', 422, 'Fattura non in stato di errore.');
+
+        $externalInvoice->update(['status' => 'ignored']);
+
+        return response()->json(['success' => true]);
+    }
+
     public function download_failed_file(int $id): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         $externalInvoice = ExternalInvoice::findOrFail($id);

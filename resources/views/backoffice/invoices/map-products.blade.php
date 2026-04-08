@@ -8,6 +8,41 @@
 @section('main-content')
     <div class="row">
         <div class="col-lg-12">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h4 class="panel-title" style="margin:0;">
+                        <i class="fa fa-file-text-o"></i>
+                        Fattura: <strong>{{ $invoice->invoice_number }}</strong>
+                        &mdash;
+                        {{ $invoice->supplier->company_name }}
+                    </h4>
+                </div>
+                <div class="panel-body" style="padding: 12px 15px;">
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <span class="text-muted small">Data fattura</span><br>
+                            <strong>{{ $invoice->invoice_date ? $invoice->invoice_date->format('d/m/Y') : '—' }}</strong>
+                        </div>
+                        <div class="col-sm-3">
+                            <span class="text-muted small">Importo totale</span><br>
+                            <strong>€ {{ number_format($invoice->amount, 2, ',', '.') }}</strong>
+                        </div>
+                        <div class="col-sm-3">
+                            <span class="text-muted small">Prodotti in fattura</span><br>
+                            <strong>{{ $invoice->products_count }}</strong>
+                            <span class="text-muted small">({{ $supplierInvoiceProducts->count() }} da mappare)</span>
+                        </div>
+                        <div class="col-sm-3">
+                            <span class="text-muted small">File</span><br>
+                            <small class="text-muted">{{ $invoice->filename }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-lg-12">
             <div class="panel panel-default">
                 <div class="panel-body">
                     <form id="mappingForm">

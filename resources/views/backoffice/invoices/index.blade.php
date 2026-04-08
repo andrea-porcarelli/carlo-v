@@ -25,12 +25,15 @@
                         <tr>
                             <td><small>{{ $fi->file_name }}</small></td>
                             <td><small class="text-danger">{{ \Illuminate\Support\Str::limit($fi->import_error, 100) }}</small></td>
-                            <td class="text-center">
+                            <td class="text-center" style="white-space:nowrap;">
                                 @if($fi->file_path)
                                 <a href="{{ route('invoices.download-failed-file', $fi->id) }}" class="btn btn-xs btn-default" title="Scarica file originale">
                                     <i class="fa fa-download"></i>
                                 </a>
                                 @endif
+                                <button class="btn btn-xs btn-warning btn-ignore-failed" data-id="{{ $fi->id }}" data-url="{{ route('invoices.ignore-failed', $fi->id) }}" title="Ignora">
+                                    <i class="fa fa-eye-slash"></i> Ignora
+                                </button>
                             </td>
                         </tr>
                         @endforeach
@@ -114,6 +117,30 @@
 @endsection
 @section('custom-script')
     <script>
+        $(document).on('click', '.btn-ignore-failed', function() {
+            var btn = $(this);
+            var url = btn.data('url');
+            if (!confirm('Ignorare questa fattura? Non sarà più visibile nella lista degli errori.')) return;
+            $.ajax({
+                url: url,
+                type: 'PATCH',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function() {
+                    var row = btn.closest('tr');
+                    row.fadeOut(300, function() {
+                        row.remove();
+                        var tbody = $('#failed-invoices-alert tbody');
+                        if (tbody.find('tr').length === 0) {
+                            $('#failed-invoices-alert').fadeOut(300);
+                        }
+                    });
+                },
+                error: function() {
+                    alert('Errore durante l\'operazione.');
+                }
+            });
+        });
+
         $(document).ready(function(){
             setTimeout(() => {
                 $(document).trigger('datatable', [{

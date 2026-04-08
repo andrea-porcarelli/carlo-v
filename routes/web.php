@@ -133,6 +133,7 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/{id}/mapping-products', [InvoiceController::class, 'mapping_products'])->name('invoices.mapping_products');
             Route::post('/{id}/store-mapping-products', [InvoiceController::class, 'store_mapping_products']);
             Route::get('/failed/{id}/download', [InvoiceController::class, 'download_failed_file'])->name('invoices.download-failed-file');
+            Route::patch('/failed/{id}/ignore', [InvoiceController::class, 'ignore_failed'])->name('invoices.ignore-failed');
         });
 
         Route::resource('invoices', InvoiceController::class);
