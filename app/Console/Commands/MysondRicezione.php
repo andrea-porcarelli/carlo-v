@@ -359,13 +359,13 @@ class MysondRicezione extends Command
                         Log::info($e->getMessage());
                     }
 
-                    if ($product) {
-                        try {
-                            self::autoMapProduct($invoice, $product, $line);
-                        } catch (\Exception $e) {
-                            Log::error('Auto-mapping fallito per "' . $line['description'] . '": ' . $e->getMessage());
-                        }
-                    }
+//                    if ($product) {
+//                        try {
+//                            self::autoMapProduct($invoice, $product, $line);
+//                        } catch (\Exception $e) {
+//                            Log::error('Auto-mapping fallito per "' . $line['description'] . '": ' . $e->getMessage());
+//                        }
+//                    }
                 }
             }
 

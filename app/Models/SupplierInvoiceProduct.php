@@ -46,6 +46,8 @@ class SupplierInvoiceProduct extends LogsModel
             'id',
             'product_name',
             'material_id'
-        );
+        )
+            ->where('mapping_products.quantity_multiplier', $this->quantity_multiplier)
+            ->where('mapping_products.supplier_id', $this->invoice->supplier_id);
     }
 }

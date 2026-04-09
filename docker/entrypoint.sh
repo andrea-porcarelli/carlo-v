@@ -2,7 +2,7 @@
 
 # Fix ownership of the entire repo so www-data (php-fpm) can run git pull
 if [ -d /var/www/html ]; then
-    chown -R www-data:www-data /var/www/html
+    chown -R www-data:www-data /var/www/html/storage
 fi
 
 # Set up SSH deploy key for www-data
