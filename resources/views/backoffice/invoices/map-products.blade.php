@@ -18,7 +18,7 @@
                             {{ $invoice->supplier->company_name }}
                         </div>
                         <div>
-                            <a href="{{ route('invoices.pdf', $item->id) }}" target="_blank" title="Scarica PDF fattura">
+                            <a href="{{ route('invoices.pdf', $invoice->id) }}" target="_blank" title="Scarica PDF fattura">
                                 <button class="btn btn-xs btn-danger">
                                     Scarica fattura
                                 </button>
