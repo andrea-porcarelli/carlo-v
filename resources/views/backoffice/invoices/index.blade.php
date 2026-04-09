@@ -170,6 +170,7 @@
         .import-log-row.status-auto_mapped    { background: #f0faf5; }
         .import-log-row.status-partial_mapping { background: #fffaf0; }
         .import-log-row.status-to_map          { background: #fffdf0; }
+        .actions { display: flex; flex-direction: column; gap: 2px; align-items: center; }
     </style>
 @endsection
 @section('custom-script')

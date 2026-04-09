@@ -41,7 +41,7 @@
             data-url="{{ route('invoices.toggle-ignore', $item->id) }}"
         >
             <span class="fa {{ $item->ignored_at ? 'fa-undo' : 'fa-eye-slash' }}"></span>
-            Ingora fattura
+            Ignora fattura
         </button>
     @endif
     @if (in_array('mapping-product', $options))
