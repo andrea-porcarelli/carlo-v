@@ -147,7 +147,11 @@ class InvoiceController extends BaseController
                 })
                 ->addColumn('mapping', function ($item) {
                     $total     = $item->products_count;
-                    $daMappare = $item->products()->whereDoesntHave('material')->where('ignore_mapping', 0)->count();
+                    $daMappare = $item->products()->whereDoesntHave('material', function ($query) {
+                        $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
+                            ->join('supplier_invoices', 'supplier_invoice_products.invoice_id', '=', 'supplier_invoices.id')
+                            ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
+                    })->where('ignore_mapping', 0)->count();
                     $mappati   = $item->products()->whereHas('material')->count();
                     $ignorati  = $item->products()->where('ignore_mapping', 1)->count();
 
