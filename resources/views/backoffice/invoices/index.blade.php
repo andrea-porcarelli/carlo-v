@@ -372,7 +372,7 @@
             html += '<thead><tr>';
             html += '<th>Prodotto fattura</th>';
             html += '<th class="text-center">Qtà fattura</th>';
-            html += '<th class="text-center">Moltiplicatore</th>';
+            html += '<th class="text-center" style="width: 90px">Moltiplicatore</th>';
             html += '<th>Materiale</th>';
             html += '<th class="text-center">Giacenza prevista</th>';
             html += '<th class="text-center">Stato</th>';
