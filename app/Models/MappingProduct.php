@@ -15,11 +15,16 @@ class MappingProduct extends Model
      */
     public $fillable = [
         'material_id',
+        'supplier_id',
         'product_name',
         'quantity_multiplier',
     ];
 
     public function material(): BelongsTo {
         return $this->belongsTo(Material::class);
+    }
+
+    public function supplier(): BelongsTo {
+        return $this->belongsTo(Supplier::class);
     }
 }

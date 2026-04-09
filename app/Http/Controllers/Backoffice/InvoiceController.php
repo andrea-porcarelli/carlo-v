@@ -275,7 +275,7 @@ class InvoiceController extends BaseController
 
                     if ($materialId) {
                         MappingProduct::updateOrCreate(
-                            ['product_name' => $product->product_name],
+                            ['product_name' => $product->product_name, 'supplier_id' => $invoice->supplier_id],
                             ['material_id' => $materialId, 'quantity_multiplier' => $multiplier]
                         );
                     }
@@ -296,12 +296,16 @@ class InvoiceController extends BaseController
         $products = SupplierInvoiceProduct::whereHas('material')
             ->whereDoesntHave('stock')
             ->where('ignore_mapping', 0)
-            ->with(['material', 'invoice'])
+            ->with(['invoice'])
             ->get();
 
         $created = 0;
         foreach ($products as $product) {
-            $material = $product->material;
+            $mapping = MappingProduct::where('product_name', $product->product_name)
+                ->where('supplier_id', $product->invoice?->supplier_id)
+                ->with('material')
+                ->first();
+            $material = $mapping?->material;
             if (!$material) continue;
 
             $realQuantity = $product->quantity * ($product->quantity_multiplier ?? 1);
@@ -632,11 +636,14 @@ class InvoiceController extends BaseController
         // Recupera tutti i prodotti delle fatture che hanno un mapping material ma non hanno ancora uno stock
         $productsToAssociate = SupplierInvoiceProduct::whereHas('material')
             ->whereDoesntHave('stock')
+            ->with(['invoice'])
             ->get();
 
         foreach ($productsToAssociate as $product) {
-            // Recupera il material_id tramite la relazione material
-            $material = $product->material;
+            $mapping = MappingProduct::where('product_name', $product->product_name)
+                ->where('supplier_id', $product->invoice?->supplier_id)
+                ->first();
+            $material = $mapping?->material;
 
             if ($material) {
                 $realQuantity = $product->quantity * ($product->quantity_multiplier ?? 1);

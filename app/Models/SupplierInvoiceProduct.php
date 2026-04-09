@@ -31,6 +31,12 @@ class SupplierInvoiceProduct extends LogsModel
         return $this->belongsTo(SupplierInvoice::class, 'supplier_invoice_id');
     }
 
+    /**
+     * Restituisce il materiale associato tramite mapping_products.
+     * Nota: questa relazione non filtra per supplier_id, quindi in caso di omonimi
+     * tra fornitori diversi può restituire il materiale errato. Usare solo per display.
+     * Per creazione di stock, fare lookup diretto su MappingProduct con supplier_id.
+     */
     public function material() : HasOneThrough
     {
         return $this->hasOneThrough(

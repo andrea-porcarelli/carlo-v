@@ -49,6 +49,7 @@ class ExternalInvoiceObserver
         // Raccoglie tutti i product_name mappati per confronto in memoria
         $descriptions = $lines->where('ignore_mapping', false)->pluck('description')->unique();
         $mappedNames  = MappingProduct::whereIn('product_name', $descriptions)
+            ->whereNull('supplier_id')
             ->pluck('product_name')
             ->flip();
 

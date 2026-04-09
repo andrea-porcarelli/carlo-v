@@ -376,6 +376,7 @@ class MysondRicezione extends Command
     private static function autoMapProduct(SupplierInvoice $invoice, $product, array $line): void
     {
         $mapping = MappingProduct::where('product_name', $line['description'])
+            ->where('supplier_id', $invoice->supplier_id)
             ->with('material')
             ->first();
 

@@ -149,7 +149,7 @@ class ExternalInvoiceController extends BaseController
 
                     if ($materialId) {
                         MappingProduct::firstOrCreate(
-                            ['product_name' => $line->description],
+                            ['product_name' => $line->description, 'supplier_id' => null],
                             ['material_id'  => $materialId]
                         );
                     }

@@ -139,8 +139,9 @@ class SupplierController extends BaseController
                 $multiplier = isset($productData['quantity_multiplier'])
                     ? $productData['quantity_multiplier']
                     : $product->quantity_multiplier;
+                $supplierId = $product->invoice->supplier_id;
                 MappingProduct::updateOrCreate(
-                    ['product_name' => $product->product_name],
+                    ['product_name' => $product->product_name, 'supplier_id' => $supplierId],
                     ['material_id' => $request->material_id, 'quantity_multiplier' => $multiplier]
                 );
             }
