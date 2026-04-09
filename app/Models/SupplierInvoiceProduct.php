@@ -16,6 +16,7 @@ class SupplierInvoiceProduct extends LogsModel
         'product_name',
         'price',
         'quantity',
+        'quantity_unit',
         'quantity_multiplier',
         'ignore_mapping',
         'iva',

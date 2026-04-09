@@ -81,7 +81,7 @@
                                                             <div class="qty-control">
                                                                 <div class="qty-invoice-line">
                                                                     <span class="text-muted small">In fattura:</span>
-                                                                    <strong>{{ $product->quantity }}</strong>
+                                                                    <strong>{{ $product->quantity }} {{ $product->quantity_unit }}</strong>
                                                                 </div>
                                                                 <div class="qty-fields">
                                                                     <div class="qty-field">
@@ -731,7 +731,7 @@
         }
 
         .qty-invoice-line {
-            font-size: 12px;
+            font-size: 14px;
             color: #888;
         }
 

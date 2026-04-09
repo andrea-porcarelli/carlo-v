@@ -350,10 +350,11 @@ class MysondRicezione extends Command
                     $product = null;
                     try {
                         $product = $invoice->products()->create([
-                            'product_name' => $line['description'],
-                            'quantity'     => $line['quantity'],
-                            'price'        => $line['unit_price'],
-                            'iva'          => $line['vat_rate'],
+                            'product_name'  => $line['description'],
+                            'quantity'      => $line['quantity'],
+                            'quantity_unit' => $line['unit_of_measure'],
+                            'price'         => $line['unit_price'],
+                            'iva'           => $line['vat_rate'],
                         ]);
                     } catch (\Illuminate\Database\QueryException $e) {
                         Log::info($e->getMessage());
