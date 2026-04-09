@@ -145,6 +145,8 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/import-logs', [InvoiceController::class, 'importLogs'])->name('invoices.import-logs');
             Route::patch('/{id}/toggle-ignore', [InvoiceController::class, 'toggleIgnore'])->name('invoices.toggle-ignore');
             Route::get('/{id}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+            Route::get('/{id}/import-stock-preview', [InvoiceController::class, 'importStockPreview'])->name('invoices.import-stock-preview');
+            Route::post('/{id}/load-invoice-stocks', [InvoiceController::class, 'loadInvoiceStocks'])->name('invoices.load-invoice-stocks');
         });
 
         Route::resource('invoices', InvoiceController::class);

@@ -150,6 +150,28 @@
             </div>
         </div>
     </div>
+    {{-- Modal Importa giacenze singola fattura --}}
+    <div class="modal fade" id="importStockModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                    <h4 class="modal-title"><i class="fas fa-seedling"></i> Importa giacenze — <span id="importStockInvoiceLabel"></span></h4>
+                </div>
+                <div class="modal-body" id="importStockBody">
+                    <div class="text-center text-muted" style="padding:30px;">
+                        <i class="fa fa-spinner fa-spin fa-2x"></i>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Annulla</button>
+                    <button type="button" class="btn btn-success" id="btnConfirmImportStock">
+                        <i class="fas fa-seedling"></i> Conferma importazione
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 @section('custom-css')
     <style>
@@ -171,6 +193,13 @@
         .import-log-row.status-partial_mapping { background: #fffaf0; }
         .import-log-row.status-to_map          { background: #fffdf0; }
         .actions { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+
+        /* Import stock modal */
+        #importStockBody .import-stock-table th { font-size: 12px; white-space: nowrap; }
+        #importStockBody .import-stock-table td { vertical-align: middle; font-size: 13px; }
+        #importStockBody .import-stock-table .qty-preview { font-weight: 700; color: #1ab394; }
+        #importStockBody .import-stock-table .already-imported { opacity: .55; }
+        #importStockBody .import-stock-table input[type=number] { width: 80px; }
     </style>
 @endsection
 @section('custom-script')
@@ -323,6 +352,152 @@
                 },
                 error: function() {
                     $body.html('<p class="text-danger text-center">Errore durante il caricamento dei log.</p>');
+                }
+            });
+        });
+
+        var importStockInvoiceId = null;
+        var importStockMaterials = [];
+
+        function renderImportStockTable(data) {
+            importStockMaterials = data.materials;
+            $('#importStockInvoiceLabel').text(data.invoice.supplier + ' — Fattura ' + data.invoice.number);
+
+            var materialsOptions = '<option value="">— Seleziona —</option>';
+            data.materials.forEach(function(m) {
+                materialsOptions += '<option value="' + m.id + '">' + m.label + '</option>';
+            });
+
+            var html = '<table class="table table-condensed table-bordered import-stock-table">';
+            html += '<thead><tr>';
+            html += '<th>Prodotto fattura</th>';
+            html += '<th class="text-center">Qtà fattura</th>';
+            html += '<th class="text-center">Moltiplicatore</th>';
+            html += '<th>Materiale</th>';
+            html += '<th class="text-center">Giacenza prevista</th>';
+            html += '<th class="text-center">Stato</th>';
+            html += '</tr></thead><tbody>';
+
+            data.products.forEach(function(p) {
+                var rowClass = p.has_stock ? 'already-imported' : '';
+                html += '<tr class="' + rowClass + '" data-product-id="' + p.id + '">';
+                html += '<td><strong>' + p.product_name + '</strong></td>';
+                html += '<td class="text-center">' + (p.quantity || '—') + (p.quantity_unit ? ' ' + p.quantity_unit : '') + '</td>';
+                html += '<td class="text-center">';
+                if (!p.has_stock) {
+                    html += '<input type="number" class="form-control input-xs multiplier-input text-center" value="' + (p.quantity_multiplier || 1) + '" min="0.001" step="0.001" data-product-id="' + p.id + '" data-quantity="' + (p.quantity || 0) + '">';
+                } else {
+                    html += '<span>' + (p.quantity_multiplier || 1) + '</span>';
+                }
+                html += '</td>';
+                html += '<td>';
+                if (!p.has_stock) {
+                    var matOptions = materialsOptions.replace('value="' + p.material_id + '"', 'value="' + p.material_id + '" selected');
+                    html += '<select class="form-control input-sm material-select" data-product-id="' + p.id + '">' + matOptions + '</select>';
+                } else {
+                    html += p.material_label || '—';
+                }
+                html += '</td>';
+                html += '<td class="text-center qty-preview" data-product-id="' + p.id + '">';
+                html += formatQty(p.quantity * (p.quantity_multiplier || 1)) + (p.stock_unit ? ' ' + p.stock_unit : '');
+                html += '</td>';
+                html += '<td class="text-center">';
+                if (p.has_stock) {
+                    html += '<span class="label label-success"><i class="fa fa-check"></i> Già importata</span>';
+                } else {
+                    html += '<span class="label label-default">Da importare</span>';
+                }
+                html += '</td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            $('#importStockBody').html(html);
+        }
+
+        function formatQty(val) {
+            return parseFloat(val).toLocaleString('it-IT', {minimumFractionDigits: 3, maximumFractionDigits: 4});
+        }
+
+        $(document).on('click', '.btn-import-stock', function() {
+            importStockInvoiceId = $(this).data('id');
+            $('#importStockInvoiceLabel').text('');
+            $('#importStockBody').html('<div class="text-center text-muted" style="padding:30px;"><i class="fa fa-spinner fa-spin fa-2x"></i></div>');
+            $('#btnConfirmImportStock').prop('disabled', false);
+            $('#importStockModal').modal('show');
+
+            $.ajax({
+                url: '/backoffice/invoices/' + importStockInvoiceId + '/import-stock-preview',
+                type: 'GET',
+                success: function(res) {
+                    if (res.data) {
+                        renderImportStockTable(res.data);
+                    } else {
+                        $('#importStockBody').html('<p class="text-danger text-center">Errore nel caricamento dei dati.</p>');
+                    }
+                },
+                error: function() {
+                    $('#importStockBody').html('<p class="text-danger text-center">Errore durante il caricamento.</p>');
+                }
+            });
+        });
+
+        // Aggiorna preview giacenza in tempo reale al cambio moltiplicatore
+        $(document).on('input change', '.multiplier-input', function() {
+            var productId = $(this).data('product-id');
+            var qty = parseFloat($(this).data('quantity')) || 0;
+            var mult = parseFloat($(this).val()) || 0;
+            var preview = qty * mult;
+            var $cell = $('.qty-preview[data-product-id="' + productId + '"]');
+            var unit = $cell.text().replace(/[\d.,\s]/g, '').trim();
+            $cell.text(formatQty(preview) + (unit ? ' ' + unit : ''));
+        });
+
+        $(document).on('click', '#btnConfirmImportStock', function() {
+            if (!importStockInvoiceId) return;
+
+            var products = [];
+            $('#importStockBody tbody tr').each(function() {
+                var productId = $(this).data('product-id');
+                var $multiplierInput = $(this).find('.multiplier-input');
+                var $materialSelect = $(this).find('.material-select');
+
+                if ($multiplierInput.length === 0) return; // già importata, skip
+
+                products.push({
+                    id: productId,
+                    material_id: $materialSelect.val() || null,
+                    quantity_multiplier: parseFloat($multiplierInput.val()) || 1,
+                });
+            });
+
+            if (products.length === 0) {
+                alert('Tutte le giacenze sono già state importate.');
+                return;
+            }
+
+            var btn = $(this);
+            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Importazione...');
+
+            $.ajax({
+                url: '/backoffice/invoices/' + importStockInvoiceId + '/load-invoice-stocks',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ products: products, _token: '{{ csrf_token() }}' }),
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                success: function(res) {
+                    btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
+                    $('#importStockModal').modal('hide');
+                    alert(res.data.message);
+                    if (window.dataTable) window.dataTable.ajax.reload();
+                    else window.location.reload();
+                },
+                error: function(xhr) {
+                    btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
+                    var msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
+                        ? xhr.responseJSON.data.message
+                        : 'Errore durante l\'importazione.';
+                    alert(msg);
                 }
             });
         });

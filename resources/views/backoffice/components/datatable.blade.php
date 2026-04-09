@@ -45,15 +45,31 @@
         </button>
     @endif
     @if (in_array('mapping-product', $options))
-        @if ($item->products()->whereDoesntHave('material')->count() > 0)
-            <a href="{{ route('invoices.mapping_products', $item->id) }}">
-                <button
-                    class="btn btn-primary btn-xs"
-                    title="Associa prodotti agli ingredienti"
-                >
-                    <i class="fas fa-seedling"></i> Mappa prodotti
-                </button>
-            </a>
+        <a href="{{ route('invoices.mapping_products', $item->id) }}">
+            <button
+                class="btn btn-primary btn-xs"
+                title="Associa prodotti agli ingredienti"
+            >
+                <i class="fas fa-seedling"></i> Mappa prodotti
+            </button>
+        </a>
+    @endif
+    @if (in_array('import-stock', $options))
+        @php
+        $to_map = $item->products()->whereDoesntHave('material', function ($query) {
+            $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
+                ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
+        })->where('ignore_mapping', 0)->count()
+        @endphp
+        @if($to_map == 0)
+            <button
+                class="btn btn-primary btn-xs btn-import-stock"
+                title="Importa giacenze dei prodotti mappati"
+                data-id="{{ $item->id }}"
+            >
+                <i class="fas fa-seedling"></i> Importa giacenze
+            </button>
         @endif
     @endif
     @if (in_array('add-stock', $options))

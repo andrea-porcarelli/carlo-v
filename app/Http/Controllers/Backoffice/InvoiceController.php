@@ -129,7 +129,7 @@ class InvoiceController extends BaseController
 
 
             $elements = $this->interface->filters($filters);
-            return $this->editColumns(datatables()->of($elements), $this->name, ['pdf-invoice', 'mapping-product', 'ignore-invoice'])
+            return $this->editColumns(datatables()->of($elements), $this->name, ['pdf-invoice', 'mapping-product', 'ignore-invoice', 'import-stock'])
                 ->addColumn('supplier_name', function ($item) {
                    return $item->supplier->extended_name;
                 })
@@ -473,6 +473,117 @@ class InvoiceController extends BaseController
             ->setPaper('a4', 'portrait');
 
         return $pdf->stream($filename);
+    }
+
+    public function importStockPreview(int $id): JsonResponse
+    {
+        $invoice = SupplierInvoice::with('supplier')->findOrFail($id);
+
+        $products = $invoice->products()
+            ->where('ignore_mapping', 0)
+            ->orderBy('id')
+            ->get();
+
+        $materials = Material::orderBy('label')->get(['id', 'label', 'stock_type']);
+
+        $productsData = $products->map(function ($product) use ($invoice) {
+            $mapping = MappingProduct::where('product_name', $product->product_name)
+                ->where('supplier_id', $invoice->supplier_id)
+                ->with('material')
+                ->first();
+
+            $material = $mapping?->material;
+            $multiplier = $mapping?->quantity_multiplier ?? $product->quantity_multiplier ?? 1;
+            $stockPreview = round($product->quantity * $multiplier, 4);
+
+            return [
+                'id'                  => $product->id,
+                'product_name'        => $product->product_name,
+                'quantity'            => $product->quantity,
+                'quantity_unit'       => $product->quantity_unit,
+                'quantity_multiplier' => $multiplier,
+                'price'               => $product->price,
+                'material_id'         => $material?->id,
+                'material_label'      => $material?->label,
+                'stock_unit'          => $material?->stock_type,
+                'stock_preview'       => $stockPreview,
+                'has_stock'           => $product->stock()->exists(),
+            ];
+        });
+
+        return $this->success([
+            'invoice'   => [
+                'id'     => $invoice->id,
+                'number' => $invoice->invoice_number,
+                'supplier' => $invoice->supplier->company_name ?? '—',
+            ],
+            'products'  => $productsData->values(),
+            'materials' => $materials->map(fn($m) => ['id' => $m->id, 'label' => $m->label])->values(),
+        ]);
+    }
+
+    public function loadInvoiceStocks(Request $request, int $id): JsonResponse
+    {
+        $invoice = SupplierInvoice::findOrFail($id);
+
+        $request->validate([
+            'products'                       => 'required|array',
+            'products.*.id'                  => 'required|integer',
+            'products.*.material_id'         => 'nullable|integer|exists:materials,id',
+            'products.*.quantity_multiplier' => 'nullable|numeric|min:0.001',
+        ]);
+
+        $created = 0;
+
+        DB::beginTransaction();
+        try {
+            foreach ($request->input('products') as $row) {
+                $product = $invoice->products()->find($row['id']);
+                if (!$product) continue;
+
+                $materialId = $row['material_id'] ?? null;
+                $multiplier = isset($row['quantity_multiplier']) && $row['quantity_multiplier'] > 0
+                    ? (float) $row['quantity_multiplier']
+                    : 1;
+
+                if (!$materialId) continue;
+
+                // Aggiorna mappatura e moltiplicatore
+                MappingProduct::updateOrCreate(
+                    ['product_name' => $product->product_name, 'supplier_id' => $invoice->supplier_id],
+                    ['material_id' => $materialId, 'quantity_multiplier' => $multiplier]
+                );
+                $product->update(['quantity_multiplier' => $multiplier]);
+
+                $realQuantity = $product->quantity * $multiplier;
+
+                $stock = MaterialStock::firstOrCreate(
+                    ['supplier_invoice_product_id' => $product->id],
+                    [
+                        'material_id'    => $materialId,
+                        'stock'          => $realQuantity,
+                        'purchase_date'  => $invoice->invoice_date,
+                        'purchase_price' => $product->price,
+                    ]
+                );
+
+                if ($stock->wasRecentlyCreated) {
+                    $created++;
+                }
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->error(['message' => 'Errore durante il caricamento delle giacenze: ' . $e->getMessage()]);
+        }
+
+        return $this->success([
+            'created' => $created,
+            'message' => $created > 0
+                ? "Caricate {$created} giacenze."
+                : 'Nessuna nuova giacenza da caricare.',
+        ]);
     }
 
     public function checkPriceAlerts(): JsonResponse
