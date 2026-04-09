@@ -10,11 +10,20 @@
         <div class="col-lg-12">
             <div class="panel panel-primary">
                 <div class="panel-heading">
-                    <h4 class="panel-title" style="margin:0;">
-                        <i class="fa fa-file-text-o"></i>
-                        Fattura: <strong>{{ $invoice->invoice_number }}</strong>
-                        &mdash;
-                        {{ $invoice->supplier->company_name }}
+                    <h4 class="panel-title" style="margin:0; display: flex; justify-content: space-between">
+                        <div>
+                            <i class="fa fa-file-text-o"></i>
+                            Fattura: <strong>{{ $invoice->invoice_number }}</strong>
+                            &mdash;
+                            {{ $invoice->supplier->company_name }}
+                        </div>
+                        <div>
+                            <a href="{{ route('invoices.pdf', $item->id) }}" target="_blank" title="Scarica PDF fattura">
+                                <button class="btn btn-xs btn-danger">
+                                    Scarica fattura
+                                </button>
+                            </a>
+                        </div>
                     </h4>
                 </div>
                 <div class="panel-body" style="padding: 12px 15px;">
@@ -792,7 +801,7 @@
         }
 
         .qty-conversion-hint {
-            font-size: 11px;
+            font-size: 16px;
             margin-top: -2px;
             min-height: 16px;
         }
