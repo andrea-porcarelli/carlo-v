@@ -372,7 +372,7 @@
             html += '<thead><tr>';
             html += '<th>Prodotto fattura</th>';
             html += '<th class="text-center">Qtà fattura</th>';
-            html += '<th class="text-center" style="width: 90px">Moltiplicatore</th>';
+            html += '<th class="text-center" style="width: 130px">Moltiplicatore</th>';
             html += '<th>Materiale</th>';
             html += '<th class="text-center">Giacenza prevista</th>';
             html += '<th class="text-center">Stato</th>';
@@ -385,7 +385,7 @@
                 html += '<td class="text-center">' + (p.quantity || '—') + (p.quantity_unit ? ' ' + p.quantity_unit : '') + '</td>';
                 html += '<td class="text-center">';
                 if (!p.has_stock) {
-                    html += '<input type="number" class="form-control input-xs multiplier-input text-center" value="' + (p.quantity_multiplier || 1) + '" min="0.001" step="0.001" data-product-id="' + p.id + '" data-quantity="' + (p.quantity || 0) + '">';
+                    html += '<input type="number" style="width: 100px" class="form-control input-xs multiplier-input text-center" value="' + (p.quantity_multiplier || 1) + '" min="0.001" step="0.001" data-product-id="' + p.id + '" data-quantity="' + (p.quantity || 0) + '">';
                 } else {
                     html += '<span>' + (p.quantity_multiplier || 1) + '</span>';
                 }
