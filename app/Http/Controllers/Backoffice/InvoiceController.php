@@ -147,11 +147,6 @@ class InvoiceController extends BaseController
                 })
                 ->addColumn('mapping', function ($item) {
                     $total     = $item->products_count;
-                    Utils::queryLog($item->products()->whereDoesntHave('material', function ($query) {
-                        $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                            ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
-                            ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
-                    })->where('ignore_mapping', 0));
                     $daMappare = $item->products()->whereDoesntHave('material', function ($query) {
                         $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
                             ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
