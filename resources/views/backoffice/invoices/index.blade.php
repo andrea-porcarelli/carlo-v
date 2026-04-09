@@ -357,16 +357,9 @@
         });
 
         var importStockInvoiceId = null;
-        var importStockMaterials = [];
 
         function renderImportStockTable(data) {
-            importStockMaterials = data.materials;
             $('#importStockInvoiceLabel').text(data.invoice.supplier + ' — Fattura ' + data.invoice.number);
-
-            var materialsOptions = '<option value="">— Seleziona —</option>';
-            data.materials.forEach(function(m) {
-                materialsOptions += '<option value="' + m.id + '">' + m.label + '</option>';
-            });
 
             var html = '<table class="table table-condensed table-bordered import-stock-table">';
             html += '<thead><tr>';
@@ -380,7 +373,7 @@
 
             data.products.forEach(function(p) {
                 var rowClass = p.has_stock ? 'already-imported' : '';
-                html += '<tr class="' + rowClass + '" data-product-id="' + p.id + '">';
+                html += '<tr class="' + rowClass + '" data-product-id="' + p.id + '" data-material-id="' + (p.material_id || '') + '">';
                 html += '<td><strong>' + p.product_name + '</strong></td>';
                 html += '<td class="text-center">' + (p.quantity || '—') + (p.quantity_unit ? ' ' + p.quantity_unit : '') + '</td>';
                 html += '<td class="text-center">';
@@ -390,14 +383,7 @@
                     html += '<span>' + (p.quantity_multiplier || 1) + '</span>';
                 }
                 html += '</td>';
-                html += '<td>';
-                if (!p.has_stock) {
-                    var matOptions = materialsOptions.replace('value="' + p.material_id + '"', 'value="' + p.material_id + '" selected');
-                    html += '<select class="form-control input-sm material-select" data-product-id="' + p.id + '">' + matOptions + '</select>';
-                } else {
-                    html += p.material_label || '—';
-                }
-                html += '</td>';
+                html += '<td>' + (p.material_label || '—') + '</td>';
                 html += '<td class="text-center qty-preview" data-product-id="' + p.id + '">';
                 html += formatQty(p.quantity * (p.quantity_multiplier || 1)) + (p.stock_unit ? ' ' + p.stock_unit : '');
                 html += '</td>';
@@ -458,15 +444,14 @@
 
             var products = [];
             $('#importStockBody tbody tr').each(function() {
-                var productId = $(this).data('product-id');
-                var $multiplierInput = $(this).find('.multiplier-input');
-                var $materialSelect = $(this).find('.material-select');
+                var $row = $(this);
+                var $multiplierInput = $row.find('.multiplier-input');
 
                 if ($multiplierInput.length === 0) return; // già importata, skip
 
                 products.push({
-                    id: productId,
-                    material_id: $materialSelect.val() || null,
+                    id: $row.data('product-id'),
+                    material_id: $row.data('material-id') || null,
                     quantity_multiplier: parseFloat($multiplierInput.val()) || 1,
                 });
             });

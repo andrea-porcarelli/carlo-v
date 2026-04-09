@@ -60,9 +60,10 @@
             $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
                 ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                 ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
-        })->where('ignore_mapping', 0)->count()
+        })->where('ignore_mapping', 0)->count();
+        $to_import = $item->products()->where('ignore_mapping', 0)->whereDoesntHave('stock')->count();
         @endphp
-        @if($to_map == 0)
+        @if($to_map == 0 && $to_import > 0)
             <button
                 class="btn btn-primary btn-xs btn-import-stock"
                 title="Importa giacenze dei prodotti mappati"

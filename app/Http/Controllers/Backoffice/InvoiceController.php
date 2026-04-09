@@ -484,8 +484,6 @@ class InvoiceController extends BaseController
             ->orderBy('id')
             ->get();
 
-        $materials = Material::orderBy('label')->get(['id', 'label', 'stock_type']);
-
         $productsData = $products->map(function ($product) use ($invoice) {
             $mapping = MappingProduct::where('product_name', $product->product_name)
                 ->where('supplier_id', $invoice->supplier_id)
@@ -512,13 +510,12 @@ class InvoiceController extends BaseController
         });
 
         return $this->success([
-            'invoice'   => [
-                'id'     => $invoice->id,
-                'number' => $invoice->invoice_number,
+            'invoice'  => [
+                'id'       => $invoice->id,
+                'number'   => $invoice->invoice_number,
                 'supplier' => $invoice->supplier->company_name ?? '—',
             ],
-            'products'  => $productsData->values(),
-            'materials' => $materials->map(fn($m) => ['id' => $m->id, 'label' => $m->label])->values(),
+            'products' => $productsData->values(),
         ]);
     }
 
