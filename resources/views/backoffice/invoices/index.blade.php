@@ -430,8 +430,8 @@
                 url: '/backoffice/invoices/' + importStockInvoiceId + '/import-stock-preview',
                 type: 'GET',
                 success: function(res) {
-                    if (res.data) {
-                        renderImportStockTable(res.data);
+                    if (res && res.products) {
+                        renderImportStockTable(res);
                     } else {
                         $('#importStockBody').html('<p class="text-danger text-center">Errore nel caricamento dei dati.</p>');
                     }
@@ -488,14 +488,14 @@
                 success: function(res) {
                     btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
                     $('#importStockModal').modal('hide');
-                    alert(res.data.message);
+                    alert(res.message || 'Importazione completata.');
                     if (window.dataTable) window.dataTable.ajax.reload();
                     else window.location.reload();
                 },
                 error: function(xhr) {
                     btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
-                    var msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message
-                        ? xhr.responseJSON.data.message
+                    var msg = xhr.responseJSON && xhr.responseJSON.message
+                        ? xhr.responseJSON.message
                         : 'Errore durante l\'importazione.';
                     alert(msg);
                 }
