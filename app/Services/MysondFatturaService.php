@@ -259,4 +259,9 @@ class MysondFatturaService
             throw $e;
         }
     }
+
+    public function createInvoice($invoice) : array
+    {
+        return InvoiceService::make_xml($invoice);
+    }
 }

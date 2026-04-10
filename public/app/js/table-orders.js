@@ -122,18 +122,31 @@ class TableOrdersManager {
     /**
      * Show notification
      */
-    showNotification(message, type = 'success') {
+    showNotification(message, type = 'success', persistent = false) {
         const notification = this.getElement('notification');
         const notificationText = this.getElement('notificationText');
+        const notificationClose = document.getElementById('notificationClose');
 
         if (notification && notificationText) {
             notificationText.textContent = message;
             notification.style.display = 'block';
             notification.className = `notification ${type}`;
 
-            setTimeout(() => {
-                notification.style.display = 'none';
-            }, 3000);
+            if (persistent) {
+                if (notificationClose) notificationClose.style.display = 'inline';
+                notification.style.cursor = 'pointer';
+                notification.onclick = () => {
+                    notification.style.display = 'none';
+                    notification.onclick = null;
+                };
+            } else {
+                if (notificationClose) notificationClose.style.display = 'none';
+                notification.style.cursor = '';
+                notification.onclick = null;
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 3000);
+            }
         }
     }
 
@@ -804,20 +817,33 @@ class TableOrdersManager {
         const isPercent = document.getElementById('discountTypePct')?.classList.contains('active');
         const discountType = isPercent ? 'percent' : 'value';
 
+        const order = this.currentTable?.order;
+
+        // Calcola il totale reale con la stessa logica usata per applicare lo sconto
+        let rawTotal;
+        if (this.modifySession.active) {
+            const items = this.modifySession.items;
+            const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
+            const coverTotal = (order && order.has_cover_charge) ? parseFloat(order.cover_charge_total || 0) : 0;
+            rawTotal = itemsTotal + coverTotal;
+        } else {
+            rawTotal = parseFloat(order ? order.total_amount : 0);
+        }
+
+        // Validazione: lo sconto non può superare il totale del tavolo
+        if (discountType === 'percent' && discountVal > 100) {
+            this.showNotification('Lo sconto percentuale non può superare il 100%', 'error');
+            return;
+        }
+        if (discountType === 'value' && discountVal > rawTotal) {
+            this.showNotification(`Lo sconto non può superare il totale del tavolo (€${rawTotal.toFixed(2)})`, 'error');
+            return;
+        }
+
         try {
             const auth = await operatorAuthManager.requestAuth();
 
-            // Calculate totals
-            const order = this.currentTable?.order;
-            let rawTotal;
-            if (this.modifySession.active) {
-                const items = this.modifySession.items;
-                const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
-                const coverTotal = (order && order.has_cover_charge) ? parseFloat(order.cover_charge_total || 0) : 0;
-                rawTotal = itemsTotal + coverTotal;
-            } else {
-                rawTotal = parseFloat(order ? order.total_amount : 0);
-            }
+            // rawTotal già calcolato sopra
             const finalTotal = discountType === 'percent'
                 ? Math.max(0, rawTotal - Math.round(rawTotal * Math.min(discountVal, 100) / 100 * 100) / 100)
                 : Math.max(0, rawTotal - Math.min(discountVal, rawTotal));
@@ -2737,7 +2763,7 @@ class TableOrdersManager {
         if (method === 'contanti') {
             const splitData = this._splitsData?.find(s => s.id === splitId);
             const amount = parseFloat(splitData?.total ?? 0);
-            await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, doPaySplit);
+            await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, doPaySplit, null, this.currentTable.table.id);
         } else {
             await doPaySplit();
         }
@@ -2754,21 +2780,29 @@ class TableOrdersManager {
     /**
      * Chiudi conto con pagamento contanti e apri il cassetto.
      */
-    async startCashDrawerFlow(amount, tableOrderId, authToken, onComplete = null, onReady = null) {
+    async startCashDrawerFlow(amount, tableOrderId, authToken, onComplete = null, onReady = null, tableId = null) {
         const overlay = document.getElementById('cashDrawerOverlay');
         const statusEl = document.getElementById('cashDrawerStatus');
         const amountEl = document.getElementById('cashDrawerAmount');
         const cancelBtn = document.getElementById('cashDrawerCancelBtn');
+        const fallbackSection = document.getElementById('cashDrawerFallbackSection');
+        const fallbackBtn = document.getElementById('cashDrawerFallbackBtn');
 
         if (!overlay) return;
 
         amountEl.textContent = `€${parseFloat(amount).toFixed(2)}`;
         statusEl.textContent = 'Avvio pagamento sulla cassa automatica...';
         cancelBtn.disabled = false;
+        if (fallbackSection) fallbackSection.style.display = 'none';
+        if (fallbackBtn) fallbackBtn.disabled = false;
         overlay.style.display = 'flex';
         window.addEventListener('beforeunload', this._beforeUnloadHandler);
 
         this._cashDrawerToken = authToken;
+        this._cashDrawerTableId = tableId;
+        this._cashDrawerPollErrors = 0;
+        // Assegna subito onComplete così _executeCashDrawerFallback può usarlo anche in caso di errore all'avvio
+        this._cashDrawerOnComplete = onComplete ?? (() => this._afterPaymentSuccess());
 
         try {
             const resp = await fetch(`${this.apiBase}/open-cash-drawer`, {
@@ -2783,8 +2817,8 @@ class TableOrdersManager {
             const data = await resp.json();
 
             if (!data.success) {
-                this._hideCashDrawerOverlay();
-                this._afterPaymentSuccess();
+                console.error('Cash drawer open failed:', data);
+                await this._executeCashDrawerFallback();
                 return;
             }
 
@@ -2800,14 +2834,12 @@ class TableOrdersManager {
                 }
             }
 
-            this._cashDrawerOnComplete = onComplete ?? (() => this._afterPaymentSuccess());
             statusEl.textContent = 'In attesa del pagamento dalla cassa automatica...';
             this._cashDrawerPollInterval = setInterval(() => this._pollCashDrawer(), 250);
 
         } catch (e) {
             console.error('Cash drawer start error:', e);
-            this._hideCashDrawerOverlay();
-            (onComplete ?? (() => this._afterPaymentSuccess()))();
+            await this._executeCashDrawerFallback();
         }
     }
 
@@ -2832,8 +2864,14 @@ class TableOrdersManager {
             }
             // payment_status === 2 → in corso, continua
         } catch (e) {
+            this._cashDrawerPollErrors = (this._cashDrawerPollErrors ?? 0) + 1;
             const statusEl = document.getElementById('cashDrawerStatus');
             if (statusEl) statusEl.textContent = 'Errore di comunicazione, riprovo...';
+
+            if (this._cashDrawerPollErrors >= 8) {
+                const fallbackSection = document.getElementById('cashDrawerFallbackSection');
+                if (fallbackSection) fallbackSection.style.display = 'block';
+            }
         }
     }
 
@@ -2865,10 +2903,48 @@ class TableOrdersManager {
     _hideCashDrawerOverlay() {
         const overlay = document.getElementById('cashDrawerOverlay');
         if (overlay) overlay.style.display = 'none';
+        const fallbackSection = document.getElementById('cashDrawerFallbackSection');
+        if (fallbackSection) fallbackSection.style.display = 'none';
         window.removeEventListener('beforeunload', this._beforeUnloadHandler);
         this._cashDrawerOperationId = null;
         this._cashDrawerToken = null;
+        this._cashDrawerTableId = null;
+        this._cashDrawerPollErrors = 0;
         this._cashDrawerOnComplete = null;
+    }
+
+    async _executeCashDrawerFallback() {
+        const fallbackBtn = document.getElementById('cashDrawerFallbackBtn');
+        if (fallbackBtn) fallbackBtn.disabled = true;
+
+        clearInterval(this._cashDrawerPollInterval);
+        this._cashDrawerPollInterval = null;
+
+        // Invia log al backend prima di completare il pagamento
+        const tableId = this._cashDrawerTableId;
+        const authToken = this._cashDrawerToken;
+        if (tableId && authToken) {
+            try {
+                await fetch(`${this.apiBase}/${tableId}/log-cash-drawer-failed`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'X-Operator-Token': authToken,
+                    },
+                });
+            } catch (e) {
+                console.error('log-cash-drawer-failed error:', e);
+            }
+        }
+
+        const onComplete = this._cashDrawerOnComplete;
+        this._hideCashDrawerOverlay();
+
+        if (onComplete) await onComplete();
+
+        const fallbackAlert = document.getElementById('cashDrawerFallbackAlert');
+        if (fallbackAlert) fallbackAlert.style.display = 'flex';
     }
 
     async chiudiContoContanti() {
@@ -2884,6 +2960,7 @@ class TableOrdersManager {
         }
 
         const amount = parseFloat(this.currentTable.order.discounted_total ?? this.currentTable.order.total_amount ?? 0);
+        const tableId = this.currentTable.table.id;
         await this.startCashDrawerFlow(
             amount,
             this.currentTable.order.id,
@@ -2893,7 +2970,7 @@ class TableOrdersManager {
             // onReady: chiamato subito dopo l'apertura del cassetto, prima del polling
             async () => {
                 try {
-                    const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
+                    const response = await fetch(`${this.apiBase}/${tableId}/pay`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -2914,7 +2991,8 @@ class TableOrdersManager {
                     this.showNotification('Errore nell\'incasso', 'error');
                     return false;
                 }
-            }
+            },
+            tableId
         );
     }
 
@@ -2973,9 +3051,10 @@ class TableOrdersManager {
         // ── Contanti: apri cassetto prima di chiudere il conto ────────────────
         if (method === 'contanti') {
             const amount = parseFloat(this.currentTable.order.discounted_total ?? this.currentTable.order.total_amount ?? 0);
+            const tableId = this.currentTable.table.id;
             await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, async () => {
                 try {
-                    const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay`, {
+                    const response = await fetch(`${this.apiBase}/${tableId}/pay`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -2995,7 +3074,7 @@ class TableOrdersManager {
                     console.error('Error paying table after cash drawer:', e);
                     this.showNotification('Errore nell\'incasso', 'error');
                 }
-            });
+            }, null, tableId);
             return;
         }
 
@@ -3151,7 +3230,7 @@ class TableOrdersManager {
 
     /**
      * Rebuild invoice rows to match current split count.
-     * Preserves descriptions and customer info already typed.
+     * Preserves all customer fields already typed.
      */
     _rebuildInvoiceRows() {
         if (!this.currentTable || !this.currentTable.order) return;
@@ -3160,13 +3239,23 @@ class TableOrdersManager {
         const n      = this._invoiceSplit || 1;
         const perRow = parseFloat((total / n).toFixed(2));
 
-        // Save existing per-row data (description, name, tax code) before clearing
+        // Save existing per-row data before clearing
         const saved = [];
         document.querySelectorAll('.invoice-row').forEach(row => {
             saved.push({
-                description:   row.querySelector('.invoice-description')?.value   || 'Pasto completo',
-                customerName:  row.querySelector('.invoice-customer-name')?.value || '',
-                taxCode:       row.querySelector('.invoice-tax-code')?.value       || '',
+                description:          row.querySelector('.invoice-description')?.value            || 'Pasto completo',
+                customerId:           row.querySelector('.invoice-customer-id')?.value            || '',
+                userType:             row.querySelector('.invoice-user-type')?.value              || 'private',
+                customerName:         row.querySelector('.invoice-customer-name')?.value          || '',
+                fiscalCode:           row.querySelector('.invoice-fiscal-code')?.value            || '',
+                vatNumber:            row.querySelector('.invoice-vat-number')?.value             || '',
+                address:              row.querySelector('.invoice-address')?.value                || '',
+                zipCode:              row.querySelector('.invoice-zip-code')?.value               || '',
+                city:                 row.querySelector('.invoice-city')?.value                   || '',
+                province:             row.querySelector('.invoice-province')?.value               || '',
+                codiceDestinatario:   row.querySelector('.invoice-codice-destinatario')?.value    || '',
+                pecDestinatario:      row.querySelector('.invoice-pec-destinatario')?.value       || '',
+                saveCustomer:         row.querySelector('.invoice-save-customer')?.checked        || false,
             });
         });
 
@@ -3177,12 +3266,7 @@ class TableOrdersManager {
             // Last row gets the remainder to avoid rounding gaps
             const amount = i < n - 1 ? perRow : parseFloat((total - perRow * (n - 1)).toFixed(2));
             const prev   = saved[i] || {};
-            this._addInvoiceRow(
-                amount,
-                prev.description  || 'Pasto completo',
-                prev.customerName || '',
-                prev.taxCode      || ''
-            );
+            this._addInvoiceRow(amount, prev);
         }
 
         // Update per-person amount display
@@ -3192,22 +3276,57 @@ class TableOrdersManager {
     }
 
     /**
-     * Add a single invoice row
+     * Add a single invoice row with full customer fields for XML generation.
+     * @param {number} defaultAmount
+     * @param {object} data  Prefill values (description, userType, customerName, fiscalCode, …)
      */
-    _addInvoiceRow(defaultAmount = '', description = 'Pasto completo', customerName = '', taxCode = '') {
+    _addInvoiceRow(defaultAmount = 0, data = {}) {
         const idx       = this._invoiceRowIndex++;
         const container = document.getElementById('invoiceRowsContainer');
         const rowNum    = idx + 1;
 
+        const description        = data.description        || 'Pasto completo';
+        const customerId         = data.customerId         || '';
+        const userType           = data.userType           || 'private';
+        const customerName       = data.customerName       || '';
+        const fiscalCode         = data.fiscalCode         || '';
+        const vatNumber          = data.vatNumber          || '';
+        const address            = data.address            || '';
+        const zipCode            = data.zipCode            || '';
+        const city               = data.city               || '';
+        const province           = data.province           || '';
+        const codiceDestinatario = data.codiceDestinatario || '';
+        const pecDestinatario    = data.pecDestinatario    || '';
+        const saveCustomer       = data.saveCustomer       || false;
+
+        const isCompany = userType === 'company' || userType === 'public_company';
+        const companyDisplay = isCompany ? 'grid' : 'none';
+
         const row = document.createElement('div');
-        row.className    = 'invoice-row';
+        row.className      = 'invoice-row';
         row.dataset.rowIdx = idx;
         row.innerHTML = `
-            <span class="invoice-row-badge">Ospite ${rowNum}</span>
-            <button class="btn-remove-invoice-row" onclick="tableOrdersManager._removeInvoiceRow(${idx})" title="Rimuovi ospite">
-                <i class="fas fa-times"></i>
-            </button>
-            <div style="display: grid; grid-template-columns: 120px 1fr 160px; gap: 10px; align-items: end;">
+            <input type="hidden" class="invoice-customer-id" value="${customerId}">
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span class="invoice-row-badge">Ospite ${rowNum}</span>
+                <button class="btn-remove-invoice-row" onclick="tableOrdersManager._removeInvoiceRow(${idx})" title="Rimuovi ospite">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Autocomplete search -->
+            <div style="position:relative; margin-bottom:8px;">
+                <input type="text" class="invoice-customer-search" placeholder="Cerca cliente per nome, CF o P.IVA…"
+                    autocomplete="off"
+                    oninput="tableOrdersManager._onCustomerSearch(this, ${idx})"
+                    style="width:100%;">
+                <div class="invoice-customer-suggestions" data-row="${idx}"
+                    style="display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ccc; border-radius:4px; z-index:999; max-height:180px; overflow-y:auto;"></div>
+            </div>
+
+            <!-- Row 1: importo, descrizione, tipo cliente -->
+            <div style="display:grid; grid-template-columns:110px 1fr 160px; gap:8px; align-items:end; margin-bottom:8px;">
                 <div>
                     <label>Importo (€)</label>
                     <input type="number" class="invoice-amount" step="0.01" min="0"
@@ -3216,22 +3335,158 @@ class TableOrdersManager {
                 </div>
                 <div>
                     <label>Descrizione fattura</label>
-                    <input type="text" class="invoice-description"
-                           value="${description}" placeholder="Pasto completo">
+                    <input type="text" class="invoice-description" value="${description}" placeholder="Pasto completo">
                 </div>
                 <div>
-                    <label>Nome ospite (opz.)</label>
-                    <input type="text" class="invoice-customer-name"
-                           value="${customerName}" placeholder="Mario Rossi">
+                    <label>Tipo cliente</label>
+                    <select class="invoice-user-type" onchange="tableOrdersManager._onInvoiceUserTypeChange(this, ${idx})">
+                        <option value="private"${userType === 'private' ? ' selected' : ''}>Privato</option>
+                        <option value="company"${userType === 'company' ? ' selected' : ''}>Azienda</option>
+                        <option value="public_company"${userType === 'public_company' ? ' selected' : ''}>Pubblica Amministrazione</option>
+                    </select>
                 </div>
             </div>
-            <div style="margin-top: 8px;">
-                <label>Codice fiscale / P.IVA (opz.)</label>
-                <input type="text" class="invoice-tax-code"
-                       value="${taxCode}" placeholder="RSSMRA80A01H501U" style="max-width: 260px;">
+
+            <!-- Row 2: nome, CF, P.IVA -->
+            <div style="display:grid; grid-template-columns:1fr 160px 160px; gap:8px; align-items:end; margin-bottom:8px;">
+                <div>
+                    <label>Nome / Ragione sociale</label>
+                    <input type="text" class="invoice-customer-name" value="${customerName}" placeholder="Mario Rossi">
+                </div>
+                <div>
+                    <label>Codice Fiscale</label>
+                    <input type="text" class="invoice-fiscal-code" value="${fiscalCode}" placeholder="RSSMRA80A01H501U">
+                </div>
+                <div>
+                    <label>P.IVA</label>
+                    <input type="text" class="invoice-vat-number" value="${vatNumber}" placeholder="01234567890">
+                </div>
+            </div>
+
+            <!-- Row 3: indirizzo (aziende) -->
+            <div class="invoice-company-fields" style="display:${companyDisplay}; grid-template-columns:1fr 70px 1fr 50px; gap:8px; align-items:end; margin-bottom:8px;">
+                <div>
+                    <label>Indirizzo</label>
+                    <input type="text" class="invoice-address" value="${address}" placeholder="Via Roma 1">
+                </div>
+                <div>
+                    <label>CAP</label>
+                    <input type="text" class="invoice-zip-code" value="${zipCode}" placeholder="00100" maxlength="10">
+                </div>
+                <div>
+                    <label>Comune</label>
+                    <input type="text" class="invoice-city" value="${city}" placeholder="Roma">
+                </div>
+                <div>
+                    <label>Prov.</label>
+                    <input type="text" class="invoice-province" value="${province}" placeholder="RM" maxlength="5">
+                </div>
+            </div>
+
+            <!-- Row 4: SDI / PEC (aziende) -->
+            <div class="invoice-company-fields" style="display:${companyDisplay}; grid-template-columns:140px 1fr; gap:8px; align-items:end; margin-bottom:8px;">
+                <div>
+                    <label>Codice Destinatario SDI</label>
+                    <input type="text" class="invoice-codice-destinatario" value="${codiceDestinatario}" placeholder="0000000" maxlength="7">
+                </div>
+                <div>
+                    <label>PEC Destinatario</label>
+                    <input type="text" class="invoice-pec-destinatario" value="${pecDestinatario}" placeholder="pec@example.com">
+                </div>
+            </div>
+
+            <!-- Salva cliente -->
+            <div style="margin-top:4px;">
+                <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:0.85em;">
+                    <input type="checkbox" class="invoice-save-customer"${saveCustomer ? ' checked' : ''}>
+                    Salva cliente per usi futuri
+                </label>
             </div>
         `;
         container.appendChild(row);
+    }
+
+    /**
+     * Show/hide company-only fields when user type changes
+     */
+    _onInvoiceUserTypeChange(select, idx) {
+        const row = document.querySelector(`.invoice-row[data-row-idx="${idx}"]`);
+        if (!row) return;
+        const isCompany = select.value === 'company' || select.value === 'public_company';
+        row.querySelectorAll('.invoice-company-fields').forEach(el => {
+            el.style.display = isCompany ? 'grid' : 'none';
+        });
+    }
+
+    /**
+     * Autocomplete: search customers as user types
+     */
+    async _onCustomerSearch(input, idx) {
+        const q = input.value.trim();
+        const suggestionsEl = document.querySelector(`.invoice-customer-suggestions[data-row="${idx}"]`);
+        if (!suggestionsEl) return;
+
+        if (q.length < 2) {
+            suggestionsEl.style.display = 'none';
+            suggestionsEl.innerHTML = '';
+            return;
+        }
+
+        try {
+            const resp = await fetch(`/api/customers?q=${encodeURIComponent(q)}`, {
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+            });
+            const data = await resp.json();
+            const customers = data.data || [];
+
+            if (customers.length === 0) {
+                suggestionsEl.style.display = 'none';
+                return;
+            }
+
+            suggestionsEl.innerHTML = customers.map(c => `
+                <div class="invoice-customer-suggestion-item" style="padding:8px 10px; cursor:pointer; border-bottom:1px solid #eee; font-size:0.9em;"
+                    onmousedown="tableOrdersManager._fillInvoiceRowFromCustomer(${idx}, ${JSON.stringify(c).replace(/"/g, '&quot;')})">
+                    <strong>${c.full_name}</strong>
+                    <span style="color:#888; font-size:0.85em; margin-left:6px;">${c.fiscal_code || c.vat_number || ''}</span>
+                </div>
+            `).join('');
+            suggestionsEl.style.display = 'block';
+        } catch (e) {
+            console.error('Customer search error:', e);
+        }
+    }
+
+    /**
+     * Fill invoice row fields from a selected customer object
+     */
+    _fillInvoiceRowFromCustomer(idx, customer) {
+        const row = document.querySelector(`.invoice-row[data-row-idx="${idx}"]`);
+        if (!row) return;
+
+        row.querySelector('.invoice-customer-id').value          = customer.id || '';
+        row.querySelector('.invoice-user-type').value            = customer.user_type || 'private';
+        row.querySelector('.invoice-customer-name').value        = customer.full_name || '';
+        row.querySelector('.invoice-fiscal-code').value          = customer.fiscal_code || '';
+        row.querySelector('.invoice-vat-number').value           = customer.vat_number || '';
+        row.querySelector('.invoice-address').value              = customer.address || '';
+        row.querySelector('.invoice-zip-code').value             = customer.zip_code || '';
+        row.querySelector('.invoice-city').value                 = customer.city || '';
+        row.querySelector('.invoice-province').value             = customer.province || '';
+        row.querySelector('.invoice-codice-destinatario').value  = customer.codice_destinatario || '';
+        row.querySelector('.invoice-pec-destinatario').value     = customer.pec_destinatario || '';
+
+        // Show/hide company fields
+        const isCompany = customer.user_type === 'company' || customer.user_type === 'public_company';
+        row.querySelectorAll('.invoice-company-fields').forEach(el => {
+            el.style.display = isCompany ? 'grid' : 'none';
+        });
+
+        // Update search input and hide suggestions
+        const searchInput = row.querySelector('.invoice-customer-search');
+        if (searchInput) searchInput.value = customer.full_name || '';
+        const suggestionsEl = row.querySelector('.invoice-customer-suggestions');
+        if (suggestionsEl) { suggestionsEl.style.display = 'none'; suggestionsEl.innerHTML = ''; }
     }
 
     /**
@@ -3288,10 +3543,20 @@ class TableOrdersManager {
             const amount = parseFloat(row.querySelector('.invoice-amount').value);
             if (isNaN(amount) || amount <= 0) { valid = false; return; }
             invoices.push({
-                amount: amount,
-                description: row.querySelector('.invoice-description').value || 'Pasto completo',
-                customer_name: row.querySelector('.invoice-customer-name').value || null,
-                customer_tax_code: row.querySelector('.invoice-tax-code').value || null,
+                amount:                       amount,
+                description:                  row.querySelector('.invoice-description')?.value                || 'Pasto completo',
+                user_type:                    row.querySelector('.invoice-user-type')?.value                  || 'private',
+                customer_name:                row.querySelector('.invoice-customer-name')?.value              || null,
+                customer_fiscal_code:         row.querySelector('.invoice-fiscal-code')?.value                || null,
+                customer_vat_number:          row.querySelector('.invoice-vat-number')?.value                 || null,
+                customer_address:             row.querySelector('.invoice-address')?.value                    || null,
+                customer_zip_code:            row.querySelector('.invoice-zip-code')?.value                   || null,
+                customer_city:                row.querySelector('.invoice-city')?.value                       || null,
+                customer_province:            row.querySelector('.invoice-province')?.value                   || null,
+                customer_codice_destinatario: row.querySelector('.invoice-codice-destinatario')?.value        || null,
+                customer_pec_destinatario:    row.querySelector('.invoice-pec-destinatario')?.value           || null,
+                customer_id:                  row.querySelector('.invoice-customer-id')?.value                || null,
+                save_customer:                row.querySelector('.invoice-save-customer')?.checked            || false,
             });
         });
 
@@ -4083,7 +4348,6 @@ class TableOrdersManager {
         }
 
         let body = { type: precontoType };
-
         if (precontoType === 'split') {
             body.split_count = parseInt(document.getElementById('splitCount').value) || null;
         } else if (precontoType === 'items') {
@@ -4106,6 +4370,7 @@ class TableOrdersManager {
         body.discount_amount = parseFloat(document.getElementById('preconto_discount_amount')?.value || 0);
 
         try {
+            console.log(`${this.apiBase}/${this.currentTable.table.id}/preconto`)
             const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto`, {
                 method: 'POST',
                 headers: {

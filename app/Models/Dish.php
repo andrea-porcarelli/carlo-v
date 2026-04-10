@@ -43,7 +43,7 @@ class Dish extends Model
             'dish_materials',
             'dish_id',
             'material_id'
-        )->withPivot('quantity')->withTimestamps();
+        )->withPivot('quantity', 'unit_type')->withTimestamps();
     }
 
     public function getIngredientsViewAttribute() : string

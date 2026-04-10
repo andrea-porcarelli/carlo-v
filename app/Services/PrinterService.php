@@ -701,15 +701,16 @@ class PrinterService implements PrinterServiceInterface
     public function printPreconto(TableOrder $tableOrder, int $operatorId, ?int $splitCount = null, string $discountType = 'none', float $discountAmount = 0): bool
     {
         try {
+            Log::info(__METHOD__ . ': ' . __LINE__);
             // Get preconto printer from settings
             $printer = Setting::getPrecontoPrinter();
-
+            Log::info("PRinter", ['printer' => $printer] );
             if (!$printer) {
                 Log::error('Stampante PreConto non configurata');
                 return false;
             }
 
-            if (!$printer->is_active || empty($ip)) {
+            if (!$printer->is_active || empty($printer->ip)) {
                 Log::error('Stampante PreConto non attiva o senza IP', ['printer_id' => $printer->id]);
                 return false;
             }
@@ -1735,7 +1736,7 @@ class PrinterService implements PrinterServiceInterface
         try {
             $response = Http::withoutVerifying()
                 ->timeout(5)
-                ->post("https://{$ip   }/selfcashapi/", [
+                ->post("https://{$ip}/selfcashapi/", [
                     'tipo'       => 1,
                     'importo'    => (int) round($amount * 100),
                     'opName'     => $opName,

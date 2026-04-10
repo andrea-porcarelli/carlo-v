@@ -218,6 +218,7 @@ window._boSale = {
                                             'fattura'        => ['label' => 'Fattura',          'icon' => 'fa-file-invoice', 'class' => 'primary'],
                                             'misto'          => ['label' => 'Misto',            'icon' => 'fa-layer-group',  'class' => 'warning'],
                                             'chiusura_conto' => ['label' => 'Chiusura conto',   'icon' => 'fa-times-circle', 'class' => 'default'],
+                                            'fattura_pos' => ['label' => 'Pos con fattura',   'icon' => 'fa-credit-card', 'class' => 'success'],
                                         ];
                                         $pm = $pmLabels[$sale->payment_method] ?? null;
                                     @endphp
@@ -434,7 +435,7 @@ window._boSale = {
                                                     @endif
                                                 </td>
                                                 @if($sale->autoconsumo)
-                                                    <td>{{ $item->autoconsumoUser->name }}</td>
+                                                    <td>{{ $item->autoconsumoUser->name ?? 'Sconosciuto' }}</td>
                                                 @endif
                                                 <td class="text-right" style="font-weight: bold">
                                                     @php
@@ -581,38 +582,180 @@ window._boSale = {
 
     <!-- Invoice Section -->
     @php
-        $invoiceLogs = $logs->where('action', 'create_invoice')->values();
+        $tableOrderInvoices = $sale->tableOrderInvoices ?? collect();
+        $invoiceLogs        = $logs->where('action', 'create_invoice')->values();
+        $hasInvoices        = $tableOrderInvoices->count() > 0;
+        $hasLegacyLogs      = !$hasInvoices && $invoiceLogs->count() > 0;
     @endphp
-    @if($invoiceLogs->count() > 0)
+    @if($hasInvoices || $hasLegacyLogs)
     <div class="row mt-4">
         <div class="col-xs-12">
             <div class="panel panel-primary">
                 <div class="panel-heading" style="display: flex; justify-content: space-between; align-items: center;">
                     <h4 class="panel-title" style="margin: 0;">
                         <i class="fas fa-file-invoice"></i> Fatturazioni
-                        <span class="label label-default" style="margin-left: 8px;">{{ $invoiceLogs->count() }} fattura/e</span>
-                        @if($invoiceLogs->filter(fn($l) => !empty($l->data_after['fic_sent']))->count() > 0)
-                            <span class="label label-success" style="margin-left: 4px;">
-                                <i class="fas fa-check"></i> {{ $invoiceLogs->filter(fn($l) => !empty($l->data_after['fic_sent']))->count() }} inviate FIC
-                            </span>
+                        @if($hasInvoices)
+                            <span class="label label-default" style="margin-left: 8px;">{{ $tableOrderInvoices->count() }} fattura/e</span>
+                            @if($tableOrderInvoices->where('status','sent')->count() > 0)
+                                <span class="label label-success" style="margin-left: 4px;">
+                                    <i class="fas fa-check"></i> {{ $tableOrderInvoices->where('status','sent')->count() }} inviate
+                                </span>
+                            @endif
+                            @if($tableOrderInvoices->where('status','error')->count() > 0)
+                                <span class="label label-danger" style="margin-left: 4px;">
+                                    <i class="fas fa-exclamation-triangle"></i> {{ $tableOrderInvoices->where('status','error')->count() }} errori
+                                </span>
+                            @endif
+                        @else
+                            <span class="label label-default" style="margin-left: 8px;">{{ $invoiceLogs->count() }} fattura/e (log)</span>
                         @endif
                     </h4>
                     @php
-                        $totalInvoiced = $invoiceLogs->sum(fn($l) => (float)($l->data_after['amount'] ?? 0));
-                        $totalAmount   = (float) $sale->total_amount;
-                        $remaining     = round($totalAmount - $totalInvoiced, 2);
+                        $totalInvoiced = $hasInvoices
+                            ? $tableOrderInvoices->sum('amount')
+                            : $invoiceLogs->sum(fn($l) => (float)($l->data_after['amount'] ?? 0));
+                        $remaining = round((float) $sale->total_amount - $totalInvoiced, 2);
                     @endphp
                     <div style="text-align: right;">
                         <small class="text-muted">Totale fatturato:</small>
                         <strong style="font-size: 1.1rem; margin-left: 6px;">€{{ number_format($totalInvoiced, 2, ',', '.') }}</strong>
                         @if($remaining > 0.01)
-                            <small class="text-muted" style="margin-left: 10px;">Resto scontrino:</small>
+                            <small class="text-muted" style="margin-left: 10px;">Resto:</small>
                             <strong style="font-size: 1.1rem; margin-left: 6px;">€{{ number_format($remaining, 2, ',', '.') }}</strong>
                         @endif
                     </div>
                 </div>
                 <div class="panel-body p-0">
                     <div class="table-responsive">
+                        @if($hasInvoices)
+                        {{-- Dati da table_order_invoices --}}
+                        <table class="table table-condensed table-hover table-striped" style="margin: 0;">
+                            <thead>
+                                <tr class="active">
+                                    <th width="110">N° Fattura</th>
+                                    <th width="130">Data/Ora</th>
+                                    <th width="110" class="text-right">Importo</th>
+                                    <th>Intestatario</th>
+                                    <th width="170">CF / P.IVA</th>
+                                    <th width="80" class="text-center">Stato</th>
+                                    <th width="185" class="text-center">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($tableOrderInvoices as $inv)
+                                    @php
+                                        $customer  = $inv->customer;
+                                        $statusMap = [
+                                            'sent'    => ['label' => 'Inviata',   'class' => 'success'],
+                                            'error'   => ['label' => 'Errore',    'class' => 'danger'],
+                                            'pending' => ['label' => 'In attesa', 'class' => 'warning'],
+                                        ];
+                                        $st = $statusMap[$inv->status] ?? ['label' => $inv->status, 'class' => 'default'];
+                                    @endphp
+                                    <tr>
+                                        <td>
+                                            @if($inv->invoice_code)
+                                                <code style="font-size:.85rem;">{{ $inv->invoice_code }}</code>
+                                            @else
+                                                <em class="text-muted">#{{ $inv->id }}</em>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <small class="text-nowrap">
+                                                {{ $inv->created_at->format('d/m/Y') }}<br>
+                                                <strong>{{ $inv->created_at->format('H:i:s') }}</strong>
+                                            </small>
+                                        </td>
+                                        <td class="text-right">
+                                            <strong style="font-size:1rem;">€{{ number_format($inv->amount, 2, ',', '.') }}</strong>
+                                            @if($inv->tax > 0)
+                                                <br><small class="text-muted">IVA: €{{ number_format($inv->tax, 2, ',', '.') }}</small>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($customer)
+                                                <strong>{{ $customer->full_name }}</strong>
+                                                @if($customer->address)
+                                                    <br><small class="text-muted">{{ $customer->address }}, {{ $customer->zip_code }} {{ $customer->city }} ({{ $customer->province }})</small>
+                                                @endif
+                                                @php $typeLabels = ['private' => 'Privato', 'company' => 'Azienda', 'public_company' => 'PA']; @endphp
+                                                <br><span class="label label-default" style="font-size:.75em;">{{ $typeLabels[$customer->user_type] ?? $customer->user_type }}</span>
+                                            @elseif($inv->description)
+                                                <em class="text-muted">{{ $inv->description }}</em>
+                                            @else
+                                                <em class="text-muted">—</em>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($customer)
+                                                @if($customer->fiscal_code)
+                                                    <code style="font-size:.8rem;">{{ $customer->fiscal_code }}</code>
+                                                @endif
+                                                @if($customer->vat_number)
+                                                    <br><code style="font-size:.8rem; color:#2563eb;">P.IVA {{ $customer->vat_number }}</code>
+                                                @endif
+                                                @if($customer->codice_destinatario)
+                                                    <br><small class="text-muted">SDI: {{ $customer->codice_destinatario }}</small>
+                                                @endif
+                                            @else
+                                                <em class="text-muted">—</em>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="label label-{{ $st['class'] }}">{{ $st['label'] }}</span>
+                                            @if($inv->sent_at)
+                                                <br><small class="text-muted">{{ $inv->sent_at->format('H:i') }}</small>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
+                                                @if($inv->xml_content)
+                                                    <a href="{{ route('restaurant.table-order-invoices.xml', $inv->id) }}" target="_blank"
+                                                       class="btn btn-xs btn-default" title="Visualizza XML">
+                                                        <i class="fas fa-code"></i> XML
+                                                    </a>
+                                                    <a href="{{ route('restaurant.table-order-invoices.pdf', $inv->id) }}" target="_blank"
+                                                       class="btn btn-xs btn-danger" title="Scarica PDF">
+                                                        <i class="fas fa-file-pdf"></i> PDF
+                                                    </a>
+                                                @endif
+                                                @if($customer)
+                                                    <button class="btn btn-xs btn-warning btn-regenerate-invoice"
+                                                            data-id="{{ $inv->id }}" title="Rigenera XML e reinvia">
+                                                        <i class="fas fa-sync-alt"></i> Rigenera
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    @if($inv->mysond_response && $inv->status !== 'sent')
+                                    <tr class="danger">
+                                        <td colspan="7" style="padding:6px 14px;">
+                                            <small><i class="fas fa-exclamation-circle"></i>
+                                            <strong>Risposta Mysond:</strong> {{ Str::limit($inv->mysond_response, 300) }}</small>
+                                        </td>
+                                    </tr>
+                                    @endif
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr class="active">
+                                    <td colspan="2"><strong>Totale fatturato</strong></td>
+                                    <td class="text-right"><strong>€{{ number_format($totalInvoiced, 2, ',', '.') }}</strong></td>
+                                    <td colspan="4">
+                                        @if($remaining > 0.01)
+                                            <small class="text-muted">
+                                                Restante €{{ number_format($remaining, 2, ',', '.') }}
+                                                @if($sale->payment_method === 'misto') — pagato con metodo complementare @endif
+                                            </small>
+                                        @endif
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        @else
+                        {{-- Legacy: dati dai log (ordini precedenti) --}}
                         <table class="table table-condensed table-hover table-striped" style="margin: 0;">
                             <thead>
                                 <tr class="active">
@@ -621,19 +764,12 @@ window._boSale = {
                                     <th>Descrizione</th>
                                     <th width="200">Intestatario</th>
                                     <th width="150">Cod. Fiscale / P.IVA</th>
-                                    <th width="80" class="text-center">FIC</th>
-                                    <th width="160">N° Documento FIC</th>
                                     <th width="120">Operatore</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($invoiceLogs as $inv)
-                                    @php
-                                        $d         = $inv->data_after ?? [];
-                                        $ficSent   = !empty($d['fic_sent']);
-                                        $ficDocId  = $d['fic_doc_id'] ?? null;
-                                        $ficDocNum = $d['fic_doc_number'] ?? null;
-                                    @endphp
+                                    @php $d = $inv->data_after ?? []; @endphp
                                     <tr>
                                         <td>
                                             <small class="text-nowrap">
@@ -642,7 +778,7 @@ window._boSale = {
                                             </small>
                                         </td>
                                         <td class="text-right">
-                                            <strong style="font-size: 1rem;">€{{ number_format($d['amount'] ?? 0, 2, ',', '.') }}</strong>
+                                            <strong style="font-size:1rem;">€{{ number_format($d['amount'] ?? 0, 2, ',', '.') }}</strong>
                                         </td>
                                         <td>{{ $d['description'] ?? 'Pasto completo' }}</td>
                                         <td>
@@ -654,33 +790,7 @@ window._boSale = {
                                         </td>
                                         <td>
                                             @if(!empty($d['customer_tax_code']))
-                                                <code style="font-size: 0.85rem;">{{ $d['customer_tax_code'] }}</code>
-                                            @else
-                                                <em class="text-muted">—</em>
-                                            @endif
-                                        </td>
-                                        <td class="text-center">
-                                            @if($ficSent && $ficDocId)
-                                                <span class="label label-success" title="Fattura inviata a Fatture in Cloud">
-                                                    <i class="fas fa-check"></i> Inviata
-                                                </span>
-                                            @elseif($ficSent)
-                                                <span class="label label-warning" title="Inviata ma senza ID documento">
-                                                    <i class="fas fa-question"></i>
-                                                </span>
-                                            @else
-                                                <span class="label label-default" title="Non inviata a FIC (sistema non configurato)">
-                                                    <i class="fas fa-minus"></i> N/A
-                                                </span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if($ficDocId)
-                                                <code style="font-size: 0.85rem;">
-                                                    @if($ficDocNum){{ $ficDocNum }}@else#{{ $ficDocId }}@endif
-                                                </code>
-                                                <br>
-                                                <small class="text-muted">ID: {{ $ficDocId }}</small>
+                                                <code style="font-size:.85rem;">{{ $d['customer_tax_code'] }}</code>
                                             @else
                                                 <em class="text-muted">—</em>
                                             @endif
@@ -697,32 +807,60 @@ window._boSale = {
                             </tbody>
                             <tfoot>
                                 <tr class="active">
-                                    <td colspan="1"><strong>Totale fatturato</strong></td>
-                                    <td class="text-right">
-                                        <strong>€{{ number_format($totalInvoiced, 2, ',', '.') }}</strong>
-                                    </td>
-                                    <td colspan="6">
+                                    <td><strong>Totale fatturato</strong></td>
+                                    <td class="text-right"><strong>€{{ number_format($totalInvoiced, 2, ',', '.') }}</strong></td>
+                                    <td colspan="4">
                                         @if($remaining > 0.01)
-                                            @php
-                                                $pmLabels = ['pos' => 'POS', 'contanti' => 'Contanti'];
-                                                $restMethod = $pmLabels[$sale->payment_method] ?? null;
-                                            @endphp
-                                            <small class="text-muted">
-                                                Restante €{{ number_format($remaining, 2, ',', '.') }}
-                                                @if($sale->payment_method === 'misto')
-                                                    pagato tramite metodo complementare
-                                                @endif
-                                            </small>
+                                            <small class="text-muted">Restante €{{ number_format($remaining, 2, ',', '.') }}</small>
                                         @endif
                                     </td>
                                 </tr>
                             </tfoot>
                         </table>
+                        @endif
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    @if($hasInvoices)
+    <script>
+    document.querySelectorAll('.btn-regenerate-invoice').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var id = this.dataset.id;
+            if (!confirm('Rigenerare XML e reinviare la fattura #' + id + '?')) return;
+            var me = this;
+            me.disabled = true;
+            me.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            fetch('/backoffice/restaurant/table-order-invoices/' + id + '/regenerate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    alert(data.message);
+                    window.location.reload();
+                } else {
+                    alert('Errore: ' + data.message);
+                    me.disabled = false;
+                    me.innerHTML = '<i class="fas fa-sync-alt"></i> Rigenera';
+                }
+            })
+            .catch(function() {
+                alert('Errore di rete');
+                me.disabled = false;
+                me.innerHTML = '<i class="fas fa-sync-alt"></i> Rigenera';
+            });
+        });
+    });
+    </script>
+    @endif
     @endif
 
     <!-- Order Activity Log -->
@@ -1934,6 +2072,41 @@ window._boSale = {
                 btn.innerHTML = originalText;
             });
         });
+        @if($hasInvoices)
+        document.querySelectorAll('.btn-regenerate-invoice').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var id = this.dataset.id;
+                if (!confirm('Rigenerare XML e reinviare la fattura #' + id + '?')) return;
+                var me = this;
+                me.disabled = true;
+                me.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                fetch('/backoffice/restaurant/table-order-invoices/' + id + '/regenerate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    }
+                })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            alert(data.message);
+                            window.location.reload();
+                        } else {
+                            alert('Errore: ' + data.message);
+                            me.disabled = false;
+                            me.innerHTML = '<i class="fas fa-sync-alt"></i> Rigenera';
+                        }
+                    })
+                    .catch(function() {
+                        alert('Errore di rete');
+                        me.disabled = false;
+                        me.innerHTML = '<i class="fas fa-sync-alt"></i> Rigenera';
+                    });
+            });
+        });
+   @endif
     </script>
 
 @endsection

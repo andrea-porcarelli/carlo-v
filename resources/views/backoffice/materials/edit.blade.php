@@ -90,6 +90,15 @@
                     >
                         <span class="fa fa-plus-circle"></span> Aggiungi quantità
                     </button>
+                    <button
+                        class="btn btn-sm btn-danger btn-remove-stock m-b-sm"
+                        title="Rimuovi giacenza"
+                        data-id="{{ $object->id }}"
+                        data-label="{{ $object->label }}"
+                        data-stock-type="{{ $object->stock_type }}"
+                    >
+                        <span class="fa fa-minus-circle"></span> Rimuovi quantità
+                    </button>
                     <div class="table-responsive">
                         <table class="table table-striped table-bordered table-hover">
                             <thead>
@@ -103,11 +112,13 @@
                             </thead>
                             <tbody>
                             @forelse($movements as $mov)
-                                <tr class="{{ $mov->type === 'consumption' ? 'warning' : 'success' }}">
+                                <tr class="{{ $mov->type === 'consumption' ? 'warning' : ($mov->type === 'adjustment' ? 'danger' : 'success') }}">
                                     <td>{{ \Carbon\Carbon::parse($mov->date)->format('d/m/Y H:i') }}</td>
                                     <td>
                                         @if($mov->type === 'load')
                                             <span class="label label-success"><i class="fa fa-arrow-down"></i> Carico</span>
+                                        @elseif($mov->type === 'adjustment')
+                                            <span class="label label-danger"><i class="fa fa-minus-circle"></i> Rettifica</span>
                                         @else
                                             <span class="label label-warning"><i class="fa fa-arrow-up"></i> Consumo</span>
                                         @endif
@@ -115,6 +126,8 @@
                                     <td class="text-right">
                                         @if($mov->type === 'load')
                                             <strong class="text-success">+{{ number_format($mov->quantity, 2, ',', '.') }}</strong>
+                                        @elseif($mov->type === 'adjustment')
+                                            <strong class="text-danger">-{{ number_format(abs($mov->quantity), 2, ',', '.') }}</strong>
                                         @else
                                             <strong class="text-danger">-{{ number_format($mov->quantity, 2, ',', '.') }}</strong>
                                         @endif
@@ -130,6 +143,8 @@
                                             @if($mov->purchase_price)
                                                 - € {{ number_format($mov->purchase_price, 2, ',', '.') }}
                                             @endif
+                                        @elseif($mov->type === 'adjustment')
+                                            <i class="fa fa-pencil"></i> Rettifica manuale
                                         @else
                                             <i class="fa fa-cutlery"></i> {{ $mov->dish_name }} (x{{ $mov->dish_qty }}) - Tavolo: {{ $mov->table_name }}
                                         @endif
@@ -151,4 +166,7 @@
 
     <!-- Modal Aggiungi Giacenza -->
     <x-load-material-modal />
+
+    <!-- Modal Rimuovi Giacenza -->
+    <x-remove-material-modal />
 @endsection

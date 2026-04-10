@@ -85,4 +85,3 @@
         </button>
     @endif
 </div>
-<small>ID: {{ $item->id }}</small>

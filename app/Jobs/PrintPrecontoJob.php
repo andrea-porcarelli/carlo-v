@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class PrintPrecontoJob implements ShouldQueue
 {
@@ -52,6 +53,7 @@ class PrintPrecontoJob implements ShouldQueue
             }
             $printerService->printPartialPreconto($tableOrder, $split, $this->operatorId);
         } else {
+            Log::info('TEST');
             $printerService->printPreconto(
                 $tableOrder,
                 $this->operatorId,
@@ -59,6 +61,7 @@ class PrintPrecontoJob implements ShouldQueue
                 $this->discountType,
                 $this->discountAmount
             );
+            Log::info('TEST');
         }
     }
 }

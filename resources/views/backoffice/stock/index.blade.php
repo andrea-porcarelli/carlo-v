@@ -110,12 +110,19 @@
                                                 </button>
                                             </td>
                                             <td class="text-center">{{ $stock['material']->stock_type_label }}</td>
-                                            <td class="text-right">{{ number_format($stock['imported'], 2, ',', '.') }}</td>
-                                            <td class="text-right">{{ number_format($stock['consumed'], 2, ',', '.') }}</td>
+                                            <td class="text-right">
+                                                {{ number_format($stock['imported'], 2, ',', '.') }}
+                                                <small class="text-muted">{{ $stock['material']->stock_type }}</small>
+                                            </td>
+                                            <td class="text-right">
+                                                {{ number_format($stock['consumed'], 2, ',', '.') }}
+                                                <small class="text-muted">{{ $stock['material']->stock_type }}</small>
+                                            </td>
                                             <td class="text-right">
                                                 <strong class="{{ $stock['current'] < 0 ? 'text-danger' : '' }}">
                                                     {{ number_format($stock['current'], 2, ',', '.') }}
                                                 </strong>
+                                                <small class="text-muted">{{ $stock['material']->stock_type }}</small>
                                             </td>
                                             <td class="text-center">
                                                 <input type="number"

@@ -10,14 +10,24 @@
                 <i class="fas fa-box-open"></i> Gestione
             </a>
         </li>
-        <li class="{{ (Request::is('backoffice/invoices*')) ? 'active' : '' }}">
+        <li class="{{ (Request::is('backoffice/invoices')) ? 'active' : '' }}">
             <a href="{{ route('invoices.index') }}">
-                <i class="fas fa-file-alt"></i> Ordini / Fatture
+                <i class="fas fa-file-alt"></i> Fatture
+            </a>
+        </li>
+        <li class="{{ (Request::is('backoffice/invoices/to-map')) ? 'active' : '' }}">
+            <a href="{{ route('invoices.to-map') }}">
+                <i class="fas fa-file-alt"></i> Da mappare
+            </a>
+        </li>
+        <li class="{{ (Request::is('backoffice/invoices/to-import')) ? 'active' : '' }}">
+            <a href="{{ route('invoices.to-import') }}">
+                <i class="fas fa-file-alt"></i> Da importare
             </a>
         </li>
         <li class="{{ (Request::is('backoffice/suppliers/product-comparison*')) ? 'active' : '' }}">
             <a href="{{ route('suppliers.product-comparison') }}">
-                <i class="fas fa-balance-scale"></i> Comparazione prodotti
+                <i class="fas fa-balance-scale"></i> Comparazione
             </a>
         </li>
     </ul>

@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Helpers\UnitConverter;
 use App\Models\Material;
 use Livewire\Component;
 
@@ -21,17 +22,51 @@ class DishMaterialsManager extends Component
     {
         $this->dishId = $dishId;
 
-        // Carica gli ingredienti esistenti se in modifica
         if (!empty($existingMaterials)) {
             foreach ($existingMaterials as $material) {
+                // Il pivot salva sempre in unità base — convertiamo nella unità più leggibile
+                $baseQty  = (float) ($material->pivot->quantity ?? 0);
+                $baseUnit = $material->stock_type;
+                $smart    = $this->smartUnit($baseQty, $baseUnit);
+
                 $this->selectedMaterials[$material->id] = [
-                    'id' => $material->id,
-                    'label' => $material->label,
-                    'stock_type' => $material->stock_type,
-                    'quantity' => $material->pivot->quantity ?? 0,
+                    'id'         => $material->id,
+                    'label'      => $material->label,
+                    'stock_type' => $baseUnit,
+                    'unit_type'  => $smart['unit'],
+                    'quantity'   => $smart['quantity'],
                 ];
             }
         }
+    }
+
+    /**
+     * Converte un valore in unità base nella rappresentazione più leggibile.
+     * Es. 0.025 kg → ['quantity' => 25, 'unit' => 'g']
+     *     1.5 kg  → ['quantity' => 1.5, 'unit' => 'kg']
+     *     75 cl   → ['quantity' => 75,  'unit' => 'cl']
+     *     0.5 cl  → ['quantity' => 5,   'unit' => 'ml']
+     */
+    public function smartUnit(float $baseQty, string $baseUnit): array
+    {
+        if ($baseUnit === 'kg') {
+            if ($baseQty > 0 && $baseQty < 1) {
+                return ['quantity' => round($baseQty * 1000, 4), 'unit' => 'g'];
+            }
+            return ['quantity' => $baseQty, 'unit' => 'kg'];
+        }
+
+        if ($baseUnit === 'cl') {
+            if ($baseQty > 0 && $baseQty < 1) {
+                return ['quantity' => round($baseQty * 10, 4), 'unit' => 'ml'];
+            }
+            if ($baseQty >= 100) {
+                return ['quantity' => round($baseQty / 100, 4), 'unit' => 'l'];
+            }
+            return ['quantity' => $baseQty, 'unit' => 'cl'];
+        }
+
+        return ['quantity' => $baseQty, 'unit' => $baseUnit];
     }
 
     public function updatedSearch()
@@ -53,10 +88,11 @@ class DishMaterialsManager extends Component
 
         if ($material && !isset($this->selectedMaterials[$materialId])) {
             $this->selectedMaterials[$materialId] = [
-                'id' => $material->id,
-                'label' => $material->label,
+                'id'         => $material->id,
+                'label'      => $material->label,
                 'stock_type' => $material->stock_type,
-                'quantity' => 0,
+                'unit_type'  => $material->stock_type,
+                'quantity'   => 0,
             ];
 
             $this->search = '';
@@ -75,23 +111,38 @@ class DishMaterialsManager extends Component
         return $types[$stockType] ?? $stockType;
     }
 
+    public function getAvailableUnits(string $stockType): array
+    {
+        return UnitConverter::compatibleUnits($stockType);
+    }
+
+    public function getBaseQuantity(float $qty, string $unitType): float
+    {
+        return UnitConverter::toBase($qty, $unitType);
+    }
+
     public function updatedSelectedMaterials()
     {
-        // Questo metodo viene chiamato automaticamente quando selectedMaterials cambia
         // Forza il re-render del componente per aggiornare il campo hidden
     }
 
     public function getMaterialsData()
     {
-        // Valida i dati prima di restituirli
         $this->validate();
-
         return array_values($this->selectedMaterials);
     }
 
     public function getMaterialsJson()
     {
-        return json_encode(array_values($this->selectedMaterials));
+        $data = array_map(function ($m) {
+            return [
+                'id'        => $m['id'],
+                'quantity'  => UnitConverter::toBase((float) ($m['quantity'] ?? 0), $m['unit_type'] ?? $m['stock_type']),
+                'unit_type' => $m['stock_type'], // salva sempre l'unità base del materiale
+            ];
+        }, array_values($this->selectedMaterials));
+
+        return json_encode($data);
     }
 
     public function render()

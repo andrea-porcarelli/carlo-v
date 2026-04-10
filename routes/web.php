@@ -20,6 +20,7 @@ use App\Http\Controllers\Backoffice\SyncController;
 use App\Http\Controllers\Backoffice\TableOrderLogController;
 use App\Http\Controllers\Backoffice\UploadController;
 use App\Http\Controllers\Backoffice\UserController;
+use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Frontoffice\AppController;
 use App\Http\Controllers\Frontoffice\OperatorAuthController;
 use App\Http\Controllers\Frontoffice\TableOrderController;
@@ -44,6 +45,9 @@ Route::post('/api/admin/login-redirect', [OperatorAuthController::class, 'adminL
 
 // Operator token for already-authenticated backoffice admin
 Route::get('/api/admin/operator-token', [OperatorAuthController::class, 'getAdminToken'])->middleware('auth')->name('api.admin.operatorToken');
+
+// Customers autocomplete
+Route::get('/api/customers', [CustomerController::class, 'search'])->name('api.customers.search');
 
 // API Routes for Menu Options
 Route::get('/api/menu-options', [TableOrderController::class, 'getMenuOptions'])->name('api.menu-options');
@@ -77,6 +81,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::post('/open-cash-drawer', [TableOrderController::class, 'openCashDrawer'])->name('openCashDrawer');
     Route::post('/cash-drawer/poll', [TableOrderController::class, 'pollCashDrawer'])->name('cashDrawer.poll');
     Route::post('/cash-drawer/cancel', [TableOrderController::class, 'cancelCashDrawer'])->name('cashDrawer.cancel');
+    Route::post('/{table}/log-cash-drawer-failed', [TableOrderController::class, 'logCashDrawerFailed'])->name('logCashDrawerFailed');
     Route::post('/{table}/move', [TableOrderController::class, 'moveTable'])->name('move');
     Route::post('/{table}/reprint', [TableOrderController::class, 'reprintOrder'])->name('reprint');
     Route::post('/{table}/print-session', [TableOrderController::class, 'printSession'])->name('printSession');
@@ -130,6 +135,7 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/product-comparison', [SupplierController::class, 'productComparison'])->name('suppliers.product-comparison');
             Route::put('/invoice-products/{id}', [SupplierController::class, 'updateInvoiceProduct'])->name('suppliers.invoice-products.update');
         });
+
         Route::resource('suppliers', SupplierController::class);
 
         Route::group(['prefix' => '/invoices'], function() {
@@ -138,6 +144,8 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::post('/import', [InvoiceController::class, 'import_invoice']);
             Route::post('/load-stocks', [InvoiceController::class, 'load_stocks'])->name('invoices.load-stocks');
             Route::get('/check-price-alerts', [InvoiceController::class, 'checkPriceAlerts'])->name('invoices.check-price-alerts');
+            Route::get('/to-map', [InvoiceController::class, 'to_map'])->name('invoices.to-map');
+            Route::get('/to-import', [InvoiceController::class, 'to_import'])->name('invoices.to-import');
             Route::get('/{id}/mapping-products', [InvoiceController::class, 'mapping_products'])->name('invoices.mapping_products');
             Route::post('/{id}/store-mapping-products', [InvoiceController::class, 'store_mapping_products']);
             Route::get('/failed/{id}/download', [InvoiceController::class, 'download_failed_file'])->name('invoices.download-failed-file');
@@ -159,6 +167,12 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/datatable-tables', [SalesController::class, 'datatable_tables'])->name('datatable.tables');
                 Route::get('/{id}', [SalesController::class, 'show'])->name('show');
                 Route::post('/export', [SalesController::class, 'export'])->name('export');
+            });
+
+            Route::group(['prefix' => '/table-order-invoices', 'as' => 'table-order-invoices.'], function() {
+                Route::get('/{invoice}/xml', [SalesController::class, 'invoiceXml'])->name('xml');
+                Route::post('/{invoice}/regenerate', [SalesController::class, 'invoiceRegenerate'])->name('regenerate');
+                Route::get('/{invoice}/pdf', [SalesController::class, 'invoicePdf'])->name('pdf');
             });
             Route::group(['prefix' => '/printers', 'as' => 'printers.'], function() {
                 Route::get('/', [PrinterController::class, 'index'])->name('index');
@@ -187,6 +201,7 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/{id}', [MaterialController::class, 'show'])->name('show');
                 Route::put('/{id}', [MaterialController::class, 'edit']);
                 Route::post('/{id}/stock', [MaterialController::class, 'storeStock'])->name('store-stock');
+                Route::post('/{id}/stock/remove', [MaterialController::class, 'removeStock'])->name('remove-stock');
             });
             Route::group(['prefix' => '/stock', 'as' => 'stock.'], function() {
                 Route::get('/', [StockController::class, 'index'])->name('index');

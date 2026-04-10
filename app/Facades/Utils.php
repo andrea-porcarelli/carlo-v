@@ -41,7 +41,7 @@ class Utils
     public static function setting(string $name) : string {
         $settings = Setting::query()->get()
             ->mapWithKeys(function ($setting) {
-                return [$setting->parameter => $setting->content];
+                return [$setting->key => $setting->value];
             })->toArray();
         return $settings[$name] ?? '';
     }

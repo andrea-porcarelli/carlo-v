@@ -392,6 +392,18 @@ class TableOrderLoggerService
         );
     }
 
+    public function logCashDrawerFailed(TableOrder $order, int $operatorId = 0): TableOrderLog
+    {
+        return $this->log(
+            action: 'cash_drawer_failed',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: $this->getOrderData($order),
+            notes: "Conto chiuso con contanti senza conferma cassa automatica (cassa non raggiungibile)",
+            userId: $operatorId,
+        );
+    }
+
     public function logPayOrder(TableOrder $order, string $paymentMethod, int $operatorId = 0): TableOrderLog
     {
         $labels = ['pos' => 'POS', 'contanti' => 'Contanti', 'fattura' => 'Fattura', 'misto' => 'Misto (Fattura + altro)'];

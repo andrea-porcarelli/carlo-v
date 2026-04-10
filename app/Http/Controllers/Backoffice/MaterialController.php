@@ -165,4 +165,32 @@ class MaterialController extends BaseController
             return $this->exception($e, $request);
         }
     }
+
+    public function removeStock(int $id, Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'stock' => 'required|numeric|min:0.01',
+                'notes' => 'nullable|string|max:1000',
+            ]);
+
+            $material = $this->interface->find($id);
+            if (!$material->id) {
+                throw new Exception('Materiale non trovato');
+            }
+
+            $stock = MaterialStock::create([
+                'material_id' => $material->id,
+                'stock'       => -abs($request->stock),
+                'notes'       => $request->notes,
+            ]);
+
+            return $this->success([
+                'stock'   => $stock->toArray(),
+                'message' => 'Quantità rimossa con successo',
+            ]);
+        } catch (Exception $e) {
+            return $this->exception($e, $request);
+        }
+    }
 }

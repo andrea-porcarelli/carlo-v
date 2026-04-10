@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Facades\Utils;
 use App\Models\Material;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -66,19 +67,18 @@ class StockService
 
     /**
      * Ottiene il totale consumato per un materiale
-     * SUM(order_items.quantity * dish_materials.quantity)
-     * WHERE table_orders.status = 'closed'
+     * SUM(order_items.quantity * order_item_materials.quantity)
+     * WHERE table_orders.status = 'paid'
      */
     public function getTotalConsumed(int $materialId): float
     {
         return (float) DB::table('order_items')
-            ->join('dishes', 'order_items.dish_id', '=', 'dishes.id')
-            ->join('dish_materials', 'dishes.id', '=', 'dish_materials.dish_id')
+            ->join('order_item_materials', 'order_items.id', '=', 'order_item_materials.order_item_id')
             ->join('table_orders', 'order_items.table_order_id', '=', 'table_orders.id')
             ->where('table_orders.status', 'paid')
-            ->where('dish_materials.material_id', $materialId)
+            ->where('order_item_materials.material_id', $materialId)
             ->whereNull('order_items.deleted_at')
-            ->sum(DB::raw('order_items.quantity * dish_materials.quantity'));
+            ->sum(DB::raw('order_items.quantity * order_item_materials.quantity'));
     }
 
     /**
@@ -98,23 +98,40 @@ class StockService
                 'material_stocks.purchase_price',
                 'material_stocks.notes',
                 'supplier_invoice_products.product_name as invoice_product',
-                DB::raw("'load' as type")
+                DB::raw("CASE WHEN material_stocks.stock >= 0 THEN 'load' ELSE 'adjustment' END as type")
             )
             ->get();
 
-        // Consumi (order_items tramite dish_materials)
-        $consumptions = DB::table('order_items')
+        // Consumi (order_items tramite snapshot order_item_materials)
+        Utils::queryLog(DB::table('order_items')
+            ->join('order_item_materials', 'order_items.id', '=', 'order_item_materials.order_item_id')
             ->join('dishes', 'order_items.dish_id', '=', 'dishes.id')
-            ->join('dish_materials', 'dishes.id', '=', 'dish_materials.dish_id')
             ->join('table_orders', 'order_items.table_order_id', '=', 'table_orders.id')
             ->join('restaurant_tables', 'table_orders.restaurant_table_id', '=', 'restaurant_tables.id')
             ->where('table_orders.status', 'paid')
-            ->where('dish_materials.material_id', $materialId)
+            ->where('order_item_materials.material_id', $materialId)
             ->whereNull('order_items.deleted_at')
             ->select(
                 'order_items.id',
                 'order_items.created_at as date',
-                DB::raw('(order_items.quantity * dish_materials.quantity) as quantity'),
+                DB::raw('(order_items.quantity * order_item_materials.quantity) as quantity'),
+                'dishes.label as dish_name',
+                'restaurant_tables.table_number as table_name',
+                'order_items.quantity as dish_qty',
+                DB::raw("'consumption' as type")
+            ));
+        $consumptions = DB::table('order_items')
+            ->join('order_item_materials', 'order_items.id', '=', 'order_item_materials.order_item_id')
+            ->join('dishes', 'order_items.dish_id', '=', 'dishes.id')
+            ->join('table_orders', 'order_items.table_order_id', '=', 'table_orders.id')
+            ->join('restaurant_tables', 'table_orders.restaurant_table_id', '=', 'restaurant_tables.id')
+            ->where('table_orders.status', 'paid')
+            ->where('order_item_materials.material_id', $materialId)
+            ->whereNull('order_items.deleted_at')
+            ->select(
+                'order_items.id',
+                'order_items.created_at as date',
+                DB::raw('(order_items.quantity * order_item_materials.quantity) as quantity'),
                 'dishes.label as dish_name',
                 'restaurant_tables.table_number as table_name',
                 'order_items.quantity as dish_qty',
@@ -152,13 +169,12 @@ class StockService
     protected function getAllConsumed(): array
     {
         return DB::table('order_items')
-            ->join('dishes', 'order_items.dish_id', '=', 'dishes.id')
-            ->join('dish_materials', 'dishes.id', '=', 'dish_materials.dish_id')
+            ->join('order_item_materials', 'order_items.id', '=', 'order_item_materials.order_item_id')
             ->join('table_orders', 'order_items.table_order_id', '=', 'table_orders.id')
             ->where('table_orders.status', 'paid')
             ->whereNull('order_items.deleted_at')
-            ->select('dish_materials.material_id', DB::raw('SUM(order_items.quantity * dish_materials.quantity) as total'))
-            ->groupBy('dish_materials.material_id')
+            ->select('order_item_materials.material_id', DB::raw('SUM(order_items.quantity * order_item_materials.quantity) as total'))
+            ->groupBy('order_item_materials.material_id')
             ->pluck('total', 'material_id')
             ->map(fn($v) => (float) $v)
             ->toArray();

@@ -207,9 +207,65 @@
     <x-autoconsumo-modal />
     <x-invoice-modal />
 
+    <!-- Cash Drawer Overlay -->
+    <div id="cashDrawerOverlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.88); align-items:center; justify-content:center; flex-direction:column;">
+        <div style="background:#1a1a2e; border-radius:16px; padding:48px 40px; max-width:420px; width:90%; text-align:center; box-shadow:0 24px 80px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:3rem; margin-bottom:24px;">💵</div>
+            <h2 style="color:#fff; margin:0 0 8px 0; font-size:1.4rem; font-weight:700; letter-spacing:0.5px;">Pagamento in corso</h2>
+            <p id="cashDrawerAmount" style="color:#a0aec0; font-size:1.1rem; margin:0 0 32px 0;"></p>
+
+            <div style="display:flex; justify-content:center; margin-bottom:28px;">
+                <div style="width:48px; height:48px; border:4px solid rgba(255,255,255,0.15); border-top-color:#4299e1; border-radius:50%; animation:cashDrawerSpin 0.8s linear infinite;"></div>
+            </div>
+
+            <p id="cashDrawerStatus" style="color:#cbd5e0; font-size:0.95rem; margin:0 0 32px 0; min-height:1.4em;">In attesa del pagamento dalla cassa automatica...</p>
+
+            <button id="cashDrawerCancelBtn"
+                onclick="tableOrdersManager.cancelCashDrawerTransaction()"
+                style="background:transparent; border:2px solid #e53e3e; color:#e53e3e; padding:12px 28px; border-radius:8px; font-size:0.95rem; font-weight:600; cursor:pointer; letter-spacing:0.3px; transition:all 0.15s;">
+                Annulla transazione
+            </button>
+
+            <div id="cashDrawerFallbackSection" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1);">
+                <p style="color:#f6ad55; font-size:0.9rem; margin:0 0 14px 0; line-height:1.5;">
+                    ⚠️ La cassa automatica non risponde.<br>Puoi chiudere il tavolo manualmente.
+                </p>
+                <button id="cashDrawerFallbackBtn"
+                    onclick="tableOrdersManager._executeCashDrawerFallback()"
+                    style="background:transparent; border:2px solid #f6ad55; color:#f6ad55; padding:12px 28px; border-radius:8px; font-size:0.95rem; font-weight:600; cursor:pointer; letter-spacing:0.3px; transition:all 0.15s;">
+                    Chiudi comunque senza cassa
+                </button>
+            </div>
+        </div>
+    </div>
+    <style>
+        @keyframes cashDrawerSpin { to { transform: rotate(360deg); } }
+    </style>
+
+    <!-- Cash Drawer Fallback Alert (rimane visibile fino alla conferma dell'operatore) -->
+    <div id="cashDrawerFallbackAlert" style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.92); align-items:center; justify-content:center;">
+        <div style="background:#2d1a00; border:2px solid #f6ad55; border-radius:16px; padding:40px 36px; max-width:440px; width:90%; text-align:center; box-shadow:0 24px 80px rgba(0,0,0,0.7);">
+            <div style="font-size:3rem; margin-bottom:20px;">⚠️</div>
+            <h2 style="color:#f6ad55; margin:0 0 16px 0; font-size:1.3rem; font-weight:700; letter-spacing:0.3px;">Cassa automatica non raggiungibile</h2>
+            <p style="color:#fbd38d; font-size:1rem; margin:0 0 12px 0; line-height:1.6;">
+                Il tavolo è stato chiuso e il pagamento è stato registrato come <strong>contanti</strong>.
+            </p>
+            <p style="color:#fbd38d; font-size:1rem; margin:0 0 32px 0; line-height:1.6;">
+                La cassa automatica non ha confermato l'operazione.<br>
+                <strong>Verifica manualmente l'incasso.</strong>
+            </p>
+            <button
+                onclick="document.getElementById('cashDrawerFallbackAlert').style.display='none'"
+                style="background:#f6ad55; border:none; color:#1a1a00; padding:14px 40px; border-radius:8px; font-size:1rem; font-weight:700; cursor:pointer; letter-spacing:0.3px;">
+                Ho verificato, chiudi
+            </button>
+        </div>
+    </div>
+
     <!-- Notification -->
-    <div id="notification" class="notification">
+    <div id="notification" class="notification" style="display:none;">
         <span id="notificationText">Operazione completata!</span>
+        <span id="notificationClose" style="display:none; margin-left:12px; font-weight:700; cursor:pointer; opacity:0.8;" onclick="document.getElementById('notification').style.display='none'">✕</span>
     </div>
 
 @endsection

@@ -130,6 +130,7 @@ class MysondRicezione extends Command
 
     private static function import_fatture($risultati, $service) {
         $failed = [];
+        $imported = [];
 
         foreach ($risultati as $doc) {
             $contenuto = Http::get($doc->docDataLink)->body();
@@ -142,7 +143,10 @@ class MysondRicezione extends Command
                     $xml_extract_content = self::estraiXmlDaP7m($tempPath, $service);
                     file_put_contents($tempPath, $xml_extract_content);
                 }
-                self::importaFattura($xmlPath);
+                $invoice = self::importaFattura($xmlPath);
+                if ($invoice) {
+                    $imported[] = $invoice;
+                }
             } catch (\Exception $e) {
                 // Salva il file in una cartella persistente per il download
                 $failedDir = storage_path("app/failed_invoices");
@@ -180,9 +184,37 @@ class MysondRicezione extends Command
             }
         }
 
+        if (!empty($imported)) {
+            self::notificaTelegramImportate($imported);
+        }
+
         if (!empty($failed)) {
             self::notificaTelegram($failed);
         }
+    }
+
+    private static function notificaTelegramImportate(array $invoices): void
+    {
+        if (!config('logging.channels.telegram.handler_with.apiKey')) {
+            return;
+        }
+
+        $count = count($invoices);
+        $lines = [];
+        foreach ($invoices as $invoice) {
+            $fornitore = $invoice->supplier->company_name ?? 'Fornitore sconosciuto';
+            $data      = $invoice->invoice_date ? $invoice->invoice_date->format('d/m/Y') : 'N/D';
+            $importo   = $invoice->amount
+                ? number_format($invoice->amount, 2, ',', '.') . ' €'
+                : 'N/D';
+            $lines[] = "📄 <b>N. {$invoice->invoice_number}</b> — {$fornitore}\n   📅 {$data} | 💰 {$importo}";
+        }
+
+        $message = "✅ <b>Fatture importate</b> — {$count} "
+            . ($count === 1 ? 'fattura' : 'fatture') . "\n\n"
+            . implode("\n\n", $lines);
+
+        Log::channel('telegram')->info($message);
     }
 
     private static function notificaTelegram(array $failedInvoices): void
@@ -256,9 +288,11 @@ class MysondRicezione extends Command
         return $service->getXmlFromP7m($content);
     }
 
-    private static function importaFattura($path)
+    private static function importaFattura($path): ?SupplierInvoice
     {
-        DB::transaction(function () use ($path) {
+        $createdInvoice = null;
+
+        DB::transaction(function () use ($path, &$createdInvoice) {
 
             $reader = new \XMLReader();
             $reader->open($path);
@@ -345,6 +379,8 @@ class MysondRicezione extends Command
                     'amount' => $invoiceData['total_amount'],
                     'filename' => basename($path),
                 ]);
+                $invoice->load('supplier');
+                $createdInvoice = $invoice;
 
                 foreach ($lines as $line) {
                     $product = null;
@@ -372,6 +408,8 @@ class MysondRicezione extends Command
 
 
         });
+
+        return $createdInvoice;
     }
 
     private static function autoMapProduct(SupplierInvoice $invoice, $product, array $line): void

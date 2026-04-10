@@ -41,6 +41,11 @@ class AppServiceProvider extends ServiceProvider
             $view->with('lowStockCount', $lowStockCount);
         });
 
+        View::composer('backoffice.components.nav-bar-supplier', function ($view) {
+            $lowStockCount = app(StockService::class)->getLowStockMaterials()->count();
+            $view->with('lowStockCount', $lowStockCount);
+        });
+
         Gate::define('viewLogViewer', function ($user = null) {
             if (!$user) {
                 return false;

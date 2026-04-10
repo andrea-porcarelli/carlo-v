@@ -83,7 +83,12 @@ class DishController extends BaseController
             $item = $this->interface->store($store);
             if (isset($item)) {
                 $item->allergens()->sync($allergens);
-                $ingredients = $ingredients_with_quantity->mapWithKeys(fn($ingredient) => [$ingredient['id'] => ['quantity' => $ingredient['quantity']]]);
+                $ingredients = $ingredients_with_quantity->mapWithKeys(fn($ingredient) => [
+                    $ingredient['id'] => [
+                        'quantity'  => $ingredient['quantity'],
+                        'unit_type' => $ingredient['unit_type'] ?? null,
+                    ]
+                ]);
 
                 $item->materials()->sync($ingredients);
             }
@@ -123,7 +128,10 @@ class DishController extends BaseController
                         $materials = json_decode($request->materials, true);
                         $syncData = [];
                         foreach ($materials as $material) {
-                            $syncData[$material['id']] = ['quantity' => $material['quantity']];
+                            $syncData[$material['id']] = [
+                                'quantity'  => $material['quantity'],
+                                'unit_type' => $material['unit_type'] ?? null,
+                            ];
                         }
                         $item->materials()->sync($syncData);
                     } else {

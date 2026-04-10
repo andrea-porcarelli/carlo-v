@@ -13,18 +13,20 @@ use App\Models\CashDrawerLog;
 use App\Models\Dish;
 use App\Models\MenuOption;
 use App\Models\OrderItem;
+use App\Models\OrderItemMaterial;
 use App\Models\PrecontoSplit;
 use App\Models\Printer;
 use App\Models\RestaurantTable;
+use App\Models\Customer;
 use App\Models\Setting;
 use App\Models\TableOrder;
+use App\Models\TableOrderInvoice;
 use App\Models\User;
-use App\Services\FattureInCloudService;
+use App\Services\MysondFatturaService;
 use App\Services\TableOrderLoggerService;
 use App\Services\VegaPosService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -350,6 +352,21 @@ class TableOrderController extends Controller
                     'segue' => false,
                 ]);
 
+                // Save material snapshot at order time (normalized to base units)
+                $dish->load('materials');
+                foreach ($dish->materials as $material) {
+                    $normalized = OrderItemMaterial::normalizeToBaseUnit(
+                        $material->pivot->quantity,
+                        $material->pivot->unit_type
+                    );
+                    OrderItemMaterial::create([
+                        'order_item_id' => $item->id,
+                        'material_id'   => $material->id,
+                        'quantity'      => $normalized['quantity'],
+                        'unit_type'     => $normalized['unit_type'],
+                    ]);
+                }
+
                 $this->logger->logAddItem($item, $operatorId);
 
                 // Log granulare per notes ed extras
@@ -469,6 +486,21 @@ class TableOrderController extends Controller
                 'removals' => $validated['removals'] ?? null,
                 'segue' => $validated['segue'] ?? false,
             ]);
+
+            // Save material snapshot at order time (normalized to base units)
+            $dish->load('materials');
+            foreach ($dish->materials as $material) {
+                $normalized = OrderItemMaterial::normalizeToBaseUnit(
+                    $material->pivot->quantity,
+                    $material->pivot->unit_type
+                );
+                OrderItemMaterial::create([
+                    'order_item_id' => $item->id,
+                    'material_id'   => $material->id,
+                    'quantity'      => $normalized['quantity'],
+                    'unit_type'     => $normalized['unit_type'],
+                ]);
+            }
 
             // The subtotal and order total are automatically calculated by the model
 
@@ -696,6 +728,33 @@ class TableOrderController extends Controller
     }
 
     /**
+     * Log that the cash drawer was unreachable during a cash payment
+     */
+    public function logCashDrawerFailed(Request $request, RestaurantTable $table): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $order = $table->activeOrder;
+        if (!$order) {
+            // Ordine già chiuso: recupera l'ultimo ordine del tavolo
+            $order = \App\Models\TableOrder::where('restaurant_table_id', $table->id)
+                ->orderByDesc('id')
+                ->first();
+        }
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Ordine non trovato'], 404);
+        }
+
+        $order->close('contanti');
+        $this->logger->logCashDrawerFailed($order, $operatorId);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
      * Pay and close table order
      */
     public function payTable(Request $request, RestaurantTable $table): JsonResponse
@@ -758,14 +817,24 @@ class TableOrderController extends Controller
     public function payTableInvoice(Request $request, RestaurantTable $table): JsonResponse
     {
         $validated = $request->validate([
-            'invoices'                   => 'required|array|min:1',
-            'invoices.*.amount'          => 'required|numeric|min:0.01',
-            'invoices.*.description'     => 'nullable|string|max:255',
-            'invoices.*.customer_name'   => 'nullable|string|max:255',
-            'invoices.*.customer_tax_code' => 'nullable|string|max:50',
-            'remaining_amount'           => 'required|numeric|min:0',
-            'remaining_method'           => 'nullable|string|in:pos,contanti,bonifico,assegno',
-            'payment_method'             => 'nullable|string',
+            'invoices'                              => 'required|array|min:1',
+            'invoices.*.amount'                     => 'required|numeric|min:0.01',
+            'invoices.*.description'                => 'nullable|string|max:255',
+            'invoices.*.user_type'                  => 'nullable|string|in:private,company,public_company',
+            'invoices.*.customer_name'              => 'nullable|string|max:255',
+            'invoices.*.customer_fiscal_code'       => 'nullable|string|max:50',
+            'invoices.*.customer_vat_number'        => 'nullable|string|max:50',
+            'invoices.*.customer_address'           => 'nullable|string|max:255',
+            'invoices.*.customer_zip_code'          => 'nullable|string|max:10',
+            'invoices.*.customer_city'              => 'nullable|string|max:100',
+            'invoices.*.customer_province'          => 'nullable|string|max:5',
+            'invoices.*.customer_codice_destinatario' => 'nullable|string|max:7',
+            'invoices.*.customer_pec_destinatario'  => 'nullable|string|max:255',
+            'invoices.*.customer_id'                => 'nullable|integer|exists:customers,id',
+            'invoices.*.save_customer'              => 'nullable|boolean',
+            'remaining_amount'                      => 'required|numeric|min:0',
+            'remaining_method'                      => 'nullable|string|in:pos,contanti,bonifico,assegno',
+            'payment_method'                        => 'nullable|string',
         ]);
 
         $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
@@ -787,31 +856,101 @@ class TableOrderController extends Controller
         try {
             DB::beginTransaction();
 
-            $ficService = app(FattureInCloudService::class);
-            $ficResults = [];
+            $mySondFature = app(MysondFatturaService::class);
+            $ficResults   = [];
 
             foreach ($validated['invoices'] as $invoiceData) {
-                $invoiceData['description'] = $invoiceData['description'] ?: 'Pasto completo';
+                $description = $invoiceData['description'] ?: 'Pasto completo';
 
-                // Try to send to Fatture in Cloud first (result stored in log)
-                $ficResult = null;
-                if ($ficService->isConfigured()) {
-                    $ficResult = $ficService->createInvoice($invoiceData);
-                    if ($ficResult) {
-                        $ficResults[] = $ficResult;
-                    }
+                // 1. Resolve or create Customer
+                if (!empty($invoiceData['customer_id'])) {
+                    $customer = Customer::find($invoiceData['customer_id']);
+                } elseif (!empty($invoiceData['save_customer'])) {
+                    $customer = Customer::create([
+                        'user_type'            => $invoiceData['user_type'] ?? 'private',
+                        'full_name'            => $invoiceData['customer_name'] ?? '',
+                        'fiscal_code'          => $invoiceData['customer_fiscal_code'] ?? null,
+                        'vat_number'           => $invoiceData['customer_vat_number'] ?? null,
+                        'address'              => $invoiceData['customer_address'] ?? null,
+                        'zip_code'             => $invoiceData['customer_zip_code'] ?? null,
+                        'city'                 => $invoiceData['customer_city'] ?? null,
+                        'province'             => $invoiceData['customer_province'] ?? null,
+                        'codice_destinatario'  => $invoiceData['customer_codice_destinatario'] ?? null,
+                        'pec_destinatario'     => $invoiceData['customer_pec_destinatario'] ?? null,
+                    ]);
+                } else {
+                    // Temporary in-memory customer (not persisted)
+                    $customer = new Customer([
+                        'user_type'            => $invoiceData['user_type'] ?? 'private',
+                        'full_name'            => $invoiceData['customer_name'] ?? '',
+                        'fiscal_code'          => $invoiceData['customer_fiscal_code'] ?? null,
+                        'vat_number'           => $invoiceData['customer_vat_number'] ?? null,
+                        'address'              => $invoiceData['customer_address'] ?? null,
+                        'zip_code'             => $invoiceData['customer_zip_code'] ?? null,
+                        'city'                 => $invoiceData['customer_city'] ?? null,
+                        'province'             => $invoiceData['customer_province'] ?? null,
+                        'codice_destinatario'  => $invoiceData['customer_codice_destinatario'] ?? null,
+                        'pec_destinatario'     => $invoiceData['customer_pec_destinatario'] ?? null,
+                    ]);
                 }
 
-                // Log invoice creation including FIC outcome
-                $this->logger->logCreateInvoice($order, $invoiceData, $operatorId, $ficResult);
+                // 2. Generate invoice code and increment counter
+                $counter     = (int) Setting::get('invoice_counter', 0) + 1;
+                Setting::set('invoice_counter', $counter, 'integer');
+                $year        = now()->format('Y');
+                $invoiceCode = 'ORD-' . $year . '-' . str_pad($counter, 4, '0', STR_PAD_LEFT);
+                $invoiceName = 'ORD' . $year . str_pad($counter, 4, '0', STR_PAD_LEFT);
+
+                // 3. Calculate tax
+                $vatRate = (float) Setting::get('invoice_vat_rate', 10);
+                $imponibile = round((float) $invoiceData['amount'] / (1 + $vatRate / 100), 2);
+                $tax = round((float) $invoiceData['amount'] - $imponibile, 2);
+
+                // 4. Create TableOrderInvoice record
+                $tableOrderInvoice = TableOrderInvoice::create([
+                    'table_order_id'   => $order->id,
+                    'customer_id'      => $customer->id ?? null,
+                    'invoice_code'     => $invoiceCode,
+                    'invoice_name'     => $invoiceName,
+                    'amount'           => $invoiceData['amount'],
+                    'discount'         => 0,
+                    'tax'              => $tax,
+                    'description'      => $description,
+                    'payment_method'   => $validated['payment_method'] ?? 'fattura',
+                    'status'           => 'pending',
+                ]);
+
+                // Attach in-memory customer so InvoiceService can access $invoice->user
+                $tableOrderInvoice->setRelation('customer', $customer);
+
+                // 5. Generate XML and send via Mysond
+                $result = $mySondFature->createInvoice($tableOrderInvoice);
+
+                // 6. Update invoice record with result
+                $updateData = [
+                    'mysond_response' => is_array($result) ? json_encode($result) : (string) $result,
+                ];
+                if (($result['response'] ?? '') === 'success') {
+                    $updateData['status']       = 'sent';
+                    $updateData['sent_at']      = now();
+                    $updateData['xml_path']     = $result['path'] ?? null;
+                    $updateData['xml_content']  = $result['content'] ?? null;
+                    $ficResults[] = $result;
+                } else {
+                    $updateData['status'] = 'error';
+                }
+                $tableOrderInvoice->update($updateData);
+
+                // Log invoice creation including outcome
+                $this->logger->logCreateInvoice($order, $invoiceData, $operatorId, $result);
             }
 
             $totalInvoiced = collect($validated['invoices'])->sum('amount');
-            $remaining = (float) $validated['remaining_amount'];
+            $remaining     = (float) $validated['remaining_amount'];
 
             // Determine overall payment method
             if ($remaining > 0.01) {
-                $paymentMethod = 'misto'; // part invoice, part pos/contanti
+                $paymentMethod = 'misto';
             } else {
                 $paymentMethod = $validated['payment_method'] ?? 'fattura';
             }
@@ -1001,8 +1140,9 @@ class TableOrderController extends Controller
             $splitCount     = ($type === 'split') ? ($validated['split_count'] ?? null) : null;
             $discountType   = $validated['discount_type'] ?? 'none';
             $discountAmount = (float) ($validated['discount_amount'] ?? 0);
-
+            Log::info(__METHOD__ . ': ' . __LINE__);
             PrintPrecontoJob::dispatch($order->id, $operatorId, $splitCount, $discountType, $discountAmount);
+            Log::info(__METHOD__ . ': ' . __LINE__);
             $this->logger->logPrintPreconto($order, $operatorId, $splitCount);
             $order->update(['preconto_requested_at' => now()]);
             $message = 'PreConto stampato con successo';

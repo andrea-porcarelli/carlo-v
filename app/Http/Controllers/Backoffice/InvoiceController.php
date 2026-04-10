@@ -127,9 +127,16 @@ class InvoiceController extends BaseController
         try {
             $filters = $request->get('filters') ?? [];
 
+            $operations = ['pdf-invoice',  'ignore-invoice', 'import-stock'];
+            if (isset($filters['mapping']) && $filters['mapping'] == 'da_effettuare') {
+                $operations[] = 'mapping-product';
+            }
+            if (isset($filters['import']) && $filters['import'] == 'da_effettuare') {
+                $operations[] = 'import-stock';
+            }
 
             $elements = $this->interface->filters($filters);
-            return $this->editColumns(datatables()->of($elements), $this->name, ['pdf-invoice', 'mapping-product', 'ignore-invoice', 'import-stock'])
+            return $this->editColumns(datatables()->of($elements), $this->name, $operations)
                 ->addColumn('supplier_name', function ($item) {
                    return $item->supplier->extended_name;
                 })
@@ -174,7 +181,28 @@ class InvoiceController extends BaseController
                     $html .= '</div></div>';
                     return $html;
                 })
-                ->rawColumns(['invoice_number', 'supplier_name', 'mapping'])
+                ->addColumn('import', function ($item) {
+                    $total     = $item->products_count;
+                    $daImportare = $item->products()->whereHas('material', function ($query) {
+                        $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
+                            ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                            ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
+                    })
+                        ->where('ignore_mapping', 0)
+                        ->whereDoesntHave('stock')
+                        ->count();
+
+
+                    $html  = '<div class="mapping-summary">';
+                    $html .= '<div style="font-size:11px; color:#888; margin-bottom:3px;">Totale: <strong>' . $total . '</strong> prodotti</div>';
+                    $html .= '<div class="mapping-badges">';
+                    if ($daImportare > 0) {
+                        $html .= '<span class="label label-warning"><span class="glyphicon glyphicon-exclamation-sign"></span> ' . $daImportare . ' da importare</span> ';
+                    }
+                    $html .= '</div></div>';
+                    return $html;
+                })
+                ->rawColumns(['invoice_number', 'supplier_name', 'mapping', 'import'])
                 ->toJson();
         } catch (\Exception $e) {
             dd($e);
@@ -785,6 +813,22 @@ class InvoiceController extends BaseController
                 }
             }
         }
+    }
+
+    public function to_map() : View {
+        $suppliers = Supplier::orderBy('company_name')->get()
+            ->map(fn($s) => ['id' => $s->id, 'label' => $s->company_name])
+            ->toArray();
+
+        return view('backoffice.' . $this->name . '.to_map', compact('suppliers'));
+    }
+
+    public function to_import() : View {
+        $suppliers = Supplier::orderBy('company_name')->get()
+            ->map(fn($s) => ['id' => $s->id, 'label' => $s->company_name])
+            ->toArray();
+
+        return view('backoffice.' . $this->name . '.to_import', compact('suppliers'));
     }
 
 }

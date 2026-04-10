@@ -1,15 +1,15 @@
 import App from "./../app.js";
 
+const stockTypes = {
+    'pz': 'Pezzi',
+    'g': 'Grammi (g)',
+    'ml': 'Millilitri (ml)'
+};
+
 const show_modal = (e) => {
     const materialId = e.data('id');
     const materialLabel = e.data('label');
     const stockType = e.data('stock-type');
-
-    const stockTypes = {
-        'pz': 'Pezzi',
-        'g': 'Grammi (g)',
-        'ml': 'Millilitri (ml)'
-    };
 
     $('#stock_material_id').val(materialId);
     $('#stock_material_label').text(materialLabel);
@@ -23,12 +23,31 @@ const show_modal = (e) => {
     $('#addStockModal').modal('show');
 }
 
+const show_remove_modal = (e) => {
+    const materialId = e.data('id');
+    const materialLabel = e.data('label');
+    const stockType = e.data('stock-type');
+
+    $('#remove_material_id').val(materialId);
+    $('#remove_material_label').text(materialLabel);
+    $('#remove_unit').text(stockTypes[stockType] || stockType);
+
+    $('#removeStockForm')[0].reset();
+    $('#remove_material_id').val(materialId);
+
+    $('#removeStockModal').modal('show');
+}
+
 
 
 const init = () => {
 
     $(document).on('click', '.btn-add-stock', function() {
         show_modal($(this))
+    });
+
+    $(document).on('click', '.btn-remove-stock', function() {
+        show_remove_modal($(this))
     });
 
     $(document).on('submit', '#addStockForm', function(e) {
@@ -61,6 +80,38 @@ const init = () => {
                 message = xhr.responseJSON.message;
             }
             toastr.error(message);
+        })
+    });
+
+    $(document).on('submit', '#removeStockForm', function(e) {
+        e.preventDefault();
+
+        const materialId = $('#remove_material_id').val();
+        const formData = {
+            stock: $('#remove_quantity').val(),
+            notes: $('#remove_notes').val() || null
+        };
+
+        $('#btnSaveRemoveStock').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Salvataggio...');
+        App.ajax({
+            path: '/backoffice/restaurant/materials/' + materialId + '/stock/remove',
+            data: formData,
+            method: 'POST',
+        }).then(() => {
+            $('#removeStockModal').modal('hide');
+            toastr.success('Quantità rimossa con successo');
+            if ($('.datatable_table').length) {
+                $('.datatable_table').DataTable().ajax.reload();
+            } else {
+                location.reload();
+            }
+        }).catch((xhr) => {
+            let message = 'Errore durante il salvataggio';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                message = xhr.responseJSON.message;
+            }
+            toastr.error(message);
+            $('#btnSaveRemoveStock').prop('disabled', false).html('<i class="fa fa-minus-circle"></i> Rimuovi Quantità');
         })
     });
 

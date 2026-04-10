@@ -6,6 +6,8 @@ use App\Facades\Utils;
 use App\Models\CashDrawerLog;
 use App\Models\PrintLog;
 use App\Models\TableOrder;
+use App\Models\TableOrderInvoice;
+use App\Services\MysondFatturaService;
 use App\Services\TableOrderLoggerService;
 use App\Traits\DatatableTrait;
 use Carbon\Carbon;
@@ -104,6 +106,7 @@ class SalesController extends BaseController
             'items.dish.allergens',
             'waiter',
             'precontoSplits',
+            'tableOrderInvoices.customer',
         ])->withTrashed()
             ->findOrFail($id);
 
@@ -132,6 +135,160 @@ class SalesController extends BaseController
     {
         // TODO: Implement export functionality (CSV, PDF, Excel)
         return response()->json(['message' => 'Export functionality coming soon']);
+    }
+
+    /**
+     * View/download the XML of a table order invoice
+     */
+    public function invoiceXml(TableOrderInvoice $invoice)
+    {
+        if (empty($invoice->xml_content)) {
+            abort(404, 'XML non disponibile per questa fattura.');
+        }
+
+        return response($invoice->xml_content, 200)
+            ->header('Content-Type', 'application/xml')
+            ->header('Content-Disposition', 'inline; filename="' . ($invoice->invoice_name ?? 'fattura') . '.xml"');
+    }
+
+    /**
+     * Regenerate XML for a table order invoice and re-send via Mysond
+     */
+    public function invoiceRegenerate(TableOrderInvoice $invoice): JsonResponse
+    {
+        if (!$invoice->customer) {
+            return response()->json(['success' => false, 'message' => 'Nessun cliente associato alla fattura.'], 422);
+        }
+
+        try {
+            $mySond = app(MysondFatturaService::class);
+            $result = $mySond->createInvoice($invoice);
+
+            $updateData = [
+                'mysond_response' => is_array($result) ? json_encode($result) : (string) $result,
+            ];
+
+            if (($result['response'] ?? '') === 'success') {
+                $updateData['status']      = 'sent';
+                $updateData['sent_at']     = now();
+                $updateData['xml_path']    = $result['path'] ?? null;
+                $updateData['xml_content'] = $result['content'] ?? null;
+            } else {
+                $updateData['status'] = 'error';
+            }
+
+            $invoice->update($updateData);
+
+            return response()->json([
+                'success' => ($result['response'] ?? '') === 'success',
+                'message' => ($result['response'] ?? '') === 'success'
+                    ? 'XML rigenerato e inviato con successo.'
+                    : 'Errore nella rigenerazione: ' . ($result['message'] ?? 'sconosciuto'),
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Invoice regenerate error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Download PDF rendered from invoice XML (reuses existing pdf.blade.php template)
+     */
+    public function invoicePdf(TableOrderInvoice $invoice)
+    {
+        if (empty($invoice->xml_content)) {
+            abort(404, 'XML non disponibile — impossibile generare il PDF.');
+        }
+
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($invoice->xml_content);
+        abort_if($xml === false, 422, 'XML non valido.');
+
+        $header      = $xml->FatturaElettronicaHeader;
+        $body        = $xml->FatturaElettronicaBody;
+        $cedente     = $header->CedentePrestatore;
+        $committente = $header->CessionarioCommittente;
+        $datiDoc     = $body->DatiGenerali->DatiGeneraliDocumento;
+
+        $cedenteName = (string)($cedente->DatiAnagrafici->Anagrafica->Denominazione ?? '');
+        if (!$cedenteName) {
+            $cedenteName = trim((string)($cedente->DatiAnagrafici->Anagrafica->Nome ?? '') . ' ' .
+                                (string)($cedente->DatiAnagrafici->Anagrafica->Cognome ?? ''));
+        }
+        $committenteName = (string)($committente->DatiAnagrafici->Anagrafica->Denominazione ?? '');
+        if (!$committenteName) {
+            $committenteName = trim((string)($committente->DatiAnagrafici->Anagrafica->Nome ?? '') . ' ' .
+                                    (string)($committente->DatiAnagrafici->Anagrafica->Cognome ?? ''));
+        }
+
+        $linee = [];
+        foreach ($body->DatiBeniServizi->DettaglioLinee as $linea) {
+            $linee[] = [
+                'numero'          => (string)$linea->NumeroLinea,
+                'descrizione'     => (string)$linea->Descrizione,
+                'quantita'        => (float)($linea->Quantita ?? 0),
+                'unita'           => (string)($linea->UnitaMisura ?? ''),
+                'prezzo_unitario' => (float)($linea->PrezzoUnitario ?? 0),
+                'prezzo_totale'   => (float)($linea->PrezzoTotale ?? 0),
+                'iva'             => (float)($linea->AliquotaIVA ?? 0),
+            ];
+        }
+
+        $riepilogo = [];
+        foreach (($body->DatiBeniServizi->DatiRiepilogo ?? []) as $r) {
+            $riepilogo[] = [
+                'aliquota'   => (float)$r->AliquotaIVA,
+                'imponibile' => (float)$r->ImponibileImporto,
+                'imposta'    => (float)($r->Imposta ?? 0),
+            ];
+        }
+
+        $pagamento = null;
+        if (isset($body->DatiPagamento->DettaglioPagamento)) {
+            $dp = $body->DatiPagamento->DettaglioPagamento;
+            $pagamento = [
+                'modalita' => (string)($dp->ModalitaPagamento ?? ''),
+                'scadenza'  => (string)($dp->DataScadenzaPagamento ?? ''),
+                'importo'   => (float)($dp->ImportoPagamento ?? 0),
+            ];
+        }
+
+        $data = [
+            'invoice'     => $invoice,
+            'cedente'     => [
+                'nome'      => $cedenteName,
+                'piva'      => (string)($cedente->DatiAnagrafici->IdFiscaleIVA->IdCodice ?? ''),
+                'indirizzo' => (string)($cedente->Sede->Indirizzo ?? ''),
+                'cap'       => (string)($cedente->Sede->CAP ?? ''),
+                'comune'    => (string)($cedente->Sede->Comune ?? ''),
+                'provincia' => (string)($cedente->Sede->Provincia ?? ''),
+            ],
+            'committente' => [
+                'nome'      => $committenteName,
+                'piva'      => (string)($committente->DatiAnagrafici->IdFiscaleIVA->IdCodice ?? ''),
+                'indirizzo' => (string)($committente->Sede->Indirizzo ?? ''),
+                'cap'       => (string)($committente->Sede->CAP ?? ''),
+                'comune'    => (string)($committente->Sede->Comune ?? ''),
+                'provincia' => (string)($committente->Sede->Provincia ?? ''),
+            ],
+            'documento'   => [
+                'numero' => (string)$datiDoc->Numero,
+                'data'   => (string)$datiDoc->Data,
+                'tipo'   => (string)($datiDoc->TipoDocumento ?? 'TD01'),
+                'divisa' => (string)($datiDoc->Divisa ?? 'EUR'),
+                'totale' => (float)($datiDoc->ImportoTotaleDocumento ?? 0),
+            ],
+            'linee'     => $linee,
+            'riepilogo' => $riepilogo,
+            'pagamento' => $pagamento,
+        ];
+
+        $filename = ($invoice->invoice_name ?? 'fattura') . '.pdf';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('backoffice.invoices.pdf', $data)
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->stream($filename);
     }
 
     public function tables(): View

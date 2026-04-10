@@ -70,6 +70,11 @@ class TableOrder extends Model
         return $this->hasMany(PrecontoSplit::class);
     }
 
+    public function tableOrderInvoices(): HasMany
+    {
+        return $this->hasMany(TableOrderInvoice::class);
+    }
+
     /**
      * Calculate and update the total amount (including cover charge)
      */
