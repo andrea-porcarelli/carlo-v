@@ -24,6 +24,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'permissions',
     ];
 
     /**
@@ -45,7 +46,33 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'permissions' => 'array',
         ];
+    }
+
+    /**
+     * Available operator permissions.
+     */
+    public static function availablePermissions(): array
+    {
+        return [
+            'take_orders'  => 'Prendere comande',
+            'view_orders'  => 'Visualizzare comande',
+            'cash_payment' => 'Pagamento contanti',
+            'pos_payment'  => 'Pagamento POS',
+            'close_bills'  => 'Chiudere i conti',
+        ];
+    }
+
+    /**
+     * Check if the user has a given permission.
+     */
+    public function hasPermission(string $permission): bool
+    {
+        if ($this->role === 'admin') {
+            return true;
+        }
+        return in_array($permission, $this->permissions ?? []);
     }
 
     public function roles(): array

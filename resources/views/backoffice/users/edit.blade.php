@@ -74,6 +74,22 @@
                             ])
                         </div>
 
+                        <div class="row mt-4" id="permissionsSection" style="{{ $_user->role === 'operator' ? '' : 'display:none;' }}">
+                            <div class="col-lg-12">
+                                <hr />
+                                <h5><i class="fas fa-shield-alt"></i> Permessi Operatore</h5>
+                                <p class="text-muted">Seleziona le funzionalità a cui questo operatore potrà accedere.</p>
+                            </div>
+                            @foreach($availablePermissions as $key => $label)
+                                <div class="col-xs-12 col-sm-4 m-t-sm">
+                                    <label>{{ $label }}</label><br />
+                                    <input type="checkbox" class="js-switch" name="permissions[]" value="{{ $key }}"
+                                        {{ in_array($key, $_user->permissions ?? []) ? 'checked' : '' }} />
+                                    <div class="invalid-feedback"></div>
+                                </div>
+                            @endforeach
+                        </div>
+
                         <div class="row mt-3">
                             <div class="col-lg-12">
                                 <div class="alert alert-secondary">
@@ -117,6 +133,17 @@
 @section('custom-script')
     <script>
         $(document).ready(function() {
+            // Show/hide permissions section based on role
+            function togglePermissions() {
+                const role = $('#role').val();
+                if (role === 'operator') {
+                    $('#permissionsSection').show();
+                } else {
+                    $('#permissionsSection').hide();
+                }
+            }
+            $('#role').on('change', togglePermissions);
+
             // Handle form submission
             $('#userForm').on('submit', function(e) {
                 e.preventDefault();

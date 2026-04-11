@@ -57,6 +57,7 @@
                                 @include('backoffice.components.form.select', ['label' => 'Fornitore', 'name' => 'supplier_id', 'col' => 2, 'class' => 'supplier_id', 'options' => $suppliers, 'first_value_text' => 'Tutti i fornitori', 'hide_first' => true])
                                 @include('backoffice.components.form.input', ['label' => 'Da data', 'name' => 'date_from', 'col' => 2, 'class' => 'date_from', 'type' => 'date'])
                                 @include('backoffice.components.form.input', ['label' => 'A data', 'name' => 'date_to', 'col' => 2, 'class' => 'date_to', 'type' => 'date'])
+                                @include('backoffice.components.form.select', ['label' => 'Stato', 'name' => 'ignored', 'col' => 2, 'class' => 'ignored', 'options' => ['' => 'Non ignorate', 'ignorate' => 'Solo ignorate'], 'hide_first' => false])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Cerca', 'class' => 'btn-find'])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Carica fattura', 'class' => 'btn-load-invoice', 'dataset' => ['path' => route('invoices.import')]])
                                 @if($importLogsCount > 0)
@@ -451,7 +452,7 @@
                         {data: 'products', class: 'text-center'},
                     ],
                     order: [[1, 'desc']],
-                    dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to'],
+                    dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'ignored'],
                     serverSide: false,
                 }]);
             }, 500);

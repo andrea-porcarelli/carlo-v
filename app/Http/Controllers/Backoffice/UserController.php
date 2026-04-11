@@ -105,7 +105,8 @@ class UserController extends BaseController
     public function create(): View
     {
         $roles = Utils::key_value((new User())->roles());
-        return view('backoffice.' . $this->name . '.create', compact('roles'));
+        $availablePermissions = User::availablePermissions();
+        return view('backoffice.' . $this->name . '.create', compact('roles', 'availablePermissions'));
     }
 
     /**
@@ -119,6 +120,8 @@ class UserController extends BaseController
                 'email' => 'nullable|email|unique:users,email',
                 'password' => 'required|string|min:4|confirmed',
                 'role' => 'required|in:admin,operator',
+                'permissions' => 'nullable|array',
+                'permissions.*' => 'string|in:' . implode(',', array_keys(User::availablePermissions())),
             ], [
                 'name.required' => 'Il nome è obbligatorio',
                 'email.email' => 'Inserisci un\'email valida',
@@ -132,11 +135,16 @@ class UserController extends BaseController
 
             DB::beginTransaction();
 
+            $permissions = $validated['role'] === 'operator'
+                ? ($validated['permissions'] ?? [])
+                : null;
+
             $user = User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
                 'role' => $validated['role'],
+                'permissions' => $permissions,
             ]);
 
             DB::commit();
@@ -160,7 +168,8 @@ class UserController extends BaseController
     {
         $_user = User::findOrFail($id);
         $roles = Utils::key_value((new User())->roles());
-        return view('backoffice.' . $this->name . '.edit', compact('_user', 'roles'));
+        $availablePermissions = User::availablePermissions();
+        return view('backoffice.' . $this->name . '.edit', compact('_user', 'roles', 'availablePermissions'));
     }
 
     /**
@@ -176,6 +185,8 @@ class UserController extends BaseController
                 'email' => ['nullable', 'email', Rule::unique('users')->ignore($user->id)],
                 'password' => 'nullable|string|min:4|confirmed',
                 'role' => 'required|in:admin,operator',
+                'permissions' => 'nullable|array',
+                'permissions.*' => 'string|in:' . implode(',', array_keys(User::availablePermissions())),
             ], [
                 'name.required' => 'Il nome è obbligatorio',
                 'email.required' => 'L\'email è obbligatoria',
@@ -193,6 +204,9 @@ class UserController extends BaseController
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'role' => $validated['role'],
+                'permissions' => $validated['role'] === 'operator'
+                    ? ($validated['permissions'] ?? [])
+                    : null,
             ];
 
             // Update password only if provided

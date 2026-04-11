@@ -58,6 +58,9 @@ class OperatorAuthController extends Controller
                     'user_name' => $user->name,
                     'user_email' => $user->email,
                     'role' => $user->role,
+                    'permissions' => $user->role === 'admin'
+                        ? array_keys(\App\Models\User::availablePermissions())
+                        : ($user->permissions ?? []),
                 ],
             ]);
         } catch (\Exception $e) {
@@ -196,9 +199,15 @@ class OperatorAuthController extends Controller
     {
         try {
             $operators = User::whereIn('role', ['operator', 'admin'])
-                ->select('id', 'name', 'email', 'role')
+                ->select('id', 'name', 'email', 'role', 'permissions')
                 ->orderBy('name')
-                ->get();
+                ->get()
+                ->map(function ($user) {
+                    $user->permissions = $user->role === 'admin'
+                        ? array_keys(\App\Models\User::availablePermissions())
+                        : ($user->permissions ?? []);
+                    return $user;
+                });
 
             return response()->json([
                 'success' => true,
