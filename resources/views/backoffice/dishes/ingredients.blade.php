@@ -30,9 +30,9 @@
                 $dispQty    = $display['qty'];
                 $dispUnit   = $display['unit'];
                 $outOfStock = $ingredient->stock <= 0;
-                $qtyLabel   = ($dispQty % 1 == 0)
-                    ? (int) $dispQty
-                    : rtrim(number_format($dispQty, 4, '.', ''), '0');
+                $qtyLabel   = (fmod($dispQty, 1.0) == 0.0)
+                    ? number_format($dispQty, 0, '.', '')
+                    : rtrim(rtrim(number_format($dispQty, 4, '.', ''), '0'), '.');
             @endphp
             <li style="display: flex; align-items: center; gap: 5px; padding: 2px 0; {{ !$loop->last ? 'border-bottom: 1px solid #f5f5f5;' : '' }}">
 
