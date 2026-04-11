@@ -30,10 +30,10 @@
                 $dispQty    = $display['qty'];
                 $dispUnit   = $display['unit'];
                 $currentStock = $materialStocks[$ingredient->id]['current'] ?? null;
-                $outOfStock   = $currentStock !== null && $currentStock <= 0;
                 $qtyLabel   = (fmod($dispQty, 1.0) == 0.0)
                     ? number_format($dispQty, 0, '.', '')
                     : rtrim(rtrim(number_format($dispQty, 4, '.', ''), '0'), '.');
+                $outOfStock   = $currentStock !== null && $qtyLabel <= 0;
             @endphp
             <li style="display: flex; align-items: center; gap: 5px; padding: 2px 0; {{ !$loop->last ? 'border-bottom: 1px solid #f5f5f5;' : '' }}">
 
