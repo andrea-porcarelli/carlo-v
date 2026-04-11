@@ -8,6 +8,7 @@ use App\Interfaces\DishInterface;
 use App\Models\Allergen;
 use App\Models\Category;
 use App\Models\Material;
+use App\Services\StockService;
 use App\Traits\DatatableTrait;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +39,11 @@ class DishController extends BaseController
     public function datatable(Request $request) : JsonResponse {
         try {
             $filters = $request->get('filters') ?? [];
+
+            // Pre-calcola tutti gli stock reali (importato − consumato) e li condivide
+            // con ingredients.blade.php per evidenziare i materiali a 0 senza N+1 query.
+            $allStocks = app(StockService::class)->calculateAllStocks();
+            view()->share('materialStocks', $allStocks);
 
             $elements = $this->interface->filters($filters);
             return $this->editColumns(datatables()->of($elements), $this->name, ['edit'], null, 'restaurant.dishes')

@@ -29,7 +29,8 @@
                 $display    = $smartUnit($baseQty, $baseUnit);
                 $dispQty    = $display['qty'];
                 $dispUnit   = $display['unit'];
-                $outOfStock = $ingredient->stock <= 0;
+                $currentStock = $materialStocks[$ingredient->id]['current'] ?? null;
+                $outOfStock   = $currentStock !== null && $currentStock <= 0;
                 $qtyLabel   = (fmod($dispQty, 1.0) == 0.0)
                     ? number_format($dispQty, 0, '.', '')
                     : rtrim(rtrim(number_format($dispQty, 4, '.', ''), '0'), '.');
