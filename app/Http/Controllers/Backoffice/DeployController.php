@@ -63,17 +63,60 @@ class DeployController extends BaseController
                 'return_code' => $returnVar,
             ]);
 
-            if ($returnVar === 0) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Git pull completato con successo',
-                    'lines'   => array_values(array_filter($output, fn($l) => trim($l) !== '')),
-                ]);
-            } else {
+            if ($returnVar !== 0) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Errore durante git pull',
                     'lines'   => array_values(array_filter($output, fn($l) => trim($l) !== '')),
+                ], 500);
+            }
+
+            // ── Pulizia cache, viste e rotte dopo git pull ──────────────────────
+            $php = '/usr/local/bin/php';
+            $artisan = escapeshellarg(base_path('artisan'));
+
+            $cleanupCommands = [
+                'cache:clear' => 'Cache',
+                'view:clear'  => 'Viste',
+                'route:clear' => 'Rotte',
+            ];
+
+            $allOutput = $output;
+            $allSuccess = true;
+
+            foreach ($cleanupCommands as $command => $label) {
+                $cleanupCmd = "{$php} {$artisan} {$command} 2>&1";
+                $cleanupOutput = [];
+                $cleanupReturn = 0;
+
+                exec($cleanupCmd, $cleanupOutput, $cleanupReturn);
+
+                Log::info("Artisan {$command} executed", [
+                    'output'      => implode("\n", $cleanupOutput),
+                    'return_code' => $cleanupReturn,
+                ]);
+
+                if ($cleanupReturn === 0) {
+                    $allOutput[] = "✓ Pulizia {$label}: OK";
+                } else {
+                    $allOutput[] = "✗ Pulizia {$label}: ERRORE";
+                    $allSuccess = false;
+                }
+
+                $allOutput = array_merge($allOutput, $cleanupOutput);
+            }
+
+            if ($allSuccess) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Git pull e pulizia completati con successo',
+                    'lines'   => array_values(array_filter($allOutput, fn($l) => trim($l) !== '')),
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Git pull OK, ma errori durante la pulizia',
+                    'lines'   => array_values(array_filter($allOutput, fn($l) => trim($l) !== '')),
                 ], 500);
             }
 
@@ -186,17 +229,60 @@ class DeployController extends BaseController
 
             Log::info("Git pull executed (local)", ['output' => implode("\n", $output), 'return_code' => $returnVar]);
 
-            if ($returnVar === 0) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Git pull completato con successo',
-                    'lines'   => array_values(array_filter($output, fn($l) => trim($l) !== '')),
-                ]);
-            } else {
+            if ($returnVar !== 0) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Errore durante git pull',
                     'lines'   => array_values(array_filter($output, fn($l) => trim($l) !== '')),
+                ], 500);
+            }
+
+            // ── Pulizia cache, viste e rotte dopo git pull ──────────────────────
+            $php = '/usr/local/bin/php';
+            $artisan = escapeshellarg(base_path('artisan'));
+
+            $cleanupCommands = [
+                'cache:clear' => 'Cache',
+                'view:clear'  => 'Viste',
+                'route:clear' => 'Rotte',
+            ];
+
+            $allOutput = $output;
+            $allSuccess = true;
+
+            foreach ($cleanupCommands as $command => $label) {
+                $cleanupCmd = "{$php} {$artisan} {$command} 2>&1";
+                $cleanupOutput = [];
+                $cleanupReturn = 0;
+
+                exec($cleanupCmd, $cleanupOutput, $cleanupReturn);
+
+                Log::info("Artisan {$command} executed (local)", [
+                    'output'      => implode("\n", $cleanupOutput),
+                    'return_code' => $cleanupReturn,
+                ]);
+
+                if ($cleanupReturn === 0) {
+                    $allOutput[] = "✓ Pulizia {$label}: OK";
+                } else {
+                    $allOutput[] = "✗ Pulizia {$label}: ERRORE";
+                    $allSuccess = false;
+                }
+
+                $allOutput = array_merge($allOutput, $cleanupOutput);
+            }
+
+            if ($allSuccess) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Git pull e pulizia completati con successo',
+                    'lines'   => array_values(array_filter($allOutput, fn($l) => trim($l) !== '')),
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Git pull OK, ma errori durante la pulizia',
+                    'lines'   => array_values(array_filter($allOutput, fn($l) => trim($l) !== '')),
                 ], 500);
             }
         } catch (\Exception $e) {
