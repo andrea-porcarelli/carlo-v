@@ -3778,6 +3778,15 @@ class TableOrdersManager {
             return;
         }
 
+        // ── Check permission: take_orders ──────────────────────────────────────
+        const sessionPerms = this.modifySession.permissions ?? [];
+        if (!sessionPerms.includes('take_orders')) {
+            console.log('❌ BLOCKED (closeModifyOverlay): Missing take_orders permission');
+            this.showNotification('Non hai il permesso di prendere comande', 'error');
+            return;
+        }
+        console.log('✅ ALLOWED (closeModifyOverlay): take_orders permission granted');
+
         // Usa il token già acquisito all'apertura della sessione (o aggiornato da Comunica).
         // Non si chiede nuova password: l'autenticazione è già avvenuta.
         const token = this.modifySession.token;

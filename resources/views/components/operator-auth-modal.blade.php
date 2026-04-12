@@ -16,7 +16,7 @@
                 Inserisci la tua password per confermare l'operazione
             </p>
 
-            <form id="operatorAuthForm">
+            <form id="operatorAuthForm" autocomplete="off">
                 <div class="operator-form-group">
                     <label for="operatorPassword">
                         <i class="fas fa-key me-2"></i> Password Operatore
@@ -28,7 +28,7 @@
                         class="operator-form-control"
                         placeholder="Inserisci la tua password"
                         required
-                        autocomplete="new-password"
+                        autocomplete="off"
                     >
                 </div>
 
