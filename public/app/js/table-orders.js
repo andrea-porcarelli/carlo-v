@@ -120,7 +120,7 @@ class TableOrdersManager {
     }
 
     /**
-     * Show notification
+     * Show notification with slide-in from bottom-left
      */
     showNotification(message, type = 'success', persistent = false) {
         const notification = this.getElement('notification');
@@ -128,26 +128,45 @@ class TableOrdersManager {
         const notificationClose = document.getElementById('notificationClose');
 
         if (notification && notificationText) {
-            notificationText.textContent = message;
-            notification.style.display = 'block';
-            notification.className = `notification ${type}`;
+            // Clear any pending hide timeouts
+            if (notification._hideTimeout) {
+                clearTimeout(notification._hideTimeout);
+            }
 
+            // Update content and style
+            notificationText.textContent = message;
+            notification.className = `notification ${type} show`;
+
+            // Handle close button
             if (persistent) {
-                if (notificationClose) notificationClose.style.display = 'inline';
-                notification.style.cursor = 'pointer';
-                notification.onclick = () => {
-                    notification.style.display = 'none';
-                    notification.onclick = null;
+                if (notificationClose) notificationClose.style.display = 'block';
+                notification.onclick = (e) => {
+                    if (e.target !== notificationClose) return;
+                    this._hideNotification();
                 };
             } else {
                 if (notificationClose) notificationClose.style.display = 'none';
-                notification.style.cursor = '';
                 notification.onclick = null;
-                setTimeout(() => {
-                    notification.style.display = 'none';
-                }, 3000);
+                // Auto-hide after 3.5 seconds
+                notification._hideTimeout = setTimeout(() => {
+                    this._hideNotification();
+                }, 3500);
             }
         }
+    }
+
+    /**
+     * Hide notification with fade-out animation
+     */
+    _hideNotification() {
+        const notification = this.getElement('notification');
+        if (!notification) return;
+
+        notification.classList.add('fade-out');
+        setTimeout(() => {
+            notification.classList.remove('fade-out', 'show');
+            notification.className = 'notification';
+        }, 300);
     }
 
     /**
@@ -2726,7 +2745,10 @@ class TableOrdersManager {
 
         // ── Permission checks ─────────────────────────────────────────────────
         const splitPerms = auth.permissions ?? [];
+        console.log('🔐 Permission Check (Split) - Method:', method, '| Permissions:', splitPerms);
+
         if (!splitPerms.includes('close_bills')) {
+            console.log('❌ BLOCKED (Split): Missing close_bills permission');
             this.showNotification('Non hai il permesso di chiudere i conti', 'error');
             document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
             return;
@@ -2734,15 +2756,18 @@ class TableOrdersManager {
         const isContantiMethod = method === 'contanti' || method === 'fattura_contanti';
         const isPosMethod = method === 'pos' || method === 'fattura_pos';
         if (isContantiMethod && !splitPerms.includes('cash_payment')) {
+            console.log('❌ BLOCKED (Split): Missing cash_payment permission');
             this.showNotification('Non hai il permesso di ricevere pagamenti in contanti', 'error');
             document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
             return;
         }
         if (isPosMethod && !splitPerms.includes('pos_payment')) {
+            console.log('❌ BLOCKED (Split): Missing pos_payment permission');
             this.showNotification('Non hai il permesso di ricevere pagamenti POS', 'error');
             document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
             return;
         }
+        console.log('✅ ALLOWED (Split): All permissions granted');
 
         const doPaySplit = async () => {
             try {
@@ -3088,18 +3113,24 @@ class TableOrdersManager {
 
         // ── Permission checks ─────────────────────────────────────────────────
         const perms = auth.permissions ?? [];
+        console.log('🔐 Permission Check - Method:', method, '| Permissions:', perms);
+
         if (!perms.includes('close_bills')) {
+            console.log('❌ BLOCKED: Missing close_bills permission');
             this.showNotification('Non hai il permesso di chiudere i conti', 'error');
             return;
         }
         if (method === 'contanti' && !perms.includes('cash_payment')) {
+            console.log('❌ BLOCKED: Missing cash_payment permission');
             this.showNotification('Non hai il permesso di ricevere pagamenti in contanti', 'error');
             return;
         }
         if (method === 'pos' && !perms.includes('pos_payment')) {
+            console.log('❌ BLOCKED: Missing pos_payment permission');
             this.showNotification('Non hai il permesso di ricevere pagamenti POS', 'error');
             return;
         }
+        console.log('✅ ALLOWED: All permissions granted');
 
         // ── Contanti: apri cassetto prima di chiudere il conto ────────────────
         if (method === 'contanti') {

@@ -1498,9 +1498,14 @@ input, textarea, select {
     margin: 0;
 }
 
-/* ===== NOTIFICATION POSITION FIX (MOBILE) ===== */
+/* ===== NOTIFICATION (MOBILE) ===== */
 .mobile-body .notification {
-    top: 80px;
+    bottom: 16px;
+    left: 12px;
+    right: 12px;
+    max-width: none;
+    font-size: 0.9rem;
+    padding: 14px 16px;
 }
 .preconto-option-label {
     padding: 6px !important;

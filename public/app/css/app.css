@@ -434,23 +434,110 @@ body {
     margin-bottom: 10px;
 }
 
+/* ===== NOTIFICATION STYLES ===== */
 .notification {
     position: fixed;
-    top: 20px;
-    right: 20px;
+    bottom: 20px;
     left: 20px;
-    max-width: 360px;
-    margin-left: auto;
-    background: #dc3545;
-    color: white;
-    padding: 10px 16px;
-    border-radius: 6px;
+    max-width: 380px;
+    background: white;
+    color: #333;
+    padding: 16px 20px;
+    padding-left: 16px;
+    border-radius: 8px;
+    border-left: 4px solid #6c757d;
     z-index: 9999;
-    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
-    font-weight: 600;
-    font-size: 0.85rem;
-    line-height: 1.4;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    font-weight: 500;
+    font-size: 0.95rem;
+    line-height: 1.5;
     word-break: break-word;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    transition: opacity 0.3s ease-out;
+}
+
+.notification.show {
+    display: flex;
+    animation: slideInUp 0.3s ease-out;
+}
+
+.notification::before {
+    flex-shrink: 0;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+/* Success */
+.notification.success {
+    border-left-color: #28a745;
+    background: #f0f8f4;
+}
+.notification.success::before {
+    content: "✓";
+    color: #28a745;
+    font-weight: 700;
+}
+
+/* Error */
+.notification.error {
+    border-left-color: #dc3545;
+    background: #fef4f5;
+}
+.notification.error::before {
+    content: "!";
+    color: #dc3545;
+    font-weight: 700;
+    font-size: 1.4rem;
+}
+
+/* Info */
+.notification.info {
+    border-left-color: #17a2b8;
+    background: #f0f8fb;
+}
+.notification.info::before {
+    content: "ℹ";
+    color: #17a2b8;
+    font-weight: 700;
+}
+
+/* Warning */
+.notification.warning {
+    border-left-color: #ffc107;
+    background: #fffbf0;
+}
+.notification.warning::before {
+    content: "⚠";
+    color: #ffc107;
+    font-weight: 700;
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+}
+
+.notification.fade-out {
+    animation: fadeOut 0.3s ease-out forwards;
 }
 
 .table-info-card {

@@ -290,9 +290,9 @@
     </div>
 
     <!-- Notification -->
-    <div id="notification" class="notification" style="display:none;">
+    <div id="notification" class="notification">
         <span id="notificationText">Operazione completata!</span>
-        <span id="notificationClose" style="display:none; margin-left:12px; font-weight:700; cursor:pointer; opacity:0.8;" onclick="document.getElementById('notification').style.display='none'">✕</span>
+        <span id="notificationClose" style="display:none; margin-left:auto; font-weight:700; cursor:pointer; opacity:0.6;" onclick="document.getElementById('notification').style.display='none'">✕</span>
     </div>
 
     <!-- Autoconsumo Modal -->
