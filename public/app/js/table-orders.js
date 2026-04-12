@@ -3022,6 +3022,16 @@ class TableOrdersManager {
             return;
         }
 
+        // Check close_bills permission
+        const perms = auth.permissions ?? [];
+        console.log('🔐 Permission Check - Operation: chiudiContoContanti | Permissions:', perms);
+        if (!perms.includes('close_bills')) {
+            console.log('❌ BLOCKED: Missing close_bills permission');
+            this.showNotification('Non hai il permesso di chiudere i conti', 'error');
+            return;
+        }
+        console.log('✅ ALLOWED: close_bills permission granted');
+
         const amount = parseFloat(this.currentTable.order.discounted_total ?? this.currentTable.order.total_amount ?? 0);
         const tableId = this.currentTable.table.id;
         await this.startCashDrawerFlow(

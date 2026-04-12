@@ -115,37 +115,59 @@ class UserController extends BaseController
     public function store(Request $request): JsonResponse
     {
         try {
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'nullable|email|unique:users,email',
-                'password' => 'required|string|min:4|confirmed',
-                'role' => 'required|in:admin,operator',
-                'permissions' => 'nullable|array',
-                'permissions.*' => 'string|in:' . implode(',', array_keys(User::availablePermissions())),
-            ], [
-                'name.required' => 'Il nome è obbligatorio',
-                'email.email' => 'Inserisci un\'email valida',
-                'email.unique' => 'Questa email è già registrata',
-                'password.required' => 'La password è obbligatoria',
-                'password.min' => 'La password deve essere di almeno 8 caratteri',
-                'password.confirmed' => 'Le password non coincidono',
-                'role.required' => 'Il ruolo è obbligatorio',
-                'role.in' => 'Ruolo non valido',
-            ]);
+            $role = $request->input('role');
 
-            DB::beginTransaction();
+            if ($role === 'admin') {
+                $validated = $request->validate([
+                    'name' => 'required|string|max:255',
+                    'email' => 'required|email|unique:users,email',
+                    'role' => 'required|in:admin,operator',
+                    'backoffice_password' => 'required|string|min:6|confirmed',
+                ], [
+                    'name.required' => 'Il nome è obbligatorio',
+                    'email.required' => 'L\'email è obbligatoria',
+                    'email.email' => 'Inserisci un\'email valida',
+                    'email.unique' => 'Questa email è già registrata',
+                    'backoffice_password.required' => 'La password backoffice è obbligatoria',
+                    'backoffice_password.min' => 'La password deve essere di almeno 6 caratteri',
+                    'backoffice_password.confirmed' => 'Le password non coincidono',
+                    'role.required' => 'Il ruolo è obbligatorio',
+                    'role.in' => 'Ruolo non valido',
+                ]);
 
-            $permissions = $validated['role'] === 'operator'
-                ? ($validated['permissions'] ?? [])
-                : null;
+                DB::beginTransaction();
 
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'password' => Hash::make($validated['password']),
-                'role' => $validated['role'],
-                'permissions' => $permissions,
-            ]);
+                $user = User::create([
+                    'name' => $validated['name'],
+                    'email' => $validated['email'],
+                    'role' => 'admin',
+                    'backoffice_password' => $validated['backoffice_password'],
+                    'permissions' => null,
+                ]);
+            } else {
+                $validated = $request->validate([
+                    'name' => 'required|string|max:255',
+                    'role' => 'required|in:admin,operator',
+                    'password' => 'required|digits_between:1,5',
+                    'permissions' => 'nullable|array',
+                    'permissions.*' => 'string|in:' . implode(',', array_keys(User::availablePermissions())),
+                ], [
+                    'name.required' => 'Il nome è obbligatorio',
+                    'password.required' => 'La password (PIN) è obbligatoria',
+                    'password.digits_between' => 'La password deve essere numerica, da 1 a 5 cifre',
+                    'role.required' => 'Il ruolo è obbligatorio',
+                    'role.in' => 'Ruolo non valido',
+                ]);
+
+                DB::beginTransaction();
+
+                $user = User::create([
+                    'name' => $validated['name'],
+                    'role' => 'operator',
+                    'password' => Hash::make($validated['password']),
+                    'permissions' => $validated['permissions'] ?? [],
+                ]);
+            }
 
             DB::commit();
 
@@ -179,42 +201,67 @@ class UserController extends BaseController
     {
         try {
             $user = User::findOrFail($id);
+            $role = $request->input('role');
 
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => ['nullable', 'email', Rule::unique('users')->ignore($user->id)],
-                'password' => 'nullable|string|min:4|confirmed',
-                'role' => 'required|in:admin,operator',
-                'permissions' => 'nullable|array',
-                'permissions.*' => 'string|in:' . implode(',', array_keys(User::availablePermissions())),
-            ], [
-                'name.required' => 'Il nome è obbligatorio',
-                'email.required' => 'L\'email è obbligatoria',
-                'email.email' => 'Inserisci un\'email valida',
-                'email.unique' => 'Questa email è già registrata',
-                'password.min' => 'La password deve essere di almeno 8 caratteri',
-                'password.confirmed' => 'Le password non coincidono',
-                'role.required' => 'Il ruolo è obbligatorio',
-                'role.in' => 'Ruolo non valido',
-            ]);
+            if ($role === 'admin') {
+                $validated = $request->validate([
+                    'name' => 'required|string|max:255',
+                    'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
+                    'backoffice_password' => 'nullable|string|min:6|confirmed',
+                    'role' => 'required|in:admin,operator',
+                ], [
+                    'name.required' => 'Il nome è obbligatorio',
+                    'email.required' => 'L\'email è obbligatoria',
+                    'email.email' => 'Inserisci un\'email valida',
+                    'email.unique' => 'Questa email è già registrata',
+                    'backoffice_password.min' => 'La password deve essere di almeno 6 caratteri',
+                    'backoffice_password.confirmed' => 'Le password non coincidono',
+                    'role.required' => 'Il ruolo è obbligatorio',
+                    'role.in' => 'Ruolo non valido',
+                ]);
 
-            DB::beginTransaction();
+                DB::beginTransaction();
 
-            $updateData = [
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'role' => $validated['role'],
-                'permissions' => $validated['role'] === 'operator'
-                    ? ($validated['permissions'] ?? [])
-                    : null,
-            ];
+                $updateData = [
+                    'name' => $validated['name'],
+                    'email' => $validated['email'],
+                    'role' => 'admin',
+                    'permissions' => null,
+                ];
 
-            // Update password only if provided
-            if (!empty($validated['password'])) {
-                $updateData['password'] = Hash::make($validated['password']);
+                if (!empty($validated['backoffice_password'])) {
+                    $updateData['backoffice_password'] = $validated['backoffice_password'];
+                }
+
+                $user->update($updateData);
+            } else {
+                $validated = $request->validate([
+                    'name' => 'required|string|max:255',
+                    'role' => 'required|in:admin,operator',
+                    'password' => 'nullable|digits_between:1,5',
+                    'permissions' => 'nullable|array',
+                    'permissions.*' => 'string|in:' . implode(',', array_keys(User::availablePermissions())),
+                ], [
+                    'name.required' => 'Il nome è obbligatorio',
+                    'password.digits_between' => 'La password deve essere numerica, da 1 a 5 cifre',
+                    'role.required' => 'Il ruolo è obbligatorio',
+                    'role.in' => 'Ruolo non valido',
+                ]);
+
+                DB::beginTransaction();
+
+                $updateData = [
+                    'name' => $validated['name'],
+                    'role' => 'operator',
+                    'permissions' => $validated['permissions'] ?? [],
+                ];
+
+                if (!empty($validated['password'])) {
+                    $updateData['password'] = Hash::make($validated['password']);
+                }
+
+                $user->update($updateData);
             }
-
-            $user->update($updateData);
 
             DB::commit();
 

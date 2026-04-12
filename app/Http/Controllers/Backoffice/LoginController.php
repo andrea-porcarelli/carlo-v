@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Backoffice;
 
 use App\Http\Controllers\Backoffice\Requests\LoginRequest;
 use App\Interfaces\UserInterface;
+use App\Models\User;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -27,13 +28,14 @@ class LoginController extends BaseController
 
     public function login(LoginRequest $request) : JsonResponse {
         try {
-            if(!Auth::validate($request->all())) {
+            $user = User::where('email', $request->email)
+                        ->where('role', 'admin')
+                        ->first();
+
+            if (!$user || !Hash::check($request->password, $user->backoffice_password ?? '')) {
                 return response()->json(['message' => 'I dati inseriti sono errati'], 422);
             }
-            $user = Auth::getProvider()->retrieveByCredentials($request->all());
-            if($user->role !== 'admin') {
-                return response()->json(['message' => "Non puoi accedere a quest'area"], 422);
-            }
+
             Auth::login($user);
             return response()->json(['response' => 'ok', 'url' => redirect()->getIntendedUrl() ?? '/backoffice/index']);
         } catch (Exception $e) {

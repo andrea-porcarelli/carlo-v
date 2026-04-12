@@ -24,7 +24,7 @@ $permissionMeta = [
                 @csrf
                 @method('PUT')
 
-                {{-- ── Dati utente ──────────────────────────────────────────────────── --}}
+                {{-- ── Sezione comune (nome e ruolo) ──────────────────────────────── --}}
                 <div class="panel panel-default">
                     <div class="panel-heading">
                         <h4 class="panel-title">
@@ -34,20 +34,12 @@ $permissionMeta = [
                     <div class="panel-body">
                         <div class="row">
                             @include('backoffice.components.form.input', [
-                                'label'       => 'Nome Completo',
+                                'label'       => 'Nome',
                                 'name'        => 'name',
                                 'col'         => 6,
                                 'required'    => true,
                                 'value'       => $_user->name,
                                 'placeholder' => 'Es: Mario Rossi',
-                            ])
-                            @include('backoffice.components.form.input', [
-                                'label'       => 'Email',
-                                'name'        => 'email',
-                                'col'         => 6,
-                                'type'        => 'email',
-                                'value'       => $_user->email,
-                                'placeholder' => 'Es: mario.rossi@example.com',
                             ])
                             @include('backoffice.components.form.select', [
                                 'label'    => 'Ruolo',
@@ -58,27 +50,50 @@ $permissionMeta = [
                                 'value'    => $_user->role,
                             ])
                         </div>
+                    </div>
+                </div>
+
+                {{-- ── Sezione Admin ───────────────────────────────────────────────── --}}
+                <div class="panel panel-default" id="adminSection"
+                     style="{{ $_user->role === 'admin' ? '' : 'display:none;' }}">
+                    <div class="panel-heading">
+                        <h4 class="panel-title">
+                            <i class="fas fa-lock"></i> Credenziali Backoffice
+                        </h4>
+                    </div>
+                    <div class="panel-body">
+                        <div class="row">
+                            @include('backoffice.components.form.input', [
+                                'label'       => 'Email',
+                                'name'        => 'email',
+                                'col'         => 6,
+                                'type'        => 'email',
+                                'required'    => true,
+                                'value'       => $_user->email,
+                                'placeholder' => 'Es: admin@example.com',
+                            ])
+                        </div>
 
                         <div class="row m-t-md">
                             <div class="col-lg-12">
                                 <div class="alert alert-info">
                                     <i class="fas fa-key"></i>
-                                    <strong>Cambio Password:</strong> Lascia i campi vuoti se non vuoi modificare la password.
+                                    <strong>Password Backoffice:</strong> Lascia i campi vuoti se non vuoi modificare la password.
                                 </div>
                             </div>
                             @include('backoffice.components.form.input', [
-                                'label'       => 'Nuova Password',
-                                'name'        => 'password',
+                                'label'       => 'Password Backoffice',
+                                'name'        => 'backoffice_password',
                                 'col'         => 6,
                                 'type'        => 'password',
                                 'placeholder' => 'Lascia vuoto per non modificare',
                             ])
                             @include('backoffice.components.form.input', [
-                                'label'       => 'Conferma Nuova Password',
-                                'name'        => 'password_confirmation',
+                                'label'       => 'Conferma Password',
+                                'name'        => 'backoffice_password_confirmation',
                                 'col'         => 6,
                                 'type'        => 'password',
-                                'placeholder' => 'Ripeti la nuova password',
+                                'placeholder' => 'Ripeti la password',
                             ])
                         </div>
 
@@ -100,21 +115,32 @@ $permissionMeta = [
                             </div>
                         </div>
                     </div>
-                    <div class="panel-footer">
-                        <div class="d-flex justify-content-between">
-                            <a href="{{ route('users.index') }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Torna alla lista
-                            </a>
-                            <div>
-                                @if(auth()->id() !== $_user->id)
-                                    <button type="button" class="btn btn-danger" id="deleteUserBtn">
-                                        <i class="fas fa-trash"></i> Elimina Utente
-                                    </button>
-                                @endif
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> Salva Modifiche
-                                </button>
+                </div>
+
+                {{-- ── Sezione Operatore ───────────────────────────────────────────── --}}
+                <div class="panel panel-default" id="operatorSection"
+                     style="{{ $_user->role === 'operator' ? '' : 'display:none;' }}">
+                    <div class="panel-heading">
+                        <h4 class="panel-title">
+                            <i class="fas fa-key"></i> Impostazioni Operatore
+                        </h4>
+                    </div>
+                    <div class="panel-body">
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Password (PIN):</strong> Numerica, max 5 cifre. Lascia vuoto per non modificare.
+                                </div>
                             </div>
+                            @include('backoffice.components.form.input', [
+                                'label'       => 'Password (PIN)',
+                                'name'        => 'password',
+                                'col'         => 6,
+                                'type'        => 'password',
+                                'inputmode'   => 'numeric',
+                                'placeholder' => 'Es: 12345',
+                            ])
                         </div>
                     </div>
                 </div>
@@ -189,8 +215,29 @@ $permissionMeta = [
                          style="background:#f9f9f9; padding:10px 20px; border-top:1px solid #eee;">
                         <small class="text-muted">
                             <i class="fas fa-info-circle"></i>
-                            Gli <strong>Amministratori</strong> hanno accesso completo a tutte le funzionalità, indipendentemente da questi permessi.
+                            Gli <strong>Amministratori</strong> hanno accesso completo a tutte le funzionalità, indipendentemente dai permessi degli operatori.
                         </small>
+                    </div>
+                </div>
+
+                {{-- ── Footer (comune) ──────────────────────────────────────────────── --}}
+                <div class="panel panel-default">
+                    <div class="panel-footer">
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ route('users.index') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Torna alla lista
+                            </a>
+                            <div>
+                                @if(auth()->id() !== $_user->id)
+                                    <button type="button" class="btn btn-danger" id="deleteUserBtn">
+                                        <i class="fas fa-trash"></i> Elimina Utente
+                                    </button>
+                                @endif
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Salva Modifiche
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -209,12 +256,18 @@ $(document).ready(function () {
         switchInstances.push(new Switchery(el, { color: '#1ab394', size: 'small' }));
     });
 
-    // ── Mostra / nascondi pannello permessi ──────────────────────────────────
+    // ── Mostra / nascondi sezioni ─────────────────────────────────────────────
     $('#role').on('change', function () {
-        if ($(this).val() === 'operator') {
-            $('#permissionsPanel').slideDown(200);
-        } else {
+        var selectedRole = $(this).val();
+
+        if (selectedRole === 'admin') {
+            $('#adminSection').slideDown(200);
+            $('#operatorSection').slideUp(200);
             $('#permissionsPanel').slideUp(200);
+        } else if (selectedRole === 'operator') {
+            $('#adminSection').slideUp(200);
+            $('#operatorSection').slideDown(200);
+            $('#permissionsPanel').slideDown(200);
         }
     });
 
