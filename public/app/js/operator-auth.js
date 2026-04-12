@@ -115,6 +115,8 @@ const operatorAuthManager = {
                     email: data.data.user_email,
                     role: data.data.role,
                 };
+                // Admins get all permissions; operators get their assigned ones
+                const permissions = data.data.permissions ?? [];
 
                 // Show success notification
                 if (typeof tableOrdersManager !== 'undefined') {
@@ -136,6 +138,7 @@ const operatorAuthManager = {
                         callback.resolve({
                             token: token,
                             user: user,
+                            permissions: permissions,
                         });
                     }
                     if (callback.callback) {

@@ -270,6 +270,11 @@ class TableOrdersManager {
                         this.showNotification('Autenticazione annullata', 'error');
                         return;
                     }
+                    if (!(auth.permissions ?? []).includes('take_orders')) {
+                        this.currentTable = null;
+                        this.showNotification('Non hai il permesso di prendere comande', 'error');
+                        return;
+                    }
 
                     await this.openTableWithCovers(tableId, covers, auth.token);
 
@@ -279,6 +284,7 @@ class TableOrdersManager {
                     if (res2.success) {
                         this.currentTable = res2.data;
                         this.modifySession.token = auth.token;
+                        this.modifySession.permissions = auth.permissions ?? [];
                         this.modifySession.active = true;
                         this._initSessionFromOrder(this.currentTable.order);
                         this.openModifyOverlay();
@@ -297,8 +303,14 @@ class TableOrdersManager {
                     return;
                 }
                 if (!auth) { this.currentTable = null; return; }
+                if (!(auth.permissions ?? []).includes('view_orders')) {
+                    this.currentTable = null;
+                    this.showNotification('Non hai il permesso di visualizzare le comande', 'error');
+                    return;
+                }
 
                 this.modifySession.token = auth.token;
+                this.modifySession.permissions = auth.permissions ?? [];
                 this.modifySession.active = true;
                 this._initSessionFromOrder(this.currentTable.order);
                 this.openModifyOverlay();
@@ -1406,6 +1418,12 @@ class TableOrdersManager {
      */
     async addProductToSession() {
         if (!this.currentTable) return;
+
+        // Permission: only operators with take_orders can add/edit items
+        if (!(this.modifySession.permissions ?? []).includes('take_orders')) {
+            this.showNotification('Non hai il permesso di prendere comande', 'error');
+            return;
+        }
 
         // Edit mode: collect changes, submit immediately with auth
         if (this._editingItemId) {
@@ -2706,6 +2724,26 @@ class TableOrdersManager {
             return;
         }
 
+        // ── Permission checks ─────────────────────────────────────────────────
+        const splitPerms = auth.permissions ?? [];
+        if (!splitPerms.includes('close_bills')) {
+            this.showNotification('Non hai il permesso di chiudere i conti', 'error');
+            document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+            return;
+        }
+        const isContantiMethod = method === 'contanti' || method === 'fattura_contanti';
+        const isPosMethod = method === 'pos' || method === 'fattura_pos';
+        if (isContantiMethod && !splitPerms.includes('cash_payment')) {
+            this.showNotification('Non hai il permesso di ricevere pagamenti in contanti', 'error');
+            document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+            return;
+        }
+        if (isPosMethod && !splitPerms.includes('pos_payment')) {
+            this.showNotification('Non hai il permesso di ricevere pagamenti POS', 'error');
+            document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+            return;
+        }
+
         const doPaySplit = async () => {
             try {
                 const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay-split/${splitId}`, {
@@ -3045,6 +3083,21 @@ class TableOrdersManager {
             if (!auth) return;
         } catch (error) {
             console.log('Authentication cancelled');
+            return;
+        }
+
+        // ── Permission checks ─────────────────────────────────────────────────
+        const perms = auth.permissions ?? [];
+        if (!perms.includes('close_bills')) {
+            this.showNotification('Non hai il permesso di chiudere i conti', 'error');
+            return;
+        }
+        if (method === 'contanti' && !perms.includes('cash_payment')) {
+            this.showNotification('Non hai il permesso di ricevere pagamenti in contanti', 'error');
+            return;
+        }
+        if (method === 'pos' && !perms.includes('pos_payment')) {
+            this.showNotification('Non hai il permesso di ricevere pagamenti POS', 'error');
             return;
         }
 

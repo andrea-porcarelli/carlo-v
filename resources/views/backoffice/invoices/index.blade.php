@@ -57,11 +57,13 @@
                                 @include('backoffice.components.form.select', ['label' => 'Fornitore', 'name' => 'supplier_id', 'col' => 2, 'class' => 'supplier_id', 'options' => $suppliers, 'first_value_text' => 'Tutti i fornitori', 'hide_first' => true])
                                 @include('backoffice.components.form.input', ['label' => 'Da data', 'name' => 'date_from', 'col' => 2, 'class' => 'date_from', 'type' => 'date'])
                                 @include('backoffice.components.form.input', ['label' => 'A data', 'name' => 'date_to', 'col' => 2, 'class' => 'date_to', 'type' => 'date'])
-                                @include('backoffice.components.form.select', ['label' => 'Stato', 'name' => 'ignored', 'col' => 2, 'class' => 'ignored', 'options' => ['' => 'Non ignorate', 'ignorate' => 'Solo ignorate'], 'hide_first' => false])
+                                @include('backoffice.components.form.select', ['label' => 'Stato', 'name' => 'ignored', 'col' => 2, 'class' => 'ignored', 'options' => Utils::key_value(['' => 'Non ignorate', 'ignorate' => 'Solo ignorate']), 'hide_first' => false])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Cerca', 'class' => 'btn-find'])
+                            </div>
+                            <div class="row m-b-sm">
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Carica fattura', 'class' => 'btn-load-invoice', 'dataset' => ['path' => route('invoices.import')]])
                                 @if($importLogsCount > 0)
-                                    <div class="col-lg-2">
+                                    <div class="col-lg-2 m-t-sm">
                                         <button type="button" class="btn btn-info btn-block btn-show-import-logs">
                                             <i class="fa fa-list-alt"></i> Log import
                                             <span class="badge" style="background:#fff;color:#31708f;">{{ $importLogsCount }}</span>
@@ -308,137 +310,6 @@
             });
         });
 
-        var importStockInvoiceId = null;
-
-        function renderImportStockTable(data) {
-            $('#importStockInvoiceLabel').text(data.invoice.supplier + ' — Fattura ' + data.invoice.number);
-
-            var html = '<table class="table table-condensed table-bordered import-stock-table">';
-            html += '<thead><tr>';
-            html += '<th>Prodotto fattura</th>';
-            html += '<th class="text-center">Qtà fattura</th>';
-            html += '<th class="text-center" style="width: 130px">Moltiplicatore</th>';
-            html += '<th>Materiale</th>';
-            html += '<th class="text-center">Giacenza prevista</th>';
-            html += '<th class="text-center">Stato</th>';
-            html += '</tr></thead><tbody>';
-
-            data.products.forEach(function(p) {
-                var rowClass = p.has_stock ? 'already-imported' : '';
-                html += '<tr class="' + rowClass + '" data-product-id="' + p.id + '" data-material-id="' + (p.material_id || '') + '">';
-                html += '<td><strong>' + p.product_name + '</strong></td>';
-                html += '<td class="text-center">' + (p.quantity || '—') + (p.quantity_unit ? ' ' + p.quantity_unit : '') + '</td>';
-                html += '<td class="text-center">';
-                if (!p.has_stock) {
-                    html += '<input type="number" style="width: 100px" class="form-control input-xs multiplier-input text-center" value="' + (p.quantity_multiplier || 1) + '" min="0.001" step="0.001" data-product-id="' + p.id + '" data-quantity="' + (p.quantity || 0) + '">';
-                } else {
-                    html += '<span>' + (p.quantity_multiplier || 1) + '</span>';
-                }
-                html += '</td>';
-                html += '<td>' + (p.material_label || '—') + '</td>';
-                html += '<td class="text-center qty-preview" data-product-id="' + p.id + '">';
-                html += formatQty(p.quantity * (p.quantity_multiplier || 1)) + (p.stock_unit ? ' ' + p.stock_unit : '');
-                html += '</td>';
-                html += '<td class="text-center">';
-                if (p.has_stock) {
-                    html += '<span class="label label-success"><i class="fa fa-check"></i> Già importata</span>';
-                } else {
-                    html += '<span class="label label-default">Da importare</span>';
-                }
-                html += '</td>';
-                html += '</tr>';
-            });
-
-            html += '</tbody></table>';
-            $('#importStockBody').html(html);
-        }
-
-        function formatQty(val) {
-            return parseFloat(val).toLocaleString('it-IT', {minimumFractionDigits: 3, maximumFractionDigits: 4});
-        }
-
-        $(document).on('click', '.btn-import-stock', function() {
-            importStockInvoiceId = $(this).data('id');
-            $('#importStockInvoiceLabel').text('');
-            $('#importStockBody').html('<div class="text-center text-muted" style="padding:30px;"><i class="fa fa-spinner fa-spin fa-2x"></i></div>');
-            $('#btnConfirmImportStock').prop('disabled', false);
-            $('#importStockModal').modal('show');
-
-            $.ajax({
-                url: '/backoffice/invoices/' + importStockInvoiceId + '/import-stock-preview',
-                type: 'GET',
-                success: function(res) {
-                    if (res && res.products) {
-                        renderImportStockTable(res);
-                    } else {
-                        $('#importStockBody').html('<p class="text-danger text-center">Errore nel caricamento dei dati.</p>');
-                    }
-                },
-                error: function() {
-                    $('#importStockBody').html('<p class="text-danger text-center">Errore durante il caricamento.</p>');
-                }
-            });
-        });
-
-        // Aggiorna preview giacenza in tempo reale al cambio moltiplicatore
-        $(document).on('input change', '.multiplier-input', function() {
-            var productId = $(this).data('product-id');
-            var qty = parseFloat($(this).data('quantity')) || 0;
-            var mult = parseFloat($(this).val()) || 0;
-            var preview = qty * mult;
-            var $cell = $('.qty-preview[data-product-id="' + productId + '"]');
-            var unit = $cell.text().replace(/[\d.,\s]/g, '').trim();
-            $cell.text(formatQty(preview) + (unit ? ' ' + unit : ''));
-        });
-
-        $(document).on('click', '#btnConfirmImportStock', function() {
-            if (!importStockInvoiceId) return;
-
-            var products = [];
-            $('#importStockBody tbody tr').each(function() {
-                var $row = $(this);
-                var $multiplierInput = $row.find('.multiplier-input');
-
-                if ($multiplierInput.length === 0) return; // già importata, skip
-
-                products.push({
-                    id: $row.data('product-id'),
-                    material_id: $row.data('material-id') || null,
-                    quantity_multiplier: parseFloat($multiplierInput.val()) || 1,
-                });
-            });
-
-            if (products.length === 0) {
-                alert('Tutte le giacenze sono già state importate.');
-                return;
-            }
-
-            var btn = $(this);
-            btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Importazione...');
-
-            $.ajax({
-                url: '/backoffice/invoices/' + importStockInvoiceId + '/load-invoice-stocks',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({ products: products, _token: '{{ csrf_token() }}' }),
-                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                success: function(res) {
-                    btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
-                    $('#importStockModal').modal('hide');
-                    alert(res.message || 'Importazione completata.');
-                    if (window.dataTable) window.dataTable.ajax.reload();
-                    else window.location.reload();
-                },
-                error: function(xhr) {
-                    btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
-                    var msg = xhr.responseJSON && xhr.responseJSON.message
-                        ? xhr.responseJSON.message
-                        : 'Errore durante l\'importazione.';
-                    alert(msg);
-                }
-            });
-        });
-
         $(document).ready(function(){
             setTimeout(() => {
                 $(document).trigger('datatable', [{
@@ -453,7 +324,7 @@
                     ],
                     order: [[1, 'desc']],
                     dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'ignored'],
-                    serverSide: false,
+                    serverSide: true,
                 }]);
             }, 500);
         })

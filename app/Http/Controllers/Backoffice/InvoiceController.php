@@ -135,7 +135,7 @@ class InvoiceController extends BaseController
                 $operations[] = 'import-stock';
             }
 
-            $elements = $this->interface->filters($filters);
+            $elements = $this->interface->filters($filters)->orderBy('created_at', 'DESC');
             return $this->editColumns(datatables()->of($elements), $this->name, $operations)
                 ->addColumn('supplier_name', function ($item) {
                    return $item->supplier->extended_name;
