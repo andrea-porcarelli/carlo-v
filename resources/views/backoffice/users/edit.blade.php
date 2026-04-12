@@ -60,7 +60,6 @@
                                 'name' => 'password',
                                 'col' => 6,
                                 'type' => 'password',
-                                'required' => false,
                                 'placeholder' => 'Lascia vuoto per non modificare'
                             ])
 
@@ -69,7 +68,6 @@
                                 'name' => 'password_confirmation',
                                 'col' => 6,
                                 'type' => 'password',
-                                'required' => false,
                                 'placeholder' => 'Ripeti la nuova password'
                             ])
                         </div>
