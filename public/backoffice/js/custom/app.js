@@ -351,7 +351,7 @@ const datatable = (params) => {
             order:
                 typeof params.order !== "undefined"
                     ? params.order
-                    : [[0, "desc"]],
+                    : [],
             bStateSave:
                 typeof params.stateSave !== "undefined"
                     ? params.stateSave
