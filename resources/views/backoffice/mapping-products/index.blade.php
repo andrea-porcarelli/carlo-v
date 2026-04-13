@@ -87,7 +87,7 @@
             }, 500);
 
             // ── Delete via AJAX ────────────────────────────────────────────
-            $(document).on('click', '.btn-delete-mapping', function() {
+            $(document).on('click', '.btn-remove', function() {
                 if (!confirm('Sei sicuro di voler eliminare questa mappatura? Questa azione è irreversibile.')) return;
 
                 const id = $(this).data('id');

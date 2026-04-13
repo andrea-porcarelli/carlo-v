@@ -58,9 +58,9 @@ class MappingProductController extends BaseController
             return $this->editColumns(
                 datatables()->of($elements),
                 $this->name,
-                ['show'],
+                ['edit', 'remove'],
                 null,
-                'mapping_products'
+                'mapping-products'
             )
                 ->addColumn('supplier_name', function ($item) {
                     return $item->supplier ? $item->supplier->company_name : '<span class="text-muted">(nessuno)</span>';
