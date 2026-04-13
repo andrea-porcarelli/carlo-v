@@ -79,9 +79,8 @@
                         {data: 'invoice_date'},
                         {data: 'products', class: 'text-center'},
                         {data: 'mapping', class: 'text-center'},
-                        {data: 'created_at', visible: false},
                     ],
-                    order: [[7, 'desc']],
+                    order: [[1, 'desc']],
                     dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'mapping', 'ignored'],
                     serverSide: true,
                 }]);
