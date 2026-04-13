@@ -324,6 +324,7 @@
                     ],
                     dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'ignored'],
                     serverSide: true,
+                    order: null
                 }]);
             }, 500);
         })
