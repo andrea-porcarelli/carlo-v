@@ -127,7 +127,7 @@ class InvoiceController extends BaseController
         try {
             $filters = $request->get('filters') ?? [];
 
-            $operations = ['pdf-invoice',  'ignore-invoice', 'import-stock'];
+            $operations = ['pdf-invoice',  'ignore-invoice'];
             if (isset($filters['mapping']) && $filters['mapping'] == 'da_effettuare') {
                 $operations[] = 'mapping-product';
             }
