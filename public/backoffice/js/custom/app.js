@@ -258,6 +258,18 @@ const datatable = (params) => {
         typeof params.name !== "undefined" ? params.name : "datatable_table";
     datatable_table[name] = $(`.${name}`);
     if (datatable_table[name].length) {
+        // Forza ordinamento per created_at descending se non è ordinabile
+        if (typeof params.order === "undefined" && !params.disableDefaultOrder) {
+            // Aggiungi drawCallback per ordinare lato client
+            params.drawCallback = function() {
+                const table = datatables[name];
+                if (table) {
+                    table.rows().every(function() {
+                        // L'ordinamento sarà fatto dal server, qui non facciamo niente
+                    });
+                }
+            };
+        }
         let exportRules = {
             exportOptions: {
                 columns: ":not(:last-child)",

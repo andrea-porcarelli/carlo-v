@@ -135,8 +135,15 @@ class InvoiceController extends BaseController
                 $operations[] = 'import-stock';
             }
 
-            $elements = $this->interface->filters($filters)->orderBy('supplier_invoices.created_at', 'DESC');
-            return $this->editColumns(datatables()->of($elements), $this->name, $operations)
+            $elements = $this->interface->filters($filters);
+            $dt = datatables()->of($elements);
+
+            // Registra come ordinare per le colonne
+            $dt->orderColumn('created_at', function ($query, $direction) {
+                $query->orderBy('supplier_invoices.created_at', $direction);
+            }, 'DESC'); // Ordinamento di default DESC
+
+            return $this->editColumns($dt, $this->name, $operations)
                 ->addColumn('supplier_name', function ($item) {
                    return $item->supplier->extended_name;
                 })
