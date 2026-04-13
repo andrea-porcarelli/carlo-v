@@ -1,4 +1,4 @@
-<li class="{{ (Request::is('backoffice/suppliers*') || Request::is('backoffice/invoices*')) ? 'active' : '' }}">
+<li class="{{ (Request::is('backoffice/suppliers*') || Request::is('backoffice/invoices*') || Request::is('backoffice/mapping-products*')) ? 'active' : '' }}">
     <a href="#">
         <i class="fas fa-shipping-fast"></i>
         <span class="nav-label">Fornitori</span>
@@ -28,6 +28,11 @@
         <li class="{{ (Request::is('backoffice/suppliers/product-comparison*')) ? 'active' : '' }}">
             <a href="{{ route('suppliers.product-comparison') }}">
                 <i class="fas fa-balance-scale"></i> Comparazione
+            </a>
+        </li>
+        <li class="{{ (Request::is('backoffice/mapping-products*')) ? 'active' : '' }}">
+            <a href="{{ route('mapping-products.index') }}">
+                <i class="fas fa-map-marked-alt"></i> Mappature
             </a>
         </li>
     </ul>

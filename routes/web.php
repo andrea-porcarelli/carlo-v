@@ -15,6 +15,7 @@ use App\Http\Controllers\Backoffice\SalesController;
 use App\Http\Controllers\Backoffice\StockController;
 use App\Http\Controllers\Backoffice\SettingController;
 use App\Http\Controllers\Backoffice\SupplierController;
+use App\Http\Controllers\Backoffice\MappingProductController;
 use App\Http\Controllers\Backoffice\PrintLogController;
 use App\Http\Controllers\Backoffice\SyncController;
 use App\Http\Controllers\Backoffice\TableOrderLogController;
@@ -137,6 +138,14 @@ Route::group(['prefix' => '/backoffice'], function() {
         });
 
         Route::resource('suppliers', SupplierController::class);
+
+        Route::group(['prefix' => '/mapping-products', 'as' => 'mapping-products.'], function() {
+            Route::get('/', [MappingProductController::class, 'index'])->name('index');
+            Route::get('/datatable', [MappingProductController::class, 'datatable'])->name('datatable');
+            Route::get('/{id}', [MappingProductController::class, 'show'])->name('show');
+            Route::put('/{id}', [MappingProductController::class, 'update'])->name('update');
+            Route::delete('/{id}', [MappingProductController::class, 'destroy'])->name('destroy');
+        });
 
         Route::group(['prefix' => '/invoices'], function() {
             Route::get('/datatable', [InvoiceController::class, 'datatable'])->name('invoices.datatable');

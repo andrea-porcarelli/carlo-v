@@ -294,8 +294,9 @@
                         {data: 'invoice_date'},
                         {data: 'products', class: 'text-center'},
                         {data: 'import', class: 'text-center'},
+                        {data: 'created_at', visible: false},
                     ],
-                    order: [[1, 'desc']],
+                    order: [[7, 'desc']],
                     dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'import'],
                     serverSide: true,
                 }]);
