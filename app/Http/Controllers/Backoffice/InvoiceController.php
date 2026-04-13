@@ -135,7 +135,7 @@ class InvoiceController extends BaseController
                 $operations[] = 'import-stock';
             }
 
-            $elements = $this->interface->filters($filters)->orderBy('created_at', 'DESC');
+            $elements = $this->interface->filters($filters);
             return $this->editColumns(datatables()->of($elements), $this->name, $operations)
                 ->addColumn('supplier_name', function ($item) {
                    return $item->supplier->extended_name;
@@ -202,6 +202,12 @@ class InvoiceController extends BaseController
                     $html .= '</div></div>';
                     return $html;
                 })
+                ->addColumn('created_at', function ($item) {
+                    return $item->created_at->format('Y-m-d H:i:s');
+                })
+                ->orderColumn('created_at', function ($query, $direction) {
+                    $query->orderBy('created_at', $direction);
+                }, 'DESC')
                 ->rawColumns(['invoice_number', 'supplier_name', 'mapping', 'import'])
                 ->toJson();
         } catch (\Exception $e) {

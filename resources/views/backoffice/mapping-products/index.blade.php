@@ -19,7 +19,7 @@
                                     'label' => 'Fornitore',
                                     'name' => 'supplier_id',
                                     'col' => 2,
-                                    'options' => array_merge(['' => 'Tutti'], $suppliers->toArray()),
+                                    'options' => \App\Facades\Utils::map_key($suppliers->toArray()),
                                     'class' => 'supplier_id',
                                 ])
                                 @include('backoffice.components.form.input', [
