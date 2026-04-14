@@ -185,8 +185,8 @@
                 html += '</td>';
                 html += '<td class="text-center">';
                 html += p.price;
-                html += '<td class="text-center">';
                 html += '</td>';
+                html += '<td class="text-center">';
                 if (p.has_stock) {
                     html += '<span class="label label-success"><i class="fa fa-check"></i> Già importata</span>';
                 } else {
