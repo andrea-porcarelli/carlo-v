@@ -20,7 +20,7 @@ $permissionMeta = [
 @section('main-content')
     <div class="row">
         <div class="col-lg-12">
-            <form id="userForm" action="{{ route('users.edit', $_user->id) }}" method="POST">
+            <form id="userForm" action="{{ route('users.edit', $_user->id) }}" method="POST" novalidate>
                 @csrf
                 @method('PUT')
 
@@ -291,14 +291,6 @@ $(document).ready(function () {
     $('#userForm').on('submit', function (e) {
         e.preventDefault();
         const form   = $(this);
-
-        // Rimuovi required dagli input nascosti per evitare errori di validazione HTML5
-        form.find('input[required]').each(function() {
-            if ($(this).closest('.panel').is(':hidden')) {
-                $(this).removeAttr('required');
-            }
-        });
-
         const submit = form.find('button[type="submit"]');
         submit.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Salvataggio...');
 
