@@ -532,7 +532,7 @@ class InvoiceController extends BaseController
                 'quantity'            => $product->quantity,
                 'quantity_unit'       => $product->quantity_unit,
                 'quantity_multiplier' => $multiplier,
-                'price'               => $product->price,
+                'price'               => Utils::price($product->price),
                 'material_id'         => $material?->id,
                 'material_label'      => $material?->label,
                 'stock_unit'          => $material?->stock_type,

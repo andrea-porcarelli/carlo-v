@@ -163,6 +163,7 @@
             html += '<th class="text-center" style="width: 130px">Moltiplicatore</th>';
             html += '<th>Materiale</th>';
             html += '<th class="text-center">Giacenza prevista</th>';
+            html += '<th class="text-center">Acquisto</th>';
             html += '<th class="text-center">Stato</th>';
             html += '</tr></thead><tbody>';
 
@@ -183,6 +184,9 @@
                 html += formatQty(p.quantity * (p.quantity_multiplier || 1)) + (p.stock_unit ? ' ' + p.stock_unit : '');
                 html += '</td>';
                 html += '<td class="text-center">';
+                html += p.price;
+                html += '<td class="text-center">';
+                html += '</td>';
                 if (p.has_stock) {
                     html += '<span class="label label-success"><i class="fa fa-check"></i> Già importata</span>';
                 } else {
