@@ -2402,7 +2402,7 @@ class TableOrderController extends Controller
                     'status' => 'paid',
                     'closed_at' => now(),
                 ]);
-                $table->update(['status' => 'fautoconsumoree']);
+                $table->update(['status' => 'free']);
                 DB::commit();
                 return response()->json(['success' => true, 'message' => 'Autoconsumo registrato con successo. L\'ordine è stato chiuso.']);
             }
