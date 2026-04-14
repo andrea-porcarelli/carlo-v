@@ -2360,7 +2360,7 @@ class TableOrderController extends Controller
                     if ($autoconsumoQty <= 0) continue;
 
                     if ($autoconsumoQty >= $item->quantity) {
-                        // Full item → mark for deletion
+                        // Full item → mark for autoconsumo
                         $item->update(['autoconsumo_user_id' => $assignment['user_id']]);
                     } else {
                         // Partial qty → reduce item, mark the reduced portion implicitly via logging
@@ -2376,37 +2376,35 @@ class TableOrderController extends Controller
 
                 $this->logger->logPartialAutoconsumo($order, $assignments, $operatorId);
 
-                // Delete only the fully-assigned items
-                $order->items()->whereNotNull('autoconsumo_user_id')->delete();
-
-                // Recalculate order total after removing autoconsumo items
+                // Non eliminiamo gli item, solo recalcoliamo il totale
                 $order->refresh();
                 $order->recalculateTotal();
                 $order->refresh();
 
-                // If no items remain → close the order
-                if ($order->items()->count() === 0) {
-                    $order->update(['autoconsumo' => 1]);
-                    $order->delete();
-                    $table->update(['status' => 'free']);
-                    DB::commit();
-                    return response()->json(['success' => true, 'message' => 'Autoconsumo registrato con successo']);
-                }
-
-                // Items remain → keep order open
-                DB::commit();
-                return response()->json(['success' => true, 'message' => 'Autoconsumo parziale registrato. L\'ordine è stato aggiornato.']);
-
-            } else {
-                // Full autoconsumo: clear any per-item assignments and close everything
-                $order->items()->update(['autoconsumo_user_id' => null]);
-                $this->logger->logFreeAmount($order, $operatorId);
-                $order->update(['autoconsumo' => 1]);
-                $order->items()->delete();
-                $order->delete();
+                // Chiudi l'ordine, settando autoconsumo e liberando il tavolo
+                $order->update([
+                    'autoconsumo' => 1,
+                    'status' => 'paid',
+                    'closed_at' => now(),
+                ]);
                 $table->update(['status' => 'free']);
                 DB::commit();
-                return response()->json(['success' => true, 'message' => 'Autoconsumo registrato con successo']);
+                return response()->json(['success' => true, 'message' => 'Autoconsumo registrato con successo. L\'ordine è stato chiuso.']);
+
+            } else {
+                // Full autoconsumo: mark all items as autoconsumo
+                $order->items()->update(['autoconsumo_user_id' => null]);
+                $this->logger->logFreeAmount($order, $operatorId);
+
+                // Chiudi l'ordine senza eliminare gli item
+                $order->update([
+                    'autoconsumo' => 1,
+                    'status' => 'paid',
+                    'closed_at' => now(),
+                ]);
+                $table->update(['status' => 'fautoconsumoree']);
+                DB::commit();
+                return response()->json(['success' => true, 'message' => 'Autoconsumo registrato con successo. L\'ordine è stato chiuso.']);
             }
         } catch (\Exception $e) {
             DB::rollBack();
