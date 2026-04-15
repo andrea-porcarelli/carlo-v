@@ -751,6 +751,26 @@ class TableOrderController extends Controller
         $order->close('contanti');
         $this->logger->logCashDrawerFailed($order, $operatorId);
 
+        if (config('logging.channels.telegram.handler_with.apiKey')) {
+            try {
+                $operator = User::find($operatorId);
+                $operatorName = $operator?->name ?? "ID {$operatorId}";
+                $tableLabel = e($table->table_number ?? $table->id);
+                $total = number_format((float) $order->total, 2, ',', '.');
+
+                $msg = "🚨 <b>CASSA CONTANTI NON RAGGIUNGIBILE</b>\n\n"
+                    . "🪑 Tavolo: <b>{$tableLabel}</b>\n"
+                    . "🧾 Ordine: <b>#{$order->id}</b> — €{$total}\n"
+                    . "👤 Operatore: <b>" . e($operatorName) . "</b>\n"
+                    . "🕒 " . now()->format('d/m/Y H:i') . "\n\n"
+                    . "Il conto è stato chiuso manualmente come CONTANTI senza conferma della cassa automatica.";
+
+                Log::channel('telegram')->critical($msg);
+            } catch (\Throwable $e) {
+                Log::error('Telegram cash-drawer-failed notification error: ' . $e->getMessage());
+            }
+        }
+
         return response()->json(['success' => true]);
     }
 

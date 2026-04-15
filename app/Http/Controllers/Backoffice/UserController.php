@@ -123,6 +123,7 @@ class UserController extends BaseController
                     'email' => 'required|email|unique:users,email',
                     'role' => 'required|in:admin,operator',
                     'backoffice_password' => 'required|string|min:6|confirmed',
+                    'authentication_pin' => 'required|digits_between:1,5|unique:users,authentication_pin',
                 ], [
                     'name.required' => 'Il nome è obbligatorio',
                     'email.required' => 'L\'email è obbligatoria',
@@ -131,6 +132,9 @@ class UserController extends BaseController
                     'backoffice_password.required' => 'La password backoffice è obbligatoria',
                     'backoffice_password.min' => 'La password deve essere di almeno 6 caratteri',
                     'backoffice_password.confirmed' => 'Le password non coincidono',
+                    'authentication_pin.required' => 'Il PIN di autenticazione è obbligatorio',
+                    'authentication_pin.digits_between' => 'Il PIN deve essere numerico, da 1 a 5 cifre',
+                    'authentication_pin.unique' => 'Questo PIN è già assegnato a un altro utente',
                     'role.required' => 'Il ruolo è obbligatorio',
                     'role.in' => 'Ruolo non valido',
                 ]);
@@ -142,6 +146,7 @@ class UserController extends BaseController
                     'email' => $validated['email'],
                     'role' => 'admin',
                     'backoffice_password' => $validated['backoffice_password'],
+                    'authentication_pin' => $validated['authentication_pin'],
                     'permissions' => null,
                 ]);
             } else {
@@ -208,6 +213,7 @@ class UserController extends BaseController
                     'name' => 'required|string|max:255',
                     'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
                     'backoffice_password' => 'nullable|string|min:6|confirmed',
+                    'authentication_pin' => ['nullable', 'digits_between:1,5', Rule::unique('users')->ignore($user->id)],
                     'role' => 'required|in:admin,operator',
                 ], [
                     'name.required' => 'Il nome è obbligatorio',
@@ -216,6 +222,8 @@ class UserController extends BaseController
                     'email.unique' => 'Questa email è già registrata',
                     'backoffice_password.min' => 'La password deve essere di almeno 6 caratteri',
                     'backoffice_password.confirmed' => 'Le password non coincidono',
+                    'authentication_pin.digits_between' => 'Il PIN deve essere numerico, da 1 a 5 cifre',
+                    'authentication_pin.unique' => 'Questo PIN è già assegnato a un altro utente',
                     'role.required' => 'Il ruolo è obbligatorio',
                     'role.in' => 'Ruolo non valido',
                 ]);
@@ -231,6 +239,10 @@ class UserController extends BaseController
 
                 if (!empty($validated['backoffice_password'])) {
                     $updateData['backoffice_password'] = $validated['backoffice_password'];
+                }
+
+                if (!empty($validated['authentication_pin'])) {
+                    $updateData['authentication_pin'] = $validated['authentication_pin'];
                 }
 
                 $user->update($updateData);

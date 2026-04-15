@@ -149,7 +149,12 @@
                                             <i class="fa fa-cutlery"></i> {{ $mov->dish_name }} (x{{ $mov->dish_qty }}) - Tavolo: {{ $mov->table_name }}
                                         @endif
                                     </td>
-                                    <td>{{ $mov->notes ?? '' }}</td>
+                                    <td>
+                                        @if($mov->type === 'consumption' && $mov->is_autoconsumo)
+                                            <span class="label label-info"><i class="fa fa-info-circle"></i> Autoconsumo</span>
+                                        @endif
+                                        {{ $mov->notes ?? '' }}
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>

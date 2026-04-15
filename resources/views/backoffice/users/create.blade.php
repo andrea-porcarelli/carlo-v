@@ -43,17 +43,18 @@
                             ])
                         </div>
 
-                        <div class="row m-t-md">
+                        <!-- Sezione Admin -->
+                        <div class="row m-t-md" id="adminSection" style="display:none;">
                             <div class="col-lg-12">
-                                <div class="alert alert-warning">
+                                <div class="alert alert-info">
                                     <i class="fas fa-lock"></i>
-                                    <strong>Password:</strong> La password deve essere di almeno 4 caratteri.
+                                    <strong>Password Backoffice:</strong> La password deve essere di almeno 6 caratteri.
                                 </div>
                             </div>
 
                             @include('backoffice.components.form.input', [
-                                'label' => 'Password',
-                                'name' => 'password',
+                                'label' => 'Password Backoffice',
+                                'name' => 'backoffice_password',
                                 'col' => 6,
                                 'type' => 'password',
                                 'required' => true,
@@ -61,12 +62,62 @@
                             ])
 
                             @include('backoffice.components.form.input', [
-                                'label' => 'Conferma Password',
-                                'name' => 'password_confirmation',
+                                'label' => 'Conferma Password Backoffice',
+                                'name' => 'backoffice_password_confirmation',
                                 'col' => 6,
                                 'type' => 'password',
                                 'required' => true,
                                 'placeholder' => 'Ripeti la password'
+                            ])
+
+                            <div class="col-lg-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-key"></i>
+                                    <strong>PIN di Autenticazione:</strong> Codice numerico univoco, da 1 a 5 cifre, per l'autenticazione operatore.
+                                </div>
+                            </div>
+
+                            @include('backoffice.components.form.input', [
+                                'label' => 'PIN di Autenticazione',
+                                'name' => 'authentication_pin',
+                                'col' => 6,
+                                'type' => 'text',
+                                'inputmode' => 'numeric',
+                                'required' => true,
+                                'placeholder' => 'Es: 12345',
+                                'pattern' => '[0-9]{1,5}'
+                            ])
+                        </div>
+
+                        <!-- Sezione Operator -->
+                        <div class="row m-t-md" id="operatorSection" style="display:none;">
+                            <div class="col-lg-12">
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-lock"></i>
+                                    <strong>Password (PIN):</strong> Codice numerico, da 1 a 5 cifre.
+                                </div>
+                            </div>
+
+                            @include('backoffice.components.form.input', [
+                                'label' => 'Password (PIN)',
+                                'name' => 'password',
+                                'col' => 6,
+                                'type' => 'password',
+                                'inputmode' => 'numeric',
+                                'required' => true,
+                                'placeholder' => 'Inserisci la password',
+                                'pattern' => '[0-9]{1,5}'
+                            ])
+
+                            @include('backoffice.components.form.input', [
+                                'label' => 'Conferma Password',
+                                'name' => 'password_confirmation',
+                                'col' => 6,
+                                'type' => 'password',
+                                'inputmode' => 'numeric',
+                                'required' => true,
+                                'placeholder' => 'Ripeti la password',
+                                'pattern' => '[0-9]{1,5}'
                             ])
                         </div>
 
@@ -103,17 +154,21 @@
 @section('custom-script')
     <script>
         $(document).ready(function() {
-            // Show/hide permissions section based on role
-            function togglePermissions() {
+            // Show/hide sections based on role
+            function toggleSections() {
                 const role = $('#role').val();
-                if (role === 'operator') {
-                    $('#permissionsSection').show();
-                } else {
+                if (role === 'admin') {
+                    $('#adminSection').show();
+                    $('#operatorSection').hide();
                     $('#permissionsSection').hide();
+                } else {
+                    $('#adminSection').hide();
+                    $('#operatorSection').show();
+                    $('#permissionsSection').show();
                 }
             }
-            togglePermissions();
-            $('#role').on('change', togglePermissions);
+            toggleSections();
+            $('#role').on('change', toggleSections);
 
             $('#userForm').on('submit', function(e) {
                 e.preventDefault();

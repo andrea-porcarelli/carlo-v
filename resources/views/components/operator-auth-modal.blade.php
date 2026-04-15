@@ -29,7 +29,25 @@
                         placeholder="Inserisci la tua password"
                         required
                         autocomplete="off"
+                        maxlength="5"
                     >
+                </div>
+
+                <!-- Tastiera numerica -->
+                <div class="operator-numpad" id="operatorNumpad">
+                    <button type="button" class="operator-numpad-btn" data-key="1">1</button>
+                    <button type="button" class="operator-numpad-btn" data-key="2">2</button>
+                    <button type="button" class="operator-numpad-btn" data-key="3">3</button>
+                    <button type="button" class="operator-numpad-btn" data-key="4">4</button>
+                    <button type="button" class="operator-numpad-btn" data-key="5">5</button>
+                    <button type="button" class="operator-numpad-btn" data-key="6">6</button>
+                    <button type="button" class="operator-numpad-btn" data-key="7">7</button>
+                    <button type="button" class="operator-numpad-btn" data-key="8">8</button>
+                    <button type="button" class="operator-numpad-btn" data-key="9">9</button>
+                    <button type="button" class="operator-numpad-btn" data-key="0">0</button>
+                    <button type="button" class="operator-numpad-btn operator-numpad-clear" id="operatorNumpadClear">
+                        <i class="fas fa-backspace"></i>
+                    </button>
                 </div>
 
                 <div class="operator-error-message" id="operatorAuthError" style="display: none;">
@@ -37,6 +55,15 @@
                     <span id="operatorAuthErrorText"></span>
                 </div>
             </form>
+
+            <!-- Anteprima piatti (visibile solo se è apertura tavolo) -->
+            <div id="operatorAuthDishesPreview" style="display: none; margin-top: 20px;">
+                <div class="operator-dishes-preview-header" id="operatorAuthDishesHeader" style="cursor: pointer; user-select: none;">
+                    <i class="fas fa-list me-2"></i> Piatti ordinati:
+                    <i class="fas fa-chevron-down" id="operatorAuthDishesChevron" style="float: right; transition: transform 0.3s;"></i>
+                </div>
+                <ul id="operatorAuthDishesList" class="operator-dishes-list" style="display: none; margin-top: 8px;"></ul>
+            </div>
         </div>
 
         <div class="operator-modal-footer">
@@ -216,6 +243,80 @@
     cursor: not-allowed;
 }
 
+/* Anteprima piatti */
+.operator-dishes-preview-header {
+    color: #fff;
+    font-weight: 600;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.operator-dishes-list {
+    list-style: none;
+    margin: 0;
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid #dc3545;
+    border-radius: 2px;
+    padding: 6px 8px;
+}
+
+.operator-dishes-list li {
+    color: #ccc;
+    padding: 6px 0;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #444;
+}
+
+.operator-dishes-list li:last-child {
+    border-bottom: none;
+}
+
+/* Tastiera numerica */
+.operator-numpad {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 20px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.operator-numpad-btn {
+    padding: 6px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.operator-numpad-btn:hover {
+    background: #3a3a3a;
+    border-color: #dc3545;
+}
+
+.operator-numpad-btn:active {
+    background: #4a4a4a;
+    transform: scale(0.95);
+}
+
+.operator-numpad-clear {
+    grid-column: span 5;
+    background: #dc3545;
+    border-color: #c82333;
+}
+
+.operator-numpad-clear:hover {
+    background: #c82333;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
     .operator-modal-content {
@@ -237,5 +338,78 @@
         padding: 10px 20px;
         font-size: 0.9rem;
     }
+
+    .operator-numpad {
+        grid-template-columns: repeat(6, 1fr);
+    }
+
+    .operator-numpad-clear {
+        grid-column: span 2;
+    }
 }
 </style>
+
+<script>
+(function() {
+    const operatorPin = document.getElementById('operatorPin');
+    const numpadButtons = document.querySelectorAll('.operator-numpad-btn:not(.operator-numpad-clear)');
+    const numpadClear = document.getElementById('operatorNumpadClear');
+
+    // Gestisci i clic sui tasti numerici
+    numpadButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const key = btn.dataset.key;
+            if (operatorPin.value.length < 5) {
+                operatorPin.value += key;
+            }
+        });
+    });
+
+    // Gestisci il tasto Clear/Backspace
+    if (numpadClear) {
+        numpadClear.addEventListener('click', (e) => {
+            e.preventDefault();
+            operatorPin.value = operatorPin.value.slice(0, -1);
+        });
+    }
+
+    // Gestisci il toggle della lista dei piatti
+    const dishesHeader = document.getElementById('operatorAuthDishesHeader');
+    const dishesList = document.getElementById('operatorAuthDishesList');
+    const dishesChevron = document.getElementById('operatorAuthDishesChevron');
+
+    if (dishesHeader) {
+        dishesHeader.addEventListener('click', (e) => {
+            e.preventDefault();
+            const isVisible = dishesList.style.display !== 'none';
+            dishesList.style.display = isVisible ? 'none' : 'block';
+            dishesChevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+        });
+    }
+
+    // Funzione pubblica per mostrare la preview dei piatti
+    window.showOperatorAuthWithDishes = function(dishes) {
+        const dishesList = document.getElementById('operatorAuthDishesList');
+        const dishesPreview = document.getElementById('operatorAuthDishesPreview');
+
+        if (dishes && dishes.length > 0) {
+            dishesList.innerHTML = '';
+            dishes.forEach(dish => {
+                const li = document.createElement('li');
+                li.textContent = dish.quantity + 'x ' + dish.name;
+                dishesList.appendChild(li);
+            });
+            dishesPreview.style.display = 'block';
+        } else {
+            dishesPreview.style.display = 'none';
+        }
+    };
+
+    // Funzione pubblica per pulire la preview
+    window.clearOperatorAuthDishes = function() {
+        document.getElementById('operatorAuthDishesPreview').style.display = 'none';
+        document.getElementById('operatorAuthDishesList').innerHTML = '';
+    };
+})();
+</script>

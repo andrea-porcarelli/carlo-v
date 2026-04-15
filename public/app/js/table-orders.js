@@ -316,7 +316,15 @@ class TableOrdersManager {
                 // Occupied table: auth → session → overlay
                 let auth;
                 try {
-                    auth = await operatorAuthManager.requestAuth();
+                    // Prepare dishes data for preview in auth modal
+                    const dishes = this.currentTable.order.items
+                        ? this.currentTable.order.items.map(item => ({
+                            quantity: item.quantity,
+                            name: item.dish_name || 'Prodotto'
+                          }))
+                        : null;
+
+                    auth = await operatorAuthManager.requestAuth(null, dishes);
                 } catch (error) {
                     this.currentTable = null;
                     return;

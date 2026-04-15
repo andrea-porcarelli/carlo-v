@@ -26,6 +26,7 @@ class User extends Authenticatable
         'role',
         'permissions',
         'backoffice_password',
+        'authentication_pin',
     ];
 
     /**

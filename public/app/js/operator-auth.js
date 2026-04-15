@@ -7,6 +7,7 @@ const operatorAuthManager = {
     currentUser: null,
     operators: [],
     pendingCallback: null,
+    currentDishes: null,
 
     /**
      * Initialize the operator authentication system
@@ -46,20 +47,34 @@ const operatorAuthManager = {
     /**
      * Request operator authentication
      * @param {Function} callback - Function to call after successful authentication
+     * @param {Array} dishes - Optional array of dishes to preview
      * @returns {Promise}
      */
-    requestAuth(callback) {
+    requestAuth(callback, dishes = null) {
         return new Promise((resolve, reject) => {
             // Always show authentication modal - no token persistence
-            this.showModal(callback, resolve, reject);
+            this.showModal(callback, resolve, reject, dishes);
         });
     },
 
     /**
      * Show authentication modal
      */
-    showModal(callback, resolve, reject) {
+    showModal(callback, resolve, reject, dishes = null) {
         this.pendingCallback = { callback, resolve, reject };
+        this.currentDishes = dishes;
+
+        // Show or hide dishes preview
+        if (dishes && dishes.length > 0) {
+            if (typeof showOperatorAuthWithDishes === 'function') {
+                showOperatorAuthWithDishes(dishes);
+            }
+        } else {
+            if (typeof clearOperatorAuthDishes === 'function') {
+                clearOperatorAuthDishes();
+            }
+        }
+
         $('#operatorAuthModal').show();
         $('#operatorPin').focus();
         $('#operatorAuthError').hide();
@@ -73,6 +88,12 @@ const operatorAuthManager = {
         $('#operatorAuthModal').hide();
         $('#operatorPin').val('');
         $('#operatorAuthError').hide();
+
+        // Clear dishes preview
+        if (typeof clearOperatorAuthDishes === 'function') {
+            clearOperatorAuthDishes();
+        }
+        this.currentDishes = null;
 
         if (this.pendingCallback && this.pendingCallback.reject) {
             this.pendingCallback.reject('Authentication cancelled');
@@ -130,6 +151,13 @@ const operatorAuthManager = {
                 $('#operatorAuthModal').hide();
                 $('#operatorPin').val('');
                 $('#operatorAuthError').hide();
+
+                // Clear dishes preview
+                if (typeof clearOperatorAuthDishes === 'function') {
+                    clearOperatorAuthDishes();
+                }
+                this.currentDishes = null;
+
                 this.pendingCallback = null;
 
                 // Execute callback with token and user

@@ -103,23 +103,7 @@ class StockService
             ->get();
 
         // Consumi (order_items tramite snapshot order_item_materials)
-        Utils::queryLog(DB::table('order_items')
-            ->join('order_item_materials', 'order_items.id', '=', 'order_item_materials.order_item_id')
-            ->join('dishes', 'order_items.dish_id', '=', 'dishes.id')
-            ->join('table_orders', 'order_items.table_order_id', '=', 'table_orders.id')
-            ->join('restaurant_tables', 'table_orders.restaurant_table_id', '=', 'restaurant_tables.id')
-            ->where('table_orders.status', 'paid')
-            ->where('order_item_materials.material_id', $materialId)
-            ->whereNull('order_items.deleted_at')
-            ->select(
-                'order_items.id',
-                'order_items.created_at as date',
-                DB::raw('(order_items.quantity * order_item_materials.quantity) as quantity'),
-                'dishes.label as dish_name',
-                'restaurant_tables.table_number as table_name',
-                'order_items.quantity as dish_qty',
-                DB::raw("'consumption' as type")
-            ));
+
         $consumptions = DB::table('order_items')
             ->join('order_item_materials', 'order_items.id', '=', 'order_item_materials.order_item_id')
             ->join('dishes', 'order_items.dish_id', '=', 'dishes.id')
@@ -135,6 +119,7 @@ class StockService
                 'dishes.label as dish_name',
                 'restaurant_tables.table_number as table_name',
                 'order_items.quantity as dish_qty',
+                'table_orders.autoconsumo as is_autoconsumo',
                 DB::raw("'consumption' as type")
             )
             ->get();

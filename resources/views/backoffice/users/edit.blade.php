@@ -99,6 +99,25 @@ $permissionMeta = [
 
                         <div class="row m-t-md">
                             <div class="col-lg-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-key"></i>
+                                    <strong>PIN di Autenticazione:</strong> Codice numerico univoco, da 1 a 5 cifre. Lascia vuoto per non modificare.
+                                </div>
+                            </div>
+                            @include('backoffice.components.form.input', [
+                                'label'       => 'PIN di Autenticazione',
+                                'name'        => 'authentication_pin',
+                                'col'         => 6,
+                                'type'        => 'text',
+                                'inputmode'   => 'numeric',
+                                'value'       => $_user->authentication_pin,
+                                'placeholder' => 'Es: 12345',
+                                'pattern'     => '[0-9]{1,5}',
+                            ])
+                        </div>
+
+                        <div class="row m-t-md">
+                            <div class="col-lg-12">
                                 <div class="alert alert-secondary">
                                     <i class="fas fa-info-circle"></i>
                                     <strong>Info Account:</strong>
