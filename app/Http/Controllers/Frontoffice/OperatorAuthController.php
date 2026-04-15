@@ -146,6 +146,9 @@ class OperatorAuthController extends Controller
                 'user_id' => $user->id,
                 'user_name' => $user->name,
                 'role' => $user->role,
+                'permissions' => $user->role === 'admin'
+                    ? array_keys(\App\Models\User::availablePermissions())
+                    : ($user->permissions ?? []),
             ],
         ]);
     }
@@ -197,6 +200,28 @@ class OperatorAuthController extends Controller
                 'message' => 'Errore durante l\'autenticazione',
             ], 500);
         }
+    }
+
+    /**
+     * Verify admin PIN without logging in (used by frontoffice admin-gated features).
+     */
+    public function adminVerifyPin(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'password' => 'required|string',
+        ]);
+
+        $user = User::where('role', 'admin')
+            ->where('authentication_pin', $validated['password'])
+            ->first();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password non corretta o utente non admin',
+            ], 401);
+        }
+
+        return response()->json(['success' => true]);
     }
 
     /**

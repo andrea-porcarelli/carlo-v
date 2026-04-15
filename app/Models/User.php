@@ -63,7 +63,8 @@ class User extends Authenticatable
             'view_orders'  => 'Visualizzare comande',
             'cash_payment' => 'Pagamento contanti',
             'pos_payment'  => 'Pagamento POS',
-            'close_bills'  => 'Chiudere i conti',
+            'close_bills'     => 'Chiudere i conti',
+            'invoice_payment' => 'Emissione fattura',
         ];
     }
 

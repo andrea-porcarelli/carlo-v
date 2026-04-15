@@ -14,6 +14,7 @@ class TableOrdersManager {
         this.modifySession = {
             active: false,
             token: null,
+            permissions: [],
             items: [],
             pendingAdd: [],
             pendingRemove: [],
@@ -102,6 +103,8 @@ class TableOrdersManager {
 
         // Close modify overlay button
         document.getElementById('closeModifyBtn')?.addEventListener('click', () => this.closeModifyOverlay());
+        document.getElementById('closeModifyNoPrintBtn')?.addEventListener('click', () => this.closeModifyOverlay({ skipPrint: true }));
+        document.getElementById('btnInviaOrdine')?.addEventListener('click', () => this.submitSessionKeepOpen());
 
         // Banco button
         document.getElementById('btnBanco')?.addEventListener('click', () => this.openBanco());
@@ -289,7 +292,8 @@ class TableOrdersManager {
                         this.showNotification('Autenticazione annullata', 'error');
                         return;
                     }
-                    if (!(auth.permissions ?? []).includes('take_orders')) {
+                    console.log(auth.permissions)
+                    if (!(auth.permissions).includes('take_orders')) {
                         this.currentTable = null;
                         this.showNotification('Non hai il permesso di prendere comande', 'error');
                         return;
@@ -630,6 +634,8 @@ class TableOrdersManager {
         // For banco: hide "Chiudi e invia" — overlay can only close via payment
         const closeBtn = document.getElementById('closeModifyBtn');
         if (closeBtn) closeBtn.style.display = isBanco ? 'none' : '';
+        const closeNoPrintBtn = document.getElementById('closeModifyNoPrintBtn');
+        if (closeNoPrintBtn) closeNoPrintBtn.style.display = isBanco ? 'none' : '';
 
         // Show overlay
         const overlay = document.getElementById('modifyOrderOverlay');
@@ -718,6 +724,7 @@ class TableOrdersManager {
                 </div>
                 <div class="receipt-item-actions">
                     <div style="display:flex;gap:4px;">
+                        <button class="btn-quick-add" onclick="tableOrdersManager.openProductModal({id:${item.dish_id}, name:'${(item.dish_name || '').replace(/'/g, "\\'")}', price:${item.unit_price}})" title="Aggiungi ancora"><i class="fas fa-plus"></i></button>
                         <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
                         ${nonSegueItems.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})" title="Rimuovi piatto"><i class="fas fa-trash"></i></button>` : ''}
                     </div>
@@ -1445,7 +1452,7 @@ class TableOrdersManager {
      */
     async addProductToSession() {
         if (!this.currentTable) return;
-
+        console.log(this.modifySession.permissions)
         // Permission: only operators with take_orders can add/edit items
         if (!(this.modifySession.permissions ?? []).includes('take_orders')) {
             this.showNotification('Non hai il permesso di prendere comande', 'error');
@@ -2588,6 +2595,13 @@ class TableOrdersManager {
      * Show a step inside the normal payment view (null = step 1 doc type choice)
      */
     _pmShowStep(type) {
+        if (type === 'fattura') {
+            const perms = this.modifySession?.permissions ?? [];
+            if (!perms.includes('invoice_payment')) {
+                this.showNotification('Non hai il permesso di emettere fatture', 'error');
+                return;
+            }
+        }
         const step1 = document.getElementById('pmStep1');
         const stepS = document.getElementById('pmStepScontrino');
         const stepF = document.getElementById('pmStepFattura');
@@ -2681,6 +2695,13 @@ class TableOrdersManager {
 
     /** Show sub-methods (scontrino/fattura) inside a split row */
     _splitToggleType(btn, type) {
+        if (type === 'fattura') {
+            const perms = this.modifySession?.permissions ?? [];
+            if (!perms.includes('invoice_payment')) {
+                this.showNotification('Non hai il permesso di emettere fatture', 'error');
+                return;
+            }
+        }
         const row = btn.closest('.split-pay-row, .split-remainder-row');
         row.querySelector('.split-doctype-row').style.display = 'none';
         row.querySelector(`[data-type="${type}-btns"]`).style.display = 'flex';
@@ -2772,6 +2793,12 @@ class TableOrdersManager {
         if (isPosMethod && !splitPerms.includes('pos_payment')) {
             console.log('❌ BLOCKED (Split): Missing pos_payment permission');
             this.showNotification('Non hai il permesso di ricevere pagamenti POS', 'error');
+            document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+            return;
+        }
+        const isFatturaMethod = ['fattura_contanti', 'fattura_pos', 'bonifico', 'assegno'].includes(method);
+        if (isFatturaMethod && !splitPerms.includes('invoice_payment')) {
+            this.showNotification('Non hai il permesso di emettere fatture', 'error');
             document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
             return;
         }
@@ -3232,6 +3259,7 @@ class TableOrdersManager {
 
             this.currentTable = tableResult.data;
             this.modifySession.token = tokenData.data.token;
+            this.modifySession.permissions = tokenData.data.permissions ?? [];
             if (tableResult.data.order) {
                 this.modifySession.active = true;
                 this._initSessionFromOrder(tableResult.data.order);
@@ -3284,6 +3312,12 @@ class TableOrdersManager {
      */
     openInvoiceModal(method = 'fattura_pos') {
         if (!this.currentTable || !this.currentTable.order) return;
+
+        const perms = this.modifySession?.permissions ?? [];
+        if (!perms.includes('invoice_payment')) {
+            this.showNotification('Non hai il permesso di emettere fatture', 'error');
+            return;
+        }
 
         this._pendingInvoicePaymentMethod = method;
         this.closePaymentMethodModal();
@@ -3428,12 +3462,13 @@ class TableOrdersManager {
             </div>
 
             <!-- Row 1: importo, descrizione, tipo cliente -->
-            <div style="display:grid; grid-template-columns:110px 1fr 160px; gap:8px; align-items:end; margin-bottom:8px;">
+            <div style="display:grid; grid-template-columns:110px 1fr 180px; gap:10px; align-items:end; margin-bottom:10px;">
                 <div>
-                    <label>Importo (€)</label>
+                    <label>Importo (€) <span class="req">*</span></label>
                     <input type="number" class="invoice-amount" step="0.01" min="0"
                            value="${parseFloat(defaultAmount).toFixed(2)}" placeholder="0.00"
-                           oninput="tableOrdersManager._updateInvoiceTotals()">
+                           oninput="tableOrdersManager._updateInvoiceTotals()"
+                           onfocus="this.classList.remove('invoice-field-error')">
                 </div>
                 <div>
                     <label>Descrizione fattura</label>
@@ -3444,52 +3479,59 @@ class TableOrdersManager {
                     <select class="invoice-user-type" onchange="tableOrdersManager._onInvoiceUserTypeChange(this, ${idx})">
                         <option value="private"${userType === 'private' ? ' selected' : ''}>Privato</option>
                         <option value="company"${userType === 'company' ? ' selected' : ''}>Azienda</option>
-                        <option value="public_company"${userType === 'public_company' ? ' selected' : ''}>Pubblica Amministrazione</option>
+                        <option value="public_company"${userType === 'public_company' ? ' selected' : ''}>Ente Pubblico</option>
                     </select>
                 </div>
             </div>
 
             <!-- Row 2: nome, CF, P.IVA -->
-            <div style="display:grid; grid-template-columns:1fr 160px 160px; gap:8px; align-items:end; margin-bottom:8px;">
+            <div style="display:grid; grid-template-columns:1fr 170px 170px; gap:10px; align-items:end; margin-bottom:10px;">
                 <div>
-                    <label>Nome / Ragione sociale</label>
-                    <input type="text" class="invoice-customer-name" value="${customerName}" placeholder="Mario Rossi">
+                    <label>Nome / Ragione sociale <span class="req">*</span></label>
+                    <input type="text" class="invoice-customer-name" value="${customerName}" placeholder="Mario Rossi"
+                           onfocus="this.classList.remove('invoice-field-error')">
                 </div>
                 <div>
-                    <label>Codice Fiscale</label>
-                    <input type="text" class="invoice-fiscal-code" value="${fiscalCode}" placeholder="RSSMRA80A01H501U">
+                    <label>Codice Fiscale <span class="req invoice-cf-req"${isCompany ? ' style="display:none"' : ''}>*</span></label>
+                    <input type="text" class="invoice-fiscal-code" value="${fiscalCode}" placeholder="RSSMRA80A01H501U" style="text-transform:uppercase;"
+                           onfocus="this.classList.remove('invoice-field-error')">
                 </div>
                 <div>
-                    <label>P.IVA</label>
-                    <input type="text" class="invoice-vat-number" value="${vatNumber}" placeholder="01234567890">
+                    <label>P.IVA <span class="req invoice-piva-req"${!isCompany ? ' style="display:none"' : ''}>*</span></label>
+                    <input type="text" class="invoice-vat-number" value="${vatNumber}" placeholder="01234567890"
+                           onfocus="this.classList.remove('invoice-field-error')">
                 </div>
             </div>
 
             <!-- Row 3: indirizzo (aziende) -->
-            <div class="invoice-company-fields" style="display:${companyDisplay}; grid-template-columns:1fr 70px 1fr 50px; gap:8px; align-items:end; margin-bottom:8px;">
+            <div class="invoice-company-fields" style="display:${companyDisplay}; grid-template-columns:1fr 80px 1fr 60px; gap:10px; align-items:end; margin-bottom:10px;">
                 <div>
-                    <label>Indirizzo</label>
-                    <input type="text" class="invoice-address" value="${address}" placeholder="Via Roma 1">
+                    <label>Indirizzo <span class="req">*</span></label>
+                    <input type="text" class="invoice-address" value="${address}" placeholder="Via Roma 1"
+                           onfocus="this.classList.remove('invoice-field-error')">
                 </div>
                 <div>
-                    <label>CAP</label>
-                    <input type="text" class="invoice-zip-code" value="${zipCode}" placeholder="00100" maxlength="10">
+                    <label>CAP <span class="req">*</span></label>
+                    <input type="text" class="invoice-zip-code" value="${zipCode}" placeholder="00100" maxlength="10"
+                           onfocus="this.classList.remove('invoice-field-error')">
                 </div>
                 <div>
-                    <label>Comune</label>
-                    <input type="text" class="invoice-city" value="${city}" placeholder="Roma">
+                    <label>Comune <span class="req">*</span></label>
+                    <input type="text" class="invoice-city" value="${city}" placeholder="Roma"
+                           onfocus="this.classList.remove('invoice-field-error')">
                 </div>
                 <div>
-                    <label>Prov.</label>
-                    <input type="text" class="invoice-province" value="${province}" placeholder="RM" maxlength="5">
+                    <label>Prov. <span class="req">*</span></label>
+                    <input type="text" class="invoice-province" value="${province}" placeholder="RM" maxlength="5" style="text-transform:uppercase;"
+                           onfocus="this.classList.remove('invoice-field-error')">
                 </div>
             </div>
 
             <!-- Row 4: SDI / PEC (aziende) -->
-            <div class="invoice-company-fields" style="display:${companyDisplay}; grid-template-columns:140px 1fr; gap:8px; align-items:end; margin-bottom:8px;">
+            <div class="invoice-company-fields" style="display:${companyDisplay}; grid-template-columns:150px 1fr; gap:10px; align-items:end; margin-bottom:10px;">
                 <div>
-                    <label>Codice Destinatario SDI</label>
-                    <input type="text" class="invoice-codice-destinatario" value="${codiceDestinatario}" placeholder="0000000" maxlength="7">
+                    <label>Codice SDI</label>
+                    <input type="text" class="invoice-codice-destinatario" value="${codiceDestinatario}" placeholder="0000000" maxlength="7" style="text-transform:uppercase;">
                 </div>
                 <div>
                     <label>PEC Destinatario</label>
@@ -3518,6 +3560,13 @@ class TableOrdersManager {
         row.querySelectorAll('.invoice-company-fields').forEach(el => {
             el.style.display = isCompany ? 'grid' : 'none';
         });
+        // Toggle required indicators: CF for private, P.IVA for company
+        const cfReq = row.querySelector('.invoice-cf-req');
+        const pivaReq = row.querySelector('.invoice-piva-req');
+        if (cfReq) cfReq.style.display = isCompany ? 'none' : '';
+        if (pivaReq) pivaReq.style.display = isCompany ? '' : 'none';
+        // Clear error highlights on toggled fields
+        row.querySelectorAll('.invoice-field-error').forEach(el => el.classList.remove('invoice-field-error'));
     }
 
     /**
@@ -3639,18 +3688,67 @@ class TableOrdersManager {
             return;
         }
 
+        // ── Validate all rows before proceeding ──────────────────────────────
         const invoices = [];
         let valid = true;
+        let firstErrorField = null;
         rows.forEach(row => {
+            // Clear previous error highlights
+            row.querySelectorAll('.invoice-field-error').forEach(el => el.classList.remove('invoice-field-error'));
+
             const amount = parseFloat(row.querySelector('.invoice-amount').value);
-            if (isNaN(amount) || amount <= 0) { valid = false; return; }
+            if (isNaN(amount) || amount <= 0) { valid = false; row.querySelector('.invoice-amount').classList.add('invoice-field-error'); }
+
+            const userType     = row.querySelector('.invoice-user-type')?.value || 'private';
+            const customerName = row.querySelector('.invoice-customer-name')?.value?.trim() || '';
+            const fiscalCode   = row.querySelector('.invoice-fiscal-code')?.value?.trim() || '';
+            const vatNumber    = row.querySelector('.invoice-vat-number')?.value?.trim() || '';
+
+            // Nome / Ragione sociale is always required
+            if (!customerName) {
+                valid = false;
+                const f = row.querySelector('.invoice-customer-name');
+                f.classList.add('invoice-field-error');
+                if (!firstErrorField) firstErrorField = f;
+            }
+
+            // Private: CF required. Company/PA: P.IVA required
+            if (userType === 'private') {
+                if (!fiscalCode) {
+                    valid = false;
+                    const f = row.querySelector('.invoice-fiscal-code');
+                    f.classList.add('invoice-field-error');
+                    if (!firstErrorField) firstErrorField = f;
+                }
+            } else {
+                if (!vatNumber) {
+                    valid = false;
+                    const f = row.querySelector('.invoice-vat-number');
+                    f.classList.add('invoice-field-error');
+                    if (!firstErrorField) firstErrorField = f;
+                }
+                // Address fields required for company/PA
+                const address  = row.querySelector('.invoice-address')?.value?.trim() || '';
+                const zipCode  = row.querySelector('.invoice-zip-code')?.value?.trim() || '';
+                const city     = row.querySelector('.invoice-city')?.value?.trim() || '';
+                const province = row.querySelector('.invoice-province')?.value?.trim() || '';
+                [{v: address, s: '.invoice-address'}, {v: zipCode, s: '.invoice-zip-code'}, {v: city, s: '.invoice-city'}, {v: province, s: '.invoice-province'}].forEach(({v, s}) => {
+                    if (!v) {
+                        valid = false;
+                        const f = row.querySelector(s);
+                        f.classList.add('invoice-field-error');
+                        if (!firstErrorField) firstErrorField = f;
+                    }
+                });
+            }
+
             invoices.push({
                 amount:                       amount,
                 description:                  row.querySelector('.invoice-description')?.value                || 'Pasto completo',
-                user_type:                    row.querySelector('.invoice-user-type')?.value                  || 'private',
-                customer_name:                row.querySelector('.invoice-customer-name')?.value              || null,
-                customer_fiscal_code:         row.querySelector('.invoice-fiscal-code')?.value                || null,
-                customer_vat_number:          row.querySelector('.invoice-vat-number')?.value                 || null,
+                user_type:                    userType,
+                customer_name:                customerName || null,
+                customer_fiscal_code:         fiscalCode || null,
+                customer_vat_number:          vatNumber || null,
                 customer_address:             row.querySelector('.invoice-address')?.value                    || null,
                 customer_zip_code:            row.querySelector('.invoice-zip-code')?.value                   || null,
                 customer_city:                row.querySelector('.invoice-city')?.value                       || null,
@@ -3663,7 +3761,8 @@ class TableOrdersManager {
         });
 
         if (!valid) {
-            this.showNotification('Controlla gli importi — devono essere maggiori di zero', 'error');
+            this.showNotification('Compila tutti i campi obbligatori per ogni fattura', 'error');
+            if (firstErrorField) firstErrorField.focus();
             return;
         }
 
@@ -3679,6 +3778,13 @@ class TableOrdersManager {
             if (!auth) return;
         } catch (error) {
             console.log('Authentication cancelled');
+            return;
+        }
+
+        // ── Permission check: invoice_payment ────────────────────────────────
+        const perms = auth.permissions ?? [];
+        if (!perms.includes('invoice_payment')) {
+            this.showNotification('Non hai il permesso di emettere fatture', 'error');
             return;
         }
 
@@ -3772,7 +3878,7 @@ class TableOrdersManager {
     /**
      * Close modify overlay: if changes exist, ask auth then submit; else close silently
      */
-    async closeModifyOverlay() {
+    async closeModifyOverlay({ skipPrint = false } = {}) {
         // Banco tables can only be closed via payment (Incassa / Chiudi Conto)
         if (this.currentTable?.table?.is_banco) {
             this.showNotification('Completare il pagamento per chiudere il banco', 'error');
@@ -3814,7 +3920,7 @@ class TableOrdersManager {
         }
 
         try {
-            await this._submitSession(token);
+            await this._submitSession(token, { skipPrint });
         } catch (error) {
             console.error('Error submitting session:', error);
             this.showNotification('Errore nel salvataggio delle modifiche', 'error');
@@ -3824,6 +3930,70 @@ class TableOrdersManager {
         this._hideModifyOverlay();
         this.modifySession.active = false;
         await this.loadTables();
+    }
+
+    /**
+     * Submit all pending changes but keep the overlay open.
+     * Used e.g. in banco mode to persist items before preconto/incasso.
+     */
+    async submitSessionKeepOpen() {
+        if (!this.currentTable) return;
+
+        if (this._autoconsumoInProgress) {
+            this.showNotification('Completare o annullare prima la procedura di autoconsumo', 'error');
+            return;
+        }
+
+        const hasChanges =
+            this.modifySession.pendingAdd.length > 0 ||
+            this.modifySession.pendingRemove.length > 0 ||
+            Object.keys(this.modifySession.pendingUpdate).length > 0 ||
+            (this.modifySession.pendingDishChange || []).length > 0;
+
+        if (!hasChanges) {
+            this.showNotification('Nessuna modifica da inviare', 'info');
+            return;
+        }
+
+        const sessionPerms = this.modifySession.permissions ?? [];
+        if (!sessionPerms.includes('take_orders')) {
+            this.showNotification('Non hai il permesso di prendere comande', 'error');
+            return;
+        }
+
+        const token = this.modifySession.token;
+        if (!token) {
+            this.showNotification('Sessione non valida, riautenticarsi', 'error');
+            return;
+        }
+
+        try {
+            await this._submitSession(token);
+        } catch (error) {
+            console.error('Error submitting session:', error);
+            this.showNotification('Errore nel salvataggio delle modifiche', 'error');
+            return;
+        }
+
+        // Refresh table/order data and rebuild session from persisted state — keep overlay open
+        const orderId = this.currentTable?.order?.id;
+        const tableId = this.currentTable?.table?.id;
+        try {
+            const resp = this.currentTable?.table?.is_banco && orderId
+                ? await fetch(`/api/order/${orderId}`)
+                : await fetch(`${this.apiBase}/${tableId}`);
+            const res = await resp.json();
+            if (res.success) {
+                this.currentTable = res.data;
+                this._initSessionFromOrder(this.currentTable.order);
+                this.updateModifyReceiptItems?.();
+            }
+        } catch (e) {
+            console.error('Error refreshing order after submit:', e);
+        }
+
+        await this.loadTables();
+        this.showNotification('Ordine inviato', 'success');
     }
 
     /**
@@ -3907,7 +4077,7 @@ class TableOrdersManager {
     /**
      * Submit all pending session changes to the backend, then trigger a single print
      */
-    async _submitSession(token) {
+    async _submitSession(token, { skipPrint = false } = {}) {
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
         const tableId = this.currentTable.table.id;
         const updatedItemIds = [];
@@ -4040,7 +4210,7 @@ class TableOrdersManager {
         }
 
         // 4. Print all changes at once
-        if (newItemIds.length > 0 || updatedItemIds.length > 0) {
+        if (!skipPrint && (newItemIds.length > 0 || updatedItemIds.length > 0)) {
             await fetch(`${this.apiBase}/${tableId}/print-session`, {
                 method: 'POST',
                 headers: {
@@ -4480,6 +4650,11 @@ class TableOrdersManager {
         body.discount_type   = document.querySelector('input[name="precontoDiscountType"]:checked')?.value || 'none';
         body.discount_amount = parseFloat(document.getElementById('preconto_discount_amount')?.value || 0);
 
+        // For banco (multi-session) the table has multiple open orders: pin the exact one.
+        if (this.currentTable?.order?.id) {
+            body.order_id = this.currentTable.order.id;
+        }
+
         try {
             console.log(`${this.apiBase}/${this.currentTable.table.id}/preconto`)
             const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto`, {
@@ -4910,6 +5085,7 @@ class TableOrdersManager {
                 // Riutilizza il token per "Chiudi e invia" così non serve reinserire la password
                 if (this.modifySession.active) {
                     this.modifySession.token = auth.token;
+                    this.modifySession.permissions = auth.permissions ?? this.modifySession.permissions;
                 }
                 this.closeComunicaModal();
             } else {
@@ -4978,8 +5154,8 @@ class TableOrdersManager {
                 return;
             }
 
-            // Load the new order and open overlay
-            await this.selectByOrderId(openResult.data.order_id);
+            // Load the new order and open overlay (propagate auth into session)
+            await this.selectByOrderId(openResult.data.order_id, auth);
             await this.loadTables();
 
         } catch (error) {
@@ -4991,12 +5167,20 @@ class TableOrdersManager {
     /**
      * Open overlay for a specific order (banco multi-session)
      */
-    async selectByOrderId(orderId) {
+    async selectByOrderId(orderId, auth = null) {
         try {
             const response = await fetch(`/api/order/${orderId}`);
             const result = await response.json();
             if (!result.success) return;
             this.currentTable = result.data;
+            if (auth) {
+                this.modifySession.token = auth.token;
+                this.modifySession.permissions = auth.permissions ?? [];
+                this.modifySession.active = true;
+                if (this.currentTable.order) {
+                    this._initSessionFromOrder(this.currentTable.order);
+                }
+            }
             this.openModifyOverlay();
         } catch (error) {
             console.error('Error selecting order:', error);

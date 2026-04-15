@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\BasicAuth;
 use App\Http\Middleware\DomainRedirect;
 use App\Http\Middleware\SyncMaintenance;
 use Illuminate\Foundation\Application;
@@ -19,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(DomainRedirect::class);
         $middleware->validateCsrfTokens(except: [
             'webhook/*',
+        ]);
+        $middleware->alias([
+            'basic.static' => BasicAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -9,8 +9,8 @@
                     <i class="fas fa-utensils"></i> CARLO V
                 </span>
                 <div>
-                    <button class="btn btn-red active me-3" id="btnMainView">
-                        <i class="fas fa-home me-2"></i> SALA PRINCIPALE
+                    <button class="btn btn-red me-3" id="btnLogOperativo">
+                        <i class="fas fa-chart-line me-2"></i> LOG OPERATIVO
                     </button>
                     @if($isAdmin)
                     <button class="btn btn-red me-3" id="btnAddTable">
@@ -42,7 +42,8 @@
             <div id="modifyOrderOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000;">
                 <div style="width: 100%; height: 100%; padding: 15px; display:flex; flex-direction:column; gap:10px;">
                     <!-- Top bar -->
-                    <div style="display:flex; justify-content:flex-end; flex-shrink:0;">
+                    <div style="display:flex; justify-content:flex-end; flex-shrink:0; gap:8px;">
+                        <button style="background: #6c757d; border: none; color: white; height: 36px; padding: 0 16px; cursor: pointer; font-size: 13px; font-weight: 700; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;" id="closeModifyNoPrintBtn"><i class="fas fa-times"></i> Chiudi senza stampare</button>
                         <button style="background: #dc3545; border: none; color: white; height: 36px; padding: 0 16px; cursor: pointer; font-size: 13px; font-weight: 700; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;" id="closeModifyBtn"><i class="fas fa-sign-out-alt"></i> Chiudi e invia</button>
                     </div>
 
@@ -107,6 +108,9 @@
                         <button class="action-btn-v" id="btnMarciaTavolo" style="background:#28a745;">
                             <i class="fas fa-play-circle"></i> MARCIA
                         </button>
+                        <button class="action-btn-v" id="btnInviaOrdine" style="background:#0d6efd;">
+                            <i class="fas fa-paper-plane"></i> INVIA ORDINE
+                        </button>
                         <button class="action-btn-v" id="btnPreconto" style="background:#17a2b8;">
                             <i class="fas fa-receipt"></i> PRE-CONTO
                         </button>
@@ -127,9 +131,6 @@
                         </button>
                         <button class="action-btn-v" id="btnModifyComunica" style="background:#6f42c1;">
                             <i class="fas fa-bullhorn"></i> COMUNICA
-                        </button>
-                        <button class="action-btn-v" id="btnAmministra" style="background:#1a1a2e;border:1px solid #ffc107;color:#ffc107;">
-                            <i class="fas fa-shield-alt"></i> AMMINISTRA
                         </button>
                     </div>
                 </div>
@@ -298,17 +299,37 @@
     <!-- Autoconsumo Modal -->
     <x-autoconsumo-modal />
 
+    <!-- Operational Log Modal -->
+    <x-operational-log-modal />
+
     <!-- Admin Auth Modal -->
     <div id="adminAuthModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; align-items:center; justify-content:center;">
         <div style="background:#1a1a1a; border:2px solid #ffc107; border-radius:8px; padding:30px; max-width:420px; width:90%; box-shadow:0 20px 60px rgba(255,193,7,0.2);">
             <h4 style="margin:0 0 8px 0; font-weight:700; text-transform:uppercase; text-align:center; color:#ffc107;">
                 <i class="fas fa-shield-alt me-2"></i>Accesso Amministratore
             </h4>
-            <p style="color:#aaa; font-size:0.85rem; margin-bottom:20px; text-align:center;">Inserisci la password admin per accedere al backoffice</p>
+            <p style="color:#aaa; font-size:0.85rem; margin-bottom:20px; text-align:center;">Inserisci la password admin per accedere al log operativo</p>
             <div style="margin-bottom:12px;">
-                <input type="password" id="adminAuthPassword" placeholder="Password admin" inputmode="numeric"
+                <input type="password" id="adminAuthPassword" placeholder="Password admin" inputmode="numeric" maxlength="10" autocomplete="off"
                     style="width:100%; padding:12px 16px; background:#2a2a2a; border:1px solid #555; border-radius:4px; color:#fff; font-size:1rem; box-sizing:border-box;">
             </div>
+
+            <div class="admin-numpad" id="adminAuthNumpad">
+                <button type="button" class="admin-numpad-btn" data-key="1">1</button>
+                <button type="button" class="admin-numpad-btn" data-key="2">2</button>
+                <button type="button" class="admin-numpad-btn" data-key="3">3</button>
+                <button type="button" class="admin-numpad-btn" data-key="4">4</button>
+                <button type="button" class="admin-numpad-btn" data-key="5">5</button>
+                <button type="button" class="admin-numpad-btn" data-key="6">6</button>
+                <button type="button" class="admin-numpad-btn" data-key="7">7</button>
+                <button type="button" class="admin-numpad-btn" data-key="8">8</button>
+                <button type="button" class="admin-numpad-btn" data-key="9">9</button>
+                <button type="button" class="admin-numpad-btn" data-key="0">0</button>
+                <button type="button" class="admin-numpad-btn admin-numpad-clear" id="adminAuthNumpadClear">
+                    <i class="fas fa-backspace"></i>
+                </button>
+            </div>
+
             <div id="adminAuthError" style="display:none; background:rgba(255,193,7,0.1); border:1px solid #ffc107; border-radius:4px; padding:10px 14px; color:#ffc107; font-size:0.85rem; margin-bottom:14px;">
                 <i class="fas fa-exclamation-circle me-2"></i><span id="adminAuthErrorText"></span>
             </div>
@@ -318,4 +339,64 @@
             </div>
         </div>
     </div>
+
+    <style>
+        .admin-numpad {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin: 0 0 14px 0;
+            padding: 14px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+        }
+        .admin-numpad-btn {
+            padding: 12px 6px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .admin-numpad-btn:hover { background: #3a3a3a; border-color: #ffc107; }
+        .admin-numpad-btn:active { background: #4a4a4a; transform: scale(0.95); }
+        .admin-numpad-clear {
+            grid-column: span 5;
+            background: #dc3545;
+            border-color: #c82333;
+            color: #fff;
+        }
+        .admin-numpad-clear:hover { background: #c82333; }
+        @media (max-width: 768px) {
+            .admin-numpad { grid-template-columns: repeat(6, 1fr); }
+            .admin-numpad-clear { grid-column: span 2; }
+        }
+    </style>
+
+    <script>
+    (function() {
+        document.addEventListener('DOMContentLoaded', function() {
+            const input = document.getElementById('adminAuthPassword');
+            if (!input) return;
+            document.querySelectorAll('#adminAuthNumpad .admin-numpad-btn:not(.admin-numpad-clear)').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const max = parseInt(input.getAttribute('maxlength') || '10', 10);
+                    if (input.value.length < max) input.value += btn.dataset.key;
+                });
+            });
+            const clearBtn = document.getElementById('adminAuthNumpadClear');
+            if (clearBtn) clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                input.value = input.value.slice(0, -1);
+            });
+        });
+    })();
+    </script>
 @endsection

@@ -720,7 +720,7 @@ body {
     color: #000;
 }
 
-.btn-remove-item, .btn-edit-item {
+.btn-remove-item, .btn-edit-item, .btn-quick-add {
     border: none;
     color: white;
     width: 30px;
@@ -733,6 +733,8 @@ body {
     font-size: 0.8rem;
 }
 
+.btn-quick-add { background: #28a745; }
+.btn-quick-add:hover { background: #218838; }
 .btn-remove-item { background: #dc3545; }
 .btn-remove-item:hover { background: #b02a37; }
 .btn-edit-item { background: #17a2b8; }
@@ -1174,7 +1176,7 @@ body {
     /* — Righe ordine corrente — */
     .receipt-item { padding: 4px 8px; padding-right: 70px; }
     .btn-remove-item,
-    .btn-edit-item { width: 26px; height: 26px; font-size: 0.73rem; }
+    .btn-edit-item, .btn-quick-add { width: 26px; height: 26px; font-size: 0.73rem; }
 
     /* — Empty state (meno spazio verticale) — */
     .empty-state { padding: 30px 20px; }

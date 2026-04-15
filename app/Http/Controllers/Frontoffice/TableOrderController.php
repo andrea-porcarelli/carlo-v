@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Frontoffice;
 
+use App\Facades\Utils;
 use App\Http\Controllers\Controller;
 use App\Interfaces\PrinterServiceInterface;
 use App\Jobs\PrintComunicaJob;
@@ -740,13 +741,15 @@ class TableOrderController extends Controller
         $order = $table->activeOrder;
         if (!$order) {
             // Ordine già chiuso: recupera l'ultimo ordine del tavolo
-            $order = \App\Models\TableOrder::where('restaurant_table_id', $table->id)
+            $order = TableOrder::where('restaurant_table_id', $table->id)
                 ->orderByDesc('id')
                 ->first();
         }
+        Log::info("Order", $order->toArray());
         if (!$order) {
             return response()->json(['success' => false, 'message' => 'Ordine non trovato'], 404);
         }
+        $order_total = Utils::price($order->total);
 
         $order->close('contanti');
         $this->logger->logCashDrawerFailed($order, $operatorId);
@@ -756,11 +759,10 @@ class TableOrderController extends Controller
                 $operator = User::find($operatorId);
                 $operatorName = $operator?->name ?? "ID {$operatorId}";
                 $tableLabel = e($table->table_number ?? $table->id);
-                $total = number_format((float) $order->total, 2, ',', '.');
 
                 $msg = "🚨 <b>CASSA CONTANTI NON RAGGIUNGIBILE</b>\n\n"
                     . "🪑 Tavolo: <b>{$tableLabel}</b>\n"
-                    . "🧾 Ordine: <b>#{$order->id}</b> — €{$total}\n"
+                    . "🧾 Ordine: <b>#{$order->id}</b> — {$order_total}\n"
                     . "👤 Operatore: <b>" . e($operatorName) . "</b>\n"
                     . "🕒 " . now()->format('d/m/Y H:i') . "\n\n"
                     . "Il conto è stato chiuso manualmente come CONTANTI senza conferma della cassa automatica.";
@@ -1063,6 +1065,7 @@ class TableOrderController extends Controller
             'label'           => 'nullable|string|max:100',
             'discount_type'   => 'nullable|string|in:none,value,percent',
             'discount_amount' => 'nullable|numeric|min:0',
+            'order_id'        => 'nullable|integer',
         ]);
 
         $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
@@ -1071,7 +1074,15 @@ class TableOrderController extends Controller
         }
 
         try {
-            $order = $table->activeOrder;
+            // For banco (multi-session) the client pins the specific order; otherwise fall back to activeOrder.
+            $order = null;
+            if (!empty($validated['order_id'])) {
+                $order = TableOrder::where('id', $validated['order_id'])
+                    ->where('restaurant_table_id', $table->id)
+                    ->where('status', 'open')
+                    ->first();
+            }
+            $order = $order ?? $table->activeOrder;
             if (!$order) {
                 return response()->json(['success' => false, 'message' => 'Nessun ordine attivo per questo tavolo'], 404);
             }

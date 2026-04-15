@@ -28,7 +28,7 @@ use App\Http\Controllers\Frontoffice\TableOrderController;
 use Illuminate\Support\Facades\Route;
 
 
-Route::get('/',[AppController::class, 'index'])->name('app');
+Route::get('/', [AppController::class, 'index'])->middleware('basic.static')->name('app');
 
 // ── Deploy webhook — protected by hardcoded key, no auth middleware ────────────
 Route::match(['GET', 'POST'], '/webhook/deploy', [DeployController::class, 'trigger'])->name('webhook.deploy');
@@ -43,6 +43,12 @@ Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function(
 
 // Admin login from frontoffice → redirect to backoffice
 Route::post('/api/admin/login-redirect', [OperatorAuthController::class, 'adminLoginRedirect'])->name('api.admin.loginRedirect');
+
+// Admin PIN verification (no login, used to gate frontoffice features like LOG OPERATIVO)
+Route::post('/api/admin/verify-pin', [OperatorAuthController::class, 'adminVerifyPin'])->name('api.admin.verifyPin');
+
+// Operational log (admin-gated, PIN re-verified server-side)
+Route::get('/api/operational-log', [\App\Http\Controllers\Frontoffice\OperationalLogController::class, 'index'])->name('api.operationalLog');
 
 // Operator token for already-authenticated backoffice admin
 Route::get('/api/admin/operator-token', [OperatorAuthController::class, 'getAdminToken'])->middleware('auth')->name('api.admin.operatorToken');
