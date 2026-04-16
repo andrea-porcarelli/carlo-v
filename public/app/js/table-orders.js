@@ -2972,8 +2972,9 @@ class TableOrdersManager {
             if (data.payment_status === 1) {
                 clearInterval(this._cashDrawerPollInterval);
                 this._cashDrawerPollInterval = null;
+                const onComplete = this._cashDrawerOnComplete;
                 this._hideCashDrawerOverlay();
-                await this._cashDrawerOnComplete();
+                if (onComplete) await onComplete();
             }
             // payment_status === 2 → in corso, continua
         } catch (e) {
@@ -3009,8 +3010,9 @@ class TableOrdersManager {
             console.error('Cash drawer cancel error:', e);
         }
 
+        const onComplete = this._cashDrawerOnComplete;
         this._hideCashDrawerOverlay();
-        await this._cashDrawerOnComplete();
+        if (onComplete) await onComplete();
     }
 
     _hideCashDrawerOverlay() {
