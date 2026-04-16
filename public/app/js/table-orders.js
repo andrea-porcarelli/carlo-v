@@ -631,11 +631,8 @@ class TableOrdersManager {
             const btn = document.getElementById(id);
             if (btn) btn.style.display = isBanco ? 'none' : '';
         });
-        // For banco: hide "Chiudi e invia" — overlay can only close via payment
-        const closeBtn = document.getElementById('closeModifyBtn');
-        if (closeBtn) closeBtn.style.display = isBanco ? 'none' : '';
-        const closeNoPrintBtn = document.getElementById('closeModifyNoPrintBtn');
-        if (closeNoPrintBtn) closeNoPrintBtn.style.display = isBanco ? 'none' : '';
+        // For banco: toggle close buttons based on whether items exist
+        this._updateBancoCloseButtons();
 
         // Show overlay
         const overlay = document.getElementById('modifyOrderOverlay');
@@ -848,6 +845,24 @@ class TableOrdersManager {
         }
 
         totalElement.textContent = `€${finalTotal.toFixed(2)}`;
+
+        this._updateBancoCloseButtons();
+    }
+
+    /**
+     * Show/hide close buttons for banco based on whether items exist.
+     * Empty banco → show close buttons. Banco with items → hide them.
+     */
+    _updateBancoCloseButtons() {
+        const isBanco = !!this.currentTable?.table?.is_banco;
+        const closeBtn = document.getElementById('closeModifyBtn');
+        const closeNoPrintBtn = document.getElementById('closeModifyNoPrintBtn');
+
+        if (!isBanco) return; // non-banco tables are handled elsewhere
+
+        const hasItems = (this.modifySession.items || []).some(i => !(i.segue && !i.dish_id));
+        if (closeBtn) closeBtn.style.display = hasItems ? 'none' : '';
+        if (closeNoPrintBtn) closeNoPrintBtn.style.display = hasItems ? 'none' : '';
     }
 
     /**
@@ -3879,9 +3894,34 @@ class TableOrdersManager {
      * Close modify overlay: if changes exist, ask auth then submit; else close silently
      */
     async closeModifyOverlay({ skipPrint = false } = {}) {
-        // Banco tables can only be closed via payment (Incassa / Chiudi Conto)
+        // Banco: empty order can be cancelled; order with items must be paid
         if (this.currentTable?.table?.is_banco) {
-            this.showNotification('Completare il pagamento per chiudere il banco', 'error');
+            const hasItems = (this.modifySession.items || []).some(i => !(i.segue && !i.dish_id));
+            if (hasItems) {
+                this.showNotification('Completare il pagamento per chiudere il banco', 'error');
+                return;
+            }
+            // Cancel the empty banco order
+            try {
+                const token = this.modifySession.token;
+                const orderId = this.currentTable.order?.id;
+                if (orderId && token) {
+                    await fetch(`/api/banco/${orderId}/cancel`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                            'X-Operator-Token': token,
+                        },
+                    });
+                }
+            } catch (e) {
+                console.error('Error cancelling empty banco order:', e);
+            }
+            this._hideModifyOverlay();
+            this.modifySession.active = false;
+            this.currentTable = null;
+            this.loadTables();
             return;
         }
 

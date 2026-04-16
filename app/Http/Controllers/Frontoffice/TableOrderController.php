@@ -749,7 +749,7 @@ class TableOrderController extends Controller
         if (!$order) {
             return response()->json(['success' => false, 'message' => 'Ordine non trovato'], 404);
         }
-        $order_total = Utils::price($order->total);
+        $order_total = Utils::price($order->total_amount);
 
         $order->close('contanti');
         $this->logger->logCashDrawerFailed($order, $operatorId);
@@ -1391,6 +1391,46 @@ class TableOrderController extends Controller
             Log::error('Error opening banco: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Errore nell\'apertura del banco'], 500);
         }
+    }
+
+    /**
+     * Cancel an empty banco order (no items).
+     */
+    public function cancelBanco(Request $request, TableOrder $order): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $order->load('restaurantTable');
+
+        if (!$order->restaurantTable?->is_banco) {
+            return response()->json(['success' => false, 'message' => 'Questo ordine non è un ordine banco'], 400);
+        }
+
+        if ($order->status !== 'open') {
+            return response()->json(['success' => false, 'message' => 'Ordine già chiuso'], 400);
+        }
+
+        if ($order->items()->count() > 0) {
+            return response()->json(['success' => false, 'message' => 'Impossibile annullare: l\'ordine contiene articoli'], 400);
+        }
+
+        $order->update([
+            'status' => 'cancelled',
+            'closed_at' => now(),
+        ]);
+
+        // Free table only if no other open orders remain
+        $openCount = TableOrder::where('restaurant_table_id', $order->restaurant_table_id)
+            ->where('status', 'open')
+            ->count();
+        if ($openCount === 0) {
+            $order->restaurantTable->update(['status' => 'free']);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Ordine banco annullato']);
     }
 
     /**

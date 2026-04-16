@@ -61,6 +61,7 @@ Route::get('/api/menu-options', [TableOrderController::class, 'getMenuOptions'])
 Route::get('/api/dishes', [TableOrderController::class, 'getDishes'])->name('api.dishes');
 Route::get('/api/banco', [TableOrderController::class, 'getBanco'])->name('api.banco');
 Route::post('/api/banco/open', [TableOrderController::class, 'openBanco'])->name('api.banco.open');
+Route::post('/api/banco/{order}/cancel', [TableOrderController::class, 'cancelBanco'])->name('api.banco.cancel');
 Route::get('/api/order/{order}', [TableOrderController::class, 'getOrderDetails'])->name('api.order.details');
 
 // API Routes for Table Management
