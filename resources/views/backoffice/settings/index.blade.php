@@ -33,19 +33,6 @@
                                     'value' => $setting->value,
                                     'small' => $setting->key,
                                 ])
-                            @elseif($setting->type === 'integer' && $setting->key === 'coperto_dish_id')
-                                <div class="col-xs-12 col-sm-4 m-t-sm">
-                                    <label>{{ $setting->description ?? $setting->key }}</label>
-                                    @include('backoffice.components.form.select', [
-                                        'field' => true,
-                                        'form' => 'update-or-create-element',
-                                        'name' => $setting->key,
-                                        'options' => $dishes,
-                                        'value' => $setting->value,
-                                    ])
-                                    <small class="text-muted">{{ $setting->key }}</small>
-                                    <div class="invalid-feedback"></div>
-                                </div>
                             @elseif($setting->type === 'integer' && $setting->key === 'preconto_printer_id')
                                 <div class="col-xs-12 col-sm-4 m-t-sm">
                                     <label>{{ $setting->description ?? $setting->key }}</label>

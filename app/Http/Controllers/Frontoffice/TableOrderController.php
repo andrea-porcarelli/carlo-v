@@ -25,7 +25,6 @@ use App\Models\TableOrderInvoice;
 use App\Models\User;
 use App\Services\MysondFatturaService;
 use App\Services\TableOrderLoggerService;
-use App\Services\VegaPosService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -1850,10 +1849,6 @@ class TableOrderController extends Controller
                 'waiter_id' => $operatorId,
             ]);
 
-            // Add coperto order_item if a coperto dish is configured
-            $this->syncCopertoItem($order, $validated['covers'], $operatorId);
-
-            // Update total (cover charge already in order_item if coperto_dish_id is set)
             $order->updateTotal();
 
             // Update table status to occupied
@@ -2049,9 +2044,6 @@ class TableOrderController extends Controller
             $oldCovers = $order->covers;
             $order->covers = $validated['covers'];
             $order->save();
-
-            // Sync coperto order_item with new covers count
-            $this->syncCopertoItem($order, $validated['covers'], $operatorId);
 
             $order->updateTotal();
 
@@ -2363,17 +2355,14 @@ class TableOrderController extends Controller
                 ], 404);
             }
 
-            $posService = app(VegaPosService::class);
 
-            if (!$posService->isConfigured()) {
-                // POS not configured — let the frontend proceed with the normal payment flow
-                return response()->json([
-                    'success'     => true,
-                    'pos_skipped' => true,
-                    'message'     => 'Terminale POS non configurato — pagamento manuale',
-                ]);
-            }
-
+            // POS not configured — let the frontend proceed with the normal payment flow
+            return response()->json([
+                'success'     => true,
+                'pos_skipped' => true,
+                'message'     => 'Terminale POS non configurato — pagamento manuale',
+            ]);
+            /*
             $result = $posService->sendPurchase(
                 (float) $order->total_amount,
                 'ORD-' . $order->id
@@ -2385,6 +2374,7 @@ class TableOrderController extends Controller
                 'response_code' => $result['response_code'],
                 'message'       => $result['message'],
             ], $result['success'] ? 200 : 402);
+            */
 
         } catch (\Exception $e) {
             Log::error('Error in posCharge: ' . $e->getMessage());
@@ -2502,51 +2492,6 @@ class TableOrderController extends Controller
         $this->logger->logAutoconsumoCancel($order, $operatorId);
 
         return response()->json(['success' => true]);
-    }
-
-    /**
-     * Create, update or delete the coperto order_item based on covers count.
-     * Does nothing if no coperto_dish_id setting is configured.
-     */
-    protected function syncCopertoItem(TableOrder $order, int $covers, int $operatorId): void
-    {
-        $coperto_dish_id = (int) Setting::get('coperto_dish_id', 0);
-        if (!$coperto_dish_id) {
-            return;
-        }
-
-        $dish = Dish::find($coperto_dish_id);
-        if (!$dish) {
-            return;
-        }
-
-        $copertoItem = $order->items()->where('dish_id', $coperto_dish_id)->first();
-
-        if ($covers <= 0) {
-            // Drinks mode: remove coperto item
-            if ($copertoItem) {
-                $copertoItem->forceDelete();
-            }
-            return;
-        }
-
-        if ($copertoItem) {
-            // Update quantity to match new covers count
-            $copertoItem->quantity  = $covers;
-            $copertoItem->subtotal  = round($dish->price * $covers, 2);
-            $copertoItem->save();
-        } else {
-            // Create coperto item
-            OrderItem::create([
-                'table_order_id' => $order->id,
-                'dish_id'        => $coperto_dish_id,
-                'added_by'       => $operatorId,
-                'quantity'       => $covers,
-                'unit_price'     => $dish->price,
-                'subtotal'       => round($dish->price * $covers, 2),
-                'status'         => 'served',
-            ]);
-        }
     }
 
     /**
