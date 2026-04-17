@@ -7,6 +7,7 @@
 @endsection
 
 @section('main-content')
+    @php $rendered = []; @endphp
     <form class="needs-validation update-or-create-element" id="update-or-create-element">
         @foreach($grouped as $groupName => $settings)
             <div class="panel panel-default">
@@ -18,6 +19,9 @@
                 <div class="panel-body">
                     <div class="row">
                         @foreach($settings as $setting)
+                            @if(in_array($setting->key, $rendered)) @continue @endif
+                            @php $rendered[] = $setting->key; @endphp
+
                             @if($setting->type === 'decimal')
                                 @include('backoffice.components.form.input', [
                                     'form' => 'update-or-create-element',
@@ -27,25 +31,34 @@
                                     'type' => 'number',
                                     'step' => '0.01',
                                     'value' => $setting->value,
+                                    'small' => $setting->key,
                                 ])
                             @elseif($setting->type === 'integer' && $setting->key === 'coperto_dish_id')
-                                @include('backoffice.components.form.select', [
-                                    'form' => 'update-or-create-element',
-                                    'name' => $setting->key,
-                                    'label' => $setting->description ?? $setting->key,
-                                    'col' => 4,
-                                    'options' => $dishes,
-                                    'value' => $setting->value,
-                                ])
+                                <div class="col-xs-12 col-sm-4 m-t-sm">
+                                    <label>{{ $setting->description ?? $setting->key }}</label>
+                                    @include('backoffice.components.form.select', [
+                                        'field' => true,
+                                        'form' => 'update-or-create-element',
+                                        'name' => $setting->key,
+                                        'options' => $dishes,
+                                        'value' => $setting->value,
+                                    ])
+                                    <small class="text-muted">{{ $setting->key }}</small>
+                                    <div class="invalid-feedback"></div>
+                                </div>
                             @elseif($setting->type === 'integer' && $setting->key === 'preconto_printer_id')
-                                @include('backoffice.components.form.select', [
-                                    'form' => 'update-or-create-element',
-                                    'name' => $setting->key,
-                                    'label' => $setting->description ?? $setting->key,
-                                    'col' => 4,
-                                    'options' => $printers,
-                                    'value' => $setting->value,
-                                ])
+                                <div class="col-xs-12 col-sm-4 m-t-sm">
+                                    <label>{{ $setting->description ?? $setting->key }}</label>
+                                    @include('backoffice.components.form.select', [
+                                        'field' => true,
+                                        'form' => 'update-or-create-element',
+                                        'name' => $setting->key,
+                                        'options' => $printers,
+                                        'value' => $setting->value,
+                                    ])
+                                    <small class="text-muted">{{ $setting->key }}</small>
+                                    <div class="invalid-feedback"></div>
+                                </div>
                             @elseif($setting->type === 'integer')
                                 @include('backoffice.components.form.input', [
                                     'form' => 'update-or-create-element',
@@ -55,6 +68,7 @@
                                     'type' => 'number',
                                     'step' => '1',
                                     'value' => $setting->value,
+                                    'small' => $setting->key,
                                 ])
                             @elseif($setting->type === 'boolean')
                                 <div class="col-xs-12 col-sm-4 m-t-sm">
@@ -71,6 +85,7 @@
                                         >
                                         <label for="{{ $setting->key }}"></label>
                                     </div>
+                                    <small class="text-muted">{{ $setting->key }}</small>
                                 </div>
                             @else
                                 @include('backoffice.components.form.input', [
@@ -79,6 +94,7 @@
                                     'label' => $setting->description ?? $setting->key,
                                     'col' => 4,
                                     'value' => $setting->value,
+                                    'small' => $setting->key,
                                 ])
                             @endif
                         @endforeach
