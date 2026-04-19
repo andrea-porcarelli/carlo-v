@@ -31,7 +31,6 @@
                                         <th class="all">N* fattura </th>
                                         <th class="all">Importo </th>
                                         <th class="all">Data </th>
-                                        <th class="all">Prodotti</th>
                                         <th class="all">Stato mappatura</th>
                                     </tr>
                                     </thead>
@@ -42,7 +41,6 @@
                                         <th class="all">N* fattura </th>
                                         <th class="all">Importo </th>
                                         <th class="all">Data </th>
-                                        <th class="all">Prodotti</th>
                                         <th class="all">Da mappare</th>
                                     </tr>
                                     </tfoot>
@@ -95,7 +93,6 @@
                         {data: 'invoice_number', orderable: false},
                         {data: 'amount', orderable: false},
                         {data: 'invoice_date', orderable: false},
-                        {data: 'products', class: 'text-center', orderable: false},
                         {data: 'mapping', class: 'text-center', orderable: false},
                     ],
                     dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'mapping', 'ignored'],

@@ -32,7 +32,6 @@
                                         <th class="all">N* fattura </th>
                                         <th class="all">Importo </th>
                                         <th class="all">Data </th>
-                                        <th class="all">Prodotti</th>
                                         <th class="all">Da importare</th>
                                     </tr>
                                     </thead>
@@ -43,7 +42,6 @@
                                         <th class="all">N* fattura </th>
                                         <th class="all">Importo </th>
                                         <th class="all">Data </th>
-                                        <th class="all">Prodotti</th>
                                         <th class="all">Da importare</th>
                                     </tr>
                                     </tfoot>
@@ -81,23 +79,22 @@
     <style>
         .mapping-summary { min-width: 260px; }
         .import-hero {
-            text-align: center;
-            padding: 10px 8px; margin-bottom: 10px;
-            border-radius: 8px; border: 2px solid transparent;
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 4px 10px; margin-bottom: 8px;
+            border-radius: 6px; border: 1px solid transparent;
         }
         .import-hero.has-pending {
             background: #fff3cd; border-color: #f0ad4e; color: #8a6d3b;
-            box-shadow: 0 0 0 1px rgba(240, 173, 78, .15);
         }
         .import-hero.all-done {
             background: #dff0d8; border-color: #5cb85c; color: #3c763d;
         }
         .import-hero-number {
-            font-size: 34px; font-weight: 800; line-height: 1;
+            font-size: 20px; font-weight: 700; line-height: 1;
         }
         .import-hero-label {
-            font-size: 12px; text-transform: uppercase;
-            letter-spacing: .5px; margin-top: 4px; font-weight: 600;
+            font-size: 11px; text-transform: uppercase;
+            letter-spacing: .3px; font-weight: 600;
         }
         .mapping-total {
             font-size: 13px; color: #555; margin-bottom: 8px;
@@ -310,8 +307,7 @@
                     btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
                     $('#importStockModal').modal('hide');
                     alert(res.message || 'Importazione completata.');
-                    if (window.dataTable) window.dataTable.ajax.reload();
-                    else window.location.reload();
+                    reloadTable('.datatable_table');
                 },
                 error: function(xhr) {
                     btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
@@ -333,7 +329,6 @@
                         {data: 'invoice_number', orderable: false},
                         {data: 'amount', orderable: false},
                         {data: 'invoice_date', orderable: false},
-                        {data: 'products', class: 'text-center', orderable: false},
                         {data: 'import', class: 'text-center', orderable: false},
                     ],
                     dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'import'],
