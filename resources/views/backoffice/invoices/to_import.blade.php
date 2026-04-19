@@ -117,6 +117,14 @@
         .mb-to-import { background: #fff3cd; color: #8a6d3b; border-color: #f0d58a; }
         .mb-imported  { background: #dff0d8; color: #3c763d; border-color: #c9e2b3; }
 
+        .import-stock-table tr.unmapped {
+            background-color: #fbe9e9 !important;
+        }
+        .import-stock-table tr.unmapped td {
+            border-color: #ebccd1;
+        }
+        .import-unmapped-alert { margin-bottom: 12px; }
+
         .actions { display: flex; flex-direction: column; gap: 2px; align-items: center; }
     </style>
 @endsection
@@ -190,7 +198,20 @@
         function renderImportStockTable(data) {
             $('#importStockInvoiceLabel').text(data.invoice.supplier + ' — Fattura ' + data.invoice.number);
 
-            var html = '<table class="table table-condensed table-bordered import-stock-table">';
+            var unmappedCount = data.products.filter(function(p) {
+                return !p.has_stock && !p.material_id;
+            }).length;
+
+            var html = '';
+            if (unmappedCount > 0) {
+                html += '<div class="alert alert-warning import-unmapped-alert">';
+                html += '<i class="fa fa-exclamation-triangle"></i> ';
+                html += '<strong>' + unmappedCount + (unmappedCount === 1 ? ' prodotto' : ' prodotti') + ' non ancora mappati</strong> ';
+                html += '(righe evidenziate in rosso). Mappa questi prodotti prima di poter importare le giacenze.';
+                html += '</div>';
+            }
+
+            html += '<table class="table table-condensed table-bordered import-stock-table">';
             html += '<thead><tr>';
             html += '<th>Prodotto fattura</th>';
             html += '<th class="text-center">Qtà fattura</th>';
@@ -202,20 +223,33 @@
             html += '</tr></thead><tbody>';
 
             data.products.forEach(function(p) {
-                var rowClass = p.has_stock ? 'already-imported' : '';
-                html += '<tr class="' + rowClass + '" data-product-id="' + p.id + '" data-material-id="' + (p.material_id || '') + '">';
+                var isUnmapped = !p.has_stock && !p.material_id;
+                var rowClasses = [];
+                if (p.has_stock) rowClasses.push('already-imported');
+                if (isUnmapped) rowClasses.push('unmapped');
+                html += '<tr class="' + rowClasses.join(' ') + '" data-product-id="' + p.id + '" data-material-id="' + (p.material_id || '') + '">';
                 html += '<td><strong>' + p.product_name + '</strong></td>';
                 html += '<td class="text-center">' + (p.quantity || '—') + (p.quantity_unit ? ' ' + p.quantity_unit : '') + '</td>';
                 html += '<td class="text-center">';
                 if (!p.has_stock) {
-                    html += '<input type="number" style="width: 100px" class="form-control input-xs multiplier-input text-center" value="' + (p.quantity_multiplier || 1) + '" min="0.001" step="0.001" data-product-id="' + p.id + '" data-quantity="' + (p.quantity || 0) + '">';
+                    html += '<input type="number" style="width: 100px" class="form-control input-xs multiplier-input text-center" value="' + (p.quantity_multiplier || 1) + '" min="0.001" step="0.001" data-product-id="' + p.id + '" data-quantity="' + (p.quantity || 0) + '"' + (isUnmapped ? ' disabled' : '') + '>';
                 } else {
                     html += '<span>' + (p.quantity_multiplier || 1) + '</span>';
                 }
                 html += '</td>';
-                html += '<td>' + (p.material_label || '—') + '</td>';
+                html += '<td>';
+                if (isUnmapped) {
+                    html += '<span class="text-danger"><i class="fa fa-exclamation-triangle"></i> Non mappato</span>';
+                } else {
+                    html += (p.material_label || '—');
+                }
+                html += '</td>';
                 html += '<td class="text-center qty-preview" data-product-id="' + p.id + '">';
-                html += formatQty(p.quantity * (p.quantity_multiplier || 1)) + (p.stock_unit ? ' ' + p.stock_unit : '');
+                if (isUnmapped) {
+                    html += '<span class="text-muted">—</span>';
+                } else {
+                    html += formatQty(p.quantity * (p.quantity_multiplier || 1)) + (p.stock_unit ? ' ' + p.stock_unit : '');
+                }
                 html += '</td>';
                 html += '<td class="text-center">';
                 html += p.price;
@@ -223,6 +257,8 @@
                 html += '<td class="text-center">';
                 if (p.has_stock) {
                     html += '<span class="label label-success"><i class="fa fa-check"></i> Già importata</span>';
+                } else if (isUnmapped) {
+                    html += '<span class="label label-danger">Da mappare</span>';
                 } else {
                     html += '<span class="label label-default">Da importare</span>';
                 }
@@ -232,6 +268,13 @@
 
             html += '</tbody></table>';
             $('#importStockBody').html(html);
+
+            $('#btnConfirmImportStock').prop('disabled', unmappedCount > 0);
+            if (unmappedCount > 0) {
+                $('#btnConfirmImportStock').attr('title', 'Mappa tutti i prodotti prima di importare le giacenze');
+            } else {
+                $('#btnConfirmImportStock').removeAttr('title');
+            }
         }
 
         function formatQty(val) {
