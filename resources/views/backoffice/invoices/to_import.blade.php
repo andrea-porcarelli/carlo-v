@@ -80,6 +80,25 @@
 @section('custom-css')
     <style>
         .mapping-summary { min-width: 260px; }
+        .import-hero {
+            text-align: center;
+            padding: 10px 8px; margin-bottom: 10px;
+            border-radius: 8px; border: 2px solid transparent;
+        }
+        .import-hero.has-pending {
+            background: #fff3cd; border-color: #f0ad4e; color: #8a6d3b;
+            box-shadow: 0 0 0 1px rgba(240, 173, 78, .15);
+        }
+        .import-hero.all-done {
+            background: #dff0d8; border-color: #5cb85c; color: #3c763d;
+        }
+        .import-hero-number {
+            font-size: 34px; font-weight: 800; line-height: 1;
+        }
+        .import-hero-label {
+            font-size: 12px; text-transform: uppercase;
+            letter-spacing: .5px; margin-top: 4px; font-weight: 600;
+        }
         .mapping-total {
             font-size: 13px; color: #555; margin-bottom: 8px;
             padding-bottom: 6px; border-bottom: 1px solid #eee;
@@ -95,7 +114,7 @@
         .mb-badge strong { font-size: 18px; font-weight: 700; }
         .mb-badge span { opacity: .85; }
         .mb-badge.is-zero { opacity: .35; filter: grayscale(1); }
-        .mb-to-map    { background: #fff3cd; color: #8a6d3b; border-color: #f0d58a; }
+        .mb-to-map    { background: #f2dede; color: #a94442; border-color: #ebccd1; }
         .mb-mapped    { background: #d9edf7; color: #31708f; border-color: #bce8f1; }
         .mb-ignored   { background: #f5f5f5; color: #777;    border-color: #ddd; }
         .mb-to-import { background: #fff3cd; color: #8a6d3b; border-color: #f0d58a; }

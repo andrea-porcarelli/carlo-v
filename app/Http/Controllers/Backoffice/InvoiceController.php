@@ -180,22 +180,34 @@ class InvoiceController extends BaseController
                     return $html;
                 })
                 ->addColumn('import', function ($item) {
-                    $total     = $item->products_count;
-                    $daImportare = $item->products()->whereHas('material', function ($query) {
+                    $mappedQuery = function ($query) {
                         $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
                             ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                             ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
-                    })
+                    };
+
+                    $total       = $item->products_count;
+                    $ignorati    = $item->products()->where('ignore_mapping', 1)->count();
+                    $daMappare   = $item->products()->whereDoesntHave('material', $mappedQuery)->where('ignore_mapping', 0)->count();
+                    $importati   = $item->products()->whereHas('stock')->count();
+                    $daImportare = $item->products()->whereHas('material', $mappedQuery)
                         ->where('ignore_mapping', 0)
                         ->whereDoesntHave('stock')
                         ->count();
-                    $importati = $item->products()->whereHas('stock')->count();
+                    $mappati     = $importati + $daImportare;
 
+                    $heroClass = $daImportare > 0 ? 'has-pending' : 'all-done';
                     $html  = '<div class="mapping-summary">';
+                    $html .= '<div class="import-hero ' . $heroClass . '">';
+                    $html .= '<div class="import-hero-number">' . $daImportare . '</div>';
+                    $html .= '<div class="import-hero-label">' . ($daImportare === 1 ? 'prodotto da importare' : 'prodotti da importare') . '</div>';
+                    $html .= '</div>';
                     $html .= '<div class="mapping-total"><i class="fa fa-box"></i> Totale: <strong>' . $total . '</strong> prodotti</div>';
                     $html .= '<div class="mapping-badges">';
-                    $html .= '<span class="mb-badge mb-to-import ' . ($daImportare > 0 ? '' : 'is-zero') . '" title="Da importare"><i class="fa fa-exclamation-triangle"></i><strong>' . $daImportare . '</strong><span>da importare</span></span>';
-                    $html .= '<span class="mb-badge mb-imported ' . ($importati > 0 ? '' : 'is-zero') . '" title="Importati"><i class="fa fa-check-circle"></i><strong>' . $importati . '</strong><span>importati</span></span>';
+                    $html .= '<span class="mb-badge mb-imported ' . ($importati > 0 ? '' : 'is-zero') . '" title="Giacenze già importate"><i class="fa fa-check-circle"></i><strong>' . $importati . '</strong><span>importati</span></span>';
+                    $html .= '<span class="mb-badge mb-mapped ' . ($mappati > 0 ? '' : 'is-zero') . '" title="Prodotti mappati (importati + da importare)"><i class="fa fa-link"></i><strong>' . $mappati . '</strong><span>mappati</span></span>';
+                    $html .= '<span class="mb-badge mb-to-map ' . ($daMappare > 0 ? '' : 'is-zero') . '" title="Prodotti ancora da mappare"><i class="fa fa-question-circle"></i><strong>' . $daMappare . '</strong><span>da mappare</span></span>';
+                    $html .= '<span class="mb-badge mb-ignored ' . ($ignorati > 0 ? '' : 'is-zero') . '" title="Prodotti ignorati"><i class="fa fa-ban"></i><strong>' . $ignorati . '</strong><span>ignorati</span></span>';
                     $html .= '</div></div>';
                     return $html;
                 })
