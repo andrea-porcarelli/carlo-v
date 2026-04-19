@@ -350,7 +350,7 @@
                     btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
                     $('#importStockModal').modal('hide');
                     alert(res.message || 'Importazione completata.');
-                    reloadTable('.datatable_table');
+                    $(document).trigger('reloadDatatable');
                 },
                 error: function(xhr) {
                     btn.prop('disabled', false).html('<i class="fas fa-seedling"></i> Conferma importazione');
