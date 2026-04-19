@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\ExternalInvoice;
+use App\Models\SupplierInvoiceProduct;
 use App\Observers\ExternalInvoiceObserver;
 use App\Services\StockService;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -43,7 +44,33 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer('backoffice.components.nav-bar-supplier', function ($view) {
             $lowStockCount = app(StockService::class)->getLowStockMaterials()->count();
-            $view->with('lowStockCount', $lowStockCount);
+
+            $productsToMapCount = SupplierInvoiceProduct::query()
+                ->where('supplier_invoice_products.ignore_mapping', 0)
+                ->whereHas('invoice', fn($q) => $q->whereNull('ignored_at'))
+                ->whereDoesntHave('material', function ($query) {
+                    $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
+                        ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                        ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
+                })
+                ->count();
+
+            $productsToImportCount = SupplierInvoiceProduct::query()
+                ->where('supplier_invoice_products.ignore_mapping', 0)
+                ->whereHas('invoice', fn($q) => $q->whereNull('ignored_at'))
+                ->whereHas('material', function ($query) {
+                    $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
+                        ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                        ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
+                })
+                ->whereDoesntHave('stock')
+                ->count();
+
+            $view->with([
+                'lowStockCount'         => $lowStockCount,
+                'productsToMapCount'    => $productsToMapCount,
+                'productsToImportCount' => $productsToImportCount,
+            ]);
         });
 
         Gate::define('viewLogViewer', function ($user = null) {

@@ -18,11 +18,17 @@
         <li class="{{ (Request::is('backoffice/invoices/to-map')) ? 'active' : '' }}">
             <a href="{{ route('invoices.to-map') }}">
                 <i class="fas fa-file-alt"></i> Da mappare
+                @if(($productsToMapCount ?? 0) > 0)
+                    <span class="badge badge-warning">{{ $productsToMapCount }}</span>
+                @endif
             </a>
         </li>
         <li class="{{ (Request::is('backoffice/invoices/to-import')) ? 'active' : '' }}">
             <a href="{{ route('invoices.to-import') }}">
                 <i class="fas fa-file-alt"></i> Da importare
+                @if(($productsToImportCount ?? 0) > 0)
+                    <span class="badge badge-primary">{{ $productsToImportCount }}</span>
+                @endif
             </a>
         </li>
         <li class="{{ (Request::is('backoffice/suppliers/product-comparison*')) ? 'active' : '' }}">

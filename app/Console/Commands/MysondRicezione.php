@@ -146,6 +146,10 @@ class MysondRicezione extends Command
                 $invoice = self::importaFattura($xmlPath);
                 if ($invoice) {
                     $imported[] = $invoice;
+
+                    ExternalInvoice::where('file_name', $doc->docName)
+                        ->where('status', 'import_error')
+                        ->update(['status' => 'ignored']);
                 }
             } catch (\Exception $e) {
                 // Salva il file in una cartella persistente per il download

@@ -171,17 +171,11 @@ class InvoiceController extends BaseController
                     $ignorati  = $item->products()->where('ignore_mapping', 1)->count();
 
                     $html  = '<div class="mapping-summary">';
-                    $html .= '<div style="font-size:11px; color:#888; margin-bottom:3px;">Totale: <strong>' . $total . '</strong> prodotti</div>';
+                    $html .= '<div class="mapping-total"><i class="fa fa-box"></i> Totale: <strong>' . $total . '</strong> prodotti</div>';
                     $html .= '<div class="mapping-badges">';
-                    if ($daMappare > 0) {
-                        $html .= '<span class="label label-warning"><span class="glyphicon glyphicon-exclamation-sign"></span> ' . $daMappare . ' da mappare</span> ';
-                    }
-                    if ($mappati > 0) {
-                        $html .= '<span class="label label-primary"><span class="glyphicon glyphicon-link"></span> ' . $mappati . ' mappati</span> ';
-                    }
-                    if ($ignorati > 0) {
-                        $html .= '<span class="label label-default"><span class="glyphicon glyphicon-minus-sign"></span> ' . $ignorati . ' ignorati</span>';
-                    }
+                    $html .= '<span class="mb-badge mb-to-map ' . ($daMappare > 0 ? '' : 'is-zero') . '" title="Da mappare"><i class="fa fa-exclamation-triangle"></i><strong>' . $daMappare . '</strong><span>da mappare</span></span>';
+                    $html .= '<span class="mb-badge mb-mapped ' . ($mappati > 0 ? '' : 'is-zero') . '" title="Mappati"><i class="fa fa-check-circle"></i><strong>' . $mappati . '</strong><span>mappati</span></span>';
+                    $html .= '<span class="mb-badge mb-ignored ' . ($ignorati > 0 ? '' : 'is-zero') . '" title="Ignorati"><i class="fa fa-ban"></i><strong>' . $ignorati . '</strong><span>ignorati</span></span>';
                     $html .= '</div></div>';
                     return $html;
                 })
@@ -195,14 +189,13 @@ class InvoiceController extends BaseController
                         ->where('ignore_mapping', 0)
                         ->whereDoesntHave('stock')
                         ->count();
-
+                    $importati = $item->products()->whereHas('stock')->count();
 
                     $html  = '<div class="mapping-summary">';
-                    $html .= '<div style="font-size:11px; color:#888; margin-bottom:3px;">Totale: <strong>' . $total . '</strong> prodotti</div>';
+                    $html .= '<div class="mapping-total"><i class="fa fa-box"></i> Totale: <strong>' . $total . '</strong> prodotti</div>';
                     $html .= '<div class="mapping-badges">';
-                    if ($daImportare > 0) {
-                        $html .= '<span class="label label-warning"><span class="glyphicon glyphicon-exclamation-sign"></span> ' . $daImportare . ' da importare</span> ';
-                    }
+                    $html .= '<span class="mb-badge mb-to-import ' . ($daImportare > 0 ? '' : 'is-zero') . '" title="Da importare"><i class="fa fa-exclamation-triangle"></i><strong>' . $daImportare . '</strong><span>da importare</span></span>';
+                    $html .= '<span class="mb-badge mb-imported ' . ($importati > 0 ? '' : 'is-zero') . '" title="Importati"><i class="fa fa-check-circle"></i><strong>' . $importati . '</strong><span>importati</span></span>';
                     $html .= '</div></div>';
                     return $html;
                 })

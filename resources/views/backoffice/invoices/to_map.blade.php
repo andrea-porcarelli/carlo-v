@@ -58,9 +58,27 @@
 @endsection
 @section('custom-css')
     <style>
-        .mapping-summary { min-width: 200px; }
-        .mapping-badges .label { display: inline-block; margin-bottom: 3px; font-size: 11px; }
-        .mapping-badges .label-success { background-color: #1ab394; }
+        .mapping-summary { min-width: 260px; }
+        .mapping-total {
+            font-size: 13px; color: #555; margin-bottom: 8px;
+            padding-bottom: 6px; border-bottom: 1px solid #eee;
+        }
+        .mapping-total strong { font-size: 16px; color: #222; }
+        .mapping-badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+        .mb-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 10px; border-radius: 6px;
+            font-size: 12px; line-height: 1;
+            border: 1px solid transparent;
+        }
+        .mb-badge strong { font-size: 18px; font-weight: 700; }
+        .mb-badge span { opacity: .85; }
+        .mb-badge.is-zero { opacity: .35; filter: grayscale(1); }
+        .mb-to-map    { background: #fff3cd; color: #8a6d3b; border-color: #f0d58a; }
+        .mb-mapped    { background: #d9edf7; color: #31708f; border-color: #bce8f1; }
+        .mb-ignored   { background: #f5f5f5; color: #777;    border-color: #ddd; }
+        .mb-to-import { background: #fff3cd; color: #8a6d3b; border-color: #f0d58a; }
+        .mb-imported  { background: #dff0d8; color: #3c763d; border-color: #c9e2b3; }
 
         .actions { display: flex; flex-direction: column; gap: 2px; align-items: center; }
     </style>
