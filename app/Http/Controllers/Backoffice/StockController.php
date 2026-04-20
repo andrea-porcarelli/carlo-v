@@ -41,6 +41,18 @@ class StockController extends Controller
             $stocks = $direction === 'asc'
                 ? $stocks->sortBy(fn($s) => $s[$sort])
                 : $stocks->sortByDesc(fn($s) => $s[$sort]);
+        } else {
+            // Default: prima le giacenze più critiche (più sotto soglia in percentuale).
+            // Per confrontare uova (pz) e farina (kg) servono grandezze adimensionali → uso la % di deficit.
+            $stocks = $stocks->sortByDesc(function ($s) {
+                $threshold = $s['material']->alert_threshold;
+                if ($threshold === null || $threshold <= 0) {
+                    return -INF; // nessuna soglia → in fondo
+                }
+                // deficit% = (threshold - current) / threshold × 100
+                // positivo e crescente = più sotto soglia = più critico
+                return (($threshold - $s['current']) / $threshold) * 100;
+            });
         }
 
         return view('backoffice.stock.index', compact('stocks', 'lowStockCount', 'sort', 'direction'));

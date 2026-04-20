@@ -22,6 +22,12 @@
                                         @endforeach
                                     </select>
                                 </div>
+                                <div class="col-xs-12 col-sm-2 m-t-sm" style="display:flex; align-items:flex-end;">
+                                    <label style="font-weight:normal; cursor:pointer; margin:0 0 8px 0;">
+                                        <input type="checkbox" name="low_stock" class="low_stock" value="1">
+                                        <strong class="text-danger"><i class="fa fa-exclamation-triangle"></i> Solo sotto soglia</strong>
+                                    </label>
+                                </div>
                                 @include('backoffice.components.form.button', ['col' => 2, 'label' => 'Cerca', 'class' => 'btn-find', 'with_add' => true, 'class_btn_add' => 'btn-add-object', 'route' => 'restaurant.materials.create'])
                             </div>
                         </div>
@@ -78,7 +84,7 @@
                         {data: 'dishes', class: 'text-center'},
                     ],
                     order: [[1, 'desc']],
-                    dataForm: ['mixed', 'stock_type'],
+                    dataForm: ['mixed', 'stock_type', 'low_stock'],
                     serverSide: false,
                 }]);
             }, 500);

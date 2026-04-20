@@ -37,6 +37,11 @@ class MaterialController extends BaseController
             $filters = $request->get('filters') ?? [];
             $stockService = app(StockService::class);
             $elements = $this->interface->filters($filters);
+
+            if (!empty($filters['low_stock'])) {
+                $lowStockIds = $stockService->getLowStockMaterials()->pluck('material.id')->all();
+                $elements = $elements->whereIn('id', $lowStockIds ?: [0]);
+            }
             return $this->editColumns(datatables()->of($elements), $this->name, ['edit', 'add-stock'], null, 'restaurant.materials')
                 ->addColumn('dishes', function ($item) {
                    return $item->dishes->count();
