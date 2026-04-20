@@ -159,13 +159,11 @@ class InvoiceController extends BaseController
                 ->addColumn('mapping', function ($item) {
                     $total     = $item->products_count;
                     $daMappare = $item->products()->whereDoesntHave('material', function ($query) {
-                        $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                            ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                        $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                             ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
                     })->where('ignore_mapping', 0)->count();
                     $mappati   = $item->products()->whereHas('material', function ($query) {
-                        $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                            ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                        $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                             ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
                     })->count();
                     $ignorati  = $item->products()->where('ignore_mapping', 1)->count();
@@ -181,8 +179,7 @@ class InvoiceController extends BaseController
                 })
                 ->addColumn('import', function ($item) {
                     $mappedQuery = function ($query) {
-                        $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                            ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                        $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                             ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
                     };
 
@@ -268,8 +265,7 @@ class InvoiceController extends BaseController
 
         $supplierInvoiceProducts = $invoice->products()
             ->whereDoesntHave('material', function ($query) {
-                $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                    ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                     ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
             })
             ->where('ignore_mapping', 0)
@@ -770,12 +766,18 @@ class InvoiceController extends BaseController
                 continue;
             }
 
+            $productName = (string)$linea->Descrizione;
+            $defaultMultiplier = MappingProduct::where('supplier_id', $invoice->supplier_id)
+                ->where('product_name', $productName)
+                ->value('quantity_multiplier');
+
             SupplierInvoiceProduct::create([
                 'supplier_invoice_id' => $invoice->id,
-                'product_name' => (string)$linea->Descrizione,
-                'quantity' => $quantity,
-                'price' => (float)($linea->PrezzoUnitario ?? 0),
-                'iva' => (float)($linea->AliquotaIVA ?? 0),
+                'product_name'        => $productName,
+                'quantity'            => $quantity,
+                'price'               => (float)($linea->PrezzoUnitario ?? 0),
+                'iva'                 => (float)($linea->AliquotaIVA ?? 0),
+                'quantity_multiplier' => $defaultMultiplier,
             ]);
 
             $count++;

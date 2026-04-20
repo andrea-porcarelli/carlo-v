@@ -49,8 +49,7 @@ class AppServiceProvider extends ServiceProvider
                 ->where('supplier_invoice_products.ignore_mapping', 0)
                 ->whereHas('invoice', fn($q) => $q->whereNull('ignored_at'))
                 ->whereDoesntHave('material', function ($query) {
-                    $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                        ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                    $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                         ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
                 })
                 ->count();
@@ -59,8 +58,7 @@ class AppServiceProvider extends ServiceProvider
                 ->where('supplier_invoice_products.ignore_mapping', 0)
                 ->whereHas('invoice', fn($q) => $q->whereNull('ignored_at'))
                 ->whereHas('material', function ($query) {
-                    $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                        ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                    $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                         ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
                 })
                 ->whereDoesntHave('stock')

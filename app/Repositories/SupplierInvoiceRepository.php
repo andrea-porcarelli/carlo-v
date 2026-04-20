@@ -48,16 +48,14 @@ class SupplierInvoiceRepository extends CrudRepository implements SupplierInvoic
             if ($filters['mapping'] === 'da_effettuare') {
                 $builder->whereHas('products', function ($q) {
                     $q->whereDoesntHave('material', function ($query) {
-                        $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                            ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                        $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                             ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
                     })->where('ignore_mapping', 0);
                 });
             } elseif ($filters['mapping'] === 'effettuata') {
                 $builder->whereDoesntHave('products', function ($q) {
                     $q->whereDoesntHave('material', function ($query) {
-                        $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                            ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                        $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                             ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
                     })->where('ignore_mapping', 0);
                 });
@@ -67,8 +65,7 @@ class SupplierInvoiceRepository extends CrudRepository implements SupplierInvoic
             if ($filters['import'] === 'da_effettuare') {
                 $builder->whereHas('products', function ($q) {
                     $q->whereHas('material', function ($query) {
-                        $query->whereColumn('mapping_products.quantity_multiplier', 'supplier_invoice_products.quantity_multiplier')
-                            ->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+                        $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                             ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
                     })
                         ->where('ignore_mapping', 0)
