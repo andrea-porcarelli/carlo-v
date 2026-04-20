@@ -18,6 +18,22 @@
                 <button class="navbar-minimalize minimalize-styl-2 btn btn-primary " href="#"><i class="fa fa-bars"></i> </button>
             </div>
         </div>
+        @if($adeBannerLabel)
+        <div class="ade-navbar-alert" style="float:left; margin: 10px 0 10px 20px; padding: 8px 14px; background: rgba(255, 193, 7, 0.15); border: 1px solid #f0ad4e; border-radius: 4px; display: flex; align-items: center; max-width: calc(100% - 540px);">
+            <i class="fa fa-exclamation-triangle" style="font-size:18px; color:#f0ad4e; margin-right:10px;"></i>
+            <div style="color:#8a6d3b; line-height:1.2;">
+                <div style="font-weight:600;">{{ $adeBannerLabel }}</div>
+                <div style="font-weight:400; font-size:11px;">
+                    @if($adeDesc){{ $adeDesc }}@endif
+                    @if($adeCodice) <span class="text-muted">(cod. {{ $adeCodice }})</span>@endif
+                    <span class="text-muted">— ultimo check: {{ $adeCheckedAt }}</span>
+                </div>
+            </div>
+            <a href="{{ route('restaurant.settings.ade-cambio-password') }}" class="btn btn-warning btn-xs" style="margin-left:12px; white-space:nowrap;">
+                <i class="fa fa-key"></i> Cambia password
+            </a>
+        </div>
+        @endif
         <ul class="nav navbar-top-links navbar-right">
             <li>
                 <span class="m-r-sm text-muted welcome-message"></span>
@@ -43,24 +59,6 @@
         </ul>
     </nav>
 </div>
-@if($adeBannerLabel)
-<div class="row" style="padding: 10px 15px; background: rgba(255, 193, 7, 0.15); border-top: 1px solid #f0ad4e; border-bottom: 2px solid #f0ad4e;">
-    <div class="col-xs-12" style="display:flex; align-items:center; color:#8a6d3b; font-weight:600;">
-        <i class="fa fa-exclamation-triangle" style="font-size:20px; color:#f0ad4e; margin-right:12px;"></i>
-        <div style="flex:1;">
-            <div>{{ $adeBannerLabel }}</div>
-            <div style="font-weight:400; font-size:12px; color:#8a6d3b;">
-                @if($adeDesc){{ $adeDesc }}@endif
-                @if($adeCodice) <span class="text-muted">(cod. {{ $adeCodice }})</span>@endif
-                <span class="text-muted">— ultimo check: {{ $adeCheckedAt }}</span>
-            </div>
-        </div>
-        <a href="{{ route('restaurant.settings.ade-cambio-password') }}" class="btn btn-warning btn-sm" style="margin-left:12px;">
-            <i class="fa fa-key"></i> Cambia password
-        </a>
-    </div>
-</div>
-@endif
 <div class="row wrapper border-bottom white-bg page-heading">
     <div class="col-lg-10">
         @yield('breadcrumb')
