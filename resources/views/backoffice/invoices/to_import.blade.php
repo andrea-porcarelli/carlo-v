@@ -54,11 +54,11 @@
         </div>
     </div>
     <div class="modal fade" id="importStockModal" tabindex="-1" role="dialog">
-        <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-dialog" role="document" style="max-width: 1400px; width: 95%;">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header" style="background:#f8f9fa;">
                     <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-                    <h4 class="modal-title"><i class="fas fa-seedling"></i> Importa giacenze — <span id="importStockInvoiceLabel"></span></h4>
+                    <h4 class="modal-title"><i class="fas fa-seedling"></i> Importa giacenze <span id="importStockInvoiceLabel" class="text-muted"></span></h4>
                 </div>
                 <div class="modal-body" id="importStockBody">
                     <div class="text-center text-muted" style="padding:30px;">
@@ -66,8 +66,9 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <div id="importStockFooterSummary" class="text-left" style="flex:1; display:none;"></div>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Annulla</button>
-                    <button type="button" class="btn btn-success" id="btnConfirmImportStock">
+                    <button type="button" class="btn btn-success" id="btnConfirmImportStock" disabled>
                         <i class="fas fa-seedling"></i> Conferma importazione
                     </button>
                 </div>
@@ -123,9 +124,90 @@
         .import-stock-table tr.unmapped td {
             border-color: #ebccd1;
         }
+        .import-stock-table tr.has-alert {
+            background-color: #fffaf0;
+        }
         .import-unmapped-alert { margin-bottom: 12px; }
 
         .actions { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+
+        /* ── Import modal header ─────────────────────────────────────────── */
+        .isp-invoice-panel {
+            background:#f5f7fa; border:1px solid #e3e8ee; border-radius:6px;
+            padding:12px 16px; margin-bottom:12px;
+            display:flex; flex-wrap:wrap; gap:18px;
+        }
+        .isp-invoice-panel .isp-item { min-width:140px; }
+        .isp-invoice-panel .isp-item small { color:#7b8897; font-size:11px; text-transform:uppercase; letter-spacing:.3px; display:block; }
+        .isp-invoice-panel .isp-item strong { font-size:15px; color:#222; }
+
+        .isp-summary-bar {
+            display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;
+        }
+        .isp-summary-badge {
+            flex:1; min-width:130px;
+            padding:8px 12px; border-radius:6px;
+            background:#fff; border:1px solid #e3e8ee;
+            text-align:center;
+        }
+        .isp-summary-badge .isp-value { font-size:20px; font-weight:700; line-height:1.2; }
+        .isp-summary-badge .isp-label { font-size:11px; color:#7b8897; text-transform:uppercase; letter-spacing:.3px; }
+        .isp-summary-badge.imported   { background:#dff0d8; border-color:#c9e2b3; color:#3c763d; }
+        .isp-summary-badge.to-import  { background:#fff3cd; border-color:#f0d58a; color:#8a6d3b; }
+        .isp-summary-badge.unmapped   { background:#f2dede; border-color:#ebccd1; color:#a94442; }
+        .isp-summary-badge.alerts     { background:#fdecea; border-color:#f5c6cb; color:#721c24; }
+        .isp-summary-badge.value      { background:#eef4fb; border-color:#bce8f1; color:#31708f; }
+
+        /* ── Row cell formatting ─────────────────────────────────────────── */
+        .import-stock-table .isp-formula {
+            font-size:12px; color:#555; line-height:1.3;
+        }
+        .import-stock-table .isp-formula .isp-qty-val,
+        .import-stock-table .isp-formula .isp-mult-val {
+            font-weight:600; color:#222;
+        }
+        .import-stock-table .isp-preview {
+            font-size:16px; font-weight:700; color:#1ab394;
+        }
+        .import-stock-table .isp-price-stack {
+            line-height:1.3;
+        }
+        .import-stock-table .isp-price-stack .isp-price-main { font-weight:600; font-size:13px; }
+        .import-stock-table .isp-price-stack .isp-price-sub  { font-size:11px; color:#7b8897; }
+
+        .isp-last-box {
+            font-size:12px; line-height:1.35;
+        }
+        .isp-last-box .isp-last-price { font-weight:600; }
+        .isp-last-box .isp-last-meta  { color:#7b8897; font-size:11px; }
+        .isp-delta-up   { color:#a94442; font-weight:700; }
+        .isp-delta-down { color:#3c763d; font-weight:700; }
+        .isp-delta-neutral { color:#7b8897; }
+
+        .isp-stock-arrow {
+            display:inline-block; padding:0 4px; color:#7b8897;
+        }
+        .isp-stock-after { font-weight:700; color:#337ab7; }
+
+        .isp-alerts { display:flex; flex-wrap:wrap; gap:3px; }
+        .isp-alert-badge {
+            display:inline-block; font-size:10px; font-weight:700;
+            padding:2px 6px; border-radius:3px; letter-spacing:.3px;
+            text-transform:uppercase; cursor:help;
+        }
+        .isp-alert-badge.alert-first      { background:#eef4fb; color:#31708f; border:1px solid #bce8f1; }
+        .isp-alert-badge.alert-price      { background:#fdecea; color:#721c24; border:1px solid #f5c6cb; }
+        .isp-alert-badge.alert-multiplier { background:#fff3cd; color:#8a6d3b; border:1px solid #f0d58a; }
+        .isp-alert-badge.alert-unit       { background:#fce4ec; color:#880e4f; border:1px solid #f8bbd0; }
+
+        .import-stock-table th {
+            background:#f8f9fa; font-size:11px;
+            text-transform:uppercase; letter-spacing:.3px;
+            color:#555;
+        }
+        .import-stock-table td { vertical-align:middle !important; }
+
+        .isp-skip-col { text-align:center; width:40px; }
     </style>
 @endsection
 @section('custom-script')
@@ -194,84 +276,240 @@
         });
 
         var importStockInvoiceId = null;
+        var importStockData = null;
+
+        function escapeHtml(str) {
+            return String(str).replace(/[&<>"']/g, function(m) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+            });
+        }
+
+        function renderAlertBadges(alerts) {
+            if (!alerts || !alerts.length) return '';
+            var map = {
+                'first_purchase':     { cls:'alert-first',      label:'1° acquisto', title:'Primo acquisto di questo materiale' },
+                'price_anomaly':      { cls:'alert-price',      label:'€ anomalo',   title:'Variazione prezzo per unità stock oltre la soglia' },
+                'multiplier_changed': { cls:'alert-multiplier', label:'mult. cambiato', title:'Il moltiplicatore differisce dall\'ultima importazione' },
+                'unit_mismatch':      { cls:'alert-unit',       label:'unità diversa', title:'L\'unità in fattura non coincide con lo stock_type del materiale' },
+            };
+            var html = '<div class="isp-alerts">';
+            alerts.forEach(function(a) {
+                var m = map[a];
+                if (m) html += '<span class="isp-alert-badge '+m.cls+'" title="'+escapeHtml(m.title)+'">'+m.label+'</span>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function renderLastPurchaseCell(lp) {
+            if (!lp) return '<span class="text-muted" style="font-size:12px;">—</span>';
+            var parts = [];
+            if (lp.unit_price_formatted) {
+                parts.push('<div class="isp-last-price">' + lp.unit_price_formatted + '/pz fatt.</div>');
+            }
+            if (lp.price_per_stock_unit !== null && lp.price_per_stock_unit !== undefined) {
+                parts.push('<div class="isp-last-meta">€ ' + formatQty(lp.price_per_stock_unit) + '/unità stock</div>');
+            }
+            var meta = [];
+            if (lp.date) meta.push(lp.date);
+            if (lp.invoice_number) meta.push('fatt. ' + escapeHtml(lp.invoice_number));
+            if (lp.multiplier) meta.push('mult. ' + lp.multiplier);
+            if (meta.length) parts.push('<div class="isp-last-meta">' + meta.join(' · ') + '</div>');
+            return '<div class="isp-last-box">' + parts.join('') + '</div>';
+        }
+
+        function renderDeltaCell(delta) {
+            if (delta === null || delta === undefined) return '<span class="isp-delta-neutral">—</span>';
+            var sign = delta > 0 ? '+' : '';
+            var cls = Math.abs(delta) >= 15 ? (delta > 0 ? 'isp-delta-up' : 'isp-delta-down') : 'isp-delta-neutral';
+            return '<span class="'+cls+'">' + sign + delta.toFixed(1) + '%</span>';
+        }
+
+        function renderHeader(data) {
+            $('#importStockInvoiceLabel').text('— ' + data.invoice.supplier + ' · Fattura ' + data.invoice.number);
+
+            var html = '<div class="isp-invoice-panel">';
+            html += '<div class="isp-item"><small>Fornitore</small><strong>' + escapeHtml(data.invoice.supplier) + '</strong></div>';
+            html += '<div class="isp-item"><small>N° fattura</small><strong>' + escapeHtml(data.invoice.number) + '</strong></div>';
+            html += '<div class="isp-item"><small>Data</small><strong>' + (data.invoice.date || '—') + '</strong></div>';
+            html += '<div class="isp-item"><small>Importo fattura</small><strong>' + data.invoice.amount + '</strong></div>';
+            html += '</div>';
+
+            var s = data.summary;
+            html += '<div class="isp-summary-bar">';
+            html += '<div class="isp-summary-badge"><div class="isp-value">'+s.lines_total+'</div><div class="isp-label">Righe tot.</div></div>';
+            html += '<div class="isp-summary-badge to-import"><div class="isp-value">'+s.lines_to_import+'</div><div class="isp-label">Da importare</div></div>';
+            html += '<div class="isp-summary-badge imported"><div class="isp-value">'+s.lines_already_imported+'</div><div class="isp-label">Già importate</div></div>';
+            html += '<div class="isp-summary-badge unmapped"><div class="isp-value">'+s.lines_unmapped+'</div><div class="isp-label">Non mappate</div></div>';
+            html += '<div class="isp-summary-badge alerts"><div class="isp-value">'+s.lines_with_alerts+'</div><div class="isp-label">Con alert</div></div>';
+            html += '<div class="isp-summary-badge value"><div class="isp-value" style="font-size:16px;">'+s.total_import_value+'</div><div class="isp-label">Valore da importare</div></div>';
+            html += '</div>';
+            return html;
+        }
 
         function renderImportStockTable(data) {
-            $('#importStockInvoiceLabel').text(data.invoice.supplier + ' — Fattura ' + data.invoice.number);
+            importStockData = data;
+            var unmappedCount = data.summary.lines_unmapped;
 
-            var unmappedCount = data.products.filter(function(p) {
-                return !p.has_stock && !p.material_id;
-            }).length;
+            var html = renderHeader(data);
 
-            var html = '';
             if (unmappedCount > 0) {
                 html += '<div class="alert alert-warning import-unmapped-alert">';
                 html += '<i class="fa fa-exclamation-triangle"></i> ';
-                html += '<strong>' + unmappedCount + (unmappedCount === 1 ? ' prodotto' : ' prodotti') + ' non ancora mappati</strong> ';
-                html += '(righe evidenziate in rosso). Mappa questi prodotti prima di poter importare le giacenze.';
+                html += '<strong>' + unmappedCount + (unmappedCount === 1 ? ' prodotto non mappato' : ' prodotti non mappati') + '</strong> ';
+                html += '(righe evidenziate in rosso). Mappa questi prodotti prima di importare le giacenze.';
+                html += '</div>';
+            }
+            if (data.summary.lines_with_alerts > 0) {
+                html += '<div class="alert alert-info" style="margin-bottom:12px;">';
+                html += '<i class="fa fa-info-circle"></i> ';
+                html += '<strong>' + data.summary.lines_with_alerts + (data.summary.lines_with_alerts === 1 ? ' riga richiede attenzione' : ' righe richiedono attenzione') + '</strong> — soglia variazione prezzo: ±'+data.summary.price_alert_threshold_percent+'%. Verifica i valori prima di confermare.';
                 html += '</div>';
             }
 
+            html += '<div style="overflow-x:auto;">';
             html += '<table class="table table-condensed table-bordered import-stock-table">';
             html += '<thead><tr>';
+            html += '<th class="isp-skip-col" title="Deseleziona per escludere dall\'import"><i class="fa fa-check-square"></i></th>';
             html += '<th>Prodotto fattura</th>';
-            html += '<th class="text-center">Qtà fattura</th>';
-            html += '<th class="text-center" style="width: 130px">Moltiplicatore</th>';
+            html += '<th class="text-center">Qtà × Molt. = Giacenza</th>';
             html += '<th>Materiale</th>';
-            html += '<th class="text-center">Giacenza prevista</th>';
-            html += '<th class="text-center">Acquisto</th>';
+            html += '<th class="text-center">Prezzo unit.</th>';
+            html += '<th class="text-center">Totale riga<br><small>(IVA incl.)</small></th>';
+            html += '<th>Ultimo acquisto</th>';
+            html += '<th class="text-center">Δ prezzo</th>';
+            html += '<th class="text-center">Magazzino</th>';
+            html += '<th>Alert</th>';
             html += '<th class="text-center">Stato</th>';
             html += '</tr></thead><tbody>';
 
             data.products.forEach(function(p) {
                 var isUnmapped = !p.has_stock && !p.material_id;
+                var hasAlerts = (p.alerts || []).length > 0;
                 var rowClasses = [];
-                if (p.has_stock) rowClasses.push('already-imported');
-                if (isUnmapped) rowClasses.push('unmapped');
-                html += '<tr class="' + rowClasses.join(' ') + '" data-product-id="' + p.id + '" data-material-id="' + (p.material_id || '') + '">';
-                html += '<td><strong>' + p.product_name + '</strong></td>';
-                html += '<td class="text-center">' + (p.quantity || '—') + (p.quantity_unit ? ' ' + p.quantity_unit : '') + '</td>';
-                html += '<td class="text-center">';
-                if (!p.has_stock) {
-                    html += '<input type="number" style="width: 100px" class="form-control input-xs multiplier-input text-center" value="' + (p.quantity_multiplier || 1) + '" min="0.001" step="0.001" data-product-id="' + p.id + '" data-quantity="' + (p.quantity || 0) + '"' + (isUnmapped ? ' disabled' : '') + '>';
-                } else {
-                    html += '<span>' + (p.quantity_multiplier || 1) + '</span>';
+                if (p.has_stock)  rowClasses.push('already-imported');
+                if (isUnmapped)   rowClasses.push('unmapped');
+                if (hasAlerts && !p.has_stock && !isUnmapped) rowClasses.push('has-alert');
+
+                html += '<tr class="' + rowClasses.join(' ') + '" data-product-id="' + p.id + '" data-material-id="' + (p.material_id || '') + '" data-quantity="' + p.quantity + '" data-stock-unit="' + (p.stock_unit || '') + '">';
+
+                // skip checkbox
+                html += '<td class="isp-skip-col">';
+                if (!p.has_stock && !isUnmapped) {
+                    html += '<input type="checkbox" class="isp-skip-cb" checked data-product-id="'+p.id+'">';
                 }
                 html += '</td>';
+
+                // product + IVA
+                html += '<td><strong>' + escapeHtml(p.product_name) + '</strong>';
+                if (p.iva !== null) {
+                    html += ' <small class="text-muted">IVA '+p.iva+'%</small>';
+                }
+                html += '</td>';
+
+                // calcolo
+                html += '<td class="text-center">';
+                html += '<div class="isp-formula">';
+                html += '<span class="isp-qty-val">' + p.quantity + '</span> ' + (p.quantity_unit || '') + ' × ';
+                if (!p.has_stock) {
+                    html += '<input type="number" class="form-control input-xs multiplier-input" style="width:70px; display:inline-block; text-align:center;" value="'+p.quantity_multiplier+'" min="0.001" step="0.001" data-product-id="'+p.id+'"' + (isUnmapped ? ' disabled' : '') + '>';
+                } else {
+                    html += '<span class="isp-mult-val">' + p.quantity_multiplier + '</span>';
+                }
+                html += '</div>';
+                html += '<div class="isp-preview qty-preview" data-product-id="'+p.id+'">';
+                if (isUnmapped) {
+                    html += '<span class="text-muted">—</span>';
+                } else {
+                    html += '= ' + formatQty(p.stock_preview) + ' ' + (p.stock_unit || '');
+                }
+                html += '</div>';
+                html += '</td>';
+
+                // materiale
                 html += '<td>';
                 if (isUnmapped) {
                     html += '<span class="text-danger"><i class="fa fa-exclamation-triangle"></i> Non mappato</span>';
                 } else {
-                    html += (p.material_label || '—');
+                    html += '<strong>' + escapeHtml(p.material_label || '—') + '</strong>';
+                    if (p.stock_unit) html += '<br><small class="text-muted">unità: '+p.stock_unit+'</small>';
                 }
                 html += '</td>';
-                html += '<td class="text-center qty-preview" data-product-id="' + p.id + '">';
-                if (isUnmapped) {
+
+                // prezzo unit + per-unit
+                html += '<td class="text-center">';
+                html += '<div class="isp-price-stack">';
+                html += '<div class="isp-price-main">' + p.price_formatted + '</div>';
+                if (p.price_per_stock_unit !== null && !isUnmapped) {
+                    html += '<div class="isp-price-sub">€ ' + formatQty(p.price_per_stock_unit) + '/' + p.stock_unit + ' <span class="isp-price-per-unit" data-product-id="'+p.id+'"></span></div>';
+                }
+                html += '</div>';
+                html += '</td>';
+
+                // totale riga
+                html += '<td class="text-center">';
+                html += '<div class="isp-price-main">' + p.line_total_iva_formatted + '</div>';
+                html += '<div class="isp-price-sub">imp. ' + p.line_total_formatted + '</div>';
+                html += '</td>';
+
+                // ultimo acquisto
+                html += '<td>' + renderLastPurchaseCell(p.last_purchase) + '</td>';
+
+                // delta
+                html += '<td class="text-center">' + renderDeltaCell(p.price_delta_percent) + '</td>';
+
+                // magazzino
+                html += '<td class="text-center">';
+                if (isUnmapped || p.current_material_stock === null) {
                     html += '<span class="text-muted">—</span>';
                 } else {
-                    html += formatQty(p.quantity * (p.quantity_multiplier || 1)) + (p.stock_unit ? ' ' + p.stock_unit : '');
+                    html += '<span style="font-size:12px;">'+formatQty(p.current_material_stock)+'</span>';
+                    html += '<span class="isp-stock-arrow">→</span>';
+                    html += '<span class="isp-stock-after stock-after-cell" data-product-id="'+p.id+'">'+formatQty(p.stock_after_import)+'</span>';
+                    html += '<br><small class="text-muted">'+(p.stock_unit || '')+'</small>';
                 }
                 html += '</td>';
-                html += '<td class="text-center">';
-                html += p.price;
-                html += '</td>';
+
+                // alerts
+                html += '<td>' + renderAlertBadges(p.alerts) + '</td>';
+
+                // stato
                 html += '<td class="text-center">';
                 if (p.has_stock) {
-                    html += '<span class="label label-success"><i class="fa fa-check"></i> Già importata</span>';
+                    html += '<span class="label label-success"><i class="fa fa-check"></i> Importata</span>';
                 } else if (isUnmapped) {
                     html += '<span class="label label-danger">Da mappare</span>';
                 } else {
                     html += '<span class="label label-default">Da importare</span>';
                 }
                 html += '</td>';
+
                 html += '</tr>';
             });
 
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             $('#importStockBody').html(html);
 
-            $('#btnConfirmImportStock').prop('disabled', unmappedCount > 0);
+            updateImportFooter();
+        }
+
+        function updateImportFooter() {
+            var selected = $('#importStockBody .isp-skip-cb:checked').length;
+            var unmappedCount = importStockData ? importStockData.summary.lines_unmapped : 0;
+            var canImport = unmappedCount === 0 && selected > 0;
+
+            var $summary = $('#importStockFooterSummary');
+            if (selected > 0) {
+                $summary.html('<span class="text-muted">Pronte all\'import: <strong>'+selected+'</strong> righe</span>').show();
+            } else {
+                $summary.hide();
+            }
+
+            $('#btnConfirmImportStock').prop('disabled', !canImport);
             if (unmappedCount > 0) {
                 $('#btnConfirmImportStock').attr('title', 'Mappa tutti i prodotti prima di importare le giacenze');
+            } else if (selected === 0) {
+                $('#btnConfirmImportStock').attr('title', 'Seleziona almeno una riga');
             } else {
                 $('#btnConfirmImportStock').removeAttr('title');
             }
@@ -304,15 +542,41 @@
             });
         });
 
-        // Aggiorna preview giacenza in tempo reale al cambio moltiplicatore
+        // Aggiorna preview giacenza + prezzo/unità + stock dopo, in tempo reale al cambio moltiplicatore
         $(document).on('input change', '.multiplier-input', function() {
             var productId = $(this).data('product-id');
-            var qty = parseFloat($(this).data('quantity')) || 0;
             var mult = parseFloat($(this).val()) || 0;
+            var $row = $('#importStockBody tr[data-product-id="' + productId + '"]');
+            var qty = parseFloat($row.data('quantity')) || 0;
+            var stockUnit = $row.data('stock-unit') || '';
+
+            // find product in data
+            var product = importStockData && importStockData.products.find(function(p){return p.id == productId;});
+            if (!product) return;
+
             var preview = qty * mult;
-            var $cell = $('.qty-preview[data-product-id="' + productId + '"]');
-            var unit = $cell.text().replace(/[\d.,\s]/g, '').trim();
-            $cell.text(formatQty(preview) + (unit ? ' ' + unit : ''));
+            $row.find('.qty-preview').html('= ' + formatQty(preview) + ' ' + stockUnit);
+
+            // stock after
+            if (product.current_material_stock !== null) {
+                var after = product.current_material_stock + preview;
+                $row.find('.stock-after-cell').text(formatQty(after));
+            }
+
+            // prezzo per unità stock
+            var newPricePerUnit = mult > 0 ? (product.price / mult) : null;
+            if (newPricePerUnit !== null) {
+                var $sub = $row.find('.isp-price-sub').first();
+                $sub.html('€ ' + formatQty(newPricePerUnit) + '/' + stockUnit);
+            }
+        });
+
+        // Toggle skip checkbox → disabilita/abilita riga
+        $(document).on('change', '.isp-skip-cb', function() {
+            var $row = $(this).closest('tr');
+            $row.css('opacity', this.checked ? '1' : '0.45');
+            $row.find('.multiplier-input').prop('disabled', !this.checked);
+            updateImportFooter();
         });
 
         $(document).on('click', '#btnConfirmImportStock', function() {
@@ -322,8 +586,10 @@
             $('#importStockBody tbody tr').each(function() {
                 var $row = $(this);
                 var $multiplierInput = $row.find('.multiplier-input');
+                var $skipCb = $row.find('.isp-skip-cb');
 
                 if ($multiplierInput.length === 0) return; // già importata, skip
+                if ($skipCb.length && !$skipCb.is(':checked')) return; // utente ha deselezionato
 
                 products.push({
                     id: $row.data('product-id'),

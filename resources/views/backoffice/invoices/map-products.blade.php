@@ -39,11 +39,20 @@
                         <div class="col-sm-3">
                             <span class="text-muted small">Prodotti in fattura</span><br>
                             <strong>{{ $invoice->products_count }}</strong>
-                            <span class="text-muted small">({{ $supplierInvoiceProducts->count() }} da mappare)</span>
+                            <span class="text-muted small">({{ $supplierInvoiceProducts->count() }} mostrate)</span>
                         </div>
                         <div class="col-sm-3">
                             <span class="text-muted small">File</span><br>
                             <small class="text-muted">{{ $invoice->filename }}</small>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top:10px; padding-top:10px; border-top:1px solid #eee;">
+                        <div class="col-sm-12">
+                            <label style="font-weight:normal; cursor:pointer; margin:0;">
+                                <input type="checkbox" id="toggleShowAllLines" {{ $showAll ? 'checked' : '' }}>
+                                <strong>Mostra anche linee già mappate</strong>
+                                <small class="text-muted">(utile per aggiornare il moltiplicatore di una linea già mappata)</small>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -289,6 +298,20 @@
 @section('custom-script')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+
+            // ─── Toggle mostra linee già mappate ────────────────────────────────
+            var toggle = document.getElementById('toggleShowAllLines');
+            if (toggle) {
+                toggle.addEventListener('change', function () {
+                    var url = new URL(window.location.href);
+                    if (this.checked) {
+                        url.searchParams.set('show_all', '1');
+                    } else {
+                        url.searchParams.delete('show_all');
+                    }
+                    window.location.href = url.toString();
+                });
+            }
 
             var materials = {!! json_encode($materials) !!};
 

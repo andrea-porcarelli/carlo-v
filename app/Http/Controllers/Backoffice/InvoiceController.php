@@ -259,25 +259,38 @@ class InvoiceController extends BaseController
         }
     }
 
-    public function mapping_products(int $id) : View
+    public function mapping_products(int $id, Request $request) : View
     {
         $invoice = SupplierInvoice::findOrFail($id);
 
-        $supplierInvoiceProducts = $invoice->products()
-            ->whereDoesntHave('material', function ($query) {
-                $query->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
+        $showAll = $request->boolean('show_all');
+
+        $query = $invoice->products()->where('ignore_mapping', 0)->orderBy('id');
+
+        if (!$showAll) {
+            $query->whereDoesntHave('material', function ($q) {
+                $q->join('supplier_invoices', 'supplier_invoice_products.supplier_invoice_id', '=', 'supplier_invoices.id')
                     ->whereColumn('mapping_products.supplier_id', 'supplier_invoices.supplier_id');
-            })
-            ->where('ignore_mapping', 0)
-            ->orderBy('id')
-            ->get();
+            });
+        }
+
+        $supplierInvoiceProducts = $query->get();
+
+        // Pre-carico il material_id per ogni linea (via mapping) così il select è preselezionato
+        $supplierInvoiceProducts->load('material');
+        foreach ($supplierInvoiceProducts as $p) {
+            if ($p->material) {
+                $p->material_id = $p->material->id;
+            }
+        }
 
         $materials = Material::orderBy('label')->get();
 
         return view('backoffice.invoices.map-products', compact(
             'invoice',
             'supplierInvoiceProducts',
-            'materials'
+            'materials',
+            'showAll'
         ));
     }
 
@@ -319,10 +332,24 @@ class InvoiceController extends BaseController
                     $product->update(['quantity_multiplier' => $multiplier]);
 
                     if ($materialId) {
-                        MappingProduct::updateOrCreate(
-                            ['product_name' => $product->product_name, 'supplier_id' => $invoice->supplier_id],
-                            ['material_id' => $materialId, 'quantity_multiplier' => $multiplier]
-                        );
+                        // Il mapping (supplier_id, product_name → material_id) è condiviso.
+                        // Il multiplier viene salvato come default solo quando il mapping non esiste ancora,
+                        // altrimenti resta per-linea (sul supplier_invoice_products) senza alterare il default.
+                        $existingMapping = MappingProduct::where('product_name', $product->product_name)
+                            ->where('supplier_id', $invoice->supplier_id)
+                            ->first();
+                        if ($existingMapping) {
+                            if ($existingMapping->material_id != $materialId) {
+                                $existingMapping->update(['material_id' => $materialId]);
+                            }
+                        } else {
+                            MappingProduct::create([
+                                'product_name'        => $product->product_name,
+                                'supplier_id'         => $invoice->supplier_id,
+                                'material_id'         => $materialId,
+                                'quantity_multiplier' => $multiplier,
+                            ]);
+                        }
                     }
                 }
             }
@@ -517,28 +544,104 @@ class InvoiceController extends BaseController
             ->orderBy('id')
             ->get();
 
-        $productsData = $products->map(function ($product) use ($invoice) {
+        $totalInvoiceValue = 0;
+        $totalImportValue  = 0;
+
+        $priceAlertThresholdPercent = 15.0;
+
+        $productsData = $products->map(function ($product) use ($invoice, &$totalInvoiceValue, &$totalImportValue, $priceAlertThresholdPercent) {
             $mapping = MappingProduct::where('product_name', $product->product_name)
                 ->where('supplier_id', $invoice->supplier_id)
                 ->with('material')
                 ->first();
 
-            $material = $mapping?->material;
-            $multiplier = $mapping?->quantity_multiplier ?? $product->quantity_multiplier ?? 1;
+            $material    = $mapping?->material;
+            $multiplier  = (float) ($product->quantity_multiplier ?? $mapping?->quantity_multiplier ?? 1);
             $stockPreview = round($product->quantity * $multiplier, 4);
+
+            $lineTotal = round($product->quantity * $product->price, 2);
+            $lineTotalIva = round($lineTotal * (1 + (float)($product->iva ?? 0) / 100), 2);
+            $totalInvoiceValue += $lineTotalIva;
+
+            $pricePerStockUnit = $multiplier > 0 ? round($product->price / $multiplier, 4) : null;
+
+            // Ultimo acquisto dello stesso materiale (se presente)
+            $lastStock = $material
+                ? MaterialStock::where('material_id', $material->id)
+                    ->where('supplier_invoice_product_id', '!=', $product->id)
+                    ->orderBy('purchase_date', 'desc')
+                    ->orderBy('id', 'desc')
+                    ->first()
+                : null;
+
+            $lastProduct = $lastStock?->supplier_invoice_product_id
+                ? SupplierInvoiceProduct::find($lastStock->supplier_invoice_product_id)
+                : null;
+            $lastMultiplier  = $lastProduct?->quantity_multiplier;
+            $lastUnitPrice   = $lastProduct?->price;
+            $lastPricePerStockUnit = ($lastUnitPrice && $lastMultiplier > 0)
+                ? round($lastUnitPrice / $lastMultiplier, 4)
+                : null;
+
+            $priceDelta = null;
+            if ($lastPricePerStockUnit !== null && $lastPricePerStockUnit > 0 && $pricePerStockUnit !== null) {
+                $priceDelta = round((($pricePerStockUnit - $lastPricePerStockUnit) / $lastPricePerStockUnit) * 100, 2);
+            }
+
+            $currentMaterialStock = $material ? (float) $material->stock : null;
+            $stockAfter = $material ? round($currentMaterialStock + $stockPreview, 4) : null;
+
+            $alerts = [];
+            if ($material && !$lastStock) {
+                $alerts[] = 'first_purchase';
+            }
+            if ($priceDelta !== null && abs($priceDelta) >= $priceAlertThresholdPercent) {
+                $alerts[] = 'price_anomaly';
+            }
+            if ($lastMultiplier !== null && (float) $lastMultiplier !== $multiplier) {
+                $alerts[] = 'multiplier_changed';
+            }
+            if ($product->quantity_unit && $material?->stock_type && $product->quantity_unit !== $material->stock_type) {
+                $alerts[] = 'unit_mismatch';
+            }
+
+            $hasStock = $product->stock()->exists();
+            if (!$hasStock && $material) {
+                $totalImportValue += $lineTotalIva;
+            }
 
             return [
                 'id'                  => $product->id,
                 'product_name'        => $product->product_name,
-                'quantity'            => $product->quantity,
+                'quantity'            => (float) $product->quantity,
                 'quantity_unit'       => $product->quantity_unit,
                 'quantity_multiplier' => $multiplier,
-                'price'               => Utils::price($product->price),
+                'price'               => (float) $product->price,
+                'price_formatted'     => Utils::price($product->price),
+                'iva'                 => $product->iva !== null ? (float) $product->iva : null,
+                'line_total'          => $lineTotal,
+                'line_total_formatted' => Utils::price($lineTotal),
+                'line_total_iva_formatted' => Utils::price($lineTotalIva),
                 'material_id'         => $material?->id,
                 'material_label'      => $material?->label,
                 'stock_unit'          => $material?->stock_type,
                 'stock_preview'       => $stockPreview,
-                'has_stock'           => $product->stock()->exists(),
+                'price_per_stock_unit' => $pricePerStockUnit,
+                'last_purchase' => $lastStock ? [
+                    'date'                => $lastStock->purchase_date?->format('d/m/Y'),
+                    'invoice_number'      => $lastProduct?->invoice?->invoice_number,
+                    'unit_price'          => $lastUnitPrice,
+                    'unit_price_formatted' => $lastUnitPrice !== null ? Utils::price($lastUnitPrice) : null,
+                    'multiplier'          => $lastMultiplier,
+                    'price_per_stock_unit' => $lastPricePerStockUnit,
+                    'quantity'            => $lastProduct?->quantity,
+                    'quantity_unit'       => $lastProduct?->quantity_unit,
+                ] : null,
+                'price_delta_percent' => $priceDelta,
+                'current_material_stock' => $currentMaterialStock,
+                'stock_after_import'  => $stockAfter,
+                'has_stock'           => $hasStock,
+                'alerts'              => $alerts,
             ];
         });
 
@@ -546,7 +649,19 @@ class InvoiceController extends BaseController
             'invoice'  => [
                 'id'       => $invoice->id,
                 'number'   => $invoice->invoice_number,
+                'date'     => $invoice->invoice_date?->format('d/m/Y'),
+                'amount'   => Utils::price($invoice->amount),
                 'supplier' => $invoice->supplier->company_name ?? '—',
+            ],
+            'summary' => [
+                'lines_total'     => $productsData->count(),
+                'lines_to_import' => $productsData->where('has_stock', false)->filter(fn($p) => $p['material_id'])->count(),
+                'lines_unmapped'  => $productsData->where('has_stock', false)->filter(fn($p) => !$p['material_id'])->count(),
+                'lines_already_imported' => $productsData->where('has_stock', true)->count(),
+                'lines_with_alerts' => $productsData->filter(fn($p) => !empty($p['alerts']) && !$p['has_stock'])->count(),
+                'total_invoice_value' => Utils::price($totalInvoiceValue),
+                'total_import_value'  => Utils::price($totalImportValue),
+                'price_alert_threshold_percent' => $priceAlertThresholdPercent,
             ],
             'products' => $productsData->values(),
         ]);
