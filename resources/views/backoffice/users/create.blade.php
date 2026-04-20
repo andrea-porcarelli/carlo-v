@@ -1,15 +1,30 @@
 @extends('backoffice.layout', ['title' => 'Crea Nuovo Utente'])
+
+@php
+$permissionMeta = [
+    'take_orders'     => ['icon' => 'fa-clipboard-list', 'color' => '#1c84c6', 'desc' => 'Può aprire nuovi tavoli e aggiungere piatti alle comande'],
+    'view_orders'     => ['icon' => 'fa-eye',            'color' => '#1ab394', 'desc' => 'Può consultare le comande attive sui tavoli'],
+    'cash_payment'    => ['icon' => 'fa-coins',          'color' => '#f8ac59', 'desc' => 'Può incassare pagamenti in contanti e aprire il cassetto'],
+    'pos_payment'     => ['icon' => 'fa-credit-card',    'color' => '#23c6c8', 'desc' => 'Può processare pagamenti tramite terminale POS'],
+    'close_bills'     => ['icon' => 'fa-receipt',        'color' => '#ed5565', 'desc' => 'Può avviare il flusso di chiusura del conto'],
+    'invoice_payment' => ['icon' => 'fa-file-invoice',   'color' => '#6f42c1', 'desc' => 'Può emettere fatture durante il pagamento'],
+];
+@endphp
+
 @section('breadcrumb')
     @include('backoffice.components.breadcrumb', [
         'level_1' => ['label' => 'Utenti', 'url' => route('users.index')],
         'level_2' => ['label' => 'Crea Nuovo Utente'],
     ])
 @endsection
+
 @section('main-content')
     <div class="row">
         <div class="col-lg-12">
-            <form id="userForm" class="form-ajax" action="{{ route('users.store') }}" method="POST">
+            <form id="userForm" action="{{ route('users.store') }}" method="POST" novalidate>
                 @csrf
+
+                {{-- ── Sezione comune (nome e ruolo) ──────────────────────────────── --}}
                 <div class="panel panel-default">
                     <div class="panel-heading">
                         <h4 class="panel-title">
@@ -19,123 +34,182 @@
                     <div class="panel-body">
                         <div class="row">
                             @include('backoffice.components.form.input', [
-                                'label' => 'Nome Completo',
-                                'name' => 'name',
-                                'col' => 4,
-                                'required' => true,
-                                'placeholder' => 'Es: Mario Rossi'
+                                'label'       => 'Nome',
+                                'name'        => 'name',
+                                'col'         => 6,
+                                'required'    => true,
+                                'placeholder' => 'Es: Mario Rossi',
                             ])
-
-                            @include('backoffice.components.form.input', [
-                                'label' => 'Email',
-                                'name' => 'email',
-                                'col' => 4,
-                                'type' => 'email',
-                                'placeholder' => 'Es: mario.rossi@example.com'
-                            ])
-
                             @include('backoffice.components.form.select', [
-                                'label' => 'Ruolo',
-                                'name' => 'role',
-                                'col' => 4,
+                                'label'    => 'Ruolo',
+                                'name'     => 'role',
+                                'col'      => 6,
                                 'required' => true,
-                                'options' => $roles
+                                'options'  => $roles,
+                            ])
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ── Sezione Admin ───────────────────────────────────────────────── --}}
+                <div class="panel panel-default" id="adminSection" style="display:none;">
+                    <div class="panel-heading">
+                        <h4 class="panel-title">
+                            <i class="fas fa-lock"></i> Credenziali Backoffice
+                        </h4>
+                    </div>
+                    <div class="panel-body">
+                        <div class="row">
+                            @include('backoffice.components.form.input', [
+                                'label'       => 'Email',
+                                'name'        => 'email',
+                                'col'         => 6,
+                                'type'        => 'email',
+                                'placeholder' => 'Es: admin@example.com',
                             ])
                         </div>
 
-                        <!-- Sezione Admin -->
-                        <div class="row m-t-md" id="adminSection" style="display:none;">
-                            <div class="col-lg-12">
-                                <div class="alert alert-info">
-                                    <i class="fas fa-lock"></i>
-                                    <strong>Password Backoffice:</strong> La password deve essere di almeno 6 caratteri.
-                                </div>
-                            </div>
-
-                            @include('backoffice.components.form.input', [
-                                'label' => 'Password Backoffice',
-                                'name' => 'backoffice_password',
-                                'col' => 6,
-                                'type' => 'password',
-                                'required' => true,
-                                'placeholder' => 'Inserisci la password'
-                            ])
-
-                            @include('backoffice.components.form.input', [
-                                'label' => 'Conferma Password Backoffice',
-                                'name' => 'backoffice_password_confirmation',
-                                'col' => 6,
-                                'type' => 'password',
-                                'required' => true,
-                                'placeholder' => 'Ripeti la password'
-                            ])
-
+                        <div class="row m-t-md">
                             <div class="col-lg-12">
                                 <div class="alert alert-info">
                                     <i class="fas fa-key"></i>
-                                    <strong>PIN di Autenticazione:</strong> Codice numerico univoco, da 1 a 5 cifre, per l'autenticazione operatore.
+                                    <strong>Password Backoffice:</strong> almeno 6 caratteri.
                                 </div>
                             </div>
-
                             @include('backoffice.components.form.input', [
-                                'label' => 'PIN di Autenticazione',
-                                'name' => 'authentication_pin',
-                                'col' => 6,
-                                'type' => 'text',
-                                'inputmode' => 'numeric',
-                                'required' => true,
-                                'placeholder' => 'Es: 12345',
-                                'pattern' => '[0-9]{1,5}'
-                            ])
-                        </div>
-
-                        <!-- Sezione Operator -->
-                        <div class="row m-t-md" id="operatorSection" style="display:none;">
-                            <div class="col-lg-12">
-                                <div class="alert alert-warning">
-                                    <i class="fas fa-lock"></i>
-                                    <strong>Password (PIN):</strong> Codice numerico, da 1 a 5 cifre.
-                                </div>
-                            </div>
-
-                            @include('backoffice.components.form.input', [
-                                'label' => 'Password (PIN)',
-                                'name' => 'password',
-                                'col' => 6,
-                                'type' => 'password',
-                                'inputmode' => 'numeric',
-                                'required' => true,
+                                'label'       => 'Password Backoffice',
+                                'name'        => 'backoffice_password',
+                                'col'         => 6,
+                                'type'        => 'password',
                                 'placeholder' => 'Inserisci la password',
-                                'pattern' => '[0-9]{1,5}'
                             ])
-
                             @include('backoffice.components.form.input', [
-                                'label' => 'Conferma Password',
-                                'name' => 'password_confirmation',
-                                'col' => 6,
-                                'type' => 'password',
-                                'inputmode' => 'numeric',
-                                'required' => true,
+                                'label'       => 'Conferma Password',
+                                'name'        => 'backoffice_password_confirmation',
+                                'col'         => 6,
+                                'type'        => 'password',
                                 'placeholder' => 'Ripeti la password',
-                                'pattern' => '[0-9]{1,5}'
                             ])
                         </div>
 
-                        <div class="row m-t-md" id="permissionsSection" style="display:none;">
+                        <div class="row m-t-md">
                             <div class="col-lg-12">
-                                <hr />
-                                <h5><i class="fas fa-shield-alt"></i> Permessi Operatore</h5>
-                                <p class="text-muted">Seleziona le funzionalità a cui questo operatore potrà accedere.</p>
-                            </div>
-                            @foreach($availablePermissions as $key => $label)
-                                <div class="col-xs-12 col-sm-4 m-t-sm">
-                                    <label>{{ $label }}</label><br />
-                                    <input type="checkbox" class="js-switch" name="permissions[]" value="{{ $key }}" />
-                                    <div class="invalid-feedback"></div>
+                                <div class="alert alert-info">
+                                    <i class="fas fa-key"></i>
+                                    <strong>PIN di Autenticazione:</strong> Codice numerico univoco, da 1 a 5 cifre.
                                 </div>
-                            @endforeach
+                            </div>
+                            @include('backoffice.components.form.input', [
+                                'label'       => 'PIN di Autenticazione',
+                                'name'        => 'authentication_pin',
+                                'col'         => 6,
+                                'type'        => 'text',
+                                'inputmode'   => 'numeric',
+                                'placeholder' => 'Es: 12345',
+                                'pattern'     => '[0-9]{1,5}',
+                            ])
                         </div>
                     </div>
+                </div>
+
+                {{-- ── Sezione Operatore ───────────────────────────────────────────── --}}
+                <div class="panel panel-default" id="operatorSection" style="display:none;">
+                    <div class="panel-heading">
+                        <h4 class="panel-title">
+                            <i class="fas fa-key"></i> Impostazioni Operatore
+                        </h4>
+                    </div>
+                    <div class="panel-body">
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>PIN di Autenticazione:</strong> numerico, da 1 a 5 cifre. Sarà richiesto all'operatore ad ogni operazione.
+                                </div>
+                            </div>
+                            @include('backoffice.components.form.input', [
+                                'label'       => 'PIN',
+                                'name'        => 'password',
+                                'col'         => 6,
+                                'type'        => 'password',
+                                'inputmode'   => 'numeric',
+                                'placeholder' => 'Es: 12345',
+                            ])
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ── Pannello permessi (solo operatori) ──────────────────────────── --}}
+                <div class="panel panel-default" id="permissionsPanel" style="display:none;">
+
+                    <div class="panel-heading"
+                         style="display:flex; align-items:center; justify-content:space-between; padding:12px 20px;">
+                        <h4 class="panel-title" style="margin:0; font-size:14px;">
+                            <i class="fas fa-shield-alt"></i>&ensp;Permessi Operatore
+                        </h4>
+                        <div style="font-size:12px; line-height:1;">
+                            <a href="#" id="selectAllPerms" class="text-navy"
+                               style="font-weight:600; text-decoration:none;">
+                                <i class="fas fa-check-double"></i> Seleziona tutti
+                            </a>
+                            <span style="color:#ccc; margin:0 8px;">|</span>
+                            <a href="#" id="deselectAllPerms" class="text-muted"
+                               style="text-decoration:none;">
+                                <i class="fas fa-times"></i> Deseleziona tutti
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="panel-body" style="padding:0;">
+                        @foreach($availablePermissions as $key => $label)
+                            @php
+                                $meta = $permissionMeta[$key] ?? ['icon' => 'fa-lock', 'color' => '#aaa', 'desc' => ''];
+                            @endphp
+                            <div class="perm-row"
+                                 style="display:flex; align-items:center; padding:15px 20px;
+                                        {{ $loop->last ? '' : 'border-bottom:1px solid #f4f4f4;' }}
+                                        cursor:default; transition:background .12s;"
+                                 onmouseover="this.style.background='#fafcff'"
+                                 onmouseout="this.style.background=''">
+
+                                <div style="width:44px; height:44px; border-radius:10px;
+                                            background:{{ $meta['color'] }}; flex-shrink:0;
+                                            display:flex; align-items:center; justify-content:center;
+                                            margin-right:18px;
+                                            box-shadow:0 2px 8px {{ $meta['color'] }}55;">
+                                    <i class="fas {{ $meta['icon'] }}" style="color:#fff; font-size:18px;"></i>
+                                </div>
+
+                                <div style="flex:1; min-width:0;">
+                                    <div style="font-weight:600; font-size:14px; color:#2c3e50; line-height:1.3;">
+                                        {{ $label }}
+                                    </div>
+                                    <div style="font-size:12px; color:#a0a0a0; margin-top:3px; line-height:1.4;">
+                                        {{ $meta['desc'] }}
+                                    </div>
+                                </div>
+
+                                <div style="margin-left:24px; flex-shrink:0;">
+                                    <input type="checkbox"
+                                           class="js-switch perm-switch"
+                                           name="permissions[]"
+                                           value="{{ $key }}" />
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="panel-footer"
+                         style="background:#f9f9f9; padding:10px 20px; border-top:1px solid #eee;">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            Gli <strong>Amministratori</strong> hanno accesso completo a tutte le funzionalità, indipendentemente dai permessi degli operatori.
+                        </small>
+                    </div>
+                </div>
+
+                {{-- ── Footer ───────────────────────────────────────────────────────── --}}
+                <div class="panel panel-default">
                     <div class="panel-footer">
                         <div class="d-flex justify-content-between">
                             <a href="{{ route('users.index') }}" class="btn btn-secondary">
@@ -147,58 +221,81 @@
                         </div>
                     </div>
                 </div>
+
             </form>
         </div>
     </div>
 @endsection
+
 @section('custom-script')
-    <script>
-        $(document).ready(function() {
-            // Show/hide sections based on role
-            function toggleSections() {
-                const role = $('#role').val();
-                if (role === 'admin') {
-                    $('#adminSection').show();
-                    $('#operatorSection').hide();
-                    $('#permissionsSection').hide();
-                } else {
-                    $('#adminSection').hide();
-                    $('#operatorSection').show();
-                    $('#permissionsSection').show();
-                }
-            }
-            toggleSections();
-            $('#role').on('change', toggleSections);
+<script>
+$(document).ready(function () {
 
-            $('#userForm').on('submit', function(e) {
-                e.preventDefault();
+    var switchInstances = [];
+    document.querySelectorAll('#permissionsPanel .js-switch').forEach(function (el) {
+        switchInstances.push(new Switchery(el, { color: '#1ab394', size: 'small' }));
+    });
 
-                const form = $(this);
-                const submitBtn = form.find('button[type="submit"]');
-                submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Creazione in corso...');
+    function toggleSections() {
+        var role = $('#role').val();
+        if (role === 'admin') {
+            $('#adminSection').slideDown(200);
+            $('#operatorSection').slideUp(200);
+            $('#permissionsPanel').slideUp(200);
+        } else if (role === 'operator') {
+            $('#adminSection').slideUp(200);
+            $('#operatorSection').slideDown(200);
+            $('#permissionsPanel').slideDown(200);
+        } else {
+            $('#adminSection').slideUp(200);
+            $('#operatorSection').slideUp(200);
+            $('#permissionsPanel').slideUp(200);
+        }
+    }
+    toggleSections();
+    $('#role').on('change', toggleSections);
 
-                $.ajax({
-                    url: form.attr('action'),
-                    type: 'POST',
-                    data: form.serialize(),
-                    success: function(response) {
-                        alert(response.message || 'Utente creato con successo');
-                        window.location.href = '{{ route('users.index') }}';
-                    },
-                    error: function(xhr) {
-                        submitBtn.prop('disabled', false).html('<i class="fas fa-save"></i> Crea Utente');
-
-                        let message = 'Errore nella creazione dell\'utente';
-                        if (xhr.responseJSON && xhr.responseJSON.errors) {
-                            const errors = xhr.responseJSON.errors;
-                            message = Object.values(errors).flat().join('\n');
-                        } else if (xhr.responseJSON && xhr.responseJSON.message) {
-                            message = xhr.responseJSON.message;
-                        }
-                        alert(message);
-                    }
-                });
-            });
+    $('#selectAllPerms').on('click', function (e) {
+        e.preventDefault();
+        document.querySelectorAll('#permissionsPanel .js-switch').forEach(function (el, i) {
+            if (!el.checked) switchInstances[i].setPosition(false);
         });
-    </script>
+    });
+
+    $('#deselectAllPerms').on('click', function (e) {
+        e.preventDefault();
+        document.querySelectorAll('#permissionsPanel .js-switch').forEach(function (el, i) {
+            if (el.checked) switchInstances[i].setPosition(true);
+        });
+    });
+
+    $('#userForm').on('submit', function (e) {
+        e.preventDefault();
+        var form   = $(this);
+        var submit = form.find('button[type="submit"]');
+        submit.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Creazione in corso...');
+
+        $.ajax({
+            url:  form.attr('action'),
+            type: 'POST',
+            data: form.serialize(),
+            success: function (res) {
+                alert(res.message || 'Utente creato con successo');
+                window.location.href = '{{ route('users.index') }}';
+            },
+            error: function (xhr) {
+                submit.prop('disabled', false).html('<i class="fas fa-save"></i> Crea Utente');
+                var msg = "Errore nella creazione dell'utente";
+                if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    msg = Object.values(xhr.responseJSON.errors).flat().join('\n');
+                } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                }
+                alert(msg);
+            },
+        });
+    });
+
+});
+</script>
 @endsection

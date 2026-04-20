@@ -392,14 +392,17 @@ class MysondRicezione extends Command
                         $defaultMultiplier = \App\Models\MappingProduct::where('supplier_id', $supplier->id)
                             ->where('product_name', $line['description'])
                             ->value('quantity_multiplier');
-                        $product = $invoice->products()->create([
-                            'product_name'        => $line['description'],
-                            'quantity'            => $line['quantity'],
-                            'quantity_unit'       => $line['unit_of_measure'],
-                            'price'               => $line['unit_price'],
-                            'iva'                 => $line['vat_rate'],
-                            'quantity_multiplier' => $defaultMultiplier,
-                        ]);
+                        $attrs = [
+                            'product_name'  => $line['description'],
+                            'quantity'      => $line['quantity'],
+                            'quantity_unit' => $line['unit_of_measure'],
+                            'price'         => $line['unit_price'],
+                            'iva'           => $line['vat_rate'],
+                        ];
+                        if ($defaultMultiplier !== null) {
+                            $attrs['quantity_multiplier'] = $defaultMultiplier;
+                        }
+                        $product = $invoice->products()->create($attrs);
                     } catch (\Illuminate\Database\QueryException $e) {
                         Log::info($e->getMessage());
                     }

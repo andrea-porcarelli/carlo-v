@@ -883,14 +883,18 @@ class InvoiceController extends BaseController
                 ->where('product_name', $productName)
                 ->value('quantity_multiplier');
 
-            SupplierInvoiceProduct::create([
+            $attrs = [
                 'supplier_invoice_id' => $invoice->id,
                 'product_name'        => $productName,
                 'quantity'            => $quantity,
                 'price'               => (float)($linea->PrezzoUnitario ?? 0),
                 'iva'                 => (float)($linea->AliquotaIVA ?? 0),
-                'quantity_multiplier' => $defaultMultiplier,
-            ]);
+            ];
+            if ($defaultMultiplier !== null) {
+                $attrs['quantity_multiplier'] = $defaultMultiplier;
+            }
+
+            SupplierInvoiceProduct::create($attrs);
 
             $count++;
         }
