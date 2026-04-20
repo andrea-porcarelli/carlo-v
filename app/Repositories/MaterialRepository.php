@@ -17,6 +17,16 @@ class MaterialRepository extends CrudRepository implements MaterialInterface
     public function filters(array $filters): Builder
     {
         $builder = $this->builder();
+
+        if (!empty($filters['mixed'])) {
+            $q = $filters['mixed'];
+            $builder->where('label', 'like', "%{$q}%");
+        }
+
+        if (!empty($filters['stock_type'])) {
+            $builder->where('stock_type', $filters['stock_type']);
+        }
+
         return $builder;
     }
 }

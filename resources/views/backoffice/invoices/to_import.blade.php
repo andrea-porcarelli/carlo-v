@@ -58,7 +58,15 @@
             <div class="modal-content">
                 <div class="modal-header" style="background:#f8f9fa;">
                     <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-                    <h4 class="modal-title"><i class="fas fa-seedling"></i> Importa giacenze <span id="importStockInvoiceLabel" class="text-muted"></span></h4>
+                    <h4 class="modal-title" style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0;">
+                        <span>
+                            <i class="fas fa-seedling"></i> Importa giacenze
+                            <span id="importStockInvoiceLabel" class="text-muted" style="font-weight:normal;"></span>
+                        </span>
+                        <a href="#" target="_blank" id="importStockPdfLink" class="btn btn-sm btn-danger" style="display:none; margin-right:28px;">
+                            <i class="fa fa-file-pdf"></i> Apri PDF fattura
+                        </a>
+                    </h4>
                 </div>
                 <div class="modal-body" id="importStockBody">
                     <div class="text-center text-muted" style="padding:30px;">
@@ -288,7 +296,6 @@
             if (!alerts || !alerts.length) return '';
             var map = {
                 'first_purchase':     { cls:'alert-first',      label:'1° acquisto', title:'Primo acquisto di questo materiale' },
-                'price_anomaly':      { cls:'alert-price',      label:'€ anomalo',   title:'Variazione prezzo per unità stock oltre la soglia' },
                 'multiplier_changed': { cls:'alert-multiplier', label:'mult. cambiato', title:'Il moltiplicatore differisce dall\'ultima importazione' },
                 'unit_mismatch':      { cls:'alert-unit',       label:'unità diversa', title:'L\'unità in fattura non coincide con lo stock_type del materiale' },
             };
@@ -304,25 +311,14 @@
         function renderLastPurchaseCell(lp) {
             if (!lp) return '<span class="text-muted" style="font-size:12px;">—</span>';
             var parts = [];
-            if (lp.unit_price_formatted) {
-                parts.push('<div class="isp-last-price">' + lp.unit_price_formatted + '/pz fatt.</div>');
-            }
-            if (lp.price_per_stock_unit !== null && lp.price_per_stock_unit !== undefined) {
-                parts.push('<div class="isp-last-meta">€ ' + formatQty(lp.price_per_stock_unit) + '/unità stock</div>');
+            if (lp.quantity !== null && lp.quantity !== undefined) {
+                parts.push('<div class="isp-last-price"><span class="isp-qty-val">' + lp.quantity + '</span>' + (lp.quantity_unit ? ' ' + lp.quantity_unit : '') + ' × <span class="isp-mult-val">' + (lp.multiplier ?? '1') + '</span></div>');
             }
             var meta = [];
             if (lp.date) meta.push(lp.date);
             if (lp.invoice_number) meta.push('fatt. ' + escapeHtml(lp.invoice_number));
-            if (lp.multiplier) meta.push('mult. ' + lp.multiplier);
             if (meta.length) parts.push('<div class="isp-last-meta">' + meta.join(' · ') + '</div>');
             return '<div class="isp-last-box">' + parts.join('') + '</div>';
-        }
-
-        function renderDeltaCell(delta) {
-            if (delta === null || delta === undefined) return '<span class="isp-delta-neutral">—</span>';
-            var sign = delta > 0 ? '+' : '';
-            var cls = Math.abs(delta) >= 15 ? (delta > 0 ? 'isp-delta-up' : 'isp-delta-down') : 'isp-delta-neutral';
-            return '<span class="'+cls+'">' + sign + delta.toFixed(1) + '%</span>';
         }
 
         function renderHeader(data) {
@@ -342,7 +338,6 @@
             html += '<div class="isp-summary-badge imported"><div class="isp-value">'+s.lines_already_imported+'</div><div class="isp-label">Già importate</div></div>';
             html += '<div class="isp-summary-badge unmapped"><div class="isp-value">'+s.lines_unmapped+'</div><div class="isp-label">Non mappate</div></div>';
             html += '<div class="isp-summary-badge alerts"><div class="isp-value">'+s.lines_with_alerts+'</div><div class="isp-label">Con alert</div></div>';
-            html += '<div class="isp-summary-badge value"><div class="isp-value" style="font-size:16px;">'+s.total_import_value+'</div><div class="isp-label">Valore da importare</div></div>';
             html += '</div>';
             return html;
         }
@@ -363,7 +358,7 @@
             if (data.summary.lines_with_alerts > 0) {
                 html += '<div class="alert alert-info" style="margin-bottom:12px;">';
                 html += '<i class="fa fa-info-circle"></i> ';
-                html += '<strong>' + data.summary.lines_with_alerts + (data.summary.lines_with_alerts === 1 ? ' riga richiede attenzione' : ' righe richiedono attenzione') + '</strong> — soglia variazione prezzo: ±'+data.summary.price_alert_threshold_percent+'%. Verifica i valori prima di confermare.';
+                html += '<strong>' + data.summary.lines_with_alerts + (data.summary.lines_with_alerts === 1 ? ' riga richiede attenzione' : ' righe richiedono attenzione') + '</strong> — verifica i valori prima di confermare.';
                 html += '</div>';
             }
 
@@ -374,10 +369,7 @@
             html += '<th>Prodotto fattura</th>';
             html += '<th class="text-center">Qtà × Molt. = Giacenza</th>';
             html += '<th>Materiale</th>';
-            html += '<th class="text-center">Prezzo unit.</th>';
-            html += '<th class="text-center">Totale riga<br><small>(IVA incl.)</small></th>';
-            html += '<th>Ultimo acquisto</th>';
-            html += '<th class="text-center">Δ prezzo</th>';
+            html += '<th>Ultima importazione</th>';
             html += '<th class="text-center">Magazzino</th>';
             html += '<th>Alert</th>';
             html += '<th class="text-center">Stato</th>';
@@ -400,12 +392,8 @@
                 }
                 html += '</td>';
 
-                // product + IVA
-                html += '<td><strong>' + escapeHtml(p.product_name) + '</strong>';
-                if (p.iva !== null) {
-                    html += ' <small class="text-muted">IVA '+p.iva+'%</small>';
-                }
-                html += '</td>';
+                // product
+                html += '<td><strong>' + escapeHtml(p.product_name) + '</strong></td>';
 
                 // calcolo
                 html += '<td class="text-center">';
@@ -436,27 +424,8 @@
                 }
                 html += '</td>';
 
-                // prezzo unit + per-unit
-                html += '<td class="text-center">';
-                html += '<div class="isp-price-stack">';
-                html += '<div class="isp-price-main">' + p.price_formatted + '</div>';
-                if (p.price_per_stock_unit !== null && !isUnmapped) {
-                    html += '<div class="isp-price-sub">€ ' + formatQty(p.price_per_stock_unit) + '/' + p.stock_unit + ' <span class="isp-price-per-unit" data-product-id="'+p.id+'"></span></div>';
-                }
-                html += '</div>';
-                html += '</td>';
-
-                // totale riga
-                html += '<td class="text-center">';
-                html += '<div class="isp-price-main">' + p.line_total_iva_formatted + '</div>';
-                html += '<div class="isp-price-sub">imp. ' + p.line_total_formatted + '</div>';
-                html += '</td>';
-
-                // ultimo acquisto
+                // ultima importazione (qty + mult + data, no prezzi)
                 html += '<td>' + renderLastPurchaseCell(p.last_purchase) + '</td>';
-
-                // delta
-                html += '<td class="text-center">' + renderDeltaCell(p.price_delta_percent) + '</td>';
 
                 // magazzino
                 html += '<td class="text-center">';
@@ -524,6 +493,9 @@
             $('#importStockInvoiceLabel').text('');
             $('#importStockBody').html('<div class="text-center text-muted" style="padding:30px;"><i class="fa fa-spinner fa-spin fa-2x"></i></div>');
             $('#btnConfirmImportStock').prop('disabled', false);
+            $('#importStockPdfLink')
+                .attr('href', '/backoffice/invoices/' + importStockInvoiceId + '/pdf')
+                .show();
             $('#importStockModal').modal('show');
 
             $.ajax({
@@ -561,13 +533,6 @@
             if (product.current_material_stock !== null) {
                 var after = product.current_material_stock + preview;
                 $row.find('.stock-after-cell').text(formatQty(after));
-            }
-
-            // prezzo per unità stock
-            var newPricePerUnit = mult > 0 ? (product.price / mult) : null;
-            if (newPricePerUnit !== null) {
-                var $sub = $row.find('.isp-price-sub').first();
-                $sub.html('€ ' + formatQty(newPricePerUnit) + '/' + stockUnit);
             }
         });
 

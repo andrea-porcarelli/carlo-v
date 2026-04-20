@@ -595,9 +595,6 @@ class InvoiceController extends BaseController
             if ($material && !$lastStock) {
                 $alerts[] = 'first_purchase';
             }
-            if ($priceDelta !== null && abs($priceDelta) >= $priceAlertThresholdPercent) {
-                $alerts[] = 'price_anomaly';
-            }
             if ($lastMultiplier !== null && (float) $lastMultiplier !== $multiplier) {
                 $alerts[] = 'multiplier_changed';
             }

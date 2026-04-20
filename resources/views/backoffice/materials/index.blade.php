@@ -12,7 +12,16 @@
                     <div class="row">
                         <div class="col-lg-12">
                             <div class="row g-1 advanced-search">
-                                @include('backoffice.components.form.input', ['label' => 'Ingrediente', 'name' => 'mixed', 'col' => 2, 'class' => 'mixed'])
+                                @include('backoffice.components.form.input', ['label' => 'Ingrediente', 'name' => 'mixed', 'col' => 3, 'class' => 'mixed'])
+                                <div class="col-xs-12 col-sm-2 m-t-sm">
+                                    <label>Unità di misura</label>
+                                    <select name="stock_type" class="form-control stock_type">
+                                        <option value="">Tutte</option>
+                                        @foreach(\App\Models\Material::stock_types() as $k => $label)
+                                            <option value="{{ $k }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
                                 @include('backoffice.components.form.button', ['col' => 2, 'label' => 'Cerca', 'class' => 'btn-find', 'with_add' => true, 'class_btn_add' => 'btn-add-object', 'route' => 'restaurant.materials.create'])
                             </div>
                         </div>
@@ -63,7 +72,7 @@
                         {data: 'dishes', class: 'text-center'},
                     ],
                     order: [[1, 'desc']],
-                    dataForm: ['mixed'],
+                    dataForm: ['mixed', 'stock_type'],
                     serverSide: false,
                 }]);
             }, 500);
