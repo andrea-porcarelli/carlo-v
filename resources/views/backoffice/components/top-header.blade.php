@@ -1,3 +1,16 @@
+@php
+    $adeStatus      = \App\Models\Setting::get('agenzia_entrate.check_last_status', null);
+    $adeDesc        = \App\Models\Setting::get('agenzia_entrate.check_last_descrizione', '');
+    $adeCodice      = \App\Models\Setting::get('agenzia_entrate.check_last_codice', '');
+    $adeCheckedAtIso= \App\Models\Setting::get('agenzia_entrate.check_last_at', null);
+    $adeCheckedAt   = $adeCheckedAtIso ? \Carbon\Carbon::parse($adeCheckedAtIso)->format('d/m/Y H:i') : 'mai';
+    $adeBannerLabel = match($adeStatus) {
+        'warning' => 'Pacchetto MySond non attivo',
+        'error'   => 'Credenziali Agenzia Entrate: verifica fallita',
+        null      => 'Credenziali Agenzia Entrate: nessun controllo eseguito',
+        default   => null,
+    };
+@endphp
 <div class="row border-bottom">
     <nav class="navbar navbar-static-top" role="navigation" style="margin-bottom: 0">
         <div class="navbar-header">
@@ -8,32 +21,6 @@
         <ul class="nav navbar-top-links navbar-right">
             <li>
                 <span class="m-r-sm text-muted welcome-message"></span>
-            </li>
-            @php
-                $adeStatus      = \App\Models\Setting::get('agenzia_entrate.check_last_status', null);
-                $adeDesc        = \App\Models\Setting::get('agenzia_entrate.check_last_descrizione', '');
-                $adeCodice      = \App\Models\Setting::get('agenzia_entrate.check_last_codice', '');
-                $adeCheckedAtIso= \App\Models\Setting::get('agenzia_entrate.check_last_at', null);
-                $adeCheckedAt   = $adeCheckedAtIso ? \Carbon\Carbon::parse($adeCheckedAtIso)->format('d/m/Y H:i') : 'mai';
-                $adeIcon        = match($adeStatus) {
-                    'ok'      => 'fa-check-circle text-success',
-                    'warning' => 'fa-exclamation-circle text-warning',
-                    'error'   => 'fa-exclamation-triangle text-danger',
-                    default   => 'fa-question-circle text-muted',
-                };
-                $adeLabel       = match($adeStatus) {
-                    'ok'      => 'Credenziali AdE OK',
-                    'warning' => 'Pacchetto MySond non attivo',
-                    'error'   => 'Credenziali AdE: problema',
-                    default   => 'Credenziali AdE: nessun check',
-                };
-                $adeTitle       = $adeLabel . ' — ultimo check: ' . $adeCheckedAt . ($adeDesc ? ' | ' . $adeDesc : '') . ($adeCodice ? ' (cod. ' . $adeCodice . ')' : '');
-            @endphp
-            <li title="{{ $adeTitle }}">
-                <span class="navbar-text">
-                    <i class="fa {{ $adeIcon }}"></i>
-                    <span class="hidden-xs">AdE</span>
-                </span>
             </li>
             @if(Auth::id() == 1 && in_array(config('sync.role'), ['web', 'local']))
             <li>
@@ -56,6 +43,24 @@
         </ul>
     </nav>
 </div>
+@if($adeBannerLabel)
+<div class="row" style="padding: 10px 15px; background: rgba(255, 193, 7, 0.15); border-top: 1px solid #f0ad4e; border-bottom: 2px solid #f0ad4e;">
+    <div class="col-xs-12" style="display:flex; align-items:center; color:#8a6d3b; font-weight:600;">
+        <i class="fa fa-exclamation-triangle" style="font-size:20px; color:#f0ad4e; margin-right:12px;"></i>
+        <div style="flex:1;">
+            <div>{{ $adeBannerLabel }}</div>
+            <div style="font-weight:400; font-size:12px; color:#8a6d3b;">
+                @if($adeDesc){{ $adeDesc }}@endif
+                @if($adeCodice) <span class="text-muted">(cod. {{ $adeCodice }})</span>@endif
+                <span class="text-muted">— ultimo check: {{ $adeCheckedAt }}</span>
+            </div>
+        </div>
+        <a href="{{ route('restaurant.settings.ade-cambio-password') }}" class="btn btn-warning btn-sm" style="margin-left:12px;">
+            <i class="fa fa-key"></i> Cambia password
+        </a>
+    </div>
+</div>
+@endif
 <div class="row wrapper border-bottom white-bg page-heading">
     <div class="col-lg-10">
         @yield('breadcrumb')
