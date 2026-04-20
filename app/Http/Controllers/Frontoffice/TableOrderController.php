@@ -920,7 +920,7 @@ class TableOrderController extends Controller
                 Setting::set('invoice_counter', $counter, 'integer');
                 $year        = now()->format('Y');
                 $invoiceCode = 'ORD-' . $year . '-' . str_pad($counter, 4, '0', STR_PAD_LEFT);
-                $invoiceName = 'ORD' . $year . str_pad($counter, 4, '0', STR_PAD_LEFT);
+                $invoiceName = TableOrderInvoice::toAlphanumeric($counter);
 
                 // 3. Calculate tax
                 $vatRate = (float) Setting::get('invoice_vat_rate', 10);
@@ -944,23 +944,24 @@ class TableOrderController extends Controller
                 // Attach in-memory customer so InvoiceService can access $invoice->user
                 $tableOrderInvoice->setRelation('customer', $customer);
 
-                // 5. Generate XML and send via Mysond
+                // 5. Generate XML and persist it — actual send is handled asynchronously by SendInvoiceToMysondJob
                 $result = $mySondFature->createInvoice($tableOrderInvoice);
 
-                // 6. Update invoice record with result
                 $updateData = [
                     'mysond_response' => is_array($result) ? json_encode($result) : (string) $result,
                 ];
                 if (($result['response'] ?? '') === 'success') {
-                    $updateData['status']       = 'sent';
-                    $updateData['sent_at']      = now();
-                    $updateData['xml_path']     = $result['path'] ?? null;
-                    $updateData['xml_content']  = $result['content'] ?? null;
+                    $updateData['xml_path']    = $result['path'] ?? null;
+                    $updateData['xml_content'] = $result['content'] ?? null;
                     $ficResults[] = $result;
                 } else {
                     $updateData['status'] = 'error';
                 }
                 $tableOrderInvoice->update($updateData);
+
+                if (($result['response'] ?? '') === 'success') {
+                    \App\Jobs\SendInvoiceToMysondJob::dispatch($tableOrderInvoice->id);
+                }
 
                 // Log invoice creation including outcome
                 $this->logger->logCreateInvoice($order, $invoiceData, $operatorId, $result);

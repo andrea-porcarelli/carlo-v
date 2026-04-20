@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Backoffice\AccountingController;
 use App\Http\Controllers\Backoffice\AllergenController;
 use App\Http\Controllers\Backoffice\ExternalInvoiceController;
 use App\Http\Controllers\Backoffice\MenuOptionController;
@@ -254,6 +255,15 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/{id}', [DishController::class, 'show'])->name('show');
                 Route::put('/{id}', [DishController::class, 'edit']);
                 Route::put('/{id}/status', [DishController::class, 'status']);
+            });
+        });
+
+        Route::group(['prefix' => '/accounting', 'as' => 'accounting.'], function() {
+            Route::group(['prefix' => '/invoices', 'as' => 'invoices.'], function() {
+                Route::get('/', [AccountingController::class, 'invoices'])->name('index');
+                Route::get('/datatable', [AccountingController::class, 'datatable'])->name('datatable');
+                Route::get('/{invoice}/xml', [AccountingController::class, 'xml'])->name('xml');
+                Route::post('/{invoice}/resend', [AccountingController::class, 'resend'])->name('resend');
             });
         });
 

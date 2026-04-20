@@ -10,6 +10,16 @@ use Illuminate\Support\Collection;
 
 class TableOrderInvoice extends Model
 {
+    const START_SERIES = 'A0000';
+
+    public static function toAlphanumeric(int $increment): string
+    {
+        $baseDec = (int) base_convert(self::START_SERIES, 36, 10);
+        $newDec  = $baseDec + $increment;
+        $code    = strtoupper(base_convert((string) $newDec, 10, 36));
+        return substr($code, -5);
+    }
+
     protected $fillable = [
         'table_order_id',
         'customer_id',

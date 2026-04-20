@@ -166,11 +166,11 @@ class SalesController extends BaseController
 
             $updateData = [
                 'mysond_response' => is_array($result) ? json_encode($result) : (string) $result,
+                'status'          => 'pending',
+                'sent_at'         => null,
             ];
 
             if (($result['response'] ?? '') === 'success') {
-                $updateData['status']      = 'sent';
-                $updateData['sent_at']     = now();
                 $updateData['xml_path']    = $result['path'] ?? null;
                 $updateData['xml_content'] = $result['content'] ?? null;
             } else {
@@ -179,10 +179,14 @@ class SalesController extends BaseController
 
             $invoice->update($updateData);
 
+            if (($result['response'] ?? '') === 'success') {
+                \App\Jobs\SendInvoiceToMysondJob::dispatch($invoice->id);
+            }
+
             return response()->json([
                 'success' => ($result['response'] ?? '') === 'success',
                 'message' => ($result['response'] ?? '') === 'success'
-                    ? 'XML rigenerato e inviato con successo.'
+                    ? 'XML rigenerato e accodato per invio a MySond.'
                     : 'Errore nella rigenerazione: ' . ($result['message'] ?? 'sconosciuto'),
             ]);
         } catch (\Exception $e) {

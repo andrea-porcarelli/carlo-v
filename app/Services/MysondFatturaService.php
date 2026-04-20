@@ -90,21 +90,25 @@ class MysondFatturaService
         }
     }
 
-    public function inviaFatturaAttiva(string $xmlContent, string $nomeFile)
+    public function importFeAttivo(string $xmlContent, string $fileName, bool $signAndSand = true)
     {
+        $this->setWsdl('mysond');
+
         $params = [
-            'parameters' => array_merge($this->auth, [
-                'file'     => $xmlContent,
-                'nomeFile' => $nomeFile,
-            ])
+            'arg0' => [
+                'utente'      => $this->auth,
+                'fileName'    => $fileName,
+                'xmlDoc'      => base64_encode($xmlContent),
+                'signAndSand' => $signAndSand,
+            ],
         ];
 
         try {
-            $response = $this->client->importFatturaPa($params);
-            $this->logDebug("importFatturaPa", ['nomeFile' => $nomeFile]);
-            return $response->return ?? $response;
+            $response = $this->client->importFeAttivo($params);
+            $this->logDebug('importFeAttivo', ['fileName' => $fileName, 'signAndSand' => $signAndSand]);
+            return $response->return ?? null;
         } catch (Exception $e) {
-            $this->logDebug("importFatturaPa", $params, null, $e);
+            $this->logDebug('importFeAttivo', ['fileName' => $fileName], null, $e);
             throw $e;
         }
     }
