@@ -33,7 +33,9 @@
                                         <th class="all no-sort"></th>
                                         <th class="all">#</th>
                                         <th class="all">Ingredienti</th>
+                                        <th class="all">Unità di misura</th>
                                         <th class="all">Quantità</th>
+                                        <th class="all">Soglia minima</th>
                                         <th class="all">Piatti</th>
                                     </tr>
                                     </thead>
@@ -42,7 +44,9 @@
                                         <th class="all no-sort"></th>
                                         <th class="all">#</th>
                                         <th class="all">Ingredienti</th>
+                                        <th class="all">Unità di misura</th>
                                         <th class="all">Quantità</th>
+                                        <th class="all">Soglia minima</th>
                                         <th class="all">Piatti</th>
                                     </tr>
                                     </tfoot>
@@ -68,7 +72,9 @@
                         {data: 'action', orderable: false, searchable: false, width: '100px'},
                         {data: 'id', width: '40px'},
                         {data: 'label'},
+                        {data: 'stock_type_label'},
                         {data: 'stock'},
+                        {data: 'alert_threshold_fmt', class: 'text-center'},
                         {data: 'dishes', class: 'text-center'},
                     ],
                     order: [[1, 'desc']],

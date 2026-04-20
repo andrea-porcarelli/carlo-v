@@ -43,9 +43,25 @@ class MaterialController extends BaseController
                 })
                 ->addColumn('stock', function ($item) use ($stockService) {
                     $stockSummary = $stockService->calculateStock($item);
-                    return $stockSummary['current'] . ' ' . $item->stock_type;
+                    $current = (float) $stockSummary['current'];
+                    $threshold = $item->alert_threshold !== null ? (float) $item->alert_threshold : null;
+                    $isLow = $threshold !== null && $current <= $threshold;
+                    $html = '<strong>' . $current . '</strong> ' . $item->stock_type;
+                    if ($isLow) {
+                        $html .= ' <span class="label label-danger" title="Giacenza sotto soglia"><i class="fa fa-exclamation-triangle"></i> Sotto soglia</span>';
+                    }
+                    return $html;
                 })
-                ->rawColumns(['dishes', 'printer'])
+                ->addColumn('stock_type_label', function ($item) {
+                    return $item->stock_type_label;
+                })
+                ->addColumn('alert_threshold_fmt', function ($item) {
+                    if ($item->alert_threshold === null) {
+                        return '<span class="text-muted">—</span>';
+                    }
+                    return $item->alert_threshold . ' ' . $item->stock_type;
+                })
+                ->rawColumns(['dishes', 'printer', 'stock', 'alert_threshold_fmt'])
                 ->toJson();
         } catch (\Exception $e) {
             return $this->exception($e);
