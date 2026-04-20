@@ -127,4 +127,66 @@ class AccountingController extends BaseController
 
         return $this->success(['message' => 'Fattura re-accodata per invio.']);
     }
+
+    public function customers(): View
+    {
+        return view('backoffice.accounting.customers.index');
+    }
+
+    public function customersDatatable(Request $request): JsonResponse
+    {
+        try {
+            $filters = $request->get('filters') ?? [];
+
+            $query = Customer::withCount('tableOrderInvoices')
+                ->orderBy('full_name');
+
+            if (!empty($filters['search'])) {
+                $q = $filters['search'];
+                $query->where(function ($sub) use ($q) {
+                    $sub->where('full_name', 'like', "%{$q}%")
+                        ->orWhere('fiscal_code', 'like', "%{$q}%")
+                        ->orWhere('vat_number', 'like', "%{$q}%");
+                });
+            }
+            if (!empty($filters['user_type'])) {
+                $query->where('user_type', $filters['user_type']);
+            }
+
+            $elements = $query->get();
+
+            return datatables()->of($elements)
+                ->addColumn('type_label', function ($item) {
+                    return match ($item->user_type) {
+                        'private'        => '<span class="label label-default">Privato</span>',
+                        'company'        => '<span class="label label-info">Azienda</span>',
+                        'public_company' => '<span class="label label-primary">PA</span>',
+                        default          => '—',
+                    };
+                })
+                ->addColumn('identifier', function ($item) {
+                    $parts = [];
+                    if ($item->vat_number)  $parts[] = 'P.IVA ' . e($item->vat_number);
+                    if ($item->fiscal_code) $parts[] = 'CF ' . e($item->fiscal_code);
+                    return implode('<br>', $parts) ?: '—';
+                })
+                ->addColumn('address_full', function ($item) {
+                    $parts = array_filter([$item->address, $item->zip_code, $item->city, $item->province ? '(' . $item->province . ')' : null]);
+                    return e(implode(' ', $parts)) ?: '—';
+                })
+                ->addColumn('destinatario', function ($item) {
+                    $parts = [];
+                    if ($item->codice_destinatario) $parts[] = 'SDI: ' . e($item->codice_destinatario);
+                    if ($item->pec_destinatario)    $parts[] = 'PEC: ' . e($item->pec_destinatario);
+                    return implode('<br>', $parts) ?: '—';
+                })
+                ->addColumn('invoices_count', function ($item) {
+                    return (int) ($item->table_order_invoices_count ?? 0);
+                })
+                ->rawColumns(['type_label', 'identifier', 'destinatario'])
+                ->make(true);
+        } catch (Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }

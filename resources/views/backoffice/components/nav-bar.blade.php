@@ -17,9 +17,23 @@
                 @include('backoffice.components.nav-bar-supplier')
                 @include('backoffice.components.nav-bar-item', ['route' => 'users.index', 'icon' => 'fa-users', 'label' => 'Utenti'])
                 <li class="{{ (Request::is('backoffice/accounting*')) ? 'active' : '' }}">
-                    <a href="{{ route('accounting.invoices.index') }}">
-                        <i class="fas fa-file-invoice"></i> <span class="nav-label">Contabilità</span>
+                    <a href="#">
+                        <i class="fas fa-file-invoice"></i>
+                        <span class="nav-label">Contabilità</span>
+                        <i class="far fa-arrow-alt-circle-down"></i>
                     </a>
+                    <ul class="nav nav-second-level collapse">
+                        <li class="{{ (Request::is('backoffice/accounting/invoices*')) ? 'active' : '' }}">
+                            <a href="{{ route('accounting.invoices.index') }}">
+                                <i class="fas fa-file-invoice"></i> Fatture
+                            </a>
+                        </li>
+                        <li class="{{ (Request::is('backoffice/accounting/customers*')) ? 'active' : '' }}">
+                            <a href="{{ route('accounting.customers.index') }}">
+                                <i class="fas fa-user-tie"></i> Clienti
+                            </a>
+                        </li>
+                    </ul>
                 </li>
                 <li class="{{ (Request::is('backoffice/restaurant/settings*')) ? 'active' : '' }}">
                     <a href="{{ route('restaurant.settings.index') }}">

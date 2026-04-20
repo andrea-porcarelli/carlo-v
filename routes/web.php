@@ -265,6 +265,10 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/{invoice}/xml', [AccountingController::class, 'xml'])->name('xml');
                 Route::post('/{invoice}/resend', [AccountingController::class, 'resend'])->name('resend');
             });
+            Route::group(['prefix' => '/customers', 'as' => 'customers.'], function() {
+                Route::get('/', [AccountingController::class, 'customers'])->name('index');
+                Route::get('/datatable', [AccountingController::class, 'customersDatatable'])->name('datatable');
+            });
         });
 
         // Sync
