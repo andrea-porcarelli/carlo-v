@@ -13,11 +13,16 @@ class MysondFatturaService
     protected $auth;
     public $wsdl;
     protected $authAde;
-    protected $endpoint = "https://cloud.mysond.it/service-ejb/FatturaElettronicaService?wsdl";
+    protected $endpoint;
+    protected $endpoints = [
+        'mysond'                          => 'https://cloud.mysond.it/service-ejb/FatturaElettronicaService?wsdl',
+        'CorrispettivoElettronicoService' => 'https://api-cassa.eportale.eu/service-ejb/CorrispettivoElettronicoService',
+    ];
 
     public function __construct()
     {
         $this->wsdl = 'mysond';
+        $this->endpoint = $this->endpoints[$this->wsdl];
         $this->auth = [
             'codiceAzienda' => config('services.mysond.codice_azienda'),
             'username'      => config('services.mysond.username'),
@@ -236,7 +241,59 @@ class MysondFatturaService
 
     public function setWsdl($wsdl)
     {
+        if ($this->wsdl === $wsdl) {
+            return;
+        }
         $this->wsdl = $wsdl;
+        if (isset($this->endpoints[$wsdl])) {
+            $this->endpoint = $this->endpoints[$wsdl];
+        }
+        $this->client = $this->initSoapClient();
+    }
+
+    public function cambiaPasswordAde(string $utenza, string $vecchiaPassword, string $nuovaPassword, ?string $confermaPassword = null)
+    {
+        $this->setWsdl('CorrispettivoElettronicoService');
+
+        $params = [
+            'arg0' => [
+                'utenteItem'       => $this->auth,
+                'utenza'           => $utenza,
+                'vecchiaPassword'  => $vecchiaPassword,
+                'nuovaPassword'    => $nuovaPassword,
+                'confermaPassword' => $confermaPassword ?? $nuovaPassword,
+            ],
+        ];
+
+        try {
+            $response = $this->client->cambiaPasswordAde($params);
+            $this->logDebug('cambiaPasswordAde', ['utenza' => $utenza]);
+            return $response->return ?? null;
+        } catch (Exception $e) {
+            $this->logDebug('cambiaPasswordAde', ['utenza' => $utenza], null, $e);
+            throw $e;
+        }
+    }
+
+    public function verificaCredenzialiAde(?array $utenteAdeOverride = null)
+    {
+        $this->setWsdl('CorrispettivoElettronicoService');
+
+        $params = [
+            'arg0' => [
+                'utenteItem'    => $this->auth,
+                'utenteAdeItem' => $utenteAdeOverride ?? $this->authAde,
+            ],
+        ];
+
+        try {
+            $response = $this->client->verificaCredenzialiAde($params);
+            $this->logDebug('verificaCredenzialiAde', $params);
+            return $response->return ?? null;
+        } catch (Exception $e) {
+            $this->logDebug('verificaCredenzialiAde', $params, null, $e);
+            throw $e;
+        }
     }
 
     public function getXmlFromP7m(string $xml) : string

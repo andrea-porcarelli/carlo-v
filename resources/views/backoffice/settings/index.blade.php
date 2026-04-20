@@ -8,6 +8,13 @@
 
 @section('main-content')
     @php $rendered = []; @endphp
+    <div class="panel panel-default">
+        <div class="panel-body">
+            <a href="{{ route('restaurant.settings.ade-cambio-password') }}" class="btn btn-warning">
+                <i class="fas fa-key"></i> Cambio password Agenzia Entrate
+            </a>
+        </div>
+    </div>
     <form class="needs-validation update-or-create-element" id="update-or-create-element">
         @foreach($grouped as $groupName => $settings)
             <div class="panel panel-default">

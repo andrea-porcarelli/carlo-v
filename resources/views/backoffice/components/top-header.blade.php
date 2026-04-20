@@ -9,6 +9,32 @@
             <li>
                 <span class="m-r-sm text-muted welcome-message"></span>
             </li>
+            @php
+                $adeStatus      = \App\Models\Setting::get('agenzia_entrate.check_last_status', null);
+                $adeDesc        = \App\Models\Setting::get('agenzia_entrate.check_last_descrizione', '');
+                $adeCodice      = \App\Models\Setting::get('agenzia_entrate.check_last_codice', '');
+                $adeCheckedAtIso= \App\Models\Setting::get('agenzia_entrate.check_last_at', null);
+                $adeCheckedAt   = $adeCheckedAtIso ? \Carbon\Carbon::parse($adeCheckedAtIso)->format('d/m/Y H:i') : 'mai';
+                $adeIcon        = match($adeStatus) {
+                    'ok'      => 'fa-check-circle text-success',
+                    'warning' => 'fa-exclamation-circle text-warning',
+                    'error'   => 'fa-exclamation-triangle text-danger',
+                    default   => 'fa-question-circle text-muted',
+                };
+                $adeLabel       = match($adeStatus) {
+                    'ok'      => 'Credenziali AdE OK',
+                    'warning' => 'Pacchetto MySond non attivo',
+                    'error'   => 'Credenziali AdE: problema',
+                    default   => 'Credenziali AdE: nessun check',
+                };
+                $adeTitle       = $adeLabel . ' — ultimo check: ' . $adeCheckedAt . ($adeDesc ? ' | ' . $adeDesc : '') . ($adeCodice ? ' (cod. ' . $adeCodice . ')' : '');
+            @endphp
+            <li title="{{ $adeTitle }}">
+                <span class="navbar-text">
+                    <i class="fa {{ $adeIcon }}"></i>
+                    <span class="hidden-xs">AdE</span>
+                </span>
+            </li>
             @if(Auth::id() == 1 && in_array(config('sync.role'), ['web', 'local']))
             <li>
                 <a href="#" onclick="triggerDeploy(); return false;" title="Deploy (git pull)">

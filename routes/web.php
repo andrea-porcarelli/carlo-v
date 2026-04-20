@@ -226,6 +226,8 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::group(['prefix' => '/settings', 'as' => 'settings.'], function() {
                 Route::get('/', [SettingController::class, 'index'])->name('index');
                 Route::post('/', [SettingController::class, 'store']);
+                Route::get('/agenzia-entrate/cambio-password', [SettingController::class, 'adeCambioPassword'])->name('ade-cambio-password');
+                Route::post('/agenzia-entrate/cambio-password', [SettingController::class, 'adeCambioPasswordStore']);
             });
             Route::group(['prefix' => '/allergens', 'as' => 'allergens.'], function() {
                 Route::get('/', [AllergenController::class, 'index'])->name('index');

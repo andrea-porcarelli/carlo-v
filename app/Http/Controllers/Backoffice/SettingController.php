@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Backoffice;
 
+use App\Facades\Utils;
 use App\Models\Printer;
 use App\Models\Setting;
+use App\Services\MysondFatturaService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 class SettingController extends BaseController
@@ -80,5 +83,58 @@ class SettingController extends BaseController
         } catch (Exception $e) {
             return $this->exception($e, $request);
         }
+    }
+
+    public function adeCambioPassword(): View
+    {
+        $utenza         = Utils::setting('agenzia_entrate.utenza');
+        $changedAtIso   = Setting::get('agenzia_entrate.password_changed_at');
+        $changedAt      = $changedAtIso ? Carbon::parse($changedAtIso)->format('d/m/Y H:i') : null;
+        $daysSinceChange = $changedAtIso ? Carbon::parse($changedAtIso)->diffInDays(now()) : null;
+
+        return view('backoffice.settings.ade-cambio-password', compact('utenza', 'changedAt', 'daysSinceChange'));
+    }
+
+    public function adeCambioPasswordStore(Request $request, MysondFatturaService $service): JsonResponse
+    {
+        $data = $request->validate([
+            'utenza'            => ['required', 'string'],
+            'vecchia_password'  => ['required', 'string'],
+            'nuova_password'    => ['required', 'string', 'min:8', 'different:vecchia_password'],
+            'conferma_password' => ['required', 'string', 'same:nuova_password'],
+        ]);
+
+        try {
+            $result = $service->cambiaPasswordAde(
+                $data['utenza'],
+                $data['vecchia_password'],
+                $data['nuova_password'],
+                $data['conferma_password'],
+            );
+        } catch (Exception $e) {
+            return $this->exception($e, $request);
+        }
+
+        $esito       = isset($result->esito) ? (int) $result->esito : null;
+        $codice      = $result->codice ?? null;
+        $descrizione = $result->descrizione ?? ($result->messaggio ?? null);
+
+        if ($esito !== 0) {
+            return $this->error([
+                'message' => $descrizione ?: 'Cambio password non riuscito',
+                'codice'  => $codice,
+                'esito'   => $esito,
+            ]);
+        }
+
+        Setting::set('agenzia_entrate.password', $data['nuova_password']);
+        Setting::set('agenzia_entrate.password_changed_at', now()->toIso8601String());
+
+        return $this->success([
+            'response'    => 'success',
+            'message'     => $descrizione ?: 'Password aggiornata correttamente',
+            'codice'      => $codice,
+            'esito'       => $esito,
+        ]);
     }
 }
