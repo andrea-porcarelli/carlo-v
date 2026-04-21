@@ -50,10 +50,10 @@
                     </div>
                 </div>
                 <div style="display:flex; gap:6px;">
-                    <button id="closeModifyNoPrintBtn" style="background:#6c757d; border:none; color:white; height:34px; padding:0 10px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; cursor:pointer;">
+                    <button id="closeModifyNoPrintBtn" style="background:#6c757d; border:none; color:white; height:34px; min-width:170px; padding:0 10px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; cursor:pointer;">
                         <i class="fas fa-times"></i> Chiudi senza stampare
                     </button>
-                    <button id="closeModifyBtn" style="background:#dc3545; border:none; color:white; height:34px; padding:0 13px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; cursor:pointer;">
+                    <button id="closeModifyBtn" style="background:#dc3545; border:none; color:white; height:34px; min-width:170px; padding:0 10px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; cursor:pointer;">
                         <i class="fas fa-sign-out-alt"></i> Chiudi e invia
                     </button>
                 </div>

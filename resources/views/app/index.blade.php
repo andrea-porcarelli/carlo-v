@@ -43,8 +43,8 @@
                 <div style="width: 100%; height: 100%; padding: 15px; display:flex; flex-direction:column; gap:10px;">
                     <!-- Top bar -->
                     <div style="display:flex; justify-content:flex-end; flex-shrink:0; gap:8px;">
-                        <button style="background: #6c757d; border: none; color: white; height: 36px; padding: 0 16px; cursor: pointer; font-size: 13px; font-weight: 700; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;" id="closeModifyNoPrintBtn"><i class="fas fa-times"></i> Chiudi senza stampare</button>
-                        <button style="background: #dc3545; border: none; color: white; height: 36px; padding: 0 16px; cursor: pointer; font-size: 13px; font-weight: 700; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;" id="closeModifyBtn"><i class="fas fa-sign-out-alt"></i> Chiudi e invia</button>
+                        <button style="background: #6c757d; border: none; color: white; height: 36px; min-width: 220px; padding: 0 16px; cursor: pointer; font-size: 13px; font-weight: 700; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;" id="closeModifyNoPrintBtn"><i class="fas fa-times"></i> Chiudi senza stampare</button>
+                        <button style="background: #dc3545; border: none; color: white; height: 36px; min-width: 220px; padding: 0 16px; cursor: pointer; font-size: 13px; font-weight: 700; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;" id="closeModifyBtn"><i class="fas fa-sign-out-alt"></i> Chiudi e invia</button>
                     </div>
 
                     <div style="display:flex; gap:10px; flex:1; min-height:0;">
