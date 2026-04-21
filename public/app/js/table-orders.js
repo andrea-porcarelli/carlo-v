@@ -857,12 +857,17 @@ class TableOrdersManager {
         const isBanco = !!this.currentTable?.table?.is_banco;
         const closeBtn = document.getElementById('closeModifyBtn');
         const closeNoPrintBtn = document.getElementById('closeModifyNoPrintBtn');
-
-        if (!isBanco) return; // non-banco tables are handled elsewhere
+        const chiudiTavoloBtn = document.getElementById('btnChiudiTavolo');
 
         const hasItems = (this.modifySession.items || []).some(i => !(i.segue && !i.dish_id));
-        if (closeBtn) closeBtn.style.display = hasItems ? 'none' : '';
-        if (closeNoPrintBtn) closeNoPrintBtn.style.display = hasItems ? 'none' : '';
+
+        if (isBanco) {
+            if (closeBtn) closeBtn.style.display = hasItems ? 'none' : '';
+            if (closeNoPrintBtn) closeNoPrintBtn.style.display = hasItems ? 'none' : '';
+            if (chiudiTavoloBtn) chiudiTavoloBtn.style.display = 'none';
+        } else {
+            if (chiudiTavoloBtn) chiudiTavoloBtn.style.display = hasItems ? 'none' : '';
+        }
     }
 
     /**
@@ -3112,6 +3117,49 @@ class TableOrdersManager {
             },
             tableId
         );
+    }
+
+    async chiudiTavoloVuoto() {
+        if (!this.currentTable) return;
+
+        const hasItems = (this.modifySession.items || []).some(i => !(i.segue && !i.dish_id));
+        if (hasItems) {
+            this.showNotification('Il tavolo contiene piatti: non è possibile chiuderlo senza incasso', 'error');
+            return;
+        }
+
+        if (!confirm('Chiudere il tavolo senza incasso?')) return;
+
+        let auth;
+        try {
+            auth = await operatorAuthManager.requestAuth();
+            if (!auth) return;
+        } catch {
+            return;
+        }
+
+        const tableId = this.currentTable.table.id;
+        try {
+            const response = await fetch(`${this.apiBase}/${tableId}/pay`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': auth.token,
+                },
+                body: JSON.stringify({ payment_method: 'chiusura_conto' }),
+            });
+            const result = await response.json();
+            if (!result.success) {
+                this.showNotification(result.message || 'Errore nella chiusura del tavolo', 'error');
+                return;
+            }
+            this.showNotification('Tavolo chiuso');
+            this._afterPaymentSuccess();
+        } catch (error) {
+            console.error('Error chiudi tavolo vuoto:', error);
+            this.showNotification('Errore nella chiusura del tavolo', 'error');
+        }
     }
 
     /**

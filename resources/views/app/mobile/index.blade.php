@@ -135,6 +135,9 @@
                 <button class="action-btn-v" id="btnModifyFreeTable" style="background:#20c997; color:#fff;">
                     <i class="fas fa-cash-register"></i> CHIUDI
                 </button>
+                <button class="action-btn-v" id="btnChiudiTavolo" style="background:#20c997; color:#fff; display:none;">
+                    <i class="fas fa-door-open"></i> CHIUDI TAVOLO
+                </button>
                 <button class="action-btn-v" id="btnSpostaTavolo" style="background:#fd7e14;">
                     <i class="fas fa-exchange-alt"></i> SPOSTA
                 </button>

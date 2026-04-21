@@ -85,6 +85,13 @@ $(document).ready(function() {
         }
     });
 
+    // Chiudi tavolo vuoto (nessun piatto) — solo visibile quando non ci sono piatti
+    $('#btnChiudiTavolo').click(function() {
+        if (typeof tableOrdersManager !== 'undefined') {
+            tableOrdersManager.chiudiTavoloVuoto();
+        }
+    });
+
     // Comunica from modify overlay
     $('#btnModifyComunica').click(function() {
         if (typeof tableOrdersManager !== 'undefined') {
