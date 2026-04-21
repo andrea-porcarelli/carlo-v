@@ -1128,11 +1128,13 @@ body {
         gap: 7px !important;
     }
 
-    /* Barra "Chiudi e invia" */
-    #closeModifyBtn {
+    /* Barra "Chiudi senza stampare" / "Chiudi e invia" */
+    #closeModifyBtn,
+    #closeModifyNoPrintBtn {
         height: 30px !important;
         font-size: 11px !important;
         padding: 0 12px !important;
+        min-width: 185px !important;
     }
 
     /* — Colonna ordine (sinistra): larghezza fissa invece del 33% — */
