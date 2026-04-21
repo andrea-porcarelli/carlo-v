@@ -2791,12 +2791,6 @@ class TableOrdersManager {
         const splitPerms = auth.permissions ?? [];
         console.log('🔐 Permission Check (Split) - Method:', method, '| Permissions:', splitPerms);
 
-        if (!splitPerms.includes('close_bills')) {
-            console.log('❌ BLOCKED (Split): Missing close_bills permission');
-            this.showNotification('Non hai il permesso di chiudere i conti', 'error');
-            document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
-            return;
-        }
         const isContantiMethod = method === 'contanti' || method === 'fattura_contanti';
         const isPosMethod = method === 'pos' || method === 'fattura_pos';
         if (isContantiMethod && !splitPerms.includes('cash_payment')) {
@@ -3074,15 +3068,14 @@ class TableOrdersManager {
             return;
         }
 
-        // Check close_bills permission
         const perms = auth.permissions ?? [];
         console.log('🔐 Permission Check - Operation: chiudiContoContanti | Permissions:', perms);
-        if (!perms.includes('close_bills')) {
-            console.log('❌ BLOCKED: Missing close_bills permission');
-            this.showNotification('Non hai il permesso di chiudere i conti', 'error');
+        if (!perms.includes('cash_payment')) {
+            console.log('❌ BLOCKED: Missing cash_payment permission');
+            this.showNotification('Non hai il permesso di ricevere pagamenti in contanti', 'error');
             return;
         }
-        console.log('✅ ALLOWED: close_bills permission granted');
+        console.log('✅ ALLOWED: cash_payment permission granted');
 
         const amount = parseFloat(this.currentTable.order.discounted_total ?? this.currentTable.order.total_amount ?? 0);
         const tableId = this.currentTable.table.id;
@@ -3177,11 +3170,6 @@ class TableOrdersManager {
         const perms = auth.permissions ?? [];
         console.log('🔐 Permission Check - Method:', method, '| Permissions:', perms);
 
-        if (!perms.includes('close_bills')) {
-            console.log('❌ BLOCKED: Missing close_bills permission');
-            this.showNotification('Non hai il permesso di chiudere i conti', 'error');
-            return;
-        }
         if (method === 'contanti' && !perms.includes('cash_payment')) {
             console.log('❌ BLOCKED: Missing cash_payment permission');
             this.showNotification('Non hai il permesso di ricevere pagamenti in contanti', 'error');

@@ -6,7 +6,6 @@ $permissionMeta = [
     'view_orders'  => ['icon' => 'fa-eye',            'color' => '#1ab394', 'desc' => 'Può consultare le comande attive sui tavoli'],
     'cash_payment' => ['icon' => 'fa-coins',          'color' => '#f8ac59', 'desc' => 'Può incassare pagamenti in contanti e aprire il cassetto'],
     'pos_payment'  => ['icon' => 'fa-credit-card',    'color' => '#23c6c8', 'desc' => 'Può processare pagamenti tramite terminale POS'],
-    'close_bills'     => ['icon' => 'fa-receipt',        'color' => '#ed5565', 'desc' => 'Può avviare il flusso di chiusura del conto'],
     'invoice_payment' => ['icon' => 'fa-file-invoice',  'color' => '#6f42c1', 'desc' => 'Può emettere fatture durante il pagamento'],
 ];
 @endphp
