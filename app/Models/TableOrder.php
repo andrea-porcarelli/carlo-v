@@ -76,6 +76,14 @@ class TableOrder extends Model
     }
 
     /**
+     * Corrispettivi elettronici (emissioni e annulli) associati al tavolo
+     */
+    public function corrispettivi(): HasMany
+    {
+        return $this->hasMany(TableOrderCorrispettivo::class)->orderBy('id');
+    }
+
+    /**
      * Calculate and update the total amount (including cover charge)
      */
     public function updateTotal(): void

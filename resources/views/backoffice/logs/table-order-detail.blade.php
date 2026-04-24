@@ -165,6 +165,137 @@
                     </div>
                     @endif
 
+                    <!-- Sconto applicato all'ordine -->
+                    @if($tableOrder->hasDiscount())
+                    @php
+                        $discountLabel = $tableOrder->discount_type === 'percent'
+                            ? number_format((float) $tableOrder->discount_amount, 0) . '%'
+                            : '€' . number_format((float) $tableOrder->discount_amount, 2);
+                        $discountedTotal = $tableOrder->getDiscountedTotal();
+                    @endphp
+                    <div class="alert mb-4" style="background: linear-gradient(135deg, #dc3545 0%, #b02a37 100%); border: none; border-radius: 8px;">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-tag fa-2x text-white mr-3"></i>
+                            <div class="flex-grow-1">
+                                <h5 class="text-white mb-1 font-weight-bold">
+                                    Sconto applicato: {{ $discountLabel }}
+                                </h5>
+                                <small class="text-white-50 d-block">
+                                    Sconto €{{ number_format((float) $tableOrder->discount_value, 2) }}
+                                    — Totale scontato: <strong>€{{ number_format($discountedTotal, 2) }}</strong>
+                                    (originale €{{ number_format((float) $tableOrder->total_amount, 2) }})
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
+                    <!-- Corrispettivi elettronici -->
+                    @if($tableOrder->corrispettivi->isNotEmpty())
+                    @php
+                        $statusBadge = [
+                            'pending'   => 'secondary',
+                            'sending'   => 'info',
+                            'sent'      => 'success',
+                            'failed'    => 'danger',
+                            'cancelled' => 'dark',
+                        ];
+                    @endphp
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h3 class="card-title">
+                                <i class="fas fa-receipt"></i> Corrispettivi elettronici
+                            </h3>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>Data</th>
+                                        <th>Preconto</th>
+                                        <th>Pagamento</th>
+                                        <th class="text-right">Totale</th>
+                                        <th>Progressivo</th>
+                                        <th>ID Transazione</th>
+                                        <th>Stato</th>
+                                        <th>Tentativi</th>
+                                        <th>Operatore</th>
+                                        <th class="text-right">Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($tableOrder->corrispettivi as $c)
+                                    <tr>
+                                        <td>
+                                            @if($c->isAnnullo())
+                                                <span class="badge badge-dark">Annullo</span>
+                                                @if($c->emissioneAnnullata)
+                                                    <small class="text-muted d-block">di #{{ $c->emissioneAnnullata->id }}</small>
+                                                @endif
+                                            @else
+                                                <span class="badge badge-primary">Emissione</span>
+                                            @endif
+                                        </td>
+                                        <td>{{ ($c->sent_at ?? $c->created_at)->format('d/m/Y H:i:s') }}</td>
+                                        <td>{{ $c->precontoSplit?->label ?? '—' }}</td>
+                                        <td>{{ $c->payment_method }}</td>
+                                        <td class="text-right">€{{ number_format((float)$c->importo_totale, 2) }}</td>
+                                        <td>
+                                            @if($c->progressivo_sdi)
+                                                <code>{{ $c->progressivo_sdi }}</code>
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($c->identificativo_sdi)
+                                                <code>{{ $c->identificativo_sdi }}</code>
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <span class="badge badge-{{ $statusBadge[$c->status] ?? 'secondary' }}">
+                                                {{ $c->getStatusLabel() }}
+                                            </span>
+                                            @if($c->last_error)
+                                                <i class="fas fa-exclamation-triangle text-danger ml-1"
+                                                   title="{{ $c->last_error }}"></i>
+                                            @endif
+                                        </td>
+                                        <td>{{ $c->attempts }}/{{ $c->max_attempts }}</td>
+                                        <td>{{ $c->operator?->name ?? '—' }}</td>
+                                        <td class="text-right">
+                                            @if($c->canRetry())
+                                                <form action="{{ route('backoffice.corrispettivi.riprova', $c->id) }}"
+                                                      method="POST" style="display:inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-warning"
+                                                            onclick="return confirm('Riprovare l\'invio del corrispettivo?');">
+                                                        <i class="fas fa-redo"></i> Riprova
+                                                    </button>
+                                                </form>
+                                            @endif
+                                            @if($c->canCancel())
+                                                <form action="{{ route('backoffice.corrispettivi.annulla', $c->id) }}"
+                                                      method="POST" style="display:inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-danger"
+                                                            onclick="return confirm('Annullare il corrispettivo {{ $c->progressivo_sdi }}? L\'operazione è irreversibile.');">
+                                                        <i class="fas fa-ban"></i> Annulla
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    @endif
+
                     <!-- Timeline dei log -->
                     <div class="timeline">
                         @php

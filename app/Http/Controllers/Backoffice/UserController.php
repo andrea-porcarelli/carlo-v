@@ -253,11 +253,14 @@ class UserController extends BaseController
                     'password' => 'nullable|digits_between:1,5',
                     'permissions' => 'nullable|array',
                     'permissions.*' => 'string|in:' . implode(',', array_keys(User::availablePermissions())),
+                    'authentication_pin' => ['nullable', 'digits_between:1,5', Rule::unique('users')->ignore($user->id)],
                 ], [
                     'name.required' => 'Il nome è obbligatorio',
                     'password.digits_between' => 'La password deve essere numerica, da 1 a 5 cifre',
                     'role.required' => 'Il ruolo è obbligatorio',
                     'role.in' => 'Ruolo non valido',
+                    'authentication_pin.digits_between' => 'Il PIN deve essere numerico, da 1 a 5 cifre',
+                    'authentication_pin.unique' => 'Questo PIN è già assegnato a un altro utente',
                 ]);
 
                 DB::beginTransaction();
@@ -268,8 +271,8 @@ class UserController extends BaseController
                     'permissions' => $validated['permissions'] ?? [],
                 ];
 
-                if (!empty($validated['password'])) {
-                    $updateData['password'] = Hash::make($validated['password']);
+                if (!empty($validated['authentication_pin'])) {
+                    $updateData['authentication_pin'] = $validated['authentication_pin'];
                 }
 
                 $user->update($updateData);

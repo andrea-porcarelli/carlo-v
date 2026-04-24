@@ -520,6 +520,42 @@ class TableOrdersManager {
     }
 
     /**
+     * Tasto veloce "Segue" (mobile): inserisce o rimuove il separatore
+     * in coda all'ordine a seconda dello stato corrente dell'ultimo elemento.
+     */
+    async toggleSegueAfterLast() {
+        const items = this.modifySession?.items;
+        if (!items || items.length === 0) {
+            this.showNotification('Aggiungi un piatto prima di impostare il segue', 'warning');
+            return;
+        }
+        const last = items[items.length - 1];
+        const lastIsSegue = !!(last.segue && !last.dish_id);
+        if (lastIsSegue) {
+            await this.removeSegueItem(last.id);
+            this.showNotification('Segue rimosso', 'info');
+        } else {
+            await this.addSegueAfter(last.id);
+            this.showNotification('Segue aggiunto', 'success');
+        }
+        this._updateQuickSegueButton();
+    }
+
+    /**
+     * Aggiorna lo stato visivo del bottone mobile "Segue" (attivo/no)
+     * in base alla presenza di un separatore come ultimo elemento.
+     */
+    _updateQuickSegueButton() {
+        const btn = document.getElementById('btnQuickSegueMobile');
+        if (!btn) return;
+        const items = this.modifySession?.items ?? [];
+        const last = items[items.length - 1];
+        const active = !!(last && last.segue && !last.dish_id);
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+
+    /**
      * Remove a segue separator item (no operator auth required).
      * For saved items (id > 0): deletes from DB.
      * For new items (id < 0): removes locally from session and pendingAdd.
@@ -631,6 +667,10 @@ class TableOrdersManager {
             const btn = document.getElementById(id);
             if (btn) btn.style.display = isBanco ? 'none' : '';
         });
+        // "Invia ordine" è visibile SOLO in modalità banco (l'ordine al banco resta
+        // aperto dopo l'invio in cucina; sui tavoli normali si usa "Marcia").
+        const btnInvia = document.getElementById('btnInviaOrdine');
+        if (btnInvia) btnInvia.style.display = isBanco ? '' : 'none';
         // For banco: toggle close buttons based on whether items exist
         this._updateBancoCloseButtons();
 
@@ -799,7 +839,11 @@ class TableOrdersManager {
                 </div>`;
             }
             pendingSplits.forEach(s => {
-                itemsHtml += `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;color:#6c757d;margin-bottom:2px;">
+                itemsHtml += `<div class="pending-split-row" data-split-id="${s.id}"
+                    onclick="tableOrdersManager.openPaymentForSplit(${s.id})"
+                    style="display:flex;justify-content:space-between;align-items:center;font-size:0.8rem;color:#6c757d;margin-bottom:2px;cursor:pointer;padding:4px 6px;border-radius:4px;transition:background 0.15s;"
+                    onmouseover="this.style.background='#fff3e0';" onmouseout="this.style.background='';"
+                    title="Clicca per incassare questo preconto">
                     <span><i class="fas fa-clock me-1"></i>${s.label || 'Preconto'}</span>
                     <span style="background:#fd7e14;color:white;padding:1px 6px;border-radius:3px;font-size:0.75rem;">€${parseFloat(s.total).toFixed(2)} DA PAGARE</span>
                 </div>`;
@@ -847,6 +891,7 @@ class TableOrdersManager {
         totalElement.textContent = `€${finalTotal.toFixed(2)}`;
 
         this._updateBancoCloseButtons();
+        this._updateQuickSegueButton();
     }
 
     /**
@@ -908,6 +953,7 @@ class TableOrdersManager {
 
         try {
             const auth = await operatorAuthManager.requestAuth();
+            if (!auth?.token) return;
 
             // rawTotal già calcolato sopra
             const finalTotal = discountType === 'percent'
@@ -916,7 +962,7 @@ class TableOrdersManager {
 
             // Save log via API
             const tableId = this.currentTable.table.id;
-            await fetch(`${this.apiBase}/${tableId}/apply-discount`, {
+            const response = await fetch(`${this.apiBase}/${tableId}/apply-discount`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -928,11 +974,27 @@ class TableOrdersManager {
                     discount_amount: discountVal,
                     original_total:  rawTotal,
                     final_total:     finalTotal,
+                    order_id:        this.currentTable?.order?.id ?? null,
                 }),
             });
 
+            const result = await response.json().catch(() => null);
+            if (!response.ok || !result?.success) {
+                const msg = result?.message ?? `Errore salvataggio sconto (HTTP ${response.status})`;
+                this.showNotification(msg, 'error');
+                console.error('apply-discount failed:', { status: response.status, body: result });
+                return;
+            }
+
+            // Usa i valori server come fonte di verità (evita drift tra UI locale e DB)
+            const saved = result.data ?? {};
+            const savedType   = saved.discount_type   ?? discountType;
+            const savedAmount = Number.isFinite(parseFloat(saved.discount_amount)) ? parseFloat(saved.discount_amount) : discountVal;
+            const savedValue  = Number.isFinite(parseFloat(saved.discount_value))  ? parseFloat(saved.discount_value)  : (rawTotal - finalTotal);
+            const savedDiscountedTotal = Number.isFinite(parseFloat(saved.discounted_total)) ? parseFloat(saved.discounted_total) : finalTotal;
+
             // Lock discount UI and apply
-            this._authorizedDiscount = { type: discountType, value: discountVal };
+            this._authorizedDiscount = { type: savedType, value: savedAmount };
             if (discountInput) discountInput.disabled = true;
             const btnApply = document.getElementById('btnApplyDiscount');
             const btnReset = document.getElementById('btnResetDiscount');
@@ -941,21 +1003,23 @@ class TableOrdersManager {
 
             // Persist discount fields in local order state
             if (this.currentTable?.order) {
-                this.currentTable.order.discount_type   = discountType;
-                this.currentTable.order.discount_amount = discountVal;
-                this.currentTable.order.discount_value  = rawTotal - finalTotal;
-                this.currentTable.order.discounted_total = finalTotal;
+                this.currentTable.order.discount_type    = savedType;
+                this.currentTable.order.discount_amount  = savedAmount;
+                this.currentTable.order.discount_value   = savedValue;
+                this.currentTable.order.discounted_total = savedDiscountedTotal;
             }
 
             this.updateModifyReceiptItems();
             this.showNotification(`Sconto autorizzato da ${auth.user.name}`, 'success');
-        } catch {
-            // auth cancelled or error — do nothing
+        } catch (e) {
+            console.warn('requestDiscountAuth error:', e);
         }
     }
 
     /**
-     * Reset the authorized discount
+     * Reset the authorized discount — richiama l'API per cancellare
+     * lo sconto persistito sull'ordine e pulisce la UI locale.
+     * Da chiamare SOLO quando l'operatore vuole rimuovere lo sconto.
      */
     async resetDiscount() {
         // Call API to clear discount from DB
@@ -975,7 +1039,16 @@ class TableOrdersManager {
                 console.warn('reset-discount API error:', e);
             }
         }
+        this._clearDiscountUI();
+        this.updateModifyReceiptItems();
+    }
 
+    /**
+     * Pulisce SOLO lo stato e i controlli UI dello sconto (senza toccare il DB).
+     * Usato quando si chiude la modale di modifica: lo sconto persistito sull'ordine
+     * deve sopravvivere alla chiusura, la UI va riazzerata per la prossima apertura.
+     */
+    _clearDiscountUI() {
         this._authorizedDiscount = null;
         if (this.currentTable?.order) {
             this.currentTable.order.discount_type   = null;
@@ -989,7 +1062,6 @@ class TableOrdersManager {
         const btnReset = document.getElementById('btnResetDiscount');
         if (btnApply) btnApply.style.display = 'inline-flex';
         if (btnReset) btnReset.style.display = 'none';
-        this.updateModifyReceiptItems();
     }
 
     /**
@@ -2574,18 +2646,43 @@ class TableOrdersManager {
     }
 
     /**
+     * Apre direttamente la modale di pagamento puntando a uno specifico preconto emesso,
+     * evidenziandolo e facendo scroll sul relativo blocco.
+     */
+    openPaymentForSplit(splitId) {
+        if (!this.currentTable?.order) {
+            this.showNotification('Nessun ordine attivo per questo tavolo', 'error');
+            return;
+        }
+        this.showPaymentMethodModal({ highlightSplitId: splitId });
+    }
+
+    /**
      * Show payment method selection modal
      * If there are preconto splits, show the split payment view instead.
      */
-    async showPaymentMethodModal() {
+    async showPaymentMethodModal({ highlightSplitId = null } = {}) {
         const modal = document.getElementById('paymentMethodModal');
         if (!modal) return;
 
-        // Populate info
+        // Populate info. Mostriamo il totale EFFETTIVO dopo sconto:
+        // se c'è discounted_total usiamo quello, altrimenti calcoliamo da total_amount − discount_value,
+        // fallback finale al total_amount grezzo.
         const tableNum = document.getElementById('pmTableNumber');
         const total = document.getElementById('pmTotalAmount');
         if (tableNum) tableNum.textContent = this.currentTable.table.table_number;
-        if (total) total.textContent = `€${parseFloat(this.currentTable.order.total_amount).toFixed(2)}`;
+        if (total) {
+            const order = this.currentTable.order;
+            const raw = parseFloat(order.total_amount) || 0;
+            const discountedFromBackend = parseFloat(order.discounted_total);
+            const discountedFromValue = order.discount_value
+                ? Math.max(0, raw - parseFloat(order.discount_value))
+                : null;
+            const effective = Number.isFinite(discountedFromBackend) && discountedFromBackend > 0
+                ? discountedFromBackend
+                : (discountedFromValue ?? raw);
+            total.textContent = `€${effective.toFixed(2)}`;
+        }
 
         modal.style.display = 'flex';
 
@@ -2597,12 +2694,32 @@ class TableOrdersManager {
             const data = await resp.json();
             if (data.success && data.data.splits && data.data.splits.length > 0) {
                 this._showSplitPaymentView(data.data.splits, data.data.remaining, data.data.order_total);
+                if (highlightSplitId) {
+                    this._highlightSplitRow(highlightSplitId);
+                }
             } else {
                 this._showNormalPaymentView();
             }
         } catch (e) {
             this._showNormalPaymentView();
         }
+    }
+
+    /**
+     * Scrolla al preconto indicato nella modale split e lo evidenzia brevemente.
+     */
+    _highlightSplitRow(splitId) {
+        // _showSplitPaymentView renderizza sincronamente; il requestAnimationFrame
+        // ci assicura che il layout sia stato applicato prima dello scroll.
+        requestAnimationFrame(() => {
+            const row = document.querySelector(`.split-pay-row[data-split-id="${splitId}"]`);
+            if (!row) return;
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const previousBox = row.style.boxShadow;
+            row.style.transition = 'box-shadow 0.3s';
+            row.style.boxShadow = '0 0 0 3px #fd7e14';
+            setTimeout(() => { row.style.boxShadow = previousBox; }, 1600);
+        });
     }
 
     _showNormalPaymentView() {
@@ -2819,6 +2936,35 @@ class TableOrdersManager {
         console.log('✅ ALLOWED (Split): All permissions granted');
 
         const doPaySplit = async () => {
+            // Se il cassetto è fallito, il fallback ha già pagato lo split ed emesso
+            // il corrispettivo. Se il tavolo è stato chiuso (ultimo split) chiudiamo la UI,
+            // altrimenti ricarichiamo la vista split per far pagare i residui.
+            if (this._paymentHandledByFallback) {
+                const orderClosed = this._paymentFallbackOrderClosed !== false;
+                this._paymentHandledByFallback = false;
+                this._paymentFallbackOrderClosed = true;
+                this._paymentFallbackSplitId = null;
+                if (orderClosed) {
+                    this.closePaymentMethodModal();
+                    this._afterPaymentSuccess();
+                } else {
+                    // Rimuovi questo split dalla sessione locale e ricarica lista
+                    this.modifySession.pendingSplits = (this.modifySession.pendingSplits ?? []).filter(s => s.id !== splitId);
+                    try {
+                        const splitsResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
+                            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+                        });
+                        const splitsData = await splitsResp.json();
+                        if (splitsData.success) {
+                            this._showSplitPaymentView(splitsData.data.splits, splitsData.data.remaining, splitsData.data.order_total);
+                        }
+                    } catch (e) {
+                        console.error('Error reloading splits after fallback:', e);
+                    }
+                    document.querySelectorAll('.split-pay-btn').forEach(b => b.disabled = false);
+                }
+                return;
+            }
             try {
                 const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay-split/${splitId}`, {
                     method: 'POST',
@@ -2832,6 +2978,7 @@ class TableOrdersManager {
                 const result = await resp.json();
 
                 if (result.success) {
+                    this._notifyCorrispettivoResult(result.data?.corrispettivo);
                     if (result.data?.order_closed) {
                         this.showNotification('Conto chiuso completamente', 'success');
                         this.closePaymentMethodModal();
@@ -2872,10 +3019,10 @@ class TableOrdersManager {
             }
         };
 
-        if (method === 'contanti') {
+        if (method === 'contanti' || method === 'chiusura_conto') {
             const splitData = this._splitsData?.find(s => s.id === splitId);
             const amount = parseFloat(splitData?.total ?? 0);
-            await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, doPaySplit, null, this.currentTable.table.id);
+            await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, doPaySplit, null, this.currentTable.table.id, splitId, method);
         } else {
             await doPaySplit();
         }
@@ -2892,7 +3039,7 @@ class TableOrdersManager {
     /**
      * Chiudi conto con pagamento contanti e apri il cassetto.
      */
-    async startCashDrawerFlow(amount, tableOrderId, authToken, onComplete = null, onReady = null, tableId = null) {
+    async startCashDrawerFlow(amount, tableOrderId, authToken, onComplete = null, onReady = null, tableId = null, splitId = null, paymentMethod = 'contanti') {
         const overlay = document.getElementById('cashDrawerOverlay');
         const statusEl = document.getElementById('cashDrawerStatus');
         const amountEl = document.getElementById('cashDrawerAmount');
@@ -2912,6 +3059,8 @@ class TableOrdersManager {
 
         this._cashDrawerToken = authToken;
         this._cashDrawerTableId = tableId;
+        this._cashDrawerSplitId = splitId;
+        this._cashDrawerPaymentMethod = paymentMethod;
         this._cashDrawerPollErrors = 0;
         // Assegna subito onComplete così _executeCashDrawerFallback può usarlo anche in caso di errore all'avvio
         this._cashDrawerOnComplete = onComplete ?? (() => this._afterPaymentSuccess());
@@ -3023,6 +3172,8 @@ class TableOrdersManager {
         this._cashDrawerOperationId = null;
         this._cashDrawerToken = null;
         this._cashDrawerTableId = null;
+        this._cashDrawerSplitId = null;
+        this._cashDrawerPaymentMethod = null;
         this._cashDrawerPollErrors = 0;
         this._cashDrawerOnComplete = null;
     }
@@ -3034,23 +3185,47 @@ class TableOrdersManager {
         clearInterval(this._cashDrawerPollInterval);
         this._cashDrawerPollInterval = null;
 
-        // Invia log al backend prima di completare il pagamento
+        // Invia log al backend prima di completare il pagamento.
+        // Se stiamo pagando uno split, passiamo split_id così il backend chiude SOLO
+        // lo split (e chiude il tavolo intero solo quando il residuo è zero).
+        // Il backend emette COMUNQUE il corrispettivo: lo scontrino fiscale deve
+        // essere emesso anche quando la cassa automatica fallisce.
         const tableId = this._cashDrawerTableId;
         const authToken = this._cashDrawerToken;
+        const splitId = this._cashDrawerSplitId;
+        const paymentMethod = this._cashDrawerPaymentMethod || 'contanti';
+        let fallbackHandled = false;
+        let fallbackOrderClosed = true;
+        let fallbackSplitId = null;
         if (tableId && authToken) {
             try {
-                await fetch(`${this.apiBase}/${tableId}/log-cash-drawer-failed`, {
+                const body = { payment_method: paymentMethod };
+                if (splitId) body.split_id = splitId;
+                const resp = await fetch(`${this.apiBase}/${tableId}/log-cash-drawer-failed`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
                         'X-Operator-Token': authToken,
                     },
+                    body: JSON.stringify(body),
                 });
+                const data = await resp.json().catch(() => null);
+                this._notifyCorrispettivoResult(data?.data?.corrispettivo);
+                fallbackHandled = !!data?.success;
+                // order_closed può essere false quando è stato pagato solo uno split e il tavolo
+                // ha ancora preconti aperti. Default true per retro-compatibilità (pagamento intero).
+                fallbackOrderClosed = data?.data?.order_closed !== false;
+                fallbackSplitId = data?.data?.split_id ?? null;
             } catch (e) {
                 console.error('log-cash-drawer-failed error:', e);
             }
         }
+        // Segnala alla onComplete che il tavolo/split è già stato chiuso dal fallback,
+        // così non prova a chiamare nuovamente l'endpoint di pagamento.
+        this._paymentHandledByFallback = fallbackHandled;
+        this._paymentFallbackOrderClosed = fallbackOrderClosed;
+        this._paymentFallbackSplitId = fallbackSplitId;
 
         const onComplete = this._cashDrawerOnComplete;
         this._hideCashDrawerOverlay();
@@ -3089,7 +3264,12 @@ class TableOrdersManager {
             this.currentTable.order.id,
             auth.token,
             // onComplete: chiamato quando il poll del cassetto conferma l'operazione
-            () => this._afterPaymentSuccess(),
+            () => {
+                if (this._paymentHandledByFallback) {
+                    this._paymentHandledByFallback = false;
+                }
+                this._afterPaymentSuccess();
+            },
             // onReady: chiamato subito dopo l'apertura del cassetto, prima del polling
             async () => {
                 try {
@@ -3108,6 +3288,7 @@ class TableOrdersManager {
                         return false;
                     }
                     this.showNotification(`Conto registrato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
+                    this._notifyCorrispettivoResult(result.data?.corrispettivo);
                     return true;
                 } catch (error) {
                     console.error('Error chiudi conto contanti:', error);
@@ -3218,7 +3399,7 @@ class TableOrdersManager {
         const perms = auth.permissions ?? [];
         console.log('🔐 Permission Check - Method:', method, '| Permissions:', perms);
 
-        if (method === 'contanti' && !perms.includes('cash_payment')) {
+        if ((method === 'contanti' || method === 'chiusura_conto') && !perms.includes('cash_payment')) {
             console.log('❌ BLOCKED: Missing cash_payment permission');
             this.showNotification('Non hai il permesso di ricevere pagamenti in contanti', 'error');
             return;
@@ -3230,11 +3411,17 @@ class TableOrdersManager {
         }
         console.log('✅ ALLOWED: All permissions granted');
 
-        // ── Contanti: apri cassetto prima di chiudere il conto ────────────────
-        if (method === 'contanti') {
+        // ── Contanti / Chiusura conto: apri cassetto prima di chiudere il conto ──
+        if (method === 'contanti' || method === 'chiusura_conto') {
             const amount = parseFloat(this.currentTable.order.discounted_total ?? this.currentTable.order.total_amount ?? 0);
             const tableId = this.currentTable.table.id;
             await this.startCashDrawerFlow(amount, this.currentTable.order.id, auth.token, async () => {
+                // Se il cassetto è fallito, il fallback ha già chiuso il tavolo ed emesso il corrispettivo.
+                if (this._paymentHandledByFallback) {
+                    this._paymentHandledByFallback = false;
+                    this._afterPaymentSuccess();
+                    return;
+                }
                 try {
                     const response = await fetch(`${this.apiBase}/${tableId}/pay`, {
                         method: 'POST',
@@ -3243,11 +3430,12 @@ class TableOrdersManager {
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
                             'X-Operator-Token': auth.token,
                         },
-                        body: JSON.stringify({ payment_method: 'contanti' }),
+                        body: JSON.stringify({ payment_method: method }),
                     });
                     const result = await response.json();
                     if (result.success) {
                         this.showNotification(`Conto incassato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
+                        this._notifyCorrispettivoResult(result.data?.corrispettivo);
                         this._afterPaymentSuccess();
                     } else {
                         this.showNotification(result.message || 'Errore nell\'incasso', 'error');
@@ -3256,7 +3444,7 @@ class TableOrdersManager {
                     console.error('Error paying table after cash drawer:', e);
                     this.showNotification('Errore nell\'incasso', 'error');
                 }
-            }, null, tableId);
+            }, null, tableId, null, method);
             return;
         }
 
@@ -3276,6 +3464,7 @@ class TableOrdersManager {
 
             if (result.success) {
                 this.showNotification(`Conto incassato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
+                this._notifyCorrispettivoResult(result.data?.corrispettivo);
                 this._afterPaymentSuccess();
             } else {
                 this.showNotification(result.message || 'Errore nell\'incasso', 'error');
@@ -3327,6 +3516,22 @@ class TableOrdersManager {
             if (statusSpan) statusSpan.style.display = 'none';
         } catch (e) {
             console.error('initForBackoffice error:', e);
+        }
+    }
+
+    /**
+     * Mostra una notifica aggiuntiva con l'esito del corrispettivo elettronico.
+     * Accetta il blocco `corrispettivo` presente in result.data (può essere null).
+     */
+    _notifyCorrispettivoResult(corrispettivo) {
+        if (!corrispettivo) return;
+        if (corrispettivo.status === 'sent' && corrispettivo.progressivo_sdi) {
+            const idtrx = corrispettivo.identificativo_sdi ? ` (ID ${corrispettivo.identificativo_sdi})` : '';
+            this.showNotification(`Scontrino emesso — N° ${corrispettivo.progressivo_sdi}${idtrx}`, 'success');
+            return;
+        }
+        if (corrispettivo.warning) {
+            this.showNotification(corrispettivo.warning, 'warning');
         }
     }
 
@@ -3918,14 +4123,16 @@ class TableOrdersManager {
     }
 
     /**
-     * Hide the modify overlay (without side effects)
+     * Hide the modify overlay (without side effects).
+     * Nota: lo sconto applicato resta persistito sull'ordine — qui resettiamo
+     * solo la UI, non il DB. Per rimuoverlo dall'ordine usare resetDiscount().
      */
     _hideModifyOverlay() {
         const overlay = document.getElementById('modifyOrderOverlay');
         if (overlay) overlay.style.display = 'none';
         this.temporaryCart = [];
         this.updateCartDisplay();
-        this.resetDiscount();
+        this._clearDiscountUI();
     }
 
     /**
@@ -4321,7 +4528,13 @@ class TableOrdersManager {
             tableNumberEl.textContent = this.currentTable.table.table_number;
         }
         if (totalAmountEl) {
-            totalAmountEl.textContent = `€${parseFloat(this.currentTable.order.total_amount).toFixed(2)}`;
+            const ord = this.currentTable.order;
+            const raw = parseFloat(ord.total_amount) || 0;
+            const discounted = parseFloat(ord.discounted_total);
+            const effective = Number.isFinite(discounted) && discounted > 0
+                ? discounted
+                : (ord.discount_value ? Math.max(0, raw - parseFloat(ord.discount_value)) : raw);
+            totalAmountEl.textContent = `€${effective.toFixed(2)}`;
         }
 
         // Reset form
@@ -4439,10 +4652,11 @@ class TableOrdersManager {
                 const sym  = document.getElementById('precontoDiscountSymbol');
                 const val  = document.querySelector('input[name="precontoDiscountType"]:checked')?.value;
                 if (val === 'none') {
-                    wrap.style.display = 'none';
-                    document.getElementById('preconto_discount_amount').value = 0;
+                    if (wrap) wrap.style.display = 'none';
+                    const discountAmt = document.getElementById('preconto_discount_amount');
+                    if (discountAmt) discountAmt.value = 0;
                 } else {
-                    wrap.style.display = 'flex';
+                    if (wrap) wrap.style.display = 'flex';
                     if (sym) sym.textContent = val === 'percent' ? '%' : '€';
                 }
                 this._updatePrecontoPartialTotal();
@@ -4479,6 +4693,8 @@ class TableOrdersManager {
         // Fetch existing pending splits — track qty already assigned per item
         let assignedQtyMap = {}; // order_item_id => total qty in pending splits
         let assignedCovers = 0;
+        // Also track discount availability from the backend (sum of value discounts already assigned)
+        this._precontoDiscountCtx = null;
         try {
             const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
                 headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
@@ -4494,18 +4710,51 @@ class TableOrdersManager {
                         });
                         assignedCovers += parseInt(s.covers || 0);
                     });
+                this._precontoDiscountCtx = {
+                    type:      data.data.order_discount_type,
+                    total:     parseFloat(data.data.order_discount_total) || 0,
+                    remaining: parseFloat(data.data.order_discount_remaining) || 0,
+                };
             }
         } catch (e) { /* ignore */ }
 
         const remainingCovers = Math.max(0, totalCovers - assignedCovers);
 
-        // Update covers input
+        // Update covers input + controlli +/-
         const coversInput = document.getElementById('preconto_covers');
         const coversRow = document.querySelector('.preconto-covers-row');
+        const coversDec = document.getElementById('preconto_covers_dec');
+        const coversInc = document.getElementById('preconto_covers_inc');
+        const coversMax = document.getElementById('preconto_covers_max');
         if (coversInput) {
             coversInput.max = remainingCovers;
             coversInput.value = remainingCovers;
             coversInput.disabled = remainingCovers === 0;
+            coversInput.oninput = () => this._updatePrecontoPartialTotal();
+        }
+        if (coversMax) coversMax.textContent = `/ ${remainingCovers}`;
+        if (coversDec) {
+            coversDec.disabled = remainingCovers === 0;
+            coversDec.onclick = () => {
+                if (!coversInput) return;
+                const v = parseInt(coversInput.value) || 0;
+                if (v > 0) {
+                    coversInput.value = v - 1;
+                    this._updatePrecontoPartialTotal();
+                }
+            };
+        }
+        if (coversInc) {
+            coversInc.disabled = remainingCovers === 0;
+            coversInc.onclick = () => {
+                if (!coversInput) return;
+                const v = parseInt(coversInput.value) || 0;
+                const max = parseInt(coversInput.max) || 0;
+                if (v < max) {
+                    coversInput.value = v + 1;
+                    this._updatePrecontoPartialTotal();
+                }
+            };
         }
         if (coversRow) coversRow.style.display = totalCovers > 0 ? 'flex' : 'none';
 
@@ -4531,19 +4780,24 @@ class TableOrdersManager {
                 : 'Nessun piatto nell\'ordine';
             listEl.innerHTML = `<div style="padding:20px;text-align:center;color:#6c757d;">${msg}</div>`;
             this._updatePrecontoPartialTotal();
-            return;
+            return { remainingItems: 0, remainingCovers };
         }
 
         listEl.innerHTML = availableItems.filter(item => !item.segue).map(item => {
             const name = item.dish_name || item.name || 'N/D';
             const avail = item._available;
-            const unitPrice = parseFloat(item.unit_price || 0);
+            // Il prezzo effettivo per unità include eventuali aggiunzioni a pagamento (extras).
+            const extrasTotal = this._itemExtrasTotal(item);
+            const unitPrice = parseFloat(item.unit_price || 0) + extrasTotal;
             const subtotal = (0).toFixed(2);
+            const extrasBadge = extrasTotal > 0
+                ? `<span style="font-size:0.72rem;color:#17a2b8;margin-left:4px;">(+€${extrasTotal.toFixed(2)} extra)</span>`
+                : '';
             const alreadyBadge = item._assigned > 0
                 ? `<span style="font-size:0.72rem;color:#fd7e14;margin-left:4px;">(${item._assigned} già in preconto)</span>`
                 : '';
             return `<div class="preconto-item-row" data-item-id="${item.id}">
-                <span class="preconto-item-name">${name}${alreadyBadge}</span>
+                <span class="preconto-item-name">${name}${extrasBadge}${alreadyBadge}</span>
                 <div style="display: flex; flex-direction: column">
                     <div class="preconto-qty-ctrl">
                         <button type="button" class="pqi-dec" data-item-id="${item.id}">−</button>
@@ -4603,30 +4857,121 @@ class TableOrdersManager {
             });
         };
 
+        this._setupPrecontoSplitDiscountUI();
         this._updatePrecontoPartialTotal();
+        return {
+            remainingItems: availableItems.reduce((sum, i) => sum + i._available, 0),
+            remainingCovers,
+        };
+    }
+
+    /**
+     * Configura la sezione "Sconto su questo preconto" nella modale preconto.
+     * È visibile solo quando l'ordine ha uno sconto di tipo 'value'; per 'percent'
+     * lo sconto è sempre proporzionale e non ha senso sceglierne il valore €.
+     */
+    _setupPrecontoSplitDiscountUI() {
+        const row      = document.getElementById('precontoSplitDiscountRow');
+        const input    = document.getElementById('preconto_split_discount');
+        const dec      = document.getElementById('preconto_split_discount_dec');
+        const inc      = document.getElementById('preconto_split_discount_inc');
+        const allBtn   = document.getElementById('preconto_split_discount_all');
+        const maxLabel = document.getElementById('preconto_split_discount_max');
+        const info     = document.getElementById('precontoSplitDiscountInfo');
+        if (!row || !input) return;
+
+        const ctx = this._precontoDiscountCtx || {};
+        if (ctx.type !== 'value' || ctx.total <= 0) {
+            row.style.display = 'none';
+            return;
+        }
+        row.style.display = 'flex';
+
+        const remaining = Math.max(0, parseFloat(ctx.remaining) || 0);
+        input.max   = remaining.toFixed(2);
+        input.value = remaining.toFixed(2); // default: applica tutto il residuo disponibile
+        input.disabled = remaining <= 0;
+        if (maxLabel) maxLabel.textContent = `/ ${remaining.toFixed(2)}`;
+        if (info) info.textContent = `Sconto ordine: €${ctx.total.toFixed(2)} — Residuo disponibile: €${remaining.toFixed(2)}`;
+
+        if (dec) dec.onclick = () => {
+            const v = parseFloat(input.value) || 0;
+            input.value = Math.max(0, (v - 0.5)).toFixed(2);
+            this._updatePrecontoPartialTotal();
+        };
+        if (inc) inc.onclick = () => {
+            const v = parseFloat(input.value) || 0;
+            const max = parseFloat(input.max) || 0;
+            input.value = Math.min(max, (v + 0.5)).toFixed(2);
+            this._updatePrecontoPartialTotal();
+        };
+        if (allBtn) allBtn.onclick = () => {
+            input.value = remaining.toFixed(2);
+            this._updatePrecontoPartialTotal();
+        };
+        input.oninput = () => {
+            let v = parseFloat(input.value);
+            const max = parseFloat(input.max) || 0;
+            if (!Number.isFinite(v) || v < 0) v = 0;
+            if (v > max) v = max;
+            input.value = v.toFixed(2);
+            this._updatePrecontoPartialTotal();
+        };
     }
 
     _updatePrecontoPartialTotal() {
-        let total = 0;
+        let subtotal = 0;
         document.querySelectorAll('#precontoItemsList .preconto-item-qty-input').forEach(input => {
             const qty = parseInt(input.value) || 0;
             const unitPrice = parseFloat(input.dataset.unitPrice) || 0;
-            total += qty * unitPrice;
+            subtotal += qty * unitPrice;
         });
 
         // Add cover charge
         const covers = parseInt(document.getElementById('preconto_covers')?.value || 0);
         if (covers > 0 && this.currentTable?.order) {
             const coverPerPerson = parseFloat(this.currentTable.order.cover_charge_per_person || 0);
-            total += coverPerPerson * covers;
+            subtotal += coverPerPerson * covers;
         }
 
-        total = this._applyPrecontoDiscount(total);
-
+        // Se l'operatore ha inserito un override di sconto per il preconto, lo usiamo
+        // direttamente (clampato a subtotal). Altrimenti applichiamo il normale calcolo
+        // proporzionale/percentuale.
+        const overrideInput = document.getElementById('preconto_split_discount');
+        const overrideRowVisible = document.getElementById('precontoSplitDiscountRow')?.style.display !== 'none';
+        let total;
+        if (overrideInput && overrideRowVisible) {
+            const overrideVal = Math.min(subtotal, Math.max(0, parseFloat(overrideInput.value) || 0));
+            total = Math.max(0, +(subtotal - overrideVal).toFixed(2));
+        } else {
+            total = this._applyPrecontoDiscount(subtotal, { partial: true });
+        }
         const el = document.getElementById('precontoPartialTotal');
         if (el) el.textContent = `€${total.toFixed(2)}`;
+
+        // Evidenza sconto nella preview (se c'è scostamento tra subtotale e totale)
         const row = document.getElementById('precontoPartialTotalRow');
-        if (row) row.style.display = 'block';
+        if (row) {
+            row.style.display = 'block';
+            let discountLine = row.querySelector('.preconto-preview-discount');
+            if (subtotal > total + 0.001) {
+                const discountVal = (subtotal - total).toFixed(2);
+                if (!discountLine) {
+                    discountLine = document.createElement('div');
+                    discountLine.className = 'preconto-preview-discount';
+                    discountLine.style.cssText = 'font-size:0.85rem;color:#dc3545;margin-bottom:3px;text-align:right;';
+                    row.insertBefore(discountLine, row.firstChild);
+                }
+                const orderDiscountType   = this.currentTable?.order?.discount_type;
+                const orderDiscountAmount = parseFloat(this.currentTable?.order?.discount_amount || 0);
+                const label = orderDiscountType === 'percent' && orderDiscountAmount > 0
+                    ? `Sconto ${orderDiscountAmount}%`
+                    : 'Sconto applicato';
+                discountLine.innerHTML = `<i class="fas fa-tag"></i> ${label}: <strong>−€${discountVal}</strong> <small style="color:#6c757d;">(Subtotale: €${subtotal.toFixed(2)})</small>`;
+            } else if (discountLine) {
+                discountLine.remove();
+            }
+        }
     }
 
     /**
@@ -4647,9 +4992,30 @@ class TableOrdersManager {
         perPersonEl.textContent = `€${perPerson.toFixed(2)}`;
     }
 
-    _applyPrecontoDiscount(total) {
-        const discountType   = document.querySelector('input[name="precontoDiscountType"]:checked')?.value || 'none';
-        const discountAmount = parseFloat(document.getElementById('preconto_discount_amount')?.value || 0);
+    _applyPrecontoDiscount(total, { partial = false } = {}) {
+        // Preferenza 1: controlli UI della modal preconto (se presenti e compilati).
+        let discountType   = document.querySelector('input[name="precontoDiscountType"]:checked')?.value || 'none';
+        let discountAmount = parseFloat(document.getElementById('preconto_discount_amount')?.value || 0);
+        let inheritedFromOrder = false;
+
+        // Preferenza 2: sconto già applicato e persistito sull'ordine
+        // (visibile anche quando la modal preconto non ha i controlli di sconto).
+        if ((discountType === 'none' || discountAmount <= 0)
+            && this.currentTable?.order?.discount_type
+            && parseFloat(this.currentTable.order.discount_amount || 0) > 0) {
+            discountType   = this.currentTable.order.discount_type;
+            discountAmount = parseFloat(this.currentTable.order.discount_amount);
+            inheritedFromOrder = true;
+        }
+
+        // Per preconti parziali con sconto 'value' ereditato dall'ordine: applica
+        // proporzionalmente (peso dello split sul totale ordine). Coerente col backend.
+        if (partial && inheritedFromOrder && discountType === 'value') {
+            const orderTotal = parseFloat(this.currentTable?.order?.total_amount || 0);
+            const ratio = orderTotal > 0 ? Math.min(1, total / orderTotal) : 0;
+            discountAmount = Math.round(discountAmount * ratio * 100) / 100;
+        }
+
         if (discountType === 'value' && discountAmount > 0) {
             return Math.max(0, total - Math.min(discountAmount, total));
         } else if (discountType === 'percent' && discountAmount > 0) {
@@ -4728,6 +5094,16 @@ class TableOrdersManager {
         body.discount_type   = document.querySelector('input[name="precontoDiscountType"]:checked')?.value || 'none';
         body.discount_amount = parseFloat(document.getElementById('preconto_discount_amount')?.value || 0);
 
+        // Override esplicito dello sconto da applicare a QUESTO preconto parziale
+        // (usato solo per sconti 'value' ereditati dall'ordine; il backend lo ignora per 'percent').
+        const discountOverrideRow = document.getElementById('precontoSplitDiscountRow');
+        if (discountOverrideRow && discountOverrideRow.style.display !== 'none') {
+            const overrideInput = document.getElementById('preconto_split_discount');
+            if (overrideInput) {
+                body.discount_override_value = parseFloat(overrideInput.value) || 0;
+            }
+        }
+
         // For banco (multi-session) the table has multiple open orders: pin the exact one.
         if (this.currentTable?.order?.id) {
             body.order_id = this.currentTable.order.id;
@@ -4753,11 +5129,20 @@ class TableOrdersManager {
 
                 if (precontoType === 'items') {
                     // Stay in modal: reload item list with remaining (non-assigned) items
-                    // Reset discount
+                    // Reset discount (i campi UI possono non essere presenti in tutte le varianti della modal)
                     const noneRadio = document.querySelector('input[name="precontoDiscountType"][value="none"]');
                     if (noneRadio) { noneRadio.checked = true; noneRadio.dispatchEvent(new Event('change')); }
-                    document.getElementById('preconto_discount_amount').value = 0;
-                    await this._renderPrecontoItemsList();
+                    const discountAmt = document.getElementById('preconto_discount_amount');
+                    if (discountAmt) discountAmt.value = 0;
+                    const info = await this._renderPrecontoItemsList();
+                    // Se tutto è stato assegnato (nessun piatto residuo e nessun coperto da assegnare),
+                    // chiudiamo la modale e aggiorniamo il box del tavolo con i preconti emessi.
+                    if (info && info.remainingItems === 0 && info.remainingCovers === 0) {
+                        this.showNotification('Tutti i piatti e i coperti sono stati assegnati ai preconti', 'success');
+                        this.closePrecontoModal();
+                        await this._refreshPendingSplitsIntoSession();
+                        this.updateModifyReceiptItems();
+                    }
                 } else {
                     this.closePrecontoModal();
                 }
@@ -4767,6 +5152,27 @@ class TableOrdersManager {
         } catch (error) {
             console.error('Error printing preconto:', error);
             this.showNotification('Errore nella stampa del PreConto', 'error');
+        }
+    }
+
+    /**
+     * Aggiorna this.modifySession.pendingSplits leggendo gli split pending
+     * dal backend. Usato dopo l'emissione di un preconto per far comparire
+     * subito il nuovo blocco nella sezione "Preconti emessi" della modifica ordine.
+     */
+    async _refreshPendingSplitsIntoSession() {
+        if (!this.currentTable?.table?.id) return;
+        try {
+            const resp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+            });
+            const data = await resp.json();
+            if (!data.success) return;
+            this.modifySession.pendingSplits = (data.data.splits || [])
+                .filter(s => s.status === 'pending')
+                .map(s => ({ id: s.id, label: s.label, total: s.total }));
+        } catch (e) {
+            console.warn('Error refreshing pending splits:', e);
         }
     }
 

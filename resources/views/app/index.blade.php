@@ -108,7 +108,7 @@
                         <button class="action-btn-v" id="btnMarciaTavolo" style="background:#28a745;">
                             <i class="fas fa-play-circle"></i> MARCIA
                         </button>
-                        <button class="action-btn-v" id="btnInviaOrdine" style="background:#0d6efd;">
+                        <button class="action-btn-v" id="btnInviaOrdine" style="background:#0d6efd; display:none;">
                             <i class="fas fa-paper-plane"></i> INVIA ORDINE
                         </button>
                         <button class="action-btn-v" id="btnPreconto" style="background:#17a2b8;">

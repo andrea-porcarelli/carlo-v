@@ -23,6 +23,7 @@ use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Models\TableOrderInvoice;
 use App\Models\User;
+use App\Services\CorrispettivoService;
 use App\Services\MysondFatturaService;
 use App\Services\TableOrderLoggerService;
 use Illuminate\Http\JsonResponse;
@@ -34,11 +35,16 @@ class TableOrderController extends Controller
 {
     protected TableOrderLoggerService $logger;
     protected PrinterServiceInterface $printerService;
+    protected CorrispettivoService $corrispettivoService;
 
-    public function __construct(TableOrderLoggerService $logger, PrinterServiceInterface $printerService)
-    {
+    public function __construct(
+        TableOrderLoggerService $logger,
+        PrinterServiceInterface $printerService,
+        CorrispettivoService $corrispettivoService,
+    ) {
         $this->logger = $logger;
         $this->printerService = $printerService;
+        $this->corrispettivoService = $corrispettivoService;
     }
 
     /**
@@ -748,23 +754,112 @@ class TableOrderController extends Controller
         if (!$order) {
             return response()->json(['success' => false, 'message' => 'Ordine non trovato'], 404);
         }
-        $order_total = Utils::price($order->total_amount);
+        // Totale al netto di eventuali sconti applicati al tavolo
+        $effectiveTotalAmount = $order->hasDiscount()
+            ? $order->getDiscountedTotal()
+            : (float) $order->total_amount;
+        $order_total = Utils::price($effectiveTotalAmount);
 
-        $order->close('contanti');
-        $this->logger->logCashDrawerFailed($order, $operatorId);
+        // Metodo di pagamento da usare per registrare l'incasso. Default 'contanti'
+        // per retro-compat con chiamate senza payload.
+        $allowedMethods = ['contanti', 'chiusura_conto'];
+        $paymentMethod = $request->input('payment_method', 'contanti');
+        if (!in_array($paymentMethod, $allowedMethods, true)) {
+            $paymentMethod = 'contanti';
+        }
+
+        // Se la richiesta riguarda uno split (pagamento di un singolo preconto), applichiamo
+        // la stessa semantica di payPrecontoSplit: chiudiamo SOLO lo split, l'ordine intero
+        // viene chiuso esclusivamente quando il residuo è zero.
+        $splitId = $request->input('split_id');
+        $split   = $splitId ? \App\Models\PrecontoSplit::where('table_order_id', $order->id)->find($splitId) : null;
+
+        $corrispettivoInfo = null;
+        $wasOpen = $order->status === 'open';
+
+        if ($split && $split->isPending()) {
+            $split->update(['status' => 'paid', 'payment_method' => $paymentMethod, 'paid_at' => now()]);
+
+            $order->refresh();
+            $paidTotal      = $order->precontoSplits->where('status', 'paid')->sum('total');
+            $effectiveTotal = $order->hasDiscount() ? $order->getDiscountedTotal() : (float) $order->total_amount;
+            $remaining      = round($effectiveTotal - $paidTotal, 2);
+
+            $this->logger->logPayPrecontoSplit($order, $split, $paymentMethod, $operatorId);
+
+            if ($remaining <= 0.01 && $wasOpen) {
+                $this->logger->logPayOrder($order, $paymentMethod, $operatorId);
+                $this->logger->logCloseOrder($order, $operatorId);
+                $order->update(['preconto_requested_at' => null]);
+                $order->close($paymentMethod);
+            }
+
+            $this->logger->logCashDrawerFailed($order, $operatorId);
+
+            $corrispettivoInfo = $this->buildCorrispettivoResponse(
+                $this->corrispettivoService->emettiPerSplit($split, $paymentMethod, $operatorId)
+            );
+        } else {
+            // Pagamento del tavolo intero: comportamento originale.
+            if ($wasOpen) {
+                $order->close($paymentMethod);
+            }
+            $this->logger->logCashDrawerFailed($order, $operatorId);
+
+            $corrispettivoInfo = $this->buildCorrispettivoResponse(
+                $this->corrispettivoService->emettiPerOrdine($order, $paymentMethod, $operatorId)
+            );
+        }
 
         if (config('logging.channels.telegram.handler_with.apiKey')) {
             try {
                 $operator = User::find($operatorId);
                 $operatorName = $operator?->name ?? "ID {$operatorId}";
-                $tableLabel = e($table->table_number ?? $table->id);
+                // Il tavolo #999 è il banco (vedi CLAUDE.md).
+                $tableNumber = $table->table_number ?? null;
+                $tableLabel  = ((int) $tableNumber === 999)
+                    ? 'Ordine al banco'
+                    : ('Tavolo ' . e($tableNumber ?? $table->id));
 
                 $msg = "🚨 <b>CASSA CONTANTI NON RAGGIUNGIBILE</b>\n\n"
-                    . "🪑 Tavolo: <b>{$tableLabel}</b>\n"
-                    . "🧾 Ordine: <b>#{$order->id}</b> — {$order_total}\n"
-                    . "👤 Operatore: <b>" . e($operatorName) . "</b>\n"
-                    . "🕒 " . now()->format('d/m/Y H:i') . "\n\n"
-                    . "Il conto è stato chiuso manualmente come CONTANTI senza conferma della cassa automatica.";
+                    . "🪑 <b>{$tableLabel}</b>\n";
+
+                if ($split) {
+                    // Notifica dedicata al pagamento di un singolo preconto: riportiamo
+                    // label, totale scontato dello split e i prodotti associati con prezzo.
+                    $splitLabel = e($split->label ?: ('Preconto #' . $split->id));
+                    $splitTotal = Utils::price((float) $split->total);
+                    $msg .= "📋 Preconto: <b>{$splitLabel}</b>\n"
+                          . "🧾 Totale preconto: <b>{$splitTotal}</b>\n";
+
+                    if ($split->covers > 0) {
+                        $coverTotal = Utils::price((float) $order->getCoverChargePerPerson() * (int) $split->covers);
+                        $msg .= "🍽️ Coperti: <b>{$split->covers}</b> ({$coverTotal})\n";
+                    }
+
+                    $items = is_array($split->items) ? $split->items : [];
+                    if (!empty($items)) {
+                        $msg .= "\n<b>Prodotti:</b>\n";
+                        foreach ($items as $it) {
+                            $qty   = (int) ($it['quantity'] ?? 1);
+                            $name  = e((string) ($it['dish_name'] ?? 'N/D'));
+                            $sub   = Utils::price((float) ($it['subtotal'] ?? 0));
+                            $msg  .= "• {$qty} × {$name} — {$sub}\n";
+                            if (!empty($it['extras']) && is_array($it['extras'])) {
+                                foreach ($it['extras'] as $eName => $ePrice) {
+                                    $msg .= "   ↳ " . e((string) $eName) . " (+" . Utils::price((float) $ePrice) . ")\n";
+                                }
+                            }
+                        }
+                    }
+                    $msg .= "\n";
+                } else {
+                    $msg .= "🧾 Ordine: <b>#{$order->id}</b> — {$order_total}\n";
+                }
+
+                $msg .= "👤 Operatore: <b>" . e($operatorName) . "</b>\n"
+                      . "🕒 " . now()->format('d/m/Y H:i') . "\n\n"
+                      . "Il conto è stato chiuso manualmente come CONTANTI senza conferma della cassa automatica.";
 
                 Log::channel('telegram')->critical($msg);
             } catch (\Throwable $e) {
@@ -772,7 +867,14 @@ class TableOrderController extends Controller
             }
         }
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'corrispettivo' => $corrispettivoInfo,
+                'split_id'      => $split?->id,
+                'order_closed'  => $order->status === 'paid',
+            ],
+        ]);
     }
 
     /**
@@ -814,12 +916,17 @@ class TableOrderController extends Controller
 
             DB::commit();
 
+            $corrispettivoInfo = $this->buildCorrispettivoResponse(
+                $this->corrispettivoService->emettiPerOrdine($order, $paymentMethod, $operatorId)
+            );
+
             return response()->json([
                 'success' => true,
                 'message' => 'Conto incassato con successo',
                 'data' => [
                     'total_paid' => $order->total_amount,
                     'table_order_id' => $order->id,
+                    'corrispettivo' => $corrispettivoInfo,
                 ],
             ]);
         } catch (\Exception $e) {
@@ -830,6 +937,34 @@ class TableOrderController extends Controller
                 'message' => 'Errore nell\'incasso del conto',
             ], 500);
         }
+    }
+
+    /**
+     * Costruisce il blocco 'corrispettivo' da inserire nella response API.
+     * Ritorna null se il corrispettivo non è stato emesso (metodo escluso o disabilitato).
+     */
+    private function buildCorrispettivoResponse(?\App\Models\TableOrderCorrispettivo $corrispettivo): ?array
+    {
+        if (!$corrispettivo) {
+            return null;
+        }
+        $corrispettivo->refresh();
+
+        $warning = null;
+        if ($corrispettivo->status === \App\Models\TableOrderCorrispettivo::STATUS_FAILED) {
+            $warning = 'Scontrino non emesso. Verrà riprovato automaticamente.';
+        } elseif ($corrispettivo->status === \App\Models\TableOrderCorrispettivo::STATUS_PENDING
+            || $corrispettivo->status === \App\Models\TableOrderCorrispettivo::STATUS_SENDING) {
+            $warning = 'Scontrino in elaborazione.';
+        }
+
+        return [
+            'id'                 => $corrispettivo->id,
+            'status'             => $corrispettivo->status,
+            'progressivo_sdi'    => $corrispettivo->progressivo_sdi,
+            'identificativo_sdi' => $corrispettivo->identificativo_sdi,
+            'warning'            => $warning,
+        ];
     }
 
     /**
@@ -1065,6 +1200,7 @@ class TableOrderController extends Controller
             'label'           => 'nullable|string|max:100',
             'discount_type'   => 'nullable|string|in:none,value,percent',
             'discount_amount' => 'nullable|numeric|min:0',
+            'discount_override_value' => 'nullable|numeric|min:0',
             'order_id'        => 'nullable|integer',
         ]);
 
@@ -1102,14 +1238,17 @@ class TableOrderController extends Controller
                     $item = $orderItems[$sel['order_item_id']] ?? null;
                     if (!$item) continue;
                     $qty = min($sel['quantity'], $item->quantity);
-                    $unitPrice = (float) $item->unit_price;
-                    $subtotal = round($unitPrice * $qty, 2);
+                    // Includiamo le aggiunzioni a pagamento (extras) nel prezzo effettivo.
+                    $extrasTotal = is_array($item->extras) ? array_sum(array_map('floatval', $item->extras)) : 0.0;
+                    $unitPriceEffective = (float) $item->unit_price + $extrasTotal;
+                    $subtotal = round($unitPriceEffective * $qty, 2);
                     $splitItems[] = [
                         'order_item_id' => $item->id,
                         'dish_name'     => $item->dish->label ?? $item->dish->name ?? 'N/D',
                         'quantity'      => $qty,
-                        'unit_price'    => $unitPrice,
+                        'unit_price'    => $unitPriceEffective,
                         'subtotal'      => $subtotal,
+                        'extras'        => $item->extras,
                     ];
                     $splitTotal += $subtotal;
                 }
@@ -1129,10 +1268,42 @@ class TableOrderController extends Controller
                 $coverCharge = $covers > 0 ? ($order->getCoverChargePerPerson() * $covers) : 0;
                 $splitTotal += $coverCharge;
 
-                // Discount
+                // Discount: se il chiamante lo passa esplicitamente, prevale;
+                // altrimenti eredita lo sconto applicato al TableOrder.
+                // Per gli sconti 'value' (importo €) applichiamo proporzionalmente al peso
+                // dello split sul totale ordine, altrimenti uno split pagherebbe tutto lo sconto.
                 $discountType   = $validated['discount_type'] ?? 'none';
                 $discountAmount = (float) ($validated['discount_amount'] ?? 0);
-                $discountValue  = 0;
+
+                $inheritFromOrder = ($discountType === 'none' || $discountAmount <= 0)
+                    && $order->discount_type
+                    && (float) $order->discount_amount > 0;
+
+                if ($inheritFromOrder) {
+                    $discountType   = $order->discount_type;
+                    if ($discountType === 'percent') {
+                        $discountAmount = (float) $order->discount_amount;
+                    } else {
+                        // 'value': ripartizione proporzionale sul subtotale dello split (default)
+                        $orderTotal = (float) $order->total_amount;
+                        $orderDiscount = (float) $order->discount_amount;
+                        $ratio = $orderTotal > 0 ? min(1.0, $splitTotal / $orderTotal) : 0.0;
+                        $discountAmount = round($orderDiscount * $ratio, 2);
+                    }
+                }
+
+                // Override: l'operatore può scegliere esplicitamente quanto sconto (€)
+                // applicare a QUESTO preconto. Valido solo per sconti 'value'.
+                // Il valore è limitato dal residuo disponibile (sconto ordine − già assegnato agli altri split).
+                $overrideValue = isset($validated['discount_override_value']) ? (float) $validated['discount_override_value'] : null;
+                if ($overrideValue !== null && $discountType === 'value') {
+                    $assignedByOtherSplits = (float) $order->precontoSplits()->sum('discount_value');
+                    $availableFromOrder    = max(0, (float) ($order->discount_value ?? 0) - $assignedByOtherSplits);
+                    // override non può superare il residuo né il subtotale dello split
+                    $discountAmount = round(min($overrideValue, $availableFromOrder, $splitTotal), 2);
+                }
+
+                $discountValue = 0;
                 if ($discountType === 'value' && $discountAmount > 0) {
                     $discountValue = min($discountAmount, $splitTotal);
                 } elseif ($discountType === 'percent' && $discountAmount > 0) {
@@ -1199,9 +1370,21 @@ class TableOrderController extends Controller
         }
 
         $splits = $order->precontoSplits()->orderBy('created_at')->get();
-        $paidTotal = $splits->where('status', 'paid')->sum('total');
         $effectiveTotal = $order->hasDiscount() ? $order->getDiscountedTotal() : (float) $order->total_amount;
-        $remaining = max(0, round($effectiveTotal - $paidTotal, 2));
+        // Il "Resto" nella UI è la parte dell'ordine NON ancora assegnata a nessun preconto
+        // (né pending né paid): se tutti gli items/coperti sono stati coperti da preconti,
+        // non deve esserci una riga Resto separata.
+        $assignedTotal = (float) $splits->sum('total');
+        $remaining = max(0, round($effectiveTotal - $assignedTotal, 2));
+
+        // Quando l'ordine ha uno sconto di tipo 'value', calcoliamo quanto sconto residuo
+        // è ancora disponibile per nuovi preconti (totale sconto ordine − sconto già assegnato ai split).
+        $orderDiscountType  = $order->discount_type;
+        $orderDiscountTotal = (float) ($order->discount_value ?? 0);
+        $assignedDiscount   = (float) $splits->sum('discount_value');
+        $discountRemaining  = $orderDiscountType === 'value'
+            ? max(0, round($orderDiscountTotal - $assignedDiscount, 2))
+            : 0;
 
         return response()->json([
             'success' => true,
@@ -1214,9 +1397,14 @@ class TableOrderController extends Controller
                     'total'          => (float) $s->total,
                     'status'         => $s->status,
                     'payment_method' => $s->payment_method,
+                    'discount_value' => (float) ($s->discount_value ?? 0),
                 ])->values(),
-                'remaining'   => $remaining,
-                'order_total' => (float) $order->total_amount,
+                'remaining'           => $remaining,
+                'order_total'         => (float) $order->total_amount,
+                'order_discounted_total' => $effectiveTotal,
+                'order_discount_type'    => $orderDiscountType,
+                'order_discount_total'   => $orderDiscountTotal,
+                'order_discount_remaining' => $discountRemaining,
             ],
         ]);
     }
@@ -1266,6 +1454,11 @@ class TableOrderController extends Controller
 
             DB::commit();
 
+            // Ogni split emette il proprio corrispettivo (se metodo pagamento non è fattura)
+            $corrispettivoInfo = $this->buildCorrispettivoResponse(
+                $this->corrispettivoService->emettiPerSplit($split, $paymentMethod, $operatorId)
+            );
+
             $splitPaidItems = collect($split->items ?? [])
                 ->map(fn($item) => [
                     'order_item_id' => $item['order_item_id'] ?? null,
@@ -1285,6 +1478,7 @@ class TableOrderController extends Controller
                     'paid_items'        => $splitPaidItems,
                     'paid_split_total'  => (float) $split->total,
                     'paid_cover_amount' => round((int) $split->covers * $order->getCoverChargePerPerson(), 2),
+                    'corrispettivo'     => $corrispettivoInfo,
                 ],
             ]);
         } catch (\Exception $e) {
@@ -1604,14 +1798,40 @@ class TableOrderController extends Controller
             'discount_amount' => 'required|numeric|min:0',
             'original_total'  => 'required|numeric|min:0',
             'final_total'     => 'required|numeric|min:0',
+            'order_id'        => 'nullable|integer',
         ]);
 
-        $order = $table->activeOrder;
+        // In modalità banco il tavolo può avere più ordini aperti contemporaneamente.
+        // Se il client specifica order_id lo usiamo, altrimenti fall-back a activeOrder.
+        $order = null;
+        if (!empty($validated['order_id'])) {
+            $order = TableOrder::where('id', $validated['order_id'])
+                ->where('restaurant_table_id', $table->id)
+                ->where('status', 'open')
+                ->first();
+        }
+        $order = $order ?? $table->activeOrder;
+
         if (!$order) {
+            Log::warning('applyDiscount: nessun ordine attivo', [
+                'table_id'    => $table->id,
+                'order_id'    => $validated['order_id'] ?? null,
+                'operator_id' => $operatorId,
+            ]);
             return response()->json(['success' => false, 'message' => 'Nessun ordine attivo'], 404);
         }
 
         $order->applyDiscount($validated['discount_type'], (float) $validated['discount_amount']);
+        $order->refresh();
+
+        Log::info('applyDiscount: sconto salvato', [
+            'order_id'        => $order->id,
+            'table_id'        => $table->id,
+            'operator_id'     => $operatorId,
+            'discount_type'   => $order->discount_type,
+            'discount_amount' => (float) $order->discount_amount,
+            'discount_value'  => (float) $order->discount_value,
+        ]);
 
         $this->logger->logApplyDiscount(
             $order,
@@ -1625,9 +1845,10 @@ class TableOrderController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'discount_type'   => $order->discount_type,
-                'discount_amount' => (float) $order->discount_amount,
-                'discount_value'  => (float) $order->discount_value,
+                'order_id'         => $order->id,
+                'discount_type'    => $order->discount_type,
+                'discount_amount'  => (float) $order->discount_amount,
+                'discount_value'   => (float) $order->discount_value,
                 'discounted_total' => $order->getDiscountedTotal(),
             ],
         ]);

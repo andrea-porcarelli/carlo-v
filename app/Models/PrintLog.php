@@ -59,6 +59,7 @@ class PrintLog extends Model
             'marcia' => 'Marcia Tavolo',
             'preconto' => 'PreConto',
             'comunica' => 'Comunicazione',
+            'corrispettivo' => 'Scontrino Elettronico',
             default => ucfirst($this->print_type),
         };
     }

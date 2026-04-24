@@ -41,27 +41,38 @@ class PrintPrecontoJob implements ShouldQueue
 
     public function handle(PrinterServiceInterface $printerService): void
     {
+        Log::info('PrintPrecontoJob start', [
+            'table_order_id' => $this->tableOrderId,
+            'operator_id'    => $this->operatorId,
+            'split_id'       => $this->splitId,
+            'split_count'    => $this->splitCount,
+            'discount_type'  => $this->discountType,
+            'discount_amount'=> $this->discountAmount,
+        ]);
+
         $tableOrder = TableOrder::with(['items.dish.category.printer', 'restaurantTable'])->find($this->tableOrderId);
         if (!$tableOrder) {
+            Log::warning('PrintPrecontoJob: tableOrder non trovato', ['id' => $this->tableOrderId]);
             return;
         }
 
         if ($this->splitId !== null) {
             $split = PrecontoSplit::find($this->splitId);
             if (!$split) {
+                Log::warning('PrintPrecontoJob: split non trovato', ['split_id' => $this->splitId]);
                 return;
             }
-            $printerService->printPartialPreconto($tableOrder, $split, $this->operatorId);
+            $ok = $printerService->printPartialPreconto($tableOrder, $split, $this->operatorId);
+            Log::info('PrintPrecontoJob: printPartialPreconto esito', ['split_id' => $split->id, 'ok' => $ok]);
         } else {
-            Log::info('TEST');
-            $printerService->printPreconto(
+            $ok = $printerService->printPreconto(
                 $tableOrder,
                 $this->operatorId,
                 $this->splitCount,
-                $this->discountType,
+                $this->discountType ?? 'none',
                 $this->discountAmount
             );
-            Log::info('TEST');
+            Log::info('PrintPrecontoJob: printPreconto esito', ['table_order_id' => $tableOrder->id, 'ok' => $ok]);
         }
     }
 }

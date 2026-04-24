@@ -27,13 +27,8 @@ class OperatorAuthController extends Controller
             $user = null;
 
             foreach ($users as $potentialUser) {
-                // For operators: check hashed password field
-                if ($potentialUser->role === 'operator' && Hash::check($validated['password'], $potentialUser->password)) {
-                    $user = $potentialUser;
-                    break;
-                }
                 // For admins: check authentication_pin (stored in plain text)
-                if ($potentialUser->role === 'admin' && $potentialUser->authentication_pin === $validated['password']) {
+                if ($potentialUser->authentication_pin === $validated['password']) {
                     $user = $potentialUser;
                     break;
                 }

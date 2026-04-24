@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PrecontoSplit extends Model
 {
@@ -36,6 +37,11 @@ class PrecontoSplit extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(TableOrder::class, 'table_order_id');
+    }
+
+    public function corrispettivi(): HasMany
+    {
+        return $this->hasMany(TableOrderCorrispettivo::class)->orderBy('id');
     }
 
     public function isPending(): bool

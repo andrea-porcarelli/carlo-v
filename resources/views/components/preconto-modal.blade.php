@@ -59,10 +59,32 @@
                 <div id="precontoItemsList" class="preconto-items-list"></div>
                 <div class="preconto-covers-row">
                     <label for="preconto_covers">Coperti inclusi:</label>
-                    <input type="number" id="preconto_covers" value="0" min="0" max="50"
-                           style="width:70px;text-align:center;border:1px solid #dee2e6;border-radius:4px;padding:4px 6px;"
-                           oninput="if(this.value>+this.max)this.value=this.max;if(this.value<0)this.value=0;">
+                    <div class="preconto-qty-ctrl">
+                        <button type="button" class="pqi-dec" id="preconto_covers_dec">−</button>
+                        <input type="number" id="preconto_covers" value="0" min="0" max="50"
+                               class="preconto-item-qty-input"
+                               oninput="if(this.value>+this.max)this.value=this.max;if(this.value<0)this.value=0;">
+                        <button type="button" class="pqi-inc" id="preconto_covers_inc">+</button>
+                        <span class="pqi-max" id="preconto_covers_max">/ 0</span>
+                    </div>
                     <span id="precontoCoversInfo" style="font-size:0.8rem;color:#6c757d;margin-left:6px;"></span>
+                </div>
+
+                <!-- Sconto dedicato a questo preconto (solo per sconti di tipo 'value') -->
+                <div id="precontoSplitDiscountRow" class="preconto-covers-row" style="display:none; flex-wrap:wrap;">
+                    <label for="preconto_split_discount" style="margin-bottom:0;">Sconto su questo preconto (€):</label>
+                    <div class="preconto-qty-ctrl">
+                        <button type="button" class="pqi-dec" id="preconto_split_discount_dec">−</button>
+                        <input type="number" id="preconto_split_discount" value="0" min="0" step="0.01"
+                               class="preconto-item-qty-input" style="width:70px;">
+                        <button type="button" class="pqi-inc" id="preconto_split_discount_inc">+</button>
+                        <span class="pqi-max" id="preconto_split_discount_max">/ 0.00</span>
+                    </div>
+                    <button type="button" id="preconto_split_discount_all"
+                            style="font-size:0.75rem;padding:3px 10px;border:1px solid #dc3545;background:white;color:#dc3545;border-radius:4px;cursor:pointer;margin-left:6px;">
+                        Tutto residuo
+                    </button>
+                    <span id="precontoSplitDiscountInfo" style="font-size:0.75rem;color:#6c757d;margin-left:6px; flex-basis:100%;"></span>
                 </div>
             </div>
 

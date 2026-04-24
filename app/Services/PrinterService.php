@@ -846,13 +846,23 @@ class PrinterService implements PrinterServiceInterface
             // Linea separatrice
             $printer->text(str_repeat('-', 48) . "\n");
 
-            // Calcola sconto
+            // Calcola sconto: se il chiamante non passa nulla o passa 'none',
+            // usiamo lo sconto persistito sull'ordine (evidenza dello sconto applicato).
             $baseTotal = (float) $tableOrder->total_amount;
+            $effectiveDiscountType   = $discountType;
+            $effectiveDiscountAmount = $discountAmount;
+            if ((!$effectiveDiscountType || $effectiveDiscountType === 'none' || $effectiveDiscountAmount <= 0)
+                && $tableOrder->discount_type
+                && (float) $tableOrder->discount_amount > 0) {
+                $effectiveDiscountType   = $tableOrder->discount_type;
+                $effectiveDiscountAmount = (float) $tableOrder->discount_amount;
+            }
+
             $discountValue = 0;
-            if ($discountType === 'value' && $discountAmount > 0) {
-                $discountValue = min($discountAmount, $baseTotal);
-            } elseif ($discountType === 'percent' && $discountAmount > 0) {
-                $discountValue = round($baseTotal * min($discountAmount, 100) / 100, 2);
+            if ($effectiveDiscountType === 'value' && $effectiveDiscountAmount > 0) {
+                $discountValue = min($effectiveDiscountAmount, $baseTotal);
+            } elseif ($effectiveDiscountType === 'percent' && $effectiveDiscountAmount > 0) {
+                $discountValue = round($baseTotal * min($effectiveDiscountAmount, 100) / 100, 2);
             }
             $finalTotal = max(0, round($baseTotal - $discountValue, 2));
 
@@ -860,8 +870,8 @@ class PrinterService implements PrinterServiceInterface
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
             if ($discountValue > 0) {
                 $printer->setEmphasis(false);
-                $discountLabel = $discountType === 'percent'
-                    ? "Abbuono " . number_format($discountAmount, 0) . "%"
+                $discountLabel = $effectiveDiscountType === 'percent'
+                    ? "Abbuono " . number_format($effectiveDiscountAmount, 0) . "%"
                     : "Abbuono";
                 $discountFormatted = '-' . number_format($discountValue, 2, ',', '.');
                 $printer->text(str_pad($discountLabel, 38) . str_pad($discountFormatted, 10, ' ', STR_PAD_LEFT) . "\n");
@@ -964,18 +974,27 @@ class PrinterService implements PrinterServiceInterface
     public function printPartialPreconto(TableOrder $tableOrder, PrecontoSplit $split, int $operatorId): bool
     {
         try {
+            Log::info('printPartialPreconto start', [
+                'table_order_id' => $tableOrder->id,
+                'split_id'       => $split->id,
+                'operator_id'    => $operatorId,
+            ]);
             $printer = Setting::getPrecontoPrinter();
             if (!$printer) {
-                Log::error('Stampante PreConto non configurata');
+                Log::error('Stampante PreConto non configurata (setting preconto_printer_id vuoto o stampante inesistente)');
                 return false;
             }
-            if (!$printer->is_active || empty($ip)) {
-                Log::error('Stampante PreConto non attiva o senza IP', ['printer_id' => $printer->id]);
+            if (!$printer->is_active || empty($printer->ip)) {
+                Log::error('Stampante PreConto non attiva o senza IP', [
+                    'printer_id' => $printer->id,
+                    'is_active'  => $printer->is_active,
+                    'ip'         => $printer->ip,
+                ]);
                 return false;
             }
 
             $tableOrder->load(['restaurantTable']);
-            $printerIp = $ip;
+            $printerIp = $printer->ip;
             $operator = User::find($operatorId);
             $operatorName = $operator?->name ?? 'N/D';
             $tableNumber = $tableOrder->restaurantTable->table_number ?? 'N/D';
@@ -1019,6 +1038,14 @@ class PrinterService implements PrinterServiceInterface
                 $line = str_pad("$qty x $name", 38) . str_pad($sub, 10, ' ', STR_PAD_LEFT);
                 $dev->text($line . "\n");
                 $dev->setEmphasis(false);
+
+                // Aggiunzioni a pagamento (extras) — dettaglio informativo sotto la riga piatto.
+                if (!empty($item['extras']) && is_array($item['extras'])) {
+                    foreach ($item['extras'] as $extraName => $extraPrice) {
+                        $priceFmt = number_format((float) $extraPrice, 2, ',', '.');
+                        $dev->text("  + " . $extraName . " (+" . $priceFmt . ")\n");
+                    }
+                }
             }
 
             // Cover charge for this split
@@ -1095,7 +1122,7 @@ class PrinterService implements PrinterServiceInterface
     public function printComunica(Printer $printer, string $message, int $operatorId, ?TableOrder $tableOrder = null): bool
     {
         try {
-            $printerIp = $ip;
+            $printerIp = $printer->ip;
 
             // Verifica se la stampante è raggiungibile
             if (!$this->isPrinterReachable($printerIp)) {
@@ -1967,5 +1994,298 @@ class PrinterService implements PrinterServiceInterface
             ]);
             return false;
         }
+    }
+
+    /**
+     * Stampa lo scontrino (non fiscale) del corrispettivo elettronico,
+     * riportando il progressivoSdi restituito da ADE.
+     */
+    public function printCorrispettivoReceipt(\App\Models\TableOrderCorrispettivo $corrispettivo): bool
+    {
+        try {
+            // Stampante dedicata se configurata, altrimenti ricadiamo sulla stampante preconto
+            $printerId = Setting::get('corrispettivo_printer_id', null);
+            $printerObj = $printerId ? Printer::find((int) $printerId) : Setting::getPrecontoPrinter();
+
+            if (!$printerObj || !$printerObj->is_active || empty($printerObj->ip)) {
+                Log::channel('corrispettivi')->warning('Stampa scontrino: stampante non configurata/attiva', $corrispettivo->getLogContext());
+                return false;
+            }
+
+            $corrispettivo->loadMissing(['tableOrder.restaurantTable', 'precontoSplit', 'operator']);
+
+            $printerIp = $printerObj->ip;
+            if (!$this->isPrinterReachable($printerIp)) {
+                Log::channel('corrispettivi')->warning('Stampa scontrino: stampante non raggiungibile', $corrispettivo->getLogContext() + [
+                    'printer_ip' => $printerIp,
+                ]);
+                if ($corrispettivo->tableOrder) {
+                    $this->printLogService->logPrint(
+                        $corrispettivo->tableOrder,
+                        $printerObj,
+                        $corrispettivo->operator_id,
+                        'corrispettivo',
+                        $corrispettivo->isAnnullo() ? 'annullo' : 'emissione',
+                        $this->buildCorrispettivoPrintData($corrispettivo),
+                        false,
+                        'Stampante non raggiungibile: ' . $printerIp,
+                    );
+                }
+                return false;
+            }
+
+            $connector = new NetworkPrintConnector($printerIp, 9100, 5);
+            $printer = new EscposPrinter($connector);
+            $printer->initialize();
+
+            // ── Intestazione aziendale (dati dai settings) ───────────────────
+            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $printer->setEmphasis(true);
+            $printer->setTextSize(1, 2);
+            $printer->text((string) (Setting::get('company_name') ?: 'SCONTRINO'));
+            $printer->text("\n");
+            $printer->setTextSize(1, 1);
+            $printer->setEmphasis(false);
+
+            $addressParts = array_filter([
+                (string) Setting::get('indirizzo_fatturazione', ''),
+            ]);
+            $cityParts = array_filter([
+                (string) Setting::get('cap_fatturazione', ''),
+                trim(
+                    (string) Setting::get('comune_fatturazione', '')
+                    . (($prov = (string) Setting::get('provincia_fatturazione', '')) !== '' ? " ({$prov})" : '')
+                ),
+            ]);
+            if ($addressParts) {
+                $printer->text(implode(' ', $addressParts) . "\n");
+            }
+            if ($cityParts) {
+                $printer->text(implode(' ', $cityParts) . "\n");
+            }
+
+            $piva = (string) Setting::get('company_vat_number', '');
+            if ($piva !== '') {
+                $printer->text("P.IVA {$piva}\n");
+            }
+
+            $tel   = (string) Setting::get('tel_fatturazione', '');
+            $email = (string) Setting::get('email_fatturazione', '');
+            if ($tel !== '')   $printer->text("Tel. {$tel}\n");
+            if ($email !== '') $printer->text($email . "\n");
+
+            $printer->feed(1);
+
+            // ── Titolo scontrino + progressivo + ID transazione ────────────
+            $printer->setEmphasis(true);
+            $printer->setTextSize(1, 2);
+            $printer->text($corrispettivo->isAnnullo() ? "ANNULLO CORRISPETTIVO\n" : "SCONTRINO ELETTRONICO\n");
+            $printer->setTextSize(1, 1);
+            $printer->setEmphasis(false);
+
+            // Progressivo (in evidenza) subito sotto il titolo
+            $printer->text("Progressivo\n");
+            $printer->setEmphasis(true);
+            $printer->setTextSize(2, 2);
+            $printer->text(((string) $corrispettivo->progressivo_sdi) . "\n");
+            $printer->setTextSize(1, 1);
+            $printer->setEmphasis(false);
+
+            // ID transazione (Mysond) subito sotto
+            if (!empty($corrispettivo->identificativo_sdi)) {
+                $printer->text("ID transazione: " . $corrispettivo->identificativo_sdi . "\n");
+            }
+
+            $printer->feed(1);
+
+            // ── Dati tavolo/preconto ────────────────────────────────────────
+            $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            $tableNumber = $corrispettivo->tableOrder->restaurantTable->table_number ?? 'N/D';
+            $splitLabel = $corrispettivo->precontoSplit->label ?? null;
+
+            $printer->text("Tavolo: {$tableNumber}\n");
+            if ($splitLabel) {
+                $printer->text("Preconto: {$splitLabel}\n");
+            }
+            $printer->text("Data: " . ($corrispettivo->sent_at?->format('d/m/Y H:i:s') ?? now()->format('d/m/Y H:i:s')) . "\n");
+            $printer->text(str_repeat('-', 48) . "\n");
+
+            // Righe — leggiamo dai dati originali (split o ordine) per poter mostrare
+            // anche il dettaglio delle aggiunzioni (extras) sotto ogni piatto.
+            $righe = $this->buildCorrispettivoRigheForPrint($corrispettivo);
+            foreach ($righe as $riga) {
+                $desc = mb_substr((string) ($riga['descrizione'] ?? ''), 0, 30);
+                $qty  = (int) ($riga['quantita'] ?? 1);
+                $tot  = number_format((float) ($riga['totale'] ?? 0), 2, ',', '.');
+                $line = str_pad("{$qty} x {$desc}", 38) . str_pad($tot, 10, ' ', STR_PAD_LEFT);
+                $printer->text($line . "\n");
+                // Aggiunzioni a pagamento sotto al piatto
+                if (!empty($riga['extras']) && is_array($riga['extras'])) {
+                    foreach ($riga['extras'] as $extraName => $extraPrice) {
+                        $extraFmt = number_format((float) $extraPrice, 2, ',', '.');
+                        $printer->text("  + " . $extraName . " (+" . $extraFmt . ")\n");
+                    }
+                }
+            }
+
+            $printer->text(str_repeat('-', 48) . "\n");
+
+            // Sconto applicato (split o ordine): riga informativa se presente.
+            $discountSource = $corrispettivo->precontoSplit ?: $corrispettivo->tableOrder;
+            if ($discountSource && ($discountSource->discount_value ?? 0) > 0) {
+                $dType  = $discountSource->discount_type;
+                $dAmt   = (float) $discountSource->discount_amount;
+                $dVal   = (float) $discountSource->discount_value;
+                $label  = $dType === 'percent'
+                    ? "Sconto " . number_format($dAmt, 0) . "%"
+                    : "Sconto";
+                $printer->text(str_pad($label, 38) . str_pad('-' . number_format($dVal, 2, ',', '.'), 10, ' ', STR_PAD_LEFT) . "\n");
+            }
+
+            $imponibile = number_format((float) $corrispettivo->imponibile, 2, ',', '.');
+            $iva        = number_format((float) $corrispettivo->iva, 2, ',', '.');
+            $totale     = number_format((float) $corrispettivo->importo_totale, 2, ',', '.');
+            $aliquota   = rtrim(rtrim(number_format((float) $corrispettivo->aliquota_iva, 2, ',', '.'), '0'), ',');
+
+            $printer->text(str_pad("Imponibile", 38) . str_pad($imponibile, 10, ' ', STR_PAD_LEFT) . "\n");
+            $printer->text(str_pad("IVA {$aliquota}%", 38) . str_pad($iva, 10, ' ', STR_PAD_LEFT) . "\n");
+            $printer->setEmphasis(true);
+            $printer->text(str_pad("TOTALE", 38) . str_pad($totale, 10, ' ', STR_PAD_LEFT) . "\n");
+            $printer->setEmphasis(false);
+
+            $methodLabels = [
+                'pos' => 'POS', 'contanti' => 'Contanti',
+                'bonifico' => 'Bonifico', 'assegno' => 'Assegno',
+                'misto' => 'Misto', 'chiusura_conto' => 'Chiusura conto',
+            ];
+            $printer->text("Pagamento: " . ($methodLabels[$corrispettivo->payment_method] ?? $corrispettivo->payment_method) . "\n");
+            $printer->feed(1);
+
+
+
+            $printer->feed(2);
+            $printer->cut();
+            $printer->close();
+
+            Log::channel('corrispettivi')->info('Scontrino corrispettivo stampato', $corrispettivo->getLogContext() + [
+                'printer_ip'      => $printerIp,
+                'progressivo_sdi' => $corrispettivo->progressivo_sdi,
+            ]);
+
+            if ($corrispettivo->tableOrder) {
+                $this->printLogService->logPrint(
+                    $corrispettivo->tableOrder,
+                    $printerObj,
+                    $corrispettivo->operator_id,
+                    'corrispettivo',
+                    $corrispettivo->isAnnullo() ? 'annullo' : 'emissione',
+                    $this->buildCorrispettivoPrintData($corrispettivo),
+                    true,
+                );
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::channel('corrispettivi')->error('Errore stampa scontrino corrispettivo', $corrispettivo->getLogContext() + [
+                'error' => $e->getMessage(),
+            ]);
+            if (isset($printerObj) && $corrispettivo->tableOrder) {
+                $this->printLogService->logPrint(
+                    $corrispettivo->tableOrder,
+                    $printerObj,
+                    $corrispettivo->operator_id,
+                    'corrispettivo',
+                    $corrispettivo->isAnnullo() ? 'annullo' : 'emissione',
+                    $this->buildCorrispettivoPrintData($corrispettivo),
+                    false,
+                    $e->getMessage(),
+                );
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Raccoglie i dati dello scontrino corrispettivo da salvare nel PrintLog.
+     * Il servizio di log li userà per rigenerare la preview HTML.
+     */
+    protected function buildCorrispettivoPrintData(\App\Models\TableOrderCorrispettivo $corrispettivo): array
+    {
+        return [
+            'corrispettivo_id'   => $corrispettivo->id,
+            'tipo'               => $corrispettivo->tipo,
+            'progressivo_sdi'    => $corrispettivo->progressivo_sdi,
+            'identificativo_sdi' => $corrispettivo->identificativo_sdi,
+            'payment_method'     => $corrispettivo->payment_method,
+            'importo_totale'     => (float) $corrispettivo->importo_totale,
+            'imponibile'         => (float) $corrispettivo->imponibile,
+            'iva'                => (float) $corrispettivo->iva,
+            'aliquota_iva'       => (float) $corrispettivo->aliquota_iva,
+            'split_label'        => $corrispettivo->precontoSplit->label ?? null,
+            'operator_name'      => $corrispettivo->operator->name ?? 'N/D',
+            'sent_at'            => $corrispettivo->sent_at?->toIso8601String(),
+            // Righe con dettaglio extras per la preview nel backoffice
+            'righe'              => $this->buildCorrispettivoRigheForPrint($corrispettivo),
+        ];
+    }
+
+    /**
+     * Costruisce la lista di righe da stampare/visualizzare sullo scontrino, includendo
+     * il dettaglio delle aggiunzioni a pagamento (extras) per ciascun piatto.
+     * - Se il corrispettivo è di uno split, itera su PrecontoSplit::items (JSON).
+     * - Se è del tavolo intero, itera sugli OrderItem del TableOrder.
+     * - Aggiunge in coda la riga "Coperto" quando presente.
+     */
+    protected function buildCorrispettivoRigheForPrint(\App\Models\TableOrderCorrispettivo $corrispettivo): array
+    {
+        $righe = [];
+
+        if ($corrispettivo->precontoSplit) {
+            $split = $corrispettivo->precontoSplit;
+            foreach ((array) ($split->items ?? []) as $it) {
+                $qty = (int) ($it['quantity'] ?? 1);
+                $righe[] = [
+                    'descrizione' => (string) ($it['dish_name'] ?? 'N/D'),
+                    'quantita'    => $qty,
+                    'totale'      => (float) ($it['subtotal'] ?? 0),
+                    'extras'      => (!empty($it['extras']) && is_array($it['extras'])) ? $it['extras'] : [],
+                ];
+            }
+            // Coperti dello split
+            if ((int) $split->covers > 0 && $split->order) {
+                $covers = (int) $split->covers;
+                $coverTotal = round((float) $split->order->getCoverChargePerPerson() * $covers, 2);
+                if ($coverTotal > 0) {
+                    $righe[] = [
+                        'descrizione' => 'Coperto',
+                        'quantita'    => $covers,
+                        'totale'      => $coverTotal,
+                        'extras'      => [],
+                    ];
+                }
+            }
+        } elseif ($corrispettivo->tableOrder) {
+            $order = $corrispettivo->tableOrder;
+            $order->loadMissing(['items.dish']);
+            foreach ($order->items as $item) {
+                if ($item->isSegueItem() || (float) $item->subtotal <= 0) continue;
+                $righe[] = [
+                    'descrizione' => (string) ($item->dish->label ?? $item->dish->name ?? 'Articolo'),
+                    'quantita'    => (int) $item->quantity,
+                    'totale'      => (float) $item->subtotal,
+                    'extras'      => (is_array($item->extras) && !empty($item->extras)) ? $item->extras : [],
+                ];
+            }
+            if ($order->hasCoverCharge()) {
+                $righe[] = [
+                    'descrizione' => 'Coperto',
+                    'quantita'    => (int) $order->covers,
+                    'totale'      => (float) $order->getCoverChargeAmount(),
+                    'extras'      => [],
+                ];
+            }
+        }
+
+        return $righe;
     }
 }

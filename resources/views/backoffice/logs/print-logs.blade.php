@@ -83,11 +83,13 @@
                                                     'order' => 'primary',
                                                     'marcia' => 'success',
                                                     'preconto' => 'info',
+                                                    'corrispettivo' => 'warning',
                                                 ];
                                                 $typeIcons = [
                                                     'order' => 'fa-utensils',
                                                     'marcia' => 'fa-play-circle',
                                                     'preconto' => 'fa-receipt',
+                                                    'corrispettivo' => 'fa-file-invoice',
                                                 ];
                                             @endphp
                                             <span class="badge badge-{{ $typeColors[$log->print_type] ?? 'secondary' }}">

@@ -129,6 +129,14 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'corrispettivi' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/corrispettivi.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
+
         'telegram' => [
             'driver' => 'monolog',
             'level' => 'warning',

@@ -79,7 +79,13 @@ class TableOrderLogController extends Controller
     public function show(TableOrder $tableOrder)
     {
         $logs = $this->logger->getLogsForOrder($tableOrder->id);
-        $tableOrder->load(['items.dish', 'items.autoconsumoUser']);
+        $tableOrder->load([
+            'items.dish',
+            'items.autoconsumoUser',
+            'corrispettivi.precontoSplit',
+            'corrispettivi.operator:id,name',
+            'corrispettivi.emissioneAnnullata',
+        ]);
 
         return view('backoffice.logs.table-order-detail', compact('tableOrder', 'logs'));
     }

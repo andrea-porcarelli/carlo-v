@@ -19,6 +19,7 @@ use App\Http\Controllers\Backoffice\SupplierController;
 use App\Http\Controllers\Backoffice\MappingProductController;
 use App\Http\Controllers\Backoffice\PrintLogController;
 use App\Http\Controllers\Backoffice\SyncController;
+use App\Http\Controllers\Backoffice\CorrispettivoController;
 use App\Http\Controllers\Backoffice\TableOrderLogController;
 use App\Http\Controllers\Backoffice\UploadController;
 use App\Http\Controllers\Backoffice\UserController;
@@ -288,6 +289,12 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/export', [TableOrderLogController::class, 'export'])->name('export');
             Route::get('/activity-summary', [TableOrderLogController::class, 'activitySummary'])->name('activity-summary');
             Route::get('/category-stats', [TableOrderLogController::class, 'categoryStats'])->name('category-stats');
+        });
+
+        // Corrispettivi elettronici — azioni manuali da backoffice
+        Route::prefix('/corrispettivi')->name('backoffice.corrispettivi.')->group(function () {
+            Route::post('/{corrispettivo}/riprova', [CorrispettivoController::class, 'riprova'])->name('riprova');
+            Route::post('/{corrispettivo}/annulla', [CorrispettivoController::class, 'annulla'])->name('annulla');
         });
 
 

@@ -126,4 +126,9 @@ interface PrinterServiceInterface
      * @return bool
      */
     public function printDishChange(TableOrder $tableOrder, OrderItem $newItem, string $oldDishName, ?Printer $oldPrinter): bool;
+
+    /**
+     * Stampa lo scontrino (non fiscale) del corrispettivo elettronico con progressivoSdi.
+     */
+    public function printCorrispettivoReceipt(\App\Models\TableOrderCorrispettivo $corrispettivo): bool;
 }

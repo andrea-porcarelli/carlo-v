@@ -107,8 +107,15 @@
                 </div>
 
                 <!-- MENU tab -->
-                <div id="mobileOverlayMenuTab" style="height:100%; display:none; flex-direction:column; overflow:hidden;">
-                    <div id="modifyMenuContainer" style="height:100%; background:white; border-radius:8px; overflow:hidden;">
+                <div id="mobileOverlayMenuTab" style="height:100%; display:none; flex-direction:column; overflow:hidden; gap:6px;">
+                    <button id="btnQuickSegueMobile" type="button"
+                            onclick="tableOrdersManager.toggleSegueAfterLast()"
+                            aria-pressed="false"
+                            class="quick-segue-btn">
+                        <i class="fas fa-level-down-alt"></i>
+                        <span>SEGUE dopo ultimo piatto</span>
+                    </button>
+                    <div id="modifyMenuContainer" style="flex:1; min-height:0; background:white; border-radius:8px; overflow:hidden;">
                         @livewire('dish-selector-mobile')
                     </div>
                 </div>
@@ -120,7 +127,7 @@
                 <button class="action-btn-v" id="btnMarciaTavolo" style="background:#28a745;">
                     <i class="fas fa-play-circle"></i> MARCIA
                 </button>
-                <button class="action-btn-v" id="btnInviaOrdine" style="background:#0d6efd;">
+                <button class="action-btn-v" id="btnInviaOrdine" style="background:#0d6efd; display:none;">
                     <i class="fas fa-paper-plane"></i> INVIA ORDINE
                 </button>
                 <button class="action-btn-v" id="btnPreconto" style="background:#17a2b8;">
@@ -251,6 +258,38 @@
     </div>
     <style>
         @keyframes cashDrawerSpin { to { transform: rotate(360deg); } }
+
+        /* Tasto veloce Segue nel tab MENU mobile */
+        .quick-segue-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            background: #ffc107;
+            color: #212529;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+            flex-shrink: 0;
+        }
+        .quick-segue-btn i { font-size: 16px; }
+        .quick-segue-btn:active { transform: scale(0.98); }
+        .quick-segue-btn.active {
+            background: #28a745;
+            border-color: #28a745;
+            color: #fff;
+        }
+        .quick-segue-btn.active span::after {
+            content: " — TOGLI";
+            font-weight: 700;
+        }
     </style>
 
     <!-- Cash Drawer Fallback Alert (rimane visibile fino alla conferma dell'operatore) -->

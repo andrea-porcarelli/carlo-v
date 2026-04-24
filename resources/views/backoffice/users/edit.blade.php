@@ -148,17 +148,19 @@ $permissionMeta = [
                         <div class="row">
                             <div class="col-lg-12">
                                 <div class="alert alert-info">
-                                    <i class="fas fa-info-circle"></i>
-                                    <strong>Password (PIN):</strong> Numerica, max 5 cifre. Lascia vuoto per non modificare.
+                                    <i class="fas fa-key"></i>
+                                    <strong>PIN di Autenticazione:</strong> Codice numerico univoco, da 1 a 5 cifre. Lascia vuoto per non modificare.
                                 </div>
                             </div>
                             @include('backoffice.components.form.input', [
-                                'label'       => 'Password (PIN)',
-                                'name'        => 'password',
+                                'label'       => 'PIN di Autenticazione',
+                                'name'        => 'authentication_pin',
                                 'col'         => 6,
-                                'type'        => 'password',
+                                'type'        => 'text',
                                 'inputmode'   => 'numeric',
+                                'value'       => $_user->authentication_pin,
                                 'placeholder' => 'Es: 12345',
+                                'pattern'     => '[0-9]{1,5}',
                             ])
                         </div>
                     </div>
@@ -294,7 +296,7 @@ $(document).ready(function () {
     $('#selectAllPerms').on('click', function (e) {
         e.preventDefault();
         document.querySelectorAll('#permissionsPanel .js-switch').forEach(function (el, i) {
-            if (!el.checked) switchInstances[i].setPosition(false);
+            if (!el.checked) switchInstances[i].setPosition(true);
         });
     });
 
