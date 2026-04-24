@@ -2086,7 +2086,7 @@ class PrinterService implements PrinterServiceInterface
             // Progressivo (in evidenza) subito sotto il titolo
             $printer->text("Progressivo\n");
             $printer->setEmphasis(true);
-            $printer->setTextSize(2, 2);
+            $printer->setTextSize(1, 2);
             $printer->text(((string) $corrispettivo->progressivo_sdi) . "\n");
             $printer->setTextSize(1, 1);
             $printer->setEmphasis(false);

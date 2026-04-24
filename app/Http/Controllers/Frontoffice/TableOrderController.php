@@ -822,42 +822,58 @@ class TableOrderController extends Controller
                     : ('Tavolo ' . e($tableNumber ?? $table->id));
 
                 $msg = "🚨 <b>CASSA CONTANTI NON RAGGIUNGIBILE</b>\n\n"
-                    . "🪑 <b>{$tableLabel}</b>\n";
+                    . "🪑 <b>{$tableLabel}</b>\n"
+                    . "🧾 Ordine: <b>#{$order->id}</b> — {$order_total}\n";
 
                 if ($split) {
-                    // Notifica dedicata al pagamento di un singolo preconto: riportiamo
-                    // label, totale scontato dello split e i prodotti associati con prezzo.
+                    // Pagamento di un singolo preconto: riportiamo label + totale del preconto.
                     $splitLabel = e($split->label ?: ('Preconto #' . $split->id));
                     $splitTotal = Utils::price((float) $split->total);
-                    $msg .= "📋 Preconto: <b>{$splitLabel}</b>\n"
-                          . "🧾 Totale preconto: <b>{$splitTotal}</b>\n";
-
+                    $msg .= "📋 Preconto: <b>{$splitLabel}</b> — <b>{$splitTotal}</b>\n";
                     if ($split->covers > 0) {
-                        $coverTotal = Utils::price((float) $order->getCoverChargePerPerson() * (int) $split->covers);
-                        $msg .= "🍽️ Coperti: <b>{$split->covers}</b> ({$coverTotal})\n";
+                        $coverTotalSplit = Utils::price((float) $order->getCoverChargePerPerson() * (int) $split->covers);
+                        $msg .= "🍽️ Coperti preconto: <b>{$split->covers}</b> ({$coverTotalSplit})\n";
                     }
+                }
 
-                    $items = is_array($split->items) ? $split->items : [];
-                    if (!empty($items)) {
-                        $msg .= "\n<b>Prodotti:</b>\n";
-                        foreach ($items as $it) {
-                            $qty   = (int) ($it['quantity'] ?? 1);
-                            $name  = e((string) ($it['dish_name'] ?? 'N/D'));
-                            $sub   = Utils::price((float) ($it['subtotal'] ?? 0));
-                            $msg  .= "• {$qty} × {$name} — {$sub}\n";
-                            if (!empty($it['extras']) && is_array($it['extras'])) {
-                                foreach ($it['extras'] as $eName => $ePrice) {
-                                    $msg .= "   ↳ " . e((string) $eName) . " (+" . Utils::price((float) $ePrice) . ")\n";
-                                }
+                // Elenco SEMPRE presente di tutti i piatti del tavolo, con aggiunzioni
+                // (con prezzo) e rimozioni di ogni piatto. Così la notifica contiene
+                // abbastanza contesto per risalire al dettaglio dell'incasso.
+                $order->loadMissing(['items.dish']);
+                $orderItems = $order->items->filter(fn($i) => !$i->isSegueItem() && (float) $i->subtotal > 0);
+                if ($orderItems->isNotEmpty()) {
+                    $msg .= "\n<b>Piatti del tavolo:</b>\n";
+                    foreach ($orderItems as $it) {
+                        $qty   = (int) $it->quantity;
+                        $name  = e((string) ($it->dish->label ?? $it->dish->name ?? 'Articolo'));
+                        $sub   = Utils::price((float) $it->subtotal);
+                        $msg  .= "• {$qty} × {$name} — {$sub}\n";
+
+                        if (is_array($it->extras) && !empty($it->extras)) {
+                            foreach ($it->extras as $eName => $ePrice) {
+                                $msg .= "   ↳ " . e((string) $eName) . " (+" . Utils::price((float) $ePrice) . ")\n";
+                            }
+                        }
+                        if (is_array($it->removals) && !empty($it->removals)) {
+                            foreach ($it->removals as $rName) {
+                                $msg .= "   ↳ − " . e((string) $rName) . "\n";
                             }
                         }
                     }
-                    $msg .= "\n";
-                } else {
-                    $msg .= "🧾 Ordine: <b>#{$order->id}</b> — {$order_total}\n";
+                    if ($order->hasCoverCharge()) {
+                        $coverTot = Utils::price((float) $order->getCoverChargeAmount());
+                        $coverPP  = Utils::price((float) $order->getCoverChargePerPerson());
+                        $msg .= "• Coperti: {$order->covers} × {$coverPP} — {$coverTot}\n";
+                    }
+                    if ($order->hasDiscount()) {
+                        $dType = $order->discount_type;
+                        $dAmt  = (float) $order->discount_amount;
+                        $dLabel = $dType === 'percent' ? number_format($dAmt, 0) . '%' : Utils::price($dAmt);
+                        $msg .= "• Sconto applicato: " . e($dLabel) . " (−" . Utils::price((float) $order->discount_value) . ")\n";
+                    }
                 }
 
-                $msg .= "👤 Operatore: <b>" . e($operatorName) . "</b>\n"
+                $msg .= "\n👤 Operatore: <b>" . e($operatorName) . "</b>\n"
                       . "🕒 " . now()->format('d/m/Y H:i') . "\n\n"
                       . "Il conto è stato chiuso manualmente come CONTANTI senza conferma della cassa automatica.";
 
