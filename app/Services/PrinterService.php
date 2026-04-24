@@ -308,7 +308,9 @@ class PrinterService implements PrinterServiceInterface
             return;
         }
 
-        // Quantità e nome piatto
+        // Quantità e nome piatto — Font B (più stretto di Font A) con double width+height:
+        // risultato visivo a metà strada tra 1×1 e 2×2 su Font A.
+        $printer->setFont(EscposPrinter::FONT_B);
         $printer->setEmphasis(true);
         $printer->setTextSize(2, 2);
         if (isset($item->dish)) {
@@ -320,6 +322,7 @@ class PrinterService implements PrinterServiceInterface
         }
         $printer->setTextSize(1, 1);
         $printer->setEmphasis(false);
+        $printer->setFont(EscposPrinter::FONT_A);
 
         // Note
         if (!empty($item->notes)) {
@@ -344,7 +347,11 @@ class PrinterService implements PrinterServiceInterface
             }
         }
 
+        // Mini-spaziatura tra un piatto e il successivo: feed corto (meno di una riga intera)
+        // ottenuto riducendo temporaneamente il line spacing a ~15 dots (default ~30).
+        $printer->setLineSpacing(15);
         $printer->feed(1);
+        $printer->setLineSpacing();
     }
 
     /**

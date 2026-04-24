@@ -107,6 +107,9 @@ class SalesController extends BaseController
             'waiter',
             'precontoSplits',
             'tableOrderInvoices.customer',
+            'corrispettivi.precontoSplit',
+            'corrispettivi.operator:id,name',
+            'corrispettivi.emissioneAnnullata',
         ])->withTrashed()
             ->findOrFail($id);
 

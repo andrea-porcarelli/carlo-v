@@ -863,6 +863,107 @@ window._boSale = {
     @endif
     @endif
 
+    <!-- Corrispettivi Elettronici -->
+    @php
+        $corrispettivi = $sale->corrispettivi ?? collect();
+        $statusBadgeCorr = [
+            'pending'   => 'default',
+            'sending'   => 'info',
+            'sent'      => 'success',
+            'failed'    => 'danger',
+            'cancelled' => 'inverse',
+        ];
+    @endphp
+    @if($corrispettivi->isNotEmpty())
+    <div class="row mt-4">
+        <div class="col-xs-12">
+            <div class="panel panel-warning">
+                <div class="panel-heading">
+                    <h4 class="panel-title" style="margin:0;">
+                        <i class="fa fa-file-invoice"></i> Corrispettivi elettronici
+                        <span class="label label-default" style="margin-left:8px;">{{ $corrispettivi->count() }}</span>
+                    </h4>
+                </div>
+                <div class="panel-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-condensed table-hover table-striped">
+                            <thead>
+                                <tr class="active">
+                                    <th>Tipo</th>
+                                    <th>Data</th>
+                                    <th>Preconto</th>
+                                    <th>Pagamento</th>
+                                    <th class="text-right">Totale</th>
+                                    <th>Progressivo</th>
+                                    <th>ID Transazione</th>
+                                    <th>Stato</th>
+                                    <th>Tentativi</th>
+                                    <th>Operatore</th>
+                                    <th class="text-right">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($corrispettivi as $c)
+                                <tr>
+                                    <td>
+                                        @if($c->isAnnullo())
+                                            <span class="label label-inverse">Annullo</span>
+                                            @if($c->emissioneAnnullata)
+                                                <small class="text-muted d-block">di #{{ $c->emissioneAnnullata->id }}</small>
+                                            @endif
+                                        @else
+                                            <span class="label label-primary">Emissione</span>
+                                        @endif
+                                    </td>
+                                    <td><small>{{ ($c->sent_at ?? $c->created_at)->format('d/m/Y H:i:s') }}</small></td>
+                                    <td>{{ $c->precontoSplit?->label ?? '—' }}</td>
+                                    <td>{{ $c->payment_method }}</td>
+                                    <td class="text-right">€{{ number_format((float)$c->importo_totale, 2) }}</td>
+                                    <td>@if($c->progressivo_sdi)<code>{{ $c->progressivo_sdi }}</code>@else — @endif</td>
+                                    <td>@if($c->identificativo_sdi)<code>{{ $c->identificativo_sdi }}</code>@else — @endif</td>
+                                    <td>
+                                        <span class="label label-{{ $statusBadgeCorr[$c->status] ?? 'default' }}">
+                                            {{ $c->getStatusLabel() }}
+                                        </span>
+                                        @if($c->last_error)
+                                            <i class="fa fa-exclamation-triangle text-danger" title="{{ $c->last_error }}"></i>
+                                        @endif
+                                    </td>
+                                    <td>{{ $c->attempts }}/{{ $c->max_attempts }}</td>
+                                    <td>{{ $c->operator?->name ?? '—' }}</td>
+                                    <td class="text-right">
+                                        @if($c->canRetry())
+                                            <form action="{{ route('backoffice.corrispettivi.riprova', $c->id) }}"
+                                                  method="POST" style="display:inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-warning"
+                                                        onclick="return confirm('Riprovare l\'invio del corrispettivo?');">
+                                                    <i class="fa fa-redo"></i> Riprova
+                                                </button>
+                                            </form>
+                                        @endif
+                                        @if($c->canCancel())
+                                            <form action="{{ route('backoffice.corrispettivi.annulla', $c->id) }}"
+                                                  method="POST" style="display:inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-danger"
+                                                        onclick="return confirm('Annullare il corrispettivo {{ $c->progressivo_sdi }}? L\'operazione è irreversibile.');">
+                                                    <i class="fa fa-ban"></i> Annulla
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- Order Activity Log -->
     <div class="row mt-4">
         <div class="col-xs-12">
