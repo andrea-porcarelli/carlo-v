@@ -1498,6 +1498,12 @@ body.mobile-body #modifyReceiptItems .receipt-item:active {
     background: rgba(13, 110, 253, 0.06);
 }
 
+/* In mobile il SEGUE si gestisce dal tasto in basso: nascondiamo separatori e placeholder inline */
+body.mobile-body #modifyReceiptItems .segue-separator,
+body.mobile-body #modifyReceiptItems .segue-placeholder {
+    display: none !important;
+}
+
 .dsm-dish-price {
     font-size: 0.92rem;
     font-weight: 700;

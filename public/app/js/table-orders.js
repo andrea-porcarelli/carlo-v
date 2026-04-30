@@ -717,7 +717,7 @@ class TableOrdersManager {
             if (isSegueItem) {
                 // This item IS the segue separator
                 itemsHtml += `
-                    <div style="display:flex;align-items:center;gap:6px;margin:2px 0;user-select:none;">
+                    <div class="segue-separator" style="display:flex;align-items:center;gap:6px;margin:2px 0;user-select:none;">
                         <div style="flex:1;height:2px;background:#dc3545;"></div>
                         <span style="font-size:1rem;font-weight:800;color:#dc3545;letter-spacing:1px;white-space:nowrap;">★ SEGUE ★</span>
                         <div style="flex:1;height:2px;background:#dc3545;"></div>
@@ -732,7 +732,7 @@ class TableOrdersManager {
             const prevIsRegularDish = prevItem && !(prevItem.segue && !prevItem.dish_id);
             if (prevIsRegularDish) {
                 itemsHtml += `
-                    <div onclick="tableOrdersManager.addSegueAfter(${prevItem.id})"
+                    <div class="segue-placeholder" onclick="tableOrdersManager.addSegueAfter(${prevItem.id})"
                         style="display:flex;align-items:center;gap:6px;margin:2px 0;cursor:pointer;opacity:0.35;user-select:none;"
                         title="Inserisci segue">
                         <div style="flex:1;height:1px;background:#6c757d;"></div>
@@ -742,7 +742,7 @@ class TableOrdersManager {
             }
 
             itemsHtml += `
-            <div class="receipt-item" data-item-id="${item.id}" data-was-printed="${item.was_printed ? '1' : '0'}" data-is-new="${item._isNew ? '1' : '0'}">
+            <div class="receipt-item" onclick="tableOrdersManager._mobileItemTap(${item.id}, event)" data-item-id="${item.id}" data-was-printed="${item.was_printed ? '1' : '0'}" data-is-new="${item._isNew ? '1' : '0'}">
                 <div style="font-size:13px;font-weight:600;line-height:1.3; color:#3d3d3d;">
                     ${item.quantity} × <span class="receipt-dish-name">${item.dish_name}</span>
                     ${item.notes ? `<br /><div class="receipt-item-notes"> ${item.notes}</div>` : ''}
@@ -5747,25 +5747,16 @@ class TableOrdersManager {
 
     // ===== MOBILE: tap su voce ordine → modal modifica (qty/prezzo) =====
 
-    _initMobileItemTapHandler() {
+    /**
+     * Entry-point inline onclick sulle voci dell'ordine.
+     * Su desktop non fa nulla (continuano le 3 icone). Su mobile apre il modal modifica.
+     */
+    _mobileItemTap(itemId, event) {
         if (!this.isMobile) return;
-        if (this._mobileTapHandlerInit) return;
-        const container = document.getElementById('modifyReceiptItems');
-        if (!container) return;
-        this._mobileTapHandlerInit = true;
-        container.addEventListener('click', (e) => {
-            // Lascia che pulsanti interni gestiscano il proprio click (es. coperto edit)
-            if (e.target.closest('button')) return;
-            if (e.target.closest('.receipt-item-actions')) return;
-            const row = e.target.closest('.receipt-item');
-            if (!row) return;
-            // Salta voci coperto e altre senza data-item-id valido
-            const rawId = row.dataset.itemId;
-            if (!rawId) return;
-            const itemId = parseInt(rawId, 10);
-            if (isNaN(itemId) || itemId === 0) return;
-            this._openMobileModifyModal(itemId);
-        });
+        // Se il click è arrivato su un bottone interno (es. coperto edit, segue ×), lascia gestire a lui
+        if (event && event.target && event.target.closest('button')) return;
+        if (typeof itemId !== 'number' || isNaN(itemId) || itemId === 0) return;
+        this._openMobileModifyModal(itemId);
     }
 
     _openMobileModifyModal(itemId) {
@@ -5930,7 +5921,6 @@ let tableOrdersManager;
 document.addEventListener('DOMContentLoaded', () => {
     const isMobile = window.innerWidth <= 768 || document.getElementById('mainViewMobile') !== null;
     tableOrdersManager = new TableOrdersManager(isMobile);
-    tableOrdersManager._initMobileItemTapHandler();
     if (window._backofficeMode && window._backofficeTableId) {
         tableOrdersManager.initForBackoffice(window._backofficeTableId);
     }
