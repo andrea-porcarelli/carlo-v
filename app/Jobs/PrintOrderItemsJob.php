@@ -24,6 +24,7 @@ class PrintOrderItemsJob implements ShouldQueue
         public readonly array $itemIds,
         public readonly string $operation,
         public readonly ?int $operatorId = null,
+        public readonly array $quantityOverrides = [],
     ) {
         $this->onQueue('printers');
     }
@@ -43,10 +44,25 @@ class PrintOrderItemsJob implements ShouldQueue
             return;
         }
 
+        if (!empty($this->quantityOverrides)) {
+            foreach ($items as $item) {
+                if (isset($this->quantityOverrides[$item->id])) {
+                    $item->quantity = (int) $this->quantityOverrides[$item->id];
+                    $item->subtotal = $item->calculateSubtotal();
+                }
+            }
+        }
+
         if ($this->operatorId) {
             $printerService->setOperatorId($this->operatorId);
         }
 
-        $printerService->printOrderItems($tableOrder, $items, $this->operation);
+        $ok = $printerService->printOrderItems($tableOrder, $items, $this->operation);
+
+        if ($ok && in_array($this->operation, ['add', 'update'], true)) {
+            OrderItem::whereIn('id', $this->itemIds)
+                ->whereNull('first_printed_at')
+                ->update(['first_printed_at' => now()]);
+        }
     }
 }

@@ -26,6 +26,7 @@ class OrderItem extends Model
         'segue',
         'sort_order',
         'autoconsumo_user_id',
+        'first_printed_at',
     ];
 
     protected $casts = [
@@ -35,6 +36,7 @@ class OrderItem extends Model
         'extras' => 'array',
         'removals' => 'array',
         'segue' => 'boolean',
+        'first_printed_at' => 'datetime',
     ];
 
     /**

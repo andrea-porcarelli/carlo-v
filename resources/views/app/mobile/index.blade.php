@@ -184,6 +184,9 @@
         </div>
     </div>
 
+    <!-- Modal modifica voce ordine (solo mobile) -->
+    <x-mobile-modify-item-modal />
+
     <!-- Shared modals (stessi del desktop, gestiti da app.js) -->
     <x-product-modal :isMobile="true" />
     <x-operator-auth-modal />

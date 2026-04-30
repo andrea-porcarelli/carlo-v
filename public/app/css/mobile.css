@@ -1462,7 +1462,7 @@ input, textarea, select {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 13px 16px;
+    padding: 8px 12px;
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
     transition: background 0.1s;
@@ -1478,6 +1478,24 @@ input, textarea, select {
     font-weight: 600;
     color: #212529;
     flex: 1;
+    text-transform: uppercase;
+}
+
+/* Maiuscolo solo sul nome piatto nelle voci ordine mobile (non su note/extras/rimozioni) */
+body.mobile-body #modifyReceiptItems .receipt-dish-name {
+    text-transform: uppercase;
+}
+
+/* In mobile la voce ordine si modifica con tap sulla riga: nascondiamo le 3 icone +/✎/🗑
+   e indichiamo la cliccabilità della riga */
+body.mobile-body #modifyReceiptItems .receipt-item-actions > div {
+    display: none !important;
+}
+body.mobile-body #modifyReceiptItems .receipt-item {
+    cursor: pointer;
+}
+body.mobile-body #modifyReceiptItems .receipt-item:active {
+    background: rgba(13, 110, 253, 0.06);
 }
 
 .dsm-dish-price {

@@ -742,9 +742,9 @@ class TableOrdersManager {
             }
 
             itemsHtml += `
-            <div class="receipt-item" data-item-id="${item.id}">
+            <div class="receipt-item" data-item-id="${item.id}" data-was-printed="${item.was_printed ? '1' : '0'}" data-is-new="${item._isNew ? '1' : '0'}">
                 <div style="font-size:13px;font-weight:600;line-height:1.3; color:#3d3d3d;">
-                    ${item.quantity} × ${item.dish_name}
+                    ${item.quantity} × <span class="receipt-dish-name">${item.dish_name}</span>
                     ${item.notes ? `<br /><div class="receipt-item-notes"> ${item.notes}</div>` : ''}
                     ${item.extras && Object.keys(item.extras).length > 0 ? `
                         <div class="receipt-item-extras">
@@ -5744,6 +5744,185 @@ class TableOrdersManager {
             this.showNotification('Errore nello spostamento del tavolo', 'error');
         }
     }
+
+    // ===== MOBILE: tap su voce ordine → modal modifica (qty/prezzo) =====
+
+    _initMobileItemTapHandler() {
+        if (!this.isMobile) return;
+        if (this._mobileTapHandlerInit) return;
+        const container = document.getElementById('modifyReceiptItems');
+        if (!container) return;
+        this._mobileTapHandlerInit = true;
+        container.addEventListener('click', (e) => {
+            // Lascia che pulsanti interni gestiscano il proprio click (es. coperto edit)
+            if (e.target.closest('button')) return;
+            if (e.target.closest('.receipt-item-actions')) return;
+            const row = e.target.closest('.receipt-item');
+            if (!row) return;
+            // Salta voci coperto e altre senza data-item-id valido
+            const rawId = row.dataset.itemId;
+            if (!rawId) return;
+            const itemId = parseInt(rawId, 10);
+            if (isNaN(itemId) || itemId === 0) return;
+            this._openMobileModifyModal(itemId);
+        });
+    }
+
+    _openMobileModifyModal(itemId) {
+        const item = this.modifySession.items.find(i => i.id === itemId);
+        if (!item) return;
+        if (item.segue && !item.dish_id) return; // separatore segue: niente modal
+
+        const modal = document.getElementById('mobileModifyItemModal');
+        if (!modal) return;
+
+        const nameEl  = document.getElementById('mmiDishName');
+        const qtyEl   = document.getElementById('mmiQty');
+        const priceEl = document.getElementById('mmiPrice');
+        if (nameEl)  nameEl.textContent  = item.dish_name || '-';
+        if (qtyEl)   qtyEl.value         = item.quantity;
+        if (priceEl) priceEl.value       = parseFloat(item.unit_price).toFixed(2);
+
+        this._mmiCtx = {
+            id: itemId,
+            oldQty: parseInt(item.quantity, 10),
+            oldPrice: parseFloat(item.unit_price),
+            wasPrinted: !!item.was_printed,
+            isNew: !!item._isNew,
+        };
+
+        // Re-bind buttons (clean handlers from previous open)
+        ['mmiQtyMinus', 'mmiQtyPlus', 'mmiCancel', 'mmiConfirm'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.replaceWith(el.cloneNode(true));
+        });
+        document.getElementById('mmiQtyMinus').addEventListener('click', () => {
+            const inp = document.getElementById('mmiQty');
+            inp.value = Math.max(0, parseInt(inp.value || 0, 10) - 1);
+        });
+        document.getElementById('mmiQtyPlus').addEventListener('click', () => {
+            const inp = document.getElementById('mmiQty');
+            inp.value = parseInt(inp.value || 0, 10) + 1;
+        });
+        document.getElementById('mmiCancel').addEventListener('click', () => this._closeMmiModal());
+        document.getElementById('mmiConfirm').addEventListener('click', () => this._handleMmiConfirm());
+
+        modal.style.display = 'flex';
+    }
+
+    _closeMmiModal() {
+        const modal = document.getElementById('mobileModifyItemModal');
+        if (modal) modal.style.display = 'none';
+        this._mmiCtx = null;
+    }
+
+    async _handleMmiConfirm() {
+        const ctx = this._mmiCtx;
+        if (!ctx) return;
+        const newQty   = parseInt(document.getElementById('mmiQty').value || 0, 10);
+        const newPrice = parseFloat(document.getElementById('mmiPrice').value || 0);
+
+        if (isNaN(newQty) || newQty < 0) {
+            this.showNotification('Quantità non valida', 'error');
+            return;
+        }
+        if (isNaN(newPrice) || newPrice < 0) {
+            this.showNotification('Prezzo non valido', 'error');
+            return;
+        }
+        if (newQty === ctx.oldQty && Math.abs(newPrice - ctx.oldPrice) < 0.001) {
+            this._closeMmiModal();
+            return;
+        }
+
+        let reason = null;
+        const needsReason = ctx.wasPrinted && newQty < ctx.oldQty;
+        this._closeMmiModal();
+        if (needsReason) {
+            reason = await this._showRemoveReasonModal();
+            if (!reason) return; // cancellato
+        }
+
+        // Voce nuova non ancora salvata: aggiorna sessione locale
+        if (ctx.isNew) {
+            const item = this.modifySession.items.find(i => i.id === ctx.id);
+            const pa   = this.modifySession.pendingAdd.find(p => p._localId === ctx.id);
+            if (newQty === 0) {
+                this.modifySession.items = this.modifySession.items.filter(i => i.id !== ctx.id);
+                this.modifySession.pendingAdd = this.modifySession.pendingAdd.filter(p => p._localId !== ctx.id);
+            } else {
+                if (item) {
+                    item.quantity = newQty;
+                    item.unit_price = newPrice;
+                    const extrasTotal = item.extras
+                        ? Object.values(item.extras).reduce((s, v) => s + parseFloat(v || 0), 0)
+                        : 0;
+                    item.subtotal = (newPrice + extrasTotal) * newQty;
+                }
+                if (pa) {
+                    pa.quantity = newQty;
+                    pa.custom_price = newPrice;
+                }
+            }
+            this.updateModifyReceiptItems();
+            this.showNotification('Voce aggiornata');
+            return;
+        }
+
+        // Voce salvata: chiama l'endpoint modifyItem
+        try {
+            const response = await fetch(`${this.apiBase}/items/${ctx.id}/modify`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': this.modifySession.token,
+                },
+                body: JSON.stringify({
+                    new_quantity: newQty,
+                    new_unit_price: newPrice,
+                    reason,
+                }),
+            });
+            const result = await response.json();
+            if (!result.success) {
+                this.showNotification(result.message || 'Errore', 'error');
+                return;
+            }
+            this.showNotification('Voce aggiornata');
+            await this._refreshSavedItemsFromBackend();
+        } catch (e) {
+            console.error(e);
+            this.showNotification('Errore di rete', 'error');
+        }
+    }
+
+    async _refreshSavedItemsFromBackend() {
+        if (!this.currentTable?.table?.id) return;
+        try {
+            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}`);
+            const result = await response.json();
+            if (!result.success) return;
+            this.currentTable = result.data;
+            const order = this.currentTable.order;
+            if (!order) {
+                // Ordine svuotato: chiudi overlay e ricarica griglia tavoli
+                const overlay = document.getElementById('modifyOrderOverlay');
+                if (overlay) overlay.style.display = 'none';
+                await this.loadTables();
+                return;
+            }
+            // Sostituisci voci salvate, preserva voci nuove non ancora trasmesse
+            const newItems   = this.modifySession.items.filter(i => i._isNew);
+            const savedItems = (order.items || []).map(i => ({ ...i, _isNew: false }));
+            this.modifySession.items = [...savedItems, ...newItems]
+                .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+            this.updateModifyReceiptItems();
+            await this.loadTables();
+        } catch (e) {
+            console.error('Error refreshing saved items:', e);
+        }
+    }
 }
 
 // Initialize manager when DOM is ready
@@ -5751,6 +5930,7 @@ let tableOrdersManager;
 document.addEventListener('DOMContentLoaded', () => {
     const isMobile = window.innerWidth <= 768 || document.getElementById('mainViewMobile') !== null;
     tableOrdersManager = new TableOrdersManager(isMobile);
+    tableOrdersManager._initMobileItemTapHandler();
     if (window._backofficeMode && window._backofficeTableId) {
         tableOrdersManager.initForBackoffice(window._backofficeTableId);
     }

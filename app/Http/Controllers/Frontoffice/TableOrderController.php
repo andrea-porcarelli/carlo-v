@@ -194,6 +194,7 @@ class TableOrderController extends Controller
                         'sort_order' => $item->sort_order,
                         'autoconsumo_user_id' => $item->autoconsumo_user_id,
                         'autoconsumo_user_name' => $item->autoconsumoUser?->name,
+                        'was_printed' => !is_null($item->first_printed_at),
                     ];
                 });
             }
@@ -680,6 +681,117 @@ class TableOrderController extends Controller
                 'success' => false,
                 'message' => 'Errore nell\'aggiornamento della quantità' . $e->getLine(),
             ], 500);
+        }
+    }
+
+    /**
+     * Modify an existing order item: quantity and/or unit price in a single call.
+     * - Decrement (qty < old) on already-printed items: requires reason and prints STORNO of |delta|.
+     * - Increment (qty > old) on already-printed items: prints MODIFICA of +delta at the new price.
+     * - Items never sent to kitchen (first_printed_at is null) are updated silently with no print.
+     * - new_quantity == 0 deletes the item (and frees the table if it becomes empty).
+     */
+    public function modifyItem(Request $request, OrderItem $item): JsonResponse
+    {
+        $validated = $request->validate([
+            'new_quantity'   => 'required|integer|min:0',
+            'new_unit_price' => 'required|numeric|min:0',
+            'reason'         => 'nullable|string|max:255',
+        ]);
+
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $newQty   = (int) $validated['new_quantity'];
+        $newPrice = (float) $validated['new_unit_price'];
+        $reason   = $validated['reason'] ?? null;
+
+        $oldQty   = (int) $item->quantity;
+        $oldPrice = (float) $item->unit_price;
+        $delta    = $newQty - $oldQty;
+        $wasPrinted   = $item->first_printed_at !== null;
+        $priceChanged = abs($oldPrice - $newPrice) > 0.001;
+
+        // Reason is mandatory only when decrementing/removing an already-printed item
+        if ($wasPrinted && $newQty < $oldQty && empty($reason)) {
+            return response()->json(['success' => false, 'message' => 'Motivazione obbligatoria per decremento o rimozione di voce già trasmessa'], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $order = $item->order;
+            $order->load('restaurantTable');
+            $item->load('dish.category.printer', 'addedBy');
+
+            // Case A: full removal
+            if ($newQty === 0) {
+                $this->logger->logRemoveItem($item, $operatorId, $reason);
+                $item->status = 'cancelled';
+                $item->saveQuietly();
+                $item->delete();
+
+                if ($order->items()->count() === 0) {
+                    $table = $order->restaurantTable;
+                    $table->update(['status' => 'free']);
+                    $this->logger->logDeleteOrder($order, $operatorId);
+                    $order->delete();
+                }
+
+                DB::commit();
+
+                if ($wasPrinted) {
+                    PrintOrderItemsJob::dispatch(
+                        $order->id, [$item->id], 'remove', $operatorId,
+                        [$item->id => $oldQty]
+                    );
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Voce rimossa',
+                    'data'    => ['removed' => true, 'order_total' => $order->fresh()?->total_amount],
+                ]);
+            }
+
+            // Case B: update quantity and/or price
+            if ($delta !== 0) {
+                $this->logger->logUpdateItemQuantity($item, $oldQty, $newQty, $operatorId);
+            }
+            if ($priceChanged) {
+                $this->logger->logUpdateItemPrice($item, $oldPrice, $newPrice, $operatorId);
+            }
+
+            $item->quantity   = $newQty;
+            $item->unit_price = $newPrice;
+            $item->save(); // recalculates subtotal
+
+            DB::commit();
+
+            // Print only when item was already sent to kitchen
+            if ($wasPrinted && $delta !== 0) {
+                $absDelta  = abs($delta);
+                $operation = $delta > 0 ? 'update' : 'remove';
+                PrintOrderItemsJob::dispatch(
+                    $order->id, [$item->id], $operation, $operatorId,
+                    [$item->id => $absDelta]
+                );
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Voce aggiornata',
+                'data'    => [
+                    'item'        => $item->fresh(['dish']),
+                    'order_total' => $order->fresh()->total_amount,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error modifying item: ' . $e->getMessage() . ' line ' . $e->getLine());
+            return response()->json(['success' => false, 'message' => 'Errore nella modifica della voce'], 500);
         }
     }
 
@@ -1663,6 +1775,7 @@ class TableOrderController extends Controller
                     'extras' => $item->extras,
                     'removals' => $item->removals,
                     'status' => $item->status,
+                    'was_printed' => !is_null($item->first_printed_at),
                     'autoconsumo_user_id' => $item->autoconsumo_user_id,
                     'autoconsumo_user_name' => $item->autoconsumoUser?->name,
                 ];

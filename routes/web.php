@@ -102,6 +102,7 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::get('/printers', [TableOrderController::class, 'getPrinters'])->name('printers');
     Route::put('/items/{item}/price', [TableOrderController::class, 'updateItemPrice'])->name('updateItemPrice');
     Route::put('/items/{item}/details', [TableOrderController::class, 'updateItemDetails'])->name('updateItemDetails');
+    Route::put('/items/{item}/modify', [TableOrderController::class, 'modifyItem'])->name('modifyItem');
     Route::post('/{table}/add-segue', [TableOrderController::class, 'addSegueItem'])->name('addSegueItem');
     Route::delete('/segue-items/{item}', [TableOrderController::class, 'removeSegueItem'])->name('removeSegueItem');
     Route::put('/items/{item}/dish', [TableOrderController::class, 'updateItemDish'])->name('updateItemDish');

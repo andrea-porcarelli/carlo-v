@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Interfaces\PrinterServiceInterface;
+use App\Models\OrderItem;
 use App\Models\TableOrder;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -32,6 +33,12 @@ class PrintMarciaJob implements ShouldQueue
             return;
         }
 
-        $printerService->printMarciaTavolo($tableOrder, $this->operatorId);
+        $ok = $printerService->printMarciaTavolo($tableOrder, $this->operatorId);
+
+        if ($ok) {
+            OrderItem::where('table_order_id', $tableOrder->id)
+                ->whereNull('first_printed_at')
+                ->update(['first_printed_at' => now()]);
+        }
     }
 }
