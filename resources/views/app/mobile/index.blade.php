@@ -42,53 +42,38 @@
     <div id="modifyOrderOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.97); z-index:1000; overflow:hidden;">
         <div style="display:flex; flex-direction:column; height:100%; padding:10px; gap:7px; box-sizing:border-box;">
 
-            <!-- Top bar -->
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:1.4rem; font-weight:700; color:white;" id="modifySelectedTableNumber">-</span>
-                    <div>
-                        <div style="font-size:0.65rem; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:0.8px;">ORDINE CORRENTE</div>
-                        <div style="font-size:0.65rem; color:rgba(255,255,255,0.6);" id="modifyCoversInfo">
-                            <i class="fas fa-users" id="modifyCoversIcon"></i>
-                            <span id="modifyCoversCount">0</span><span id="modifyCoversLabel"> coperti</span>
-                        </div>
-                    </div>
+            <!-- Top bar: tavolo + chiudi -->
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    <span style="font-size:1.3rem; font-weight:700; color:white; line-height:1;" id="modifySelectedTableNumber">-</span>
+                    <span style="font-size:0.65rem; color:rgba(255,255,255,0.65); white-space:nowrap;" id="modifyCoversInfo">
+                        <i class="fas fa-users" id="modifyCoversIcon"></i>
+                        <span id="modifyCoversCount">0</span><span id="modifyCoversLabel"> cop</span>
+                    </span>
                 </div>
-            </div>
-
-            <!-- Tab bar: ORDINE | AGGIUNGI | Chiudi e invia -->
-            <div class="mobile-overlay-tabs">
-                <button class="mobile-overlay-tab active" id="mobileTabOrdine" onclick="mobileShowOverlayTab('ordine')">
-                    <i class="fas fa-list-ul"></i> ORDINE
-                </button>
-                <button class="mobile-overlay-tab" id="mobileTabMenu" onclick="mobileShowOverlayTab('menu')">
-                    <i class="fas fa-utensils"></i> AGGIUNGI
-                </button>
-                <button id="closeModifyBtn" style="flex:0 0 auto; background:#dc3545; border:1px solid #dc3545; color:white; padding:9px 12px; border-radius:6px; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                <button id="closeModifyBtn" style="flex:0 0 auto; background:#dc3545; border:none; color:white; padding:8px 12px; border-radius:5px; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; cursor:pointer; display:flex; align-items:center; gap:6px;">
                     <i class="fas fa-sign-out-alt"></i> Chiudi e invia
                 </button>
             </div>
 
-            <!-- Tab content -->
-            <div style="flex:1; min-height:0; overflow:hidden;">
+            <!-- Pannelli ordine + piatti, sempre entrambi visibili -->
+            <div style="flex:1; min-height:0; display:flex; flex-direction:column; gap:6px;">
 
-                <!-- ORDINE tab -->
-                <div id="mobileOverlayOrderTab" style="height:100%; display:flex; flex-direction:column; overflow:hidden;">
-                    <div style="flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:white; border-radius:8px 8px 0 0; padding:10px;" id="modifyReceiptItems">
+                <!-- ORDINE (35%) -->
+                <div id="mobileOverlayOrderTab" style="flex:35 1 0; min-height:0; display:flex; flex-direction:column; overflow:hidden;">
+                    <div style="flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:white; border-radius:8px; padding:8px;" id="modifyReceiptItems">
                         <div class="empty-state">
                             <i class="fas fa-shopping-cart"></i>
                             <p>Nessun ordine</p>
                         </div>
                     </div>
-                    <!-- Footer sconto + totale -->
-                    <div class="overlay-order-footer">
+                    <!-- Footer sconto/totale (nascosto sul mobile, mantenuto in DOM per JS) -->
+                    <div class="overlay-order-footer" style="display:none;">
                         <div class="overlay-discount-row">
                             <span class="discount-label"><i class="fas fa-tag me-1"></i>SCONTO</span>
                             <div class="discount-controls">
-                                <button class="discount-type-btn active" id="discountTypePct"
-                                    onclick="if(!document.getElementById('modifyDiscountInput').disabled){ this.classList.add('active'); document.getElementById('discountTypeVal').classList.remove('active'); }">%</button>
-                                <button class="discount-type-btn" id="discountTypeVal"
-                                    onclick="if(!document.getElementById('modifyDiscountInput').disabled){ this.classList.add('active'); document.getElementById('discountTypePct').classList.remove('active'); }">€</button>
+                                <button class="discount-type-btn active" id="discountTypePct">%</button>
+                                <button class="discount-type-btn" id="discountTypeVal">€</button>
                                 <input type="number" id="modifyDiscountInput" min="0" step="0.5" placeholder="0">
                                 <button id="btnApplyDiscount" class="discount-apply-btn" onclick="tableOrdersManager.requestDiscountAuth()">
                                     <i class="fas fa-check"></i>
@@ -106,8 +91,8 @@
                     </div>
                 </div>
 
-                <!-- MENU tab -->
-                <div id="mobileOverlayMenuTab" style="height:100%; display:none; flex-direction:column; overflow:hidden;">
+                <!-- MENU (65%) -->
+                <div id="mobileOverlayMenuTab" style="flex:65 1 0; min-height:0; display:flex; flex-direction:column; overflow:hidden;">
                     <div id="modifyMenuContainer" style="flex:1; min-height:0; background:white; border-radius:8px; overflow:hidden;">
                         @livewire('dish-selector-mobile')
                     </div>
@@ -115,31 +100,31 @@
 
             </div>
 
-            <!-- Barra azioni (3 colonne su mobile) -->
+            <!-- Barra azioni: tasti quadrati icona+sigla, sempre visibili -->
             <div class="overlay-actions-bar mobile-actions-bar">
                 <button class="action-btn-v" id="btnMarciaTavolo" style="background:#28a745;">
-                    <i class="fas fa-play-circle"></i> MARCIA
+                    <i class="fas fa-play-circle"></i><span>MARCIA</span>
                 </button>
                 <button class="action-btn-v" id="btnInviaOrdine" style="background:#0d6efd; display:none;">
-                    <i class="fas fa-paper-plane"></i> INVIA ORDINE
+                    <i class="fas fa-paper-plane"></i><span>INVIA</span>
                 </button>
                 <button class="action-btn-v" id="btnPreconto" style="background:#17a2b8;">
-                    <i class="fas fa-receipt"></i> PRE-CONTO
+                    <i class="fas fa-receipt"></i><span>PRE</span>
                 </button>
                 <button class="action-btn-v" id="btnSpostaTavolo" style="background:#fd7e14;">
-                    <i class="fas fa-exchange-alt"></i> SPOSTA
+                    <i class="fas fa-exchange-alt"></i><span>SPOSTA</span>
                 </button>
                 <button class="action-btn-v" id="btnRistampaOrdine" style="background:#343a40;">
-                    <i class="fas fa-print"></i> RISTAMPA
+                    <i class="fas fa-print"></i><span>RIST</span>
                 </button>
                 <button class="action-btn-v" id="btnModifyComunica" style="background:#6f42c1;">
-                    <i class="fas fa-bullhorn"></i> COMUNICA
+                    <i class="fas fa-bullhorn"></i><span>COM</span>
                 </button>
                 <button class="action-btn-v quick-segue-btn" id="btnQuickSegueMobile" type="button"
                         onclick="tableOrdersManager.toggleSegueAfterLast()"
                         aria-pressed="false"
                         style="background:#ffc107; color:#212529;">
-                    <i class="fas fa-level-down-alt"></i> SEGUE
+                    <i class="fas fa-level-down-alt"></i><span>SEGUE</span>
                 </button>
             </div>
 

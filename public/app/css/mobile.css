@@ -1356,28 +1356,35 @@ input, textarea, select {
     font-size: 0.9rem;
 }
 
-/* ===== ACTION BAR – 9 BUTTONS (MOBILE) ===== */
+/* ===== ACTION BAR – TASTI QUADRATI ICONA+TESTO, RIGA UNICA ===== */
 .mobile-actions-bar {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 5px;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
     flex-shrink: 0;
 }
 
 .mobile-actions-bar .action-btn-v {
-    flex: none;
-    min-height: 45px;
-    font-size: 0.60rem;
-    padding: 7px 4px;
-    border-radius: 2px;
-    max-width: none;
-    white-space: normal;
-    text-align: center;
+    flex: 1 1 0;
+    min-width: 0;
+    aspect-ratio: 1 / 1;
+    max-height: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 2px;
+    font-size: 0.55rem;
     line-height: 1;
+    border-radius: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .mobile-actions-bar .action-btn-v i {
-    font-size: 1rem;
+    font-size: 0.95rem;
 }
 
 /* ===== DISH SELECTOR MOBILE (dsm-*) ===== */
