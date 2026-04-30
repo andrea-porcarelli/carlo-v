@@ -43,7 +43,7 @@ class DomainRedirect
 
         // Check if we are NOT in the /backoffice path AND NOT on internal.carlov.it domain
         $isNotBackoffice = !str_starts_with($path, 'backoffice');
-        $isNotInternalDomain = !in_array($host, ['carlov.local', 'carlov.local.internal', '192.168.8.110', 'carlovristorante.share.zrok.io']); ;
+        $isNotInternalDomain = !in_array($host, ['carlov.local', 'carlov.local.internal', '192.168.8.110', '192.168.1.100', 'carlovristorante.share.zrok.io']); ;
 
         // If both conditions are true, invoke welcome method
         if ($isNotBackoffice && $isNotInternalDomain) {
