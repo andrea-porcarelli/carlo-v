@@ -170,7 +170,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setEmphasis(true);
                 $printer->setTextSize(2, 2);
                 $printer->setReverseColors(true);
-                $printer->text(str_pad('*** STORNO ***', 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->text(str_pad('*** STORNO ***', 18, ' ', STR_PAD_BOTH) . "\n");
                 $printer->setReverseColors(false);
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
@@ -181,7 +181,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setEmphasis(true);
                 $printer->setTextSize(2, 2);
                 $printer->setReverseColors(true);
-                $printer->text(str_pad('*** MODIFICA ***', 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->text(str_pad('*** MODIFICA ***', 18, ' ', STR_PAD_BOTH) . "\n");
                 $printer->setReverseColors(false);
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
