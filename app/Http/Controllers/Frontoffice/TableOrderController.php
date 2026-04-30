@@ -392,6 +392,9 @@ class TableOrderController extends Controller
             $addedItemIds = collect($addedItems)->pluck('id')->toArray();
             $skipPrint = $request->input('skip_print', false);
             if (!$skipPrint && !empty($addedItemIds)) {
+                OrderItem::whereIn('id', $addedItemIds)
+                    ->whereNull('first_printed_at')
+                    ->update(['first_printed_at' => now()]);
                 PrintOrderItemsJob::dispatch($order->id, $addedItemIds, 'add', $operatorId);
             }
 
@@ -526,6 +529,9 @@ class TableOrderController extends Controller
 
             $skipPrint = $request->input('skip_print', false);
             if (!$skipPrint) {
+                OrderItem::where('id', $item->id)
+                    ->whereNull('first_printed_at')
+                    ->update(['first_printed_at' => now()]);
                 PrintOrderItemsJob::dispatch($order->id, [$item->id], 'add', $operatorId);
             }
 
@@ -1293,6 +1299,11 @@ class TableOrderController extends Controller
 
             // Load items with relationships
             $order->load(['items.dish.category.printer', 'restaurantTable']);
+
+            // Marca first_printed_at su tutti gli item ancora non trasmessi (sync, prima del job)
+            OrderItem::where('table_order_id', $order->id)
+                ->whereNull('first_printed_at')
+                ->update(['first_printed_at' => now()]);
 
             // Invia stampa marcia alla coda printers
             PrintMarciaJob::dispatch($order->id, $operatorId);
@@ -2864,9 +2875,15 @@ class TableOrderController extends Controller
         $updatedItemIds = $request->input('updated_item_ids', []);
 
         if (!empty($newItemIds)) {
+            OrderItem::whereIn('id', $newItemIds)
+                ->whereNull('first_printed_at')
+                ->update(['first_printed_at' => now()]);
             PrintOrderItemsJob::dispatch($order->id, $newItemIds, 'add', $operatorId);
         }
         if (!empty($updatedItemIds)) {
+            OrderItem::whereIn('id', $updatedItemIds)
+                ->whereNull('first_printed_at')
+                ->update(['first_printed_at' => now()]);
             PrintOrderItemsJob::dispatch($order->id, $updatedItemIds, 'update', $operatorId);
         }
 

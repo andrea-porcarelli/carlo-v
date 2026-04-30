@@ -303,7 +303,6 @@ class PrinterService implements PrinterServiceInterface
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
 
             $printer->setTextSize(2, 1);
-            $printer->setTextSize(2, 1);
             $printer->setEmphasis(true);
             $printer->text("*** SEGUE ***\n");
             $printer->setEmphasis(false);
