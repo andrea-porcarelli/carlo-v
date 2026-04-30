@@ -311,9 +311,6 @@ class PrinterService implements PrinterServiceInterface
             return;
         }
 
-        // Quantità e nome piatto — Font B (più stretto di Font A) con double width+height:
-        // risultato visivo a metà strada tra 1×1 e 2×2 su Font A.
-        $printer->setFont(EscposPrinter::FONT_B);
         $printer->setEmphasis(false);
         $printer->setTextSize(2, 2);
         if (isset($item->dish)) {
@@ -330,7 +327,6 @@ class PrinterService implements PrinterServiceInterface
         }
         $printer->setTextSize(1, 1);
         $printer->setEmphasis(false);
-        $printer->setFont(EscposPrinter::FONT_A);
 
         // Note
         if (!empty($item->notes)) {

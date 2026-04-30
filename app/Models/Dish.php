@@ -28,7 +28,8 @@ class Dish extends Model
     public function getPrintNameAttribute() : string
     {
         $printLabel = $this->attributes['print_label'] ?? null;
-        return ($printLabel !== null && $printLabel !== '') ? $printLabel : (string) $this->label;
+        $name = ($printLabel !== null && $printLabel !== '') ? $printLabel : (string) $this->label;
+        return mb_strtoupper($name, 'UTF-8');
     }
 
     public function category() : BelongsTo {
