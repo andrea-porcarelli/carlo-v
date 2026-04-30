@@ -741,10 +741,12 @@ class TableOrdersManager {
                     </div>`;
             }
 
+            const _rawName = item.dish_name || '';
+            const _displayName = this.isMobile && _rawName.length > 30 ? _rawName.substring(0, 30) + '…' : _rawName;
             itemsHtml += `
             <div class="receipt-item" onclick="tableOrdersManager._mobileItemTap(${item.id}, event)" data-item-id="${item.id}" data-was-printed="${item.was_printed ? '1' : '0'}" data-is-new="${item._isNew ? '1' : '0'}">
                 <div style="font-size:13px;font-weight:600;line-height:1.3; color:#3d3d3d;">
-                    ${item.quantity} × <span class="receipt-dish-name">${item.dish_name}</span>
+                    ${item.quantity} × <span class="receipt-dish-name" title="${_rawName.replace(/"/g, '&quot;')}">${_displayName}</span>
                     ${item.notes ? `<br /><div class="receipt-item-notes"> ${item.notes}</div>` : ''}
                     ${item.extras && Object.keys(item.extras).length > 0 ? `
                         <div class="receipt-item-extras">
