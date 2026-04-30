@@ -14,6 +14,7 @@ class StoreDishRequest extends FormRequest
     public function rules() : array {
         return [
             'label' => 'required|string',
+            'print_label' => 'nullable|string|max:255',
             'price' => 'required|string',
             'description' => 'required|string',
             'category_id' => 'required|int|exists:categories,id',

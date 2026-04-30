@@ -20,9 +20,16 @@ class Dish extends Model
         'category_id',
         'is_active',
         'label',
+        'print_label',
         'price',
         'description',
     ];
+
+    public function getPrintNameAttribute() : string
+    {
+        $printLabel = $this->attributes['print_label'] ?? null;
+        return ($printLabel !== null && $printLabel !== '') ? $printLabel : (string) $this->label;
+    }
 
     public function category() : BelongsTo {
         return $this->belongsTo(Category::class);

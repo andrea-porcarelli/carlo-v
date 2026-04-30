@@ -107,7 +107,7 @@ class PrinterService implements PrinterServiceInterface
                     $operation,
                     [
                         'items' => collect($items)->map(fn($item) => [
-                            'dish_name' => $item->dish_id ? ($item->dish->label ?? 'N/D') : null,
+                            'dish_name' => $item->dish_id ? ($item->dish->print_name ?? 'N/D') : null,
                             'quantity' => $item->quantity,
                             'notes' => $item->notes,
                             'extras' => $item->extras,
@@ -241,7 +241,7 @@ class PrinterService implements PrinterServiceInterface
                 $operation,
                 [
                     'items' => collect($items)->map(fn($item) => [
-                        'dish_name' => $item->dish_id ? ($item->dish->label ?? 'N/D') : null,
+                        'dish_name' => $item->dish_id ? ($item->dish->print_name ?? 'N/D') : null,
                         'quantity' => $item->quantity,
                         'notes' => $item->notes,
                         'extras' => $item->extras,
@@ -272,7 +272,7 @@ class PrinterService implements PrinterServiceInterface
                 $operation,
                 [
                     'items' => collect($items)->map(fn($item) => [
-                        'dish_name' => $item->dish_id ? ($item->dish->label ?? 'N/D') : null,
+                        'dish_name' => $item->dish_id ? ($item->dish->print_name ?? 'N/D') : null,
                         'quantity' => $item->quantity,
                         'notes' => $item->notes,
                         'extras' => $item->extras,
@@ -301,6 +301,9 @@ class PrinterService implements PrinterServiceInterface
         // Segue separator item: stampa solo il separatore e ritorna
         if ($item->isSegueItem()) {
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+
+            $printer->setTextSize(2, 1);
+            $printer->setTextSize(2, 1);
             $printer->setEmphasis(true);
             $printer->text("*** SEGUE ***\n");
             $printer->setEmphasis(false);
@@ -315,7 +318,7 @@ class PrinterService implements PrinterServiceInterface
         $printer->setTextSize(2, 2);
         if (isset($item->dish)) {
             $quantity = str_pad($item->quantity, 2, ' ', STR_PAD_RIGHT);
-            $dishName = $item->dish->label ?? 'N/D';
+            $dishName = $item->dish->print_name ?? 'N/D';
             $printer->text("$quantity $dishName\n");
         } else {
 
@@ -414,7 +417,7 @@ class PrinterService implements PrinterServiceInterface
 
             // Articoli in formato ridotto
             foreach ($otherItems as $item) {
-                $dishName = $item->dish->label ?? 'N/D';
+                $dishName = $item->dish->print_name ?? 'N/D';
                 $quantity = $item->quantity;
                 $printer->text("  $quantity x $dishName\n");
 
@@ -825,7 +828,7 @@ class PrinterService implements PrinterServiceInterface
             // Stampa gli articoli
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
             foreach ($tableOrder->items->filter(fn($item) => isset($item->dish)) as $item) {
-                $dishName = $item->dish->label ?? 'N/D';
+                $dishName = $item->dish->print_name ?? 'N/D';
                 $quantity = $item->quantity;
                 $subtotal = number_format($item->subtotal, 2, ',', '.');
 
@@ -1365,7 +1368,7 @@ class PrinterService implements PrinterServiceInterface
 
                 // Dettagli prodotto (se presente)
                 if ($log->orderItem && $log->orderItem->dish) {
-                    $dishName = $log->orderItem->dish->label ?? $log->orderItem->dish->name ?? 'N/D';
+                    $dishName = $log->orderItem->dish->print_name ?? 'N/D';
                     $printer->text("  >> " . $dishName);
 
                     // Quantità se disponibile
@@ -1552,7 +1555,7 @@ class PrinterService implements PrinterServiceInterface
 
                 // Dettagli prodotto (se presente)
                 if ($log->orderItem && $log->orderItem->dish) {
-                    $dishName = $log->orderItem->dish->label ?? $log->orderItem->dish->name ?? 'N/D';
+                    $dishName = $log->orderItem->dish->print_name ?? 'N/D';
                     $dishName = substr($dishName, 0, 30);
                     $printer->text("  >> " . $dishName);
 
@@ -1710,7 +1713,7 @@ class PrinterService implements PrinterServiceInterface
             foreach ($items as $item) {
                 if (isset($item->dish)) {
                     $quantity = str_pad($item->quantity, 3, ' ', STR_PAD_RIGHT);
-                    $dishName = strtoupper($item->dish->label) ?? 'N/D';
+                    $dishName = strtoupper($item->dish->print_name) ?? 'N/D';
                     $printer->setTextSize(1, 1);
                     $printer->text("$quantity $dishName\n");
                     $printer->setTextSize(1, 1);
@@ -1749,7 +1752,7 @@ class PrinterService implements PrinterServiceInterface
                     'source_table' => $sourceTableNumber,
                     'destination_table' => $destTableNumber,
                     'items' => collect($items)->map(fn($item) => [
-                        'dish_name' => $item->dish_id ? ($item->dish->label ?? 'N/D') : null,
+                        'dish_name' => $item->dish_id ? ($item->dish->print_name ?? 'N/D') : null,
                         'quantity' => $item->quantity,
                     ])->toArray(),
                 ],
@@ -2282,7 +2285,7 @@ class PrinterService implements PrinterServiceInterface
             foreach ($order->items as $item) {
                 if ($item->isSegueItem() || (float) $item->subtotal <= 0) continue;
                 $righe[] = [
-                    'descrizione' => (string) ($item->dish->label ?? $item->dish->name ?? 'Articolo'),
+                    'descrizione' => (string) ($item->dish->print_name ?? 'Articolo'),
                     'quantita'    => (int) $item->quantity,
                     'totale'      => (float) $item->subtotal,
                     'extras'      => (is_array($item->extras) && !empty($item->extras)) ? $item->extras : [],

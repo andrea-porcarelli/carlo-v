@@ -15,6 +15,7 @@
                     <form class="needs-validation update-or-create-element" id="update-or-create-element">
                         <div class="row">
                             @include('backoffice.components.form.input',['name' => 'label', 'label' => 'Dai un nome al piatto *', 'col' => 12])
+                            @include('backoffice.components.form.input',['name' => 'print_label', 'label' => 'Nome breve per stampa (opzionale)', 'col' => 12])
                             @include('backoffice.components.form.textarea',['name' => 'description', 'class' => 'summernote', 'label' => 'Descrizione', 'col' => 12])
                         </div>
                     </form>

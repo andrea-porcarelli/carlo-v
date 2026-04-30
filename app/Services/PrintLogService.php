@@ -196,7 +196,7 @@ class PrintLogService
 
         $html .= '<div class="print-items">';
         foreach ($items as $item) {
-            $dishName = is_array($item) ? ($item['dish_name'] ?? null) : ($item->dish_id ? ($item->dish->label ?? 'N/D') : null);
+            $dishName = is_array($item) ? ($item['dish_name'] ?? null) : ($item->dish_id ? ($item->dish->print_name ?? 'N/D') : null);
             $quantity = is_array($item) ? ($item['quantity'] ?? 1) : $item->quantity;
             $notes = is_array($item) ? ($item['notes'] ?? null) : $item->notes;
             $extras = is_array($item) ? ($item['extras'] ?? []) : $item->extras;
@@ -300,7 +300,7 @@ class PrintLogService
 
         $html .= '<div class="print-items">';
         foreach ($tableOrder->items as $item) {
-            $dishName = $item->dish->label ?? 'N/D';
+            $dishName = $item->dish->print_name ?? 'N/D';
             $quantity = $item->quantity;
             $subtotal = number_format($item->subtotal, 2, ',', '.');
 
