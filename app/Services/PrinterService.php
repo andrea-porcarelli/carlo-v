@@ -311,14 +311,19 @@ class PrinterService implements PrinterServiceInterface
         // Quantità e nome piatto — Font B (più stretto di Font A) con double width+height:
         // risultato visivo a metà strada tra 1×1 e 2×2 su Font A.
         $printer->setFont(EscposPrinter::FONT_B);
-        $printer->setEmphasis(true);
+        $printer->setEmphasis(false);
         $printer->setTextSize(2, 2);
         if (isset($item->dish)) {
-            $quantity = str_pad($item->quantity, 3, ' ', STR_PAD_RIGHT);
+            $quantity = str_pad($item->quantity, 2, ' ', STR_PAD_RIGHT);
             $dishName = $item->dish->label ?? 'N/D';
             $printer->text("$quantity $dishName\n");
         } else {
+
+            $printer->setTextSize(2, 1);
+            $printer->setEmphasis(true);
             $printer->text("*** SEGUE ***\n");
+            $printer->setTextSize(2, 2);
+            $printer->setEmphasis(false);
         }
         $printer->setTextSize(1, 1);
         $printer->setEmphasis(false);

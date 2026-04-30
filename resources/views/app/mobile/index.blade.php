@@ -138,18 +138,6 @@
                 <button class="action-btn-v" id="btnPreconto" style="background:#17a2b8;">
                     <i class="fas fa-receipt"></i> PRE-CONTO
                 </button>
-                <button class="action-btn-v" id="btnModifyPayBill" style="background:#dc3545;">
-                    <i class="fas fa-money-bill"></i> INCASSA
-                </button>
-                <button class="action-btn-v" id="btnModifyFreeAmount" style="background:#6c757d;">
-                    <i class="fas fa-eraser"></i> AUTO
-                </button>
-                <button class="action-btn-v" id="btnModifyFreeTable" style="background:#20c997; color:#fff;">
-                    <i class="fas fa-cash-register"></i> CHIUDI
-                </button>
-                <button class="action-btn-v" id="btnChiudiTavolo" style="background:#20c997; color:#fff; display:none;">
-                    <i class="fas fa-door-open"></i> CHIUDI TAVOLO
-                </button>
                 <button class="action-btn-v" id="btnSpostaTavolo" style="background:#fd7e14;">
                     <i class="fas fa-exchange-alt"></i> SPOSTA
                 </button>
@@ -158,9 +146,6 @@
                 </button>
                 <button class="action-btn-v" id="btnModifyComunica" style="background:#6f42c1;">
                     <i class="fas fa-bullhorn"></i> COMUNICA
-                </button>
-                <button class="action-btn-v" id="btnAmministra" style="background:#1a1a2e; border:1px solid #ffc107; color:#ffc107;">
-                    <i class="fas fa-shield-alt"></i> ADMIN
                 </button>
             </div>
 
@@ -269,14 +254,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 6px;
             width: 100%;
-            padding: 12px;
-            border: 2px solid #ffc107;
-            border-radius: 8px;
+            padding: 7px;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
             background: #ffc107;
             color: #212529;
-            font-size: 14px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.3px;
@@ -284,7 +269,7 @@
             transition: background 0.15s, color 0.15s, border-color 0.15s;
             flex-shrink: 0;
         }
-        .quick-segue-btn i { font-size: 16px; }
+        .quick-segue-btn i { font-size: 12px; }
         .quick-segue-btn:active { transform: scale(0.98); }
         .quick-segue-btn.active {
             background: #28a745;
