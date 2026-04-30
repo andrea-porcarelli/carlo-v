@@ -6,3 +6,19 @@
 <script src="{{ asset('app/js/covers-manager.js') }}"></script>
 <script src="{{ asset('app/js/table-orders.js') }}"></script>
 <script src="{{ asset('app/js/app.js') }}"></script>
+
+<style>
+    @media all and (display-mode: standalone), all and (display-mode: fullscreen) {
+        .js-fullscreen-btn { display: none !important; }
+    }
+</style>
+<script>
+    function openFullscreen() {
+        var elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+        }
+    }
+</script>

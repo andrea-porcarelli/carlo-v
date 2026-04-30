@@ -9,11 +9,16 @@
                 <div class="mobile-logo">
                     <i class="fas fa-utensils"></i> CARLO V
                 </div>
-                @if($isAdmin)
-                <button id="btnAddTableMobile" style="background:#dc3545; border:none; color:white; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer;">
-                    <i class="fas fa-plus"></i> TAVOLI
-                </button>
-                @endif
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <button onclick="openFullscreen()" class="js-fullscreen-btn" style="background:#007bff; border:none; color:white; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer;">
+                        <i class="fas fa-expand"></i> SCHERMO
+                    </button>
+                    @if($isAdmin)
+                    <button id="btnAddTableMobile" style="background:#dc3545; border:none; color:white; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer;">
+                        <i class="fas fa-plus"></i> TAVOLI
+                    </button>
+                    @endif
+                </div>
             </div>
         </header>
 

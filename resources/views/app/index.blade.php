@@ -9,6 +9,9 @@
                     <i class="fas fa-utensils"></i> CARLO V
                 </span>
                 <div>
+                    <button class="btn me-3 js-fullscreen-btn" onclick="openFullscreen()" style="background:#007bff; color:white; border:none;">
+                        <i class="fas fa-expand me-2"></i> SCHERMO INTERO
+                    </button>
                     <button class="btn btn-red me-3" id="btnLogOperativo">
                         <i class="fas fa-chart-line me-2"></i> LOG OPERATIVO
                     </button>
