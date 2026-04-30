@@ -15,15 +15,6 @@
         @endforeach
     </div>
 
-    <!-- Campo ricerca -->
-    <div class="dsm-search">
-        <input
-            type="text"
-            wire:model.live.debounce.300ms="search"
-            class="dsm-search-input"
-            placeholder="Cerca piatto...">
-    </div>
-
     <!-- Lista piatti verticale scrollabile -->
     <div class="dsm-dishes-list">
         @forelse($dishes as $dish)
@@ -40,9 +31,6 @@
                 @if(!$selectedCategory)
                     <i class="fas fa-hand-point-up"></i>
                     <p>Seleziona una categoria</p>
-                @elseif($search)
-                    <i class="fas fa-search"></i>
-                    <p>Nessun piatto trovato per "{{ $search }}"</p>
                 @else
                     <i class="fas fa-utensils"></i>
                     <p>Nessun piatto disponibile</p>

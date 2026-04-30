@@ -300,7 +300,7 @@ class PrintLogService
 
         $html .= '<div class="print-items">';
         foreach ($tableOrder->items as $item) {
-            $dishName = $item->dish->print_name ?? 'N/D';
+            $dishName = $item->dish->label ?? 'N/D';
             $quantity = $item->quantity;
             $subtotal = number_format($item->subtotal, 2, ',', '.');
 

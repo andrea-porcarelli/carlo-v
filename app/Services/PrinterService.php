@@ -828,7 +828,7 @@ class PrinterService implements PrinterServiceInterface
             // Stampa gli articoli
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
             foreach ($tableOrder->items->filter(fn($item) => isset($item->dish)) as $item) {
-                $dishName = $item->dish->print_name ?? 'N/D';
+                $dishName = $item->dish->label ?? 'N/D';
                 $quantity = $item->quantity;
                 $subtotal = number_format($item->subtotal, 2, ',', '.');
 
@@ -2285,7 +2285,7 @@ class PrinterService implements PrinterServiceInterface
             foreach ($order->items as $item) {
                 if ($item->isSegueItem() || (float) $item->subtotal <= 0) continue;
                 $righe[] = [
-                    'descrizione' => (string) ($item->dish->print_name ?? 'Articolo'),
+                    'descrizione' => (string) ($item->dish->label ?? 'Articolo'),
                     'quantita'    => (int) $item->quantity,
                     'totale'      => (float) $item->subtotal,
                     'extras'      => (is_array($item->extras) && !empty($item->extras)) ? $item->extras : [],

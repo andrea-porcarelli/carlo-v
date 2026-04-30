@@ -54,23 +54,18 @@
                         </div>
                     </div>
                 </div>
-                <div style="display:flex; gap:6px;">
-                    <button id="closeModifyNoPrintBtn" style="background:#6c757d; border:none; color:white; height:34px; min-width:170px; padding:0 10px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; cursor:pointer;">
-                        <i class="fas fa-times"></i> Chiudi senza stampare
-                    </button>
-                    <button id="closeModifyBtn" style="background:#dc3545; border:none; color:white; height:34px; min-width:170px; padding:0 10px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; cursor:pointer;">
-                        <i class="fas fa-sign-out-alt"></i> Chiudi e invia
-                    </button>
-                </div>
             </div>
 
-            <!-- Tab bar: ORDINE | MENU -->
+            <!-- Tab bar: ORDINE | AGGIUNGI | Chiudi e invia -->
             <div class="mobile-overlay-tabs">
                 <button class="mobile-overlay-tab active" id="mobileTabOrdine" onclick="mobileShowOverlayTab('ordine')">
                     <i class="fas fa-list-ul"></i> ORDINE
                 </button>
                 <button class="mobile-overlay-tab" id="mobileTabMenu" onclick="mobileShowOverlayTab('menu')">
                     <i class="fas fa-utensils"></i> AGGIUNGI
+                </button>
+                <button id="closeModifyBtn" style="flex:0 0 auto; background:#dc3545; border:1px solid #dc3545; color:white; padding:9px 12px; border-radius:6px; font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <i class="fas fa-sign-out-alt"></i> Chiudi e invia
                 </button>
             </div>
 
@@ -112,14 +107,7 @@
                 </div>
 
                 <!-- MENU tab -->
-                <div id="mobileOverlayMenuTab" style="height:100%; display:none; flex-direction:column; overflow:hidden; gap:6px;">
-                    <button id="btnQuickSegueMobile" type="button"
-                            onclick="tableOrdersManager.toggleSegueAfterLast()"
-                            aria-pressed="false"
-                            class="quick-segue-btn">
-                        <i class="fas fa-level-down-alt"></i>
-                        <span>SEGUE dopo ultimo piatto</span>
-                    </button>
+                <div id="mobileOverlayMenuTab" style="height:100%; display:none; flex-direction:column; overflow:hidden;">
                     <div id="modifyMenuContainer" style="flex:1; min-height:0; background:white; border-radius:8px; overflow:hidden;">
                         @livewire('dish-selector-mobile')
                     </div>
@@ -146,6 +134,12 @@
                 </button>
                 <button class="action-btn-v" id="btnModifyComunica" style="background:#6f42c1;">
                     <i class="fas fa-bullhorn"></i> COMUNICA
+                </button>
+                <button class="action-btn-v quick-segue-btn" id="btnQuickSegueMobile" type="button"
+                        onclick="tableOrdersManager.toggleSegueAfterLast()"
+                        aria-pressed="false"
+                        style="background:#ffc107; color:#212529;">
+                    <i class="fas fa-level-down-alt"></i> SEGUE
                 </button>
             </div>
 
@@ -249,36 +243,10 @@
     <style>
         @keyframes cashDrawerSpin { to { transform: rotate(360deg); } }
 
-        /* Tasto veloce Segue nel tab MENU mobile */
-        .quick-segue-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            width: 100%;
-            padding: 7px;
-            border: 1px solid #ffc107;
-            border-radius: 5px;
-            background: #ffc107;
-            color: #212529;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s, border-color 0.15s;
-            flex-shrink: 0;
-        }
-        .quick-segue-btn i { font-size: 12px; }
-        .quick-segue-btn:active { transform: scale(0.98); }
-        .quick-segue-btn.active {
-            background: #28a745;
-            border-color: #28a745;
-            color: #fff;
-        }
-        .quick-segue-btn.active span::after {
-            content: " — TOGLI";
-            font-weight: 700;
+        /* Tasto veloce Segue nella barra azioni mobile */
+        .action-btn-v.quick-segue-btn.active {
+            background: #28a745 !important;
+            color: #fff !important;
         }
     </style>
 
