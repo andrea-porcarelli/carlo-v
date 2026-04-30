@@ -59,8 +59,8 @@
             <!-- Pannelli ordine + piatti, sempre entrambi visibili -->
             <div style="flex:1; min-height:0; display:flex; flex-direction:column; gap:6px;">
 
-                <!-- ORDINE (35%) -->
-                <div id="mobileOverlayOrderTab" style="flex:35 1 0; min-height:0; display:flex; flex-direction:column; overflow:hidden;">
+                <!-- ORDINE (55%) -->
+                <div id="mobileOverlayOrderTab" style="flex:55 1 0; min-height:0; display:flex; flex-direction:column; overflow:hidden;">
                     <div style="flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:white; border-radius:8px; padding:8px;" id="modifyReceiptItems">
                         <div class="empty-state">
                             <i class="fas fa-shopping-cart"></i>
@@ -91,8 +91,8 @@
                     </div>
                 </div>
 
-                <!-- MENU (65%) -->
-                <div id="mobileOverlayMenuTab" style="flex:65 1 0; min-height:0; display:flex; flex-direction:column; overflow:hidden;">
+                <!-- MENU (45%) -->
+                <div id="mobileOverlayMenuTab" style="flex:45 1 0; min-height:0; display:flex; flex-direction:column; overflow:hidden;">
                     <div id="modifyMenuContainer" style="flex:1; min-height:0; background:white; border-radius:8px; overflow:hidden;">
                         @livewire('dish-selector-mobile')
                     </div>

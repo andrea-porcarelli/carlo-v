@@ -23,8 +23,7 @@
                  data-item="{{ $dish->label }}"
                  data-price="{{ number_format($dish->price, 2, '.', '') }}"
                  data-dish-id="{{ $dish->id }}">
-                <span class="dsm-dish-name">{{ $dish->label }}</span>
-                <span class="dsm-dish-price">€{{ number_format($dish->price, 2) }}</span>
+                <span class="dsm-dish-name">{{ $dish->print_name }}</span>
             </div>
         @empty
             <div class="dsm-empty">
