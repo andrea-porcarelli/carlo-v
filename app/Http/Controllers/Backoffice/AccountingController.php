@@ -101,7 +101,8 @@ class AccountingController extends BaseController
                 ->addColumn('action', function ($item) {
                     $xmlBtn = '';
                     if (!empty($item->xml_content)) {
-                        $xmlBtn = '<a href="' . route('accounting.invoices.xml', $item->id) . '" target="_blank" class="btn btn-xs btn-info" title="XML"><i class="fa fa-file-code"></i></a> ';
+                        $xmlBtn = '<a href="' . route('accounting.invoices.xml', $item->id) . '" target="_blank" class="btn btn-xs btn-info" title="Apri XML"><i class="fa fa-file-code"></i></a> '
+                                . '<a href="' . route('accounting.invoices.xml-download', $item->id) . '" class="btn btn-xs btn-info" title="Scarica XML"><i class="fa fa-download"></i></a> ';
                     }
                     $resendBtn = '';
                     if (in_array($item->status, ['error', 'pending'])) {
@@ -125,6 +126,17 @@ class AccountingController extends BaseController
         return response($invoice->xml_content, 200)
             ->header('Content-Type', 'application/xml')
             ->header('Content-Disposition', 'inline; filename="' . ($invoice->invoice_name ?? 'fattura') . '.xml"');
+    }
+
+    public function xmlDownload(TableOrderInvoice $invoice): Response
+    {
+        if (empty($invoice->xml_content)) {
+            abort(404, 'XML non disponibile per questa fattura.');
+        }
+        $filename = ($invoice->invoice_name ?? ('fattura-' . $invoice->id)) . '.xml';
+        return response($invoice->xml_content, 200)
+            ->header('Content-Type', 'application/xml')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
     }
 
     public function resend(TableOrderInvoice $invoice): JsonResponse
