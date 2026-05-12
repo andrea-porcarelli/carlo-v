@@ -336,7 +336,12 @@ class QuickInvoiceWizard extends Component
 
         $this->submitting = true;
 
+        $invoice = null;
+
         try {
+            // ── Fase 1: persistenza atomica di customer + fattura ─────────────
+            // Customer e fattura devono essere salvati anche se la successiva
+            // generazione XML / invio a MySond fallisce.
             $invoice = DB::transaction(function () {
                 // 1) Resolve/persist customer
                 if ($this->selectedCustomerId) {
@@ -389,41 +394,8 @@ class QuickInvoiceWizard extends Component
                 // Attach in-memory customer so XML factory has access immediately
                 $invoice->setRelation('customer', $customer);
 
-                // 4) Generate XML
-                $mySond = app(MysondFatturaService::class);
-                $xmlResult = $mySond->createInvoice($invoice);
-
-                $update = [
-                    'mysond_response' => is_array($xmlResult) ? json_encode($xmlResult) : (string) $xmlResult,
-                ];
-                if (($xmlResult['response'] ?? '') === 'success') {
-                    $update['xml_path']    = $xmlResult['path'] ?? null;
-                    $update['xml_content'] = $xmlResult['content'] ?? null;
-                } else {
-                    $update['status'] = 'error';
-                }
-                $invoice->update($update);
-
-                if (($xmlResult['response'] ?? '') === 'success') {
-                    \App\Jobs\SendInvoiceToMysondJob::dispatch($invoice->id);
-                } else {
-                    // Surface XML build failure
-                    throw new \RuntimeException(
-                        'Errore nella generazione XML: ' . ($xmlResult['message'] ?? 'sconosciuto')
-                    );
-                }
-
                 return $invoice;
             });
-
-            $this->result = [
-                'success'      => true,
-                'invoice_id'   => $invoice->id,
-                'invoice_code' => $invoice->invoice_code,
-                'invoice_name' => $invoice->invoice_name,
-                'message'      => 'Fattura generata e accodata per invio a MySond.',
-            ];
-            $this->step = 3;
         } catch (\Throwable $e) {
             Log::error('QuickInvoiceWizard submit error', [
                 'error' => $e->getMessage(),
@@ -433,9 +405,59 @@ class QuickInvoiceWizard extends Component
                 'message' => $e->getMessage(),
             ];
             $this->step = 3;
-        } finally {
             $this->submitting = false;
+            return;
         }
+
+        // ── Fase 2: generazione XML e dispatch invio a MySond ─────────────────
+        // Eventuali errori non devono annullare il salvataggio della fattura:
+        // la marchiamo come `error` con il messaggio e l'utente potrà ritentare.
+        $xmlError = null;
+        try {
+            $mySond = app(MysondFatturaService::class);
+            $xmlResult = $mySond->createInvoice($invoice);
+
+            $update = [
+                'mysond_response' => is_array($xmlResult) ? json_encode($xmlResult) : (string) $xmlResult,
+            ];
+            if (($xmlResult['response'] ?? '') === 'success') {
+                $update['xml_path']    = $xmlResult['path'] ?? null;
+                $update['xml_content'] = $xmlResult['content'] ?? null;
+            } else {
+                $update['status'] = 'error';
+                $xmlError = $xmlResult['message'] ?? 'sconosciuto';
+            }
+            $invoice->update($update);
+
+            if (($xmlResult['response'] ?? '') === 'success') {
+                \App\Jobs\SendInvoiceToMysondJob::dispatch($invoice->id);
+            }
+        } catch (\Throwable $e) {
+            Log::error('QuickInvoiceWizard XML generation error', [
+                'invoice_id' => $invoice->id,
+                'error'      => $e->getMessage(),
+            ]);
+            $xmlError = $e->getMessage();
+            $invoice->update([
+                'status'          => 'error',
+                'mysond_response' => json_encode([
+                    'response' => 'error',
+                    'message'  => $xmlError,
+                ]),
+            ]);
+        }
+
+        $this->result = [
+            'success'      => $xmlError === null,
+            'invoice_id'   => $invoice->id,
+            'invoice_code' => $invoice->invoice_code,
+            'invoice_name' => $invoice->invoice_name,
+            'message'      => $xmlError === null
+                ? 'Fattura generata e accodata per invio a MySond.'
+                : 'Fattura salvata ma errore nella generazione XML: ' . $xmlError,
+        ];
+        $this->step = 3;
+        $this->submitting = false;
     }
 
     private function customerPayload(): array
