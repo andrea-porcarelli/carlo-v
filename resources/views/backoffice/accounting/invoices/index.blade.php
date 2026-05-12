@@ -223,12 +223,12 @@
                     method: 'POST',
                     headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     success: function () {
-                        App.sweet('Fattura re-accodata per invio.', 'Operazione effettuata');
+                        toastr.success('Fattura re-accodata per invio.', 'Operazione effettuata');
                         $('.datatable_table').DataTable().ajax.reload(null, false);
                     },
                     error: function (xhr) {
                         const r = xhr.responseJSON || {};
-                        App.sweet(r.message || 'Errore', 'Errore');
+                        toastr.error(r.message || 'Errore', 'Errore');
                     }
                 });
             });
@@ -244,12 +244,12 @@
                     method: 'POST',
                     headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                     success: function (data) {
-                        App.sweet(data.message || 'Esito SDI aggiornato.', 'Operazione effettuata');
+                        toastr.success(data.message || 'Esito SDI aggiornato.', 'Operazione effettuata');
                         $('.datatable_table').DataTable().ajax.reload(null, false);
                     },
                     error: function (xhr) {
                         const r = xhr.responseJSON || {};
-                        App.sweet(r.message || 'Errore', 'Errore');
+                        toastr.error(r.message || 'Errore', 'Errore');
                     },
                     complete: function () {
                         $btn.prop('disabled', false);
