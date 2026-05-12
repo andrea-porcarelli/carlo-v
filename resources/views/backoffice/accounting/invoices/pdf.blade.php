@@ -218,6 +218,18 @@
         color: #8a96a8;
     }
 
+    /* ── NOTE ────────────────────────────────────────────────── */
+    .notes-box {
+        background: #fafbfd;
+        border: 1px solid #e2e8f0;
+        border-left: 3px solid #c9a449;
+        padding: 16px 20px;
+        margin-bottom: 28px;
+        font-size: 9.5px;
+        color: #2d3748;
+        line-height: 1.6;
+    }
+
     /* ── BOTTOM: PAGAMENTO + TOTALE ──────────────────────────── */
     .bottom { width: 100%; border-collapse: collapse; margin-top: 8px; }
     .bottom td.pay { width: 52%; vertical-align: top; padding-right: 28px; }
@@ -464,6 +476,16 @@
     </tfoot>
     @endif
 </table>
+
+{{-- ═══════════════════════════════════════════════════════════
+     NOTE
+═══════════════════════════════════════════════════════════ --}}
+@if(!empty($invoice->description))
+<div class="section-title"><span class="dash"></span>Note</div>
+<div class="notes-box">
+    {!! nl2br(e($invoice->description)) !!}
+</div>
+@endif
 
 {{-- ═══════════════════════════════════════════════════════════
      PAGAMENTO + RIEPILOGO IVA / TOTALI
