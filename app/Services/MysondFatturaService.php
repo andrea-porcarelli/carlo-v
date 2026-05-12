@@ -94,11 +94,14 @@ class MysondFatturaService
     {
         $this->setWsdl('mysond');
 
+        // NB: $xmlContent viene passato come stringa raw. Il SoapClient PHP serializza
+        // automaticamente il campo `xmlDoc` come xsd:base64Binary (encoding gestito dal WSDL).
+        // Pre-encodarlo qui causerebbe un doppio base64 e MySond risponde "formato non valido".
         $params = [
             'arg0' => [
                 'utente'      => $this->auth,
                 'fileName'    => $fileName,
-                'xmlDoc'      => base64_encode($xmlContent),
+                'xmlDoc'      => $xmlContent,
                 'signAndSand' => $signAndSand,
             ],
         ];
