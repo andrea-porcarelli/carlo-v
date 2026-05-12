@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PrintLog;
 use App\Models\Printer;
+use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
@@ -353,7 +354,7 @@ class PrintLogService
             $html .= '</div>';
         }
 
-        $html .= '<div class="print-footer-note">Misuraca S.R.L. </div>';
+        $html .= '<div class="print-footer-note">' . ((string) (Setting::get('company_name') ?: 'SCONTRINO')) . '</div>';
         $html .= '<div class="print-footer-note">*** DOCUMENTO NON FISCALE ***</div>';
 
         $html .= '</div>';

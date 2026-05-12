@@ -81,9 +81,6 @@ class DishController extends BaseController
             $ingredients = json_decode($request->get('materials'), true);
             $allergens = json_decode($request->get('allergens'), true);
             $ingredients_with_quantity = collect($ingredients)->filter(fn($ingredient) => $ingredient['quantity'] > 0);
-            if ($ingredients_with_quantity->count() == 0) {
-                return $this->error(['message' => 'Devi inserire almeno un ingrediente']);
-            }
             $store = $request->except('ingredients', 'allergens');
 
             $item = $this->interface->store($store);
@@ -121,11 +118,6 @@ class DishController extends BaseController
 
     public function edit(int $id, StoreDishRequest $request) : JsonResponse {
         try {
-            $ingredients = json_decode($request->get('materials'), true);
-            $ingredients_with_quantity = collect($ingredients)->filter(fn($ingredient) => $ingredient['quantity'] > 0);
-            if ($ingredients_with_quantity->count() == 0) {
-                return $this->error(['message' => 'Devi inserire almeno un ingrediente']);
-            }
             $item = $this->interface->find($id);
             if ($item->id) {
                 $store = $request->validated();

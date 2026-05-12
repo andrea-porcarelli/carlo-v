@@ -27,6 +27,10 @@ class TableOrder extends Model
         'discount_type',
         'discount_amount',
         'discount_value',
+        'revolut_order_id',
+        'revolut_payment_state',
+        'revolut_payment_started_at',
+        'revolut_operator_id',
     ];
 
     protected $casts = [
@@ -36,6 +40,7 @@ class TableOrder extends Model
         'opened_at'       => 'datetime',
         'closed_at'       => 'datetime',
         'preconto_requested_at' => 'datetime',
+        'revolut_payment_started_at' => 'datetime',
     ];
 
     /**
@@ -187,6 +192,11 @@ class TableOrder extends Model
         return $this->status === 'open';
     }
 
+    public function isPendingPayment(): bool
+    {
+        return $this->status === 'pending_payment';
+    }
+
     /**
      * Close the order
      */
@@ -206,6 +216,7 @@ class TableOrder extends Model
     {
         $statuses = [
             'open' => 'Occupato / Aperto',
+            'pending_payment' => 'In attesa di pagamento',
             'paid' => 'Pagato',
             'cancelled' => 'Cancellato',
         ];
@@ -216,6 +227,7 @@ class TableOrder extends Model
     {
         $statuses = [
             'open' => 'info',
+            'pending_payment' => 'warning',
             'paid' => 'success',
             'cancelled' => 'danger',
         ];
@@ -226,6 +238,7 @@ class TableOrder extends Model
     {
         $statuses = [
             'open' => 'fa-time',
+            'pending_payment' => 'fa-hourglass-half',
             'paid' => 'fa-check-circle',
             'cancelled' => 'fa-trash-alt',
         ];

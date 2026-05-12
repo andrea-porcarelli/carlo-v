@@ -35,6 +35,16 @@
         </div>
         @endif
         <ul class="nav navbar-top-links navbar-right">
+            @if(\Illuminate\Support\Facades\Auth::check() && \Illuminate\Support\Facades\Auth::user()->role === 'admin')
+                <li class="quick-invoice-nav-item">
+                    <a href="{{ route('accounting.invoices.create') }}"
+                       class="quick-invoice-link"
+                       title="Emetti una fattura elettronica (Mysond)">
+                        <i class="fa fa-file-invoice-dollar"></i>
+                        <span class="quick-invoice-label">Fattura</span>
+                    </a>
+                </li>
+            @endif
             <li>
                 <span class="m-r-sm text-muted welcome-message"></span>
             </li>
@@ -66,4 +76,35 @@
     <div class="col-lg-2">
     </div>
 </div>
+
+<style>
+    /* Quick invoice nav item — icon + small label, in linea con le icone Inspinia top-links */
+    .quick-invoice-link {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 6px 14px !important;
+        line-height: 1 !important;
+        color: #676a6c !important;
+        transition: color .15s, background .15s;
+    }
+    .quick-invoice-link:hover,
+    .quick-invoice-link:focus {
+        color: #1ab394 !important;
+        background: rgba(26, 179, 148, 0.08);
+        text-decoration: none;
+    }
+    .quick-invoice-link .fa-file-invoice-dollar {
+        font-size: 20px;
+        line-height: 1;
+    }
+    .quick-invoice-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        font-weight: 600;
+    }
+</style>
 

@@ -25,6 +25,8 @@ use App\Models\TableOrderInvoice;
 use App\Models\User;
 use App\Services\CorrispettivoService;
 use App\Services\MysondFatturaService;
+use App\Services\RevolutPaymentCloser;
+use App\Services\RevolutTerminalService;
 use App\Services\TableOrderLoggerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -1102,6 +1104,296 @@ class TableOrderController extends Controller
     }
 
     /**
+     * Avvia un pagamento sul Revolut Terminal: crea l'order, lo spinge al terminale,
+     * mette il TableOrder in stato 'pending_payment'.
+     *
+     * Se l'integrazione POS è 'none', risponde { pos_skipped: true } e il frontend
+     * fa il fallback al /pay diretto (chiusura manuale come "POS").
+     */
+    public function posPayStart(RestaurantTable $table, RevolutTerminalService $revolut): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $order = $table->activeOrder;
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Nessun ordine attivo per questo tavolo'], 404);
+        }
+
+        if (Setting::getPosIntegration() !== 'revolut') {
+            return response()->json([
+                'success'     => true,
+                'pos_skipped' => true,
+                'message'     => 'Integrazione POS non configurata',
+            ]);
+        }
+
+        if (!$revolut->isConfigured()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Revolut non configurato (manca API key o location)',
+            ], 422);
+        }
+
+        if ($order->status !== 'open') {
+            return response()->json([
+                'success' => false,
+                'message' => "L'ordine non è in stato aperto",
+            ], 422);
+        }
+
+        $revolutOrderId = null;
+        try {
+            $terminals = array_values($revolut->listTerminals());
+            if (empty($terminals)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nessun terminale Revolut disponibile per la location configurata',
+                ], 422);
+            }
+            $terminal = $terminals[0];
+
+            $amountFloat = (float) ($order->hasDiscount() ? $order->getDiscountedTotal() : $order->total_amount);
+            $amountMinor = (int) round($amountFloat * 100);
+
+            if ($amountMinor <= 0) {
+                return response()->json(['success' => false, 'message' => 'Importo non valido'], 422);
+            }
+
+            $revolutOrder = $revolut->createOrder($amountMinor, 'EUR', 'tableorder-' . $order->id);
+            $revolutOrderId = $revolutOrder['id'];
+            if ($revolutOrderId === '') {
+                return response()->json(['success' => false, 'message' => 'Errore creazione ordine Revolut'], 502);
+            }
+
+            $revolut->pushPayment($revolutOrderId, $terminal['id']);
+
+            $order->update([
+                'status'                     => 'pending_payment',
+                'revolut_order_id'           => $revolutOrderId,
+                'revolut_payment_state'      => 'pending',
+                'revolut_payment_started_at' => now(),
+                'revolut_operator_id'        => $operatorId,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data'    => [
+                    'revolut_order_id' => $revolutOrderId,
+                    'terminal'         => $terminal['name'] ?: $terminal['id'],
+                    'timeout_seconds'  => Setting::getRevolutConfig()['timeout_seconds'],
+                    'amount'           => $amountFloat,
+                    'mock_mode'        => $revolut->isMock(),
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            // Tentativo di cleanup lato Revolut se l'ordine è stato creato ma il push è fallito
+            if ($revolutOrderId) {
+                try { $revolut->cancelPayment($revolutOrderId); } catch (\Throwable $ce) { /* best effort */ }
+            }
+            Log::error('posPayStart failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore avvio pagamento'], 502);
+        }
+    }
+
+    /**
+     * Annulla un pagamento Revolut in corso. Gestisce la race condition:
+     * se il cliente ha pagato proprio mentre il cassiere annullava, l'ordine
+     * viene chiuso normalmente (con corrispettivo emesso) e il frontend mostra
+     * "pagamento già completato".
+     */
+    public function posPayCancel(RestaurantTable $table, RevolutTerminalService $revolut): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $order = $table->activeOrder;
+        if (!$order || !$order->isPendingPayment() || !$order->revolut_order_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nessun pagamento in attesa per questo tavolo',
+            ], 422);
+        }
+
+        try {
+            try {
+                $revolut->cancelPayment($order->revolut_order_id);
+            } catch (\Throwable $e) {
+                // Se il cancel fallisce è probabile che il pagamento sia già completato:
+                // chiariamo la verità interrogando lo stato.
+                Log::warning('Revolut cancelPayment failed (verifying state): ' . $e->getMessage());
+            }
+
+            $status = $revolut->getOrderStatus($order->revolut_order_id);
+            $state  = strtolower($status['state'] ?? '');
+
+            if (in_array($state, ['completed', 'authorised'], true)) {
+                $closed = app(RevolutPaymentCloser::class)->closeAfterPayment($order, $state);
+                return response()->json([
+                    'success' => true,
+                    'data'    => [
+                        'state'         => 'completed',
+                        'already_paid'  => true,
+                        'total_paid'    => $closed['total_paid'],
+                        'corrispettivo' => $this->buildCorrispettivoResponse($closed['corrispettivo']),
+                    ],
+                ]);
+            }
+
+            $order->update([
+                'status'                     => 'open',
+                'revolut_order_id'           => null,
+                'revolut_payment_state'      => 'cancelled',
+                'revolut_payment_started_at' => null,
+                'revolut_operator_id'        => null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data'    => ['state' => 'cancelled'],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('posPayCancel failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Errore annullamento pagamento'], 502);
+        }
+    }
+
+    /**
+     * MOCK ONLY: simula la conferma di pagamento (come se fosse arrivato il webhook
+     * Revolut con stato 'completed'). Disponibile solo se mock_mode è attivo —
+     * altrimenti risponde 403. Usato dal bottone "Simula pagamento OK" nell'overlay
+     * cassiere per testare il flusso end-to-end senza un terminale fisico.
+     */
+    public function posPayMockComplete(RestaurantTable $table, RevolutTerminalService $revolut): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        if (!$revolut->isMock()) {
+            return response()->json(['success' => false, 'message' => 'Mock mode non attiva'], 403);
+        }
+
+        $order = $table->activeOrder;
+        if (!$order || !$order->isPendingPayment()) {
+            return response()->json(['success' => false, 'message' => 'Nessun pagamento in attesa per questo tavolo'], 422);
+        }
+
+        $closed = app(RevolutPaymentCloser::class)->closeAfterPayment($order, 'completed');
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'state'         => 'completed',
+                'mock'          => true,
+                'total_paid'    => $closed['total_paid'],
+                'corrispettivo' => $this->buildCorrispettivoResponse($closed['corrispettivo']),
+            ],
+        ]);
+    }
+
+    /**
+     * Polling di stato del pagamento Revolut. Funziona da fallback se il webhook
+     * non arriva, e disambigua quando l'ordine è effettivamente completato/fallito.
+     */
+    public function posPayStatus(RestaurantTable $table, RevolutTerminalService $revolut): JsonResponse
+    {
+        $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
+        if (!$operatorId) {
+            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
+        }
+
+        $order = $table->activeOrder;
+        if (!$order) {
+            // Tavolo già libero: il pagamento è andato a buon fine via webhook
+            return response()->json([
+                'success' => true,
+                'data'    => ['state' => 'completed', 'already_paid' => true],
+            ]);
+        }
+
+        if ($order->status === 'paid') {
+            return response()->json([
+                'success' => true,
+                'data'    => ['state' => 'completed', 'already_paid' => true],
+            ]);
+        }
+
+        if (!$order->isPendingPayment() || !$order->revolut_order_id) {
+            return response()->json([
+                'success' => true,
+                'data'    => ['state' => 'idle'],
+            ]);
+        }
+
+        $cfg       = Setting::getRevolutConfig();
+        $startedAt = $order->revolut_payment_started_at;
+        $elapsed   = $startedAt ? (int) abs(now()->diffInSeconds($startedAt)) : 0;
+        $timedOut  = $elapsed >= $cfg['timeout_seconds'];
+
+        try {
+            $status = $revolut->getOrderStatus($order->revolut_order_id);
+            $state  = strtolower($status['state'] ?? '');
+
+            if ($order->revolut_payment_state !== $state && $state !== '') {
+                $order->update(['revolut_payment_state' => $state]);
+            }
+
+            if (in_array($state, ['completed', 'authorised'], true)) {
+                $closed = app(RevolutPaymentCloser::class)->closeAfterPayment($order->fresh(), $state);
+                return response()->json([
+                    'success' => true,
+                    'data'    => [
+                        'state'         => 'completed',
+                        'total_paid'    => $closed['total_paid'],
+                        'corrispettivo' => $this->buildCorrispettivoResponse($closed['corrispettivo']),
+                    ],
+                ]);
+            }
+
+            if (in_array($state, ['failed', 'cancelled', 'declined'], true)) {
+                $order->update([
+                    'status'                     => 'open',
+                    'revolut_order_id'           => null,
+                    'revolut_payment_state'      => $state,
+                    'revolut_payment_started_at' => null,
+                    'revolut_operator_id'        => null,
+                ]);
+                return response()->json([
+                    'success' => true,
+                    'data'    => ['state' => $state],
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data'    => [
+                    'state'           => $state ?: 'pending',
+                    'elapsed_seconds' => $elapsed,
+                    'timed_out'       => $timedOut,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('posPayStatus polling error: ' . $e->getMessage());
+            return response()->json([
+                'success' => true,
+                'data'    => [
+                    'state'           => 'pending',
+                    'elapsed_seconds' => $elapsed,
+                    'timed_out'       => $timedOut,
+                    'polling_error'   => true,
+                ],
+            ]);
+        }
+    }
+
+
+    /**
      * Pay table with invoice(s) — supports partial invoice + remainder via POS/Contanti
      */
     public function payTableInvoice(Request $request, RestaurantTable $table): JsonResponse
@@ -1832,6 +2124,17 @@ class TableOrderController extends Controller
         if (!$operatorId) {
             return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
         }
+
+        // Integrazione disabilitata: il frontend chiude direttamente il tavolo via /pay
+        if (!Setting::isCashDrawerEnabled()) {
+            return response()->json([
+                'success'      => true,
+                'skipped'      => true,
+                'operation_id' => null,
+                'message'      => 'Cassa automatica non attiva',
+            ]);
+        }
+
         $amount = $request->input('amount');
         $table_order_id = $request->input('table_order_id');
         $printer = Setting::getCashDrawerPrinter();
@@ -2699,51 +3002,6 @@ class TableOrderController extends Controller
             DB::rollBack();
             Log::error('Error updating item dish: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Errore nel cambio piatto'], 500);
-        }
-    }
-
-    /**
-     * Send a purchase request to the local POS terminal (VEGA3000 via JSONPOS TCP).
-     * Does NOT close the order — the frontend calls /pay afterwards on success.
-     */
-    public function posCharge(RestaurantTable $table): JsonResponse
-    {
-        try {
-            $order = $table->activeOrder;
-            if (!$order) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Nessun ordine attivo per questo tavolo',
-                ], 404);
-            }
-
-
-            // POS not configured — let the frontend proceed with the normal payment flow
-            return response()->json([
-                'success'     => true,
-                'pos_skipped' => true,
-                'message'     => 'Terminale POS non configurato — pagamento manuale',
-            ]);
-            /*
-            $result = $posService->sendPurchase(
-                (float) $order->total_amount,
-                'ORD-' . $order->id
-            );
-
-            return response()->json([
-                'success'       => $result['success'],
-                'pos_skipped'   => false,
-                'response_code' => $result['response_code'],
-                'message'       => $result['message'],
-            ], $result['success'] ? 200 : 402);
-            */
-
-        } catch (\Exception $e) {
-            Log::error('Error in posCharge: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Errore comunicazione POS',
-            ], 500);
         }
     }
 

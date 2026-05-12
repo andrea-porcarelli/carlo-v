@@ -89,6 +89,14 @@ class Setting extends Model
     }
 
     /**
+     * Get the restaurant display name
+     */
+    public static function getRestaurantName(): string
+    {
+        return (string) self::get('restaurant_name', 'Carlo V');
+    }
+
+    /**
      * Get preconto printer ID
      *
      * @return int|null
@@ -120,5 +128,56 @@ class Setting extends Model
     {
         $rawSetting = self::where('key', 'cash_drawer_printer_id')->first();
         return $rawSetting->value ?? null;
+    }
+
+    /**
+     * Integrazione cassa automatica: 'none' | 'printer'
+     */
+    public static function getCashDrawerIntegration(): string
+    {
+        return (string) self::get('cash_drawer_integration', 'none');
+    }
+
+    public static function isCashDrawerEnabled(): bool
+    {
+        return self::getCashDrawerIntegration() === 'printer';
+    }
+
+    /**
+     * Integrazione POS attiva: 'none' | 'revolut'
+     */
+    public static function getPosIntegration(): string
+    {
+        return (string) self::get('pos_integration', 'none');
+    }
+
+    public static function isRevolutEnabled(): bool
+    {
+        return self::getPosIntegration() === 'revolut';
+    }
+
+    /**
+     * @return array{environment:string, api_key:string, location_id:string, webhook_secret:string, timeout_seconds:int, mock_mode:bool}
+     */
+    public static function getRevolutConfig(): array
+    {
+        return [
+            'environment'      => (string) self::get('revolut.environment', 'sandbox'),
+            'api_key'          => (string) self::get('revolut.api_key', ''),
+            'location_id'      => (string) self::get('revolut.location_id', ''),
+            'webhook_secret'   => (string) self::get('revolut.webhook_secret', ''),
+            'timeout_seconds'  => (int) self::get('revolut.timeout_seconds', 90),
+            'mock_mode'        => (bool) self::get('revolut.mock_mode', false),
+        ];
+    }
+
+    /**
+     * Mock mode è attivo solo se la flag è ON E siamo in sandbox.
+     * Doppio guard per evitare che venga lasciato attivo per errore in produzione.
+     */
+    public static function isRevolutMockMode(): bool
+    {
+        $cfg = self::getRevolutConfig();
+        return $cfg['mock_mode'] && $cfg['environment'] === 'sandbox';
     }
 }

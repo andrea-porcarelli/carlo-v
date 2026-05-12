@@ -6,7 +6,7 @@
         <div>
             <div>
                 <h1 class="logo-name" style="font-size: 34px">
-                    CARLO V
+                    {{ \Illuminate\Support\Str::upper(\App\Models\Setting::getRestaurantName()) }}
                 </h1>
             </div>
             <p>Log-in</p>

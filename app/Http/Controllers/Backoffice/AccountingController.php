@@ -27,6 +27,14 @@ class AccountingController extends BaseController
         return view('backoffice.accounting.invoices.index', compact('customers'));
     }
 
+    /**
+     * Render the quick-invoice wizard page (standalone invoice issuance).
+     */
+    public function createInvoice(): View
+    {
+        return view('backoffice.accounting.invoices.create');
+    }
+
     public function datatable(Request $request): JsonResponse
     {
         try {

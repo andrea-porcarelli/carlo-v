@@ -5,6 +5,7 @@ use App\Http\Controllers\Backoffice\AllergenController;
 use App\Http\Controllers\Backoffice\ExternalInvoiceController;
 use App\Http\Controllers\Backoffice\MenuOptionController;
 use App\Http\Controllers\Backoffice\DeployController;
+use App\Http\Controllers\RevolutWebhookController;
 use App\Http\Controllers\Backoffice\CategoryController;
 use App\Http\Controllers\Backoffice\DishController;
 use App\Http\Controllers\Backoffice\InvoiceController;
@@ -35,6 +36,7 @@ Route::get('/', [AppController::class, 'index'])->middleware('basic.static')->na
 // ── Deploy webhook — protected by hardcoded key, no auth middleware ────────────
 Route::match(['GET', 'POST'], '/webhook/deploy', [DeployController::class, 'trigger'])->name('webhook.deploy');
 Route::match(['GET', 'POST'], '/webhook/migrate', [DeployController::class, 'migrate'])->name('webhook.migrate');
+Route::post('/webhook/revolut', [RevolutWebhookController::class, 'handle'])->name('webhook.revolut');
 
 // API Routes for Operator Authentication
 Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function() {
@@ -77,7 +79,10 @@ Route::group(['prefix' => '/api/tables', 'as' => 'api.tables.'], function() {
     Route::delete('/items/{item}', [TableOrderController::class, 'removeItem'])->name('removeItem');
     Route::post('/{table}/clear', [TableOrderController::class, 'clearTable'])->name('clear');
     Route::post('/{table}/free-amount', [TableOrderController::class, 'freeAmount'])->name('free-amount');
-    Route::post('/{table}/pos-charge', [TableOrderController::class, 'posCharge'])->name('posCharge');
+    Route::post('/{table}/pos-pay/start',         [TableOrderController::class, 'posPayStart'])->name('posPayStart');
+    Route::post('/{table}/pos-pay/cancel',        [TableOrderController::class, 'posPayCancel'])->name('posPayCancel');
+    Route::post('/{table}/pos-pay/status',        [TableOrderController::class, 'posPayStatus'])->name('posPayStatus');
+    Route::post('/{table}/pos-pay/mock-complete', [TableOrderController::class, 'posPayMockComplete'])->name('posPayMockComplete');
     Route::post('/{table}/pay', [TableOrderController::class, 'payTable'])->name('pay');
     Route::post('/{table}/pay-invoice', [TableOrderController::class, 'payTableInvoice'])->name('payInvoice');
     Route::post('/{table}/cancel-autoconsumo', [TableOrderController::class, 'cancelAutoconsumo'])->name('cancelAutoconsumo');
@@ -263,6 +268,7 @@ Route::group(['prefix' => '/backoffice'], function() {
         Route::group(['prefix' => '/accounting', 'as' => 'accounting.'], function() {
             Route::group(['prefix' => '/invoices', 'as' => 'invoices.'], function() {
                 Route::get('/', [AccountingController::class, 'invoices'])->name('index');
+                Route::get('/create', [AccountingController::class, 'createInvoice'])->name('create');
                 Route::get('/datatable', [AccountingController::class, 'datatable'])->name('datatable');
                 Route::get('/{invoice}/xml', [AccountingController::class, 'xml'])->name('xml');
                 Route::post('/{invoice}/resend', [AccountingController::class, 'resend'])->name('resend');

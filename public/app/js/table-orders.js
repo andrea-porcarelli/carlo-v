@@ -3051,14 +3051,6 @@ class TableOrdersManager {
 
         if (!overlay) return;
 
-        amountEl.textContent = `€${parseFloat(amount).toFixed(2)}`;
-        statusEl.textContent = 'Avvio pagamento sulla cassa automatica...';
-        cancelBtn.disabled = false;
-        if (fallbackSection) fallbackSection.style.display = 'none';
-        if (fallbackBtn) fallbackBtn.disabled = false;
-        overlay.style.display = 'flex';
-        window.addEventListener('beforeunload', this._beforeUnloadHandler);
-
         this._cashDrawerToken = authToken;
         this._cashDrawerTableId = tableId;
         this._cashDrawerSplitId = splitId;
@@ -3067,8 +3059,12 @@ class TableOrdersManager {
         // Assegna subito onComplete così _executeCashDrawerFallback può usarlo anche in caso di errore all'avvio
         this._cashDrawerOnComplete = onComplete ?? (() => this._afterPaymentSuccess());
 
+        // Probe iniziale: se l'integrazione cashDrawer è disabilitata in Settings,
+        // il backend risponde { skipped: true } e saltiamo direttamente al callback
+        // (chiusura tavolo via /pay) senza mostrare l'overlay.
+        let initialResp;
         try {
-            const resp = await fetch(`${this.apiBase}/open-cash-drawer`, {
+            initialResp = await fetch(`${this.apiBase}/open-cash-drawer`, {
                 method: 'POST',
                 body: JSON.stringify({ amount, table_order_id: tableOrderId }),
                 headers: {
@@ -3077,8 +3073,34 @@ class TableOrdersManager {
                     'X-Operator-Token': authToken,
                 },
             });
-            const data = await resp.json();
+        } catch (e) {
+            console.error('Cash drawer start error:', e);
+            amountEl.textContent = `€${parseFloat(amount).toFixed(2)}`;
+            overlay.style.display = 'flex';
+            await this._executeCashDrawerFallback();
+            return;
+        }
 
+        const data = await initialResp.json();
+
+        if (data.skipped) {
+            // Integrazione disabilitata: chiudi direttamente come da onComplete (il callback fa /pay)
+            const onComp = this._cashDrawerOnComplete;
+            this._cashDrawerOnComplete = null;
+            if (onComp) await onComp();
+            return;
+        }
+
+        // Integrazione attiva: mostra overlay e procedi col flusso polling
+        amountEl.textContent = `€${parseFloat(amount).toFixed(2)}`;
+        statusEl.textContent = 'Avvio pagamento sulla cassa automatica...';
+        cancelBtn.disabled = false;
+        if (fallbackSection) fallbackSection.style.display = 'none';
+        if (fallbackBtn) fallbackBtn.disabled = false;
+        overlay.style.display = 'flex';
+        window.addEventListener('beforeunload', this._beforeUnloadHandler);
+
+        try {
             if (!data.success) {
                 console.error('Cash drawer open failed:', data);
                 await this._executeCashDrawerFallback();
@@ -3345,47 +3367,10 @@ class TableOrdersManager {
         }
     }
 
-    /**
-     * Execute payment with specified method (pos/contanti).
-     * When method is 'pos', first sends a charge request to the physical POS terminal
-     * via the backend TCP/JSONPOS bridge; proceeds with closing the order only on approval.
-     */
     async executePayment(method) {
         if (!this.currentTable) return;
 
         this.closePaymentMethodModal();
-
-        // ── POS terminal charge (only for 'pos' payments) ─────────────────────
-        if (method === 'pos') {
-            this.showNotification('POS in attesa di pagamento...', 'info');
-
-            try {
-                const posResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pos-charge`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    },
-                });
-
-                const posResult = await posResp.json();
-
-                if (!posResult.success) {
-                    // Hard failure — POS declined or unreachable
-                    this.showNotification(posResult.message || 'Pagamento POS rifiutato', 'error');
-                    return;
-                }
-
-                if (!posResult.pos_skipped) {
-                    // Real POS approval — notify operator
-                    this.showNotification('Pagamento POS approvato', 'success');
-                }
-            } catch (error) {
-                console.error('POS charge error:', error);
-                this.showNotification('Errore comunicazione POS', 'error');
-                return;
-            }
-        }
 
         // ── Operator authentication ────────────────────────────────────────────
         let auth;
@@ -3412,6 +3397,12 @@ class TableOrdersManager {
             return;
         }
         console.log('✅ ALLOWED: All permissions granted');
+
+        // ── POS Elettronico (Revolut Terminal): flusso async con webhook ──────
+        if (method === 'pos') {
+            await this._executeRevolutPayment(auth);
+            return;
+        }
 
         // ── Contanti / Chiusura conto: apri cassetto prima di chiudere il conto ──
         if (method === 'contanti' || method === 'chiusura_conto') {
@@ -3477,9 +3468,249 @@ class TableOrdersManager {
         }
     }
 
-    /**
-     * Post-payment cleanup (hide overlays, reset state)
-     */
+    // ────────────────────────────────────────────────────────────────────────
+    // Revolut Terminal payment flow (POS Elettronico async)
+    // ────────────────────────────────────────────────────────────────────────
+
+    async _executeRevolutPayment(auth) {
+        const tableId = this.currentTable.table.id;
+        const token   = auth.token;
+
+        let startResult;
+        try {
+            const resp = await fetch(`${this.apiBase}/${tableId}/pos-pay/start`, {
+                method: 'POST',
+                headers: this._revolutHeaders(token),
+            });
+            startResult = await resp.json();
+        } catch (e) {
+            console.error('Revolut start error:', e);
+            this.showNotification('Errore comunicazione server', 'error');
+            return;
+        }
+
+        if (!startResult.success) {
+            this.showNotification(startResult.message || 'Errore avvio pagamento', 'error');
+            return;
+        }
+
+        // Integrazione disabilitata: fallback al /pay diretto (chiusura manuale come "POS")
+        if (startResult.pos_skipped) {
+            await this._payTableDirect(tableId, token, 'pos');
+            return;
+        }
+
+        const data = startResult.data || {};
+        this._revolutContext = {
+            tableId,
+            token,
+            timeoutAt: Date.now() + ((data.timeout_seconds || 90) * 1000),
+            cancelInProgress: false,
+            mockMode: !!data.mock_mode,
+        };
+        this._showRevolutOverlay(data.amount, data.terminal, data.timeout_seconds, !!data.mock_mode);
+
+        this._revolutPollInterval = setInterval(() => this._pollRevolutStatus(), 2500);
+        this._revolutCountdownInterval = setInterval(() => this._updateRevolutCountdown(), 1000);
+        this._updateRevolutCountdown();
+    }
+
+    async _pollRevolutStatus() {
+        if (!this._revolutContext || this._revolutContext.cancelInProgress) return;
+
+        const { tableId, token } = this._revolutContext;
+        let result;
+        try {
+            const resp = await fetch(`${this.apiBase}/${tableId}/pos-pay/status`, {
+                method: 'POST',
+                headers: this._revolutHeaders(token),
+            });
+            result = await resp.json();
+        } catch (e) {
+            console.warn('Revolut polling error:', e);
+            return;
+        }
+
+        if (!result.success) return;
+        const state = result.data?.state;
+
+        if (state === 'completed') {
+            this._stopRevolutFlow();
+            this._hideRevolutOverlay();
+            const total = result.data.total_paid ?? this.currentTable?.order?.total_amount ?? 0;
+            this.showNotification(`Conto incassato: €${parseFloat(total).toFixed(2)}`);
+            this._notifyCorrispettivoResult(result.data?.corrispettivo);
+            this._afterPaymentSuccess();
+            return;
+        }
+
+        if (['failed', 'cancelled', 'declined'].includes(state)) {
+            this._stopRevolutFlow();
+            this._hideRevolutOverlay();
+            this.showNotification(`Pagamento ${state === 'failed' ? 'fallito' : (state === 'declined' ? 'rifiutato' : 'annullato')}`, 'error');
+            return;
+        }
+
+        if (result.data?.timed_out) {
+            const sec = document.getElementById('revolutPaymentTimeoutSection');
+            if (sec) sec.style.display = '';
+        }
+    }
+
+    async cancelRevolutPayment() {
+        if (!this._revolutContext || this._revolutContext.cancelInProgress) return;
+        if (!confirm('Vuoi davvero annullare la transazione?')) return;
+
+        this._revolutContext.cancelInProgress = true;
+
+        const btn = document.getElementById('revolutPaymentCancelBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Annullamento in corso...'; }
+        const status = document.getElementById('revolutPaymentStatus');
+        if (status) status.textContent = 'Verifica stato pagamento...';
+
+        const { tableId, token } = this._revolutContext;
+        let result;
+        try {
+            const resp = await fetch(`${this.apiBase}/${tableId}/pos-pay/cancel`, {
+                method: 'POST',
+                headers: this._revolutHeaders(token),
+            });
+            result = await resp.json();
+        } catch (e) {
+            console.error('Revolut cancel error:', e);
+            this.showNotification('Errore annullamento', 'error');
+            this._restoreCancelButton();
+            return;
+        }
+
+        if (!result.success) {
+            this.showNotification(result.message || 'Errore annullamento', 'error');
+            this._restoreCancelButton();
+            return;
+        }
+
+        const data = result.data || {};
+
+        // Race: il cliente ha pagato proprio mentre il cassiere annullava
+        if (data.already_paid) {
+            this._stopRevolutFlow();
+            this._hideRevolutOverlay();
+            const total = data.total_paid ?? this.currentTable?.order?.total_amount ?? 0;
+            this.showNotification(`Pagamento già completato — conto chiuso (€${parseFloat(total).toFixed(2)})`);
+            this._notifyCorrispettivoResult(data.corrispettivo);
+            this._afterPaymentSuccess();
+            return;
+        }
+
+        this._stopRevolutFlow();
+        this._hideRevolutOverlay();
+        this.showNotification('Transazione annullata', 'info');
+    }
+
+    _showRevolutOverlay(amount, terminalName, timeoutSec, mockMode = false) {
+        const $ = (id) => document.getElementById(id);
+        if ($('revolutPaymentAmount'))   $('revolutPaymentAmount').textContent   = `€${parseFloat(amount || 0).toFixed(2)}`;
+        if ($('revolutPaymentTerminal')) $('revolutPaymentTerminal').textContent = terminalName ? `Terminale: ${terminalName}${mockMode ? ' (MOCK)' : ''}` : '';
+        if ($('revolutPaymentStatus'))   $('revolutPaymentStatus').textContent   = mockMode ? 'Modalità test — clicca "Simula pagamento OK" per completare' : 'Avvicinare la carta al terminale Revolut';
+        if ($('revolutPaymentTimeoutSection')) $('revolutPaymentTimeoutSection').style.display = 'none';
+        const btn = $('revolutPaymentCancelBtn');
+        if (btn) { btn.disabled = false; btn.textContent = 'Annulla transazione'; }
+        const mockBtn = $('revolutPaymentMockBtn');
+        if (mockBtn) {
+            mockBtn.style.display = mockMode ? '' : 'none';
+            mockBtn.disabled = false;
+            mockBtn.textContent = 'Simula pagamento OK';
+        }
+        if ($('revolutPaymentOverlay')) $('revolutPaymentOverlay').style.display = 'flex';
+    }
+
+    async mockCompleteRevolutPayment() {
+        if (!this._revolutContext) return;
+        const { tableId, token } = this._revolutContext;
+        const btn = document.getElementById('revolutPaymentMockBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Completamento...'; }
+
+        let result;
+        try {
+            const resp = await fetch(`${this.apiBase}/${tableId}/pos-pay/mock-complete`, {
+                method: 'POST',
+                headers: this._revolutHeaders(token),
+            });
+            result = await resp.json();
+        } catch (e) {
+            console.error('Revolut mock-complete error:', e);
+            this.showNotification('Errore simulazione pagamento', 'error');
+            if (btn) { btn.disabled = false; btn.textContent = 'Simula pagamento OK'; }
+            return;
+        }
+
+        if (!result.success) {
+            this.showNotification(result.message || 'Errore simulazione', 'error');
+            if (btn) { btn.disabled = false; btn.textContent = 'Simula pagamento OK'; }
+            return;
+        }
+
+        this._stopRevolutFlow();
+        this._hideRevolutOverlay();
+        const total = result.data.total_paid ?? this.currentTable?.order?.total_amount ?? 0;
+        this.showNotification(`Conto incassato (MOCK): €${parseFloat(total).toFixed(2)}`);
+        this._notifyCorrispettivoResult(result.data?.corrispettivo);
+        this._afterPaymentSuccess();
+    }
+
+    _hideRevolutOverlay() {
+        const ov = document.getElementById('revolutPaymentOverlay');
+        if (ov) ov.style.display = 'none';
+    }
+
+    _updateRevolutCountdown() {
+        if (!this._revolutContext) return;
+        const remaining = Math.max(0, Math.ceil((this._revolutContext.timeoutAt - Date.now()) / 1000));
+        const cd = document.getElementById('revolutPaymentCountdown');
+        if (cd) cd.textContent = remaining > 0 ? `Tempo residuo: ${remaining}s` : 'Tempo scaduto — verifica manualmente o annulla';
+    }
+
+    _stopRevolutFlow() {
+        if (this._revolutPollInterval)      { clearInterval(this._revolutPollInterval);      this._revolutPollInterval = null; }
+        if (this._revolutCountdownInterval) { clearInterval(this._revolutCountdownInterval); this._revolutCountdownInterval = null; }
+        this._revolutContext = null;
+    }
+
+    _restoreCancelButton() {
+        const btn = document.getElementById('revolutPaymentCancelBtn');
+        if (btn) { btn.disabled = false; btn.textContent = 'Annulla transazione'; }
+        if (this._revolutContext) this._revolutContext.cancelInProgress = false;
+    }
+
+    _revolutHeaders(token) {
+        return {
+            'Content-Type':   'application/json',
+            'X-CSRF-TOKEN':   document.querySelector('meta[name="csrf-token"]')?.content,
+            'X-Operator-Token': token,
+        };
+    }
+
+    async _payTableDirect(tableId, token, method) {
+        try {
+            const resp = await fetch(`${this.apiBase}/${tableId}/pay`, {
+                method: 'POST',
+                headers: this._revolutHeaders(token),
+                body: JSON.stringify({ payment_method: method }),
+            });
+            const result = await resp.json();
+            if (result.success) {
+                this.showNotification(`Conto incassato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
+                this._notifyCorrispettivoResult(result.data?.corrispettivo);
+                this._afterPaymentSuccess();
+            } else {
+                this.showNotification(result.message || "Errore nell'incasso", 'error');
+            }
+        } catch (e) {
+            console.error('Pay direct error:', e);
+            this.showNotification("Errore nell'incasso", 'error');
+        }
+    }
+
     /**
      * Initialize the manager for a specific table when running inside the backoffice
      */

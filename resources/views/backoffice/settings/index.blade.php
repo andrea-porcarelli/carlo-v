@@ -7,7 +7,21 @@
 @endsection
 
 @section('main-content')
-    @php $rendered = []; @endphp
+    @php
+        $rendered = [];
+        $posIntegrationOptions = [
+            ['id' => 'none',    'label' => 'Scollegato'],
+            ['id' => 'revolut', 'label' => 'Revolut Terminal'],
+        ];
+        $revolutEnvOptions = [
+            ['id' => 'sandbox',    'label' => 'Sandbox (test)'],
+            ['id' => 'production', 'label' => 'Produzione'],
+        ];
+        $cashDrawerOptions = [
+            ['id' => 'none',    'label' => 'Scollegato'],
+            ['id' => 'printer', 'label' => 'Stampante (ESC/POS)'],
+        ];
+    @endphp
     <div class="panel panel-default">
         <div class="panel-body">
             <a href="{{ route('restaurant.settings.ade-cambio-password') }}" class="btn btn-warning">
@@ -29,7 +43,67 @@
                             @if(in_array($setting->key, $rendered)) @continue @endif
                             @php $rendered[] = $setting->key; @endphp
 
-                            @if($setting->type === 'decimal')
+                            @if($setting->key === 'cash_drawer_integration')
+                                <div class="col-xs-12 col-sm-4 m-t-sm">
+                                    <label>{{ $setting->description ?? $setting->key }}</label>
+                                    @include('backoffice.components.form.select', [
+                                        'field' => true,
+                                        'form' => 'update-or-create-element',
+                                        'name' => $setting->key,
+                                        'options' => $cashDrawerOptions,
+                                        'value' => $setting->value,
+                                        'hide_first' => true,
+                                        'dataset' => ['cash-drawer-integration-select' => '1'],
+                                    ])
+                                    <small class="text-muted">{{ $setting->key }}</small>
+                                </div>
+                            @elseif($setting->key === 'cash_drawer_printer_id')
+                                <div class="col-xs-12 col-sm-4 m-t-sm" data-cash-drawer-block="printer" style="{{ \App\Models\Setting::getCashDrawerIntegration() === 'printer' ? '' : 'display:none' }}">
+                                    @include('backoffice.components.form.input', [
+                                        'form' => 'update-or-create-element',
+                                        'name' => $setting->key,
+                                        'label' => $setting->description ?? $setting->key,
+                                        'col' => 12,
+                                        'type' => 'number',
+                                        'step' => '1',
+                                        'value' => $setting->value,
+                                        'small' => $setting->key,
+                                    ])
+                                </div>
+                            @elseif($setting->key === 'pos_integration')
+                                <div class="col-xs-12 col-sm-4 m-t-sm">
+                                    <label>{{ $setting->description ?? $setting->key }}</label>
+                                    @include('backoffice.components.form.select', [
+                                        'field' => true,
+                                        'form' => 'update-or-create-element',
+                                        'name' => $setting->key,
+                                        'options' => $posIntegrationOptions,
+                                        'value' => $setting->value,
+                                        'hide_first' => true,
+                                        'dataset' => ['pos-integration-select' => '1'],
+                                    ])
+                                    <small class="text-muted">{{ $setting->key }}</small>
+                                </div>
+                                </div></div></div>
+                                <div class="panel panel-default" data-pos-integration-block="revolut" style="{{ $setting->value === 'revolut' ? '' : 'display:none' }}">
+                                    <div class="panel-heading">
+                                        <h4 class="panel-title"><i class="fas fa-credit-card"></i> Configurazione Revolut</h4>
+                                    </div>
+                                    <div class="panel-body"><div class="row">
+                            @elseif($setting->key === 'revolut.environment')
+                                <div class="col-xs-12 col-sm-4 m-t-sm">
+                                    <label>{{ $setting->description ?? $setting->key }}</label>
+                                    @include('backoffice.components.form.select', [
+                                        'field' => true,
+                                        'form' => 'update-or-create-element',
+                                        'name' => $setting->key,
+                                        'options' => $revolutEnvOptions,
+                                        'value' => $setting->value,
+                                        'hide_first' => true,
+                                    ])
+                                    <small class="text-muted">{{ $setting->key }}</small>
+                                </div>
+                            @elseif($setting->type === 'decimal')
                                 @include('backoffice.components.form.input', [
                                     'form' => 'update-or-create-element',
                                     'name' => $setting->key,
@@ -104,4 +178,24 @@
             </div>
         </div>
     </form>
+
+    <script>
+        (function () {
+            const posSelect = document.querySelector('[data-pos-integration-select]');
+            const posBlock  = document.querySelector('[data-pos-integration-block="revolut"]');
+            if (posSelect && posBlock) {
+                const sync = () => { posBlock.style.display = posSelect.value === 'revolut' ? '' : 'none'; };
+                posSelect.addEventListener('change', sync);
+                sync();
+            }
+
+            const cdSelect = document.querySelector('[data-cash-drawer-integration-select]');
+            const cdBlock  = document.querySelector('[data-cash-drawer-block="printer"]');
+            if (cdSelect && cdBlock) {
+                const sync = () => { cdBlock.style.display = cdSelect.value === 'printer' ? '' : 'none'; };
+                cdSelect.addEventListener('change', sync);
+                sync();
+            }
+        })();
+    </script>
 @endsection

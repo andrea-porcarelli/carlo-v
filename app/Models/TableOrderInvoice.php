@@ -30,6 +30,7 @@ class TableOrderInvoice extends Model
         'discount',
         'tax',
         'description',
+        'lines',
         'payment_method',
         'xml_path',
         'xml_content',
@@ -42,6 +43,7 @@ class TableOrderInvoice extends Model
         'amount'   => 'decimal:2',
         'discount' => 'decimal:2',
         'tax'      => 'decimal:2',
+        'lines'    => 'array',
         'sent_at'  => 'datetime',
     ];
 
@@ -93,7 +95,32 @@ class InvoiceRowsProxy
 
     public function get(): Collection
     {
-        $vatRate  = (float) Utils::setting('invoice_vat_rate', 10);
+        $vatRate = (float) Utils::setting('invoice_vat_rate', 10);
+
+        // Multi-line invoice (e.g. standalone backoffice issuance): each stored line
+        // already carries label, unit_price (lordo), quantity and optional vat_rate.
+        $storedLines = $this->invoice->lines;
+        if (is_array($storedLines) && count($storedLines) > 0) {
+            return collect($storedLines)->map(function ($line) use ($vatRate) {
+                $lineVat   = isset($line['vat_rate']) ? (float) $line['vat_rate'] : $vatRate;
+                $unitGross = (float) ($line['unit_price'] ?? 0);
+                $unitNet   = round($unitGross / (1 + $lineVat / 100), 2);
+
+                $tax = new \stdClass();
+                $tax->tax = $lineVat;
+
+                $row = new \stdClass();
+                $row->label        = $line['label'] ?? '';
+                $row->price        = $unitNet;
+                $row->quantity     = (float) ($line['quantity'] ?? 1);
+                $row->tax          = $tax;
+                $row->tax_id       = null;
+                $row->cart_product = null;
+                return $row;
+            });
+        }
+
+        // Single-line fallback (legacy: pasto completo from table order)
         $imponibile = round((float) $this->invoice->amount / (1 + $vatRate / 100), 2);
 
         $tax = new \stdClass();

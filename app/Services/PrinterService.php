@@ -916,7 +916,7 @@ class PrinterService implements PrinterServiceInterface
 
             // Nota finale
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
-            $printer->text("Misuraca S.R.L. \n");
+            $printer->text((string) (Setting::get('company_name') ?: '') . " \n");
             $printer->text("***  NON FISCALE ***\n");
             $printer->text("Documento Fiscale alla cassa\n");
 
@@ -1094,7 +1094,7 @@ class PrinterService implements PrinterServiceInterface
             $dev->feed(1);
 
             $dev->setJustification(EscposPrinter::JUSTIFY_CENTER);
-            $dev->text("Misuraca S.R.L. \n");
+            $dev->text((string) (Setting::get('company_name') ?: '') . " \n");
             $dev->text("*** DOCUMENTO NON FISCALE ***\n");
             $dev->text("Ritirare lo scontrino alla cassa\n");
             $dev->feed(2);

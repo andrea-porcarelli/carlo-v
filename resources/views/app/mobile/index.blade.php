@@ -7,7 +7,7 @@
         <header class="mobile-header">
             <div class="mobile-header-top">
                 <div class="mobile-logo">
-                    <i class="fas fa-utensils"></i> CARLO V
+                    <i class="fas fa-utensils"></i> {{ \Illuminate\Support\Str::upper(\App\Models\Setting::getRestaurantName()) }}
                 </div>
                 <div style="display:flex; gap:6px; align-items:center;">
                     <button onclick="openFullscreen()" class="js-fullscreen-btn" style="background:#007bff; border:none; color:white; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer;">
@@ -237,6 +237,42 @@
             color: #fff !important;
         }
     </style>
+
+    <!-- Revolut Payment Overlay -->
+    <div id="revolutPaymentOverlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.88); align-items:center; justify-content:center;">
+        <div style="background:#0f172a; border-radius:16px; padding:44px 40px; max-width:460px; width:90%; text-align:center; box-shadow:0 24px 80px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:3rem; margin-bottom:14px;">💳</div>
+            <h2 style="color:#fff; margin:0 0 6px 0; font-size:1.4rem; font-weight:700; letter-spacing:0.5px;">In attesa di pagamento</h2>
+            <p id="revolutPaymentTerminal" style="color:#94a3b8; font-size:0.85rem; margin:0;"></p>
+            <p id="revolutPaymentAmount" style="color:#e2e8f0; font-size:1.6rem; margin:10px 0 24px 0; font-weight:700;"></p>
+
+            <div style="display:flex; justify-content:center; margin-bottom:22px;">
+                <div style="width:48px; height:48px; border:4px solid rgba(255,255,255,0.15); border-top-color:#22c55e; border-radius:50%; animation:cashDrawerSpin 0.8s linear infinite;"></div>
+            </div>
+
+            <p id="revolutPaymentStatus" style="color:#cbd5e1; font-size:0.95rem; margin:0 0 8px 0; min-height:1.4em;">Avvicinare la carta al terminale Revolut</p>
+            <p id="revolutPaymentCountdown" style="color:#64748b; font-size:0.85rem; margin:0 0 24px 0; min-height:1.2em;"></p>
+
+            <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                <button id="revolutPaymentCancelBtn"
+                    onclick="tableOrdersManager.cancelRevolutPayment()"
+                    style="background:transparent; border:2px solid #ef4444; color:#ef4444; padding:12px 28px; border-radius:8px; font-size:0.95rem; font-weight:600; cursor:pointer; letter-spacing:0.3px; transition:all 0.15s;">
+                    Annulla transazione
+                </button>
+                <button id="revolutPaymentMockBtn"
+                    onclick="tableOrdersManager.mockCompleteRevolutPayment()"
+                    style="display:none; background:transparent; border:2px solid #22c55e; color:#22c55e; padding:12px 28px; border-radius:8px; font-size:0.95rem; font-weight:600; cursor:pointer; letter-spacing:0.3px; transition:all 0.15s;">
+                    Simula pagamento OK
+                </button>
+            </div>
+
+            <div id="revolutPaymentTimeoutSection" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1);">
+                <p style="color:#fbbf24; font-size:0.9rem; margin:0; line-height:1.5;">
+                    ⚠️ Il pagamento sta impiegando più del previsto.<br>Verifica sul terminale o annulla per riprovare.
+                </p>
+            </div>
+        </div>
+    </div>
 
     <!-- Cash Drawer Fallback Alert (rimane visibile fino alla conferma dell'operatore) -->
     <div id="cashDrawerFallbackAlert" style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.92); align-items:center; justify-content:center;">

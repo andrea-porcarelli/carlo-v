@@ -4,7 +4,7 @@
             <li class="nav-header">
                 <div class="dropdown profile-element text-center">
                     <h3 class="text-white">
-                        CARLO V
+                        {{ \Illuminate\Support\Str::upper(\App\Models\Setting::getRestaurantName()) }}
                     </h3>
                 </div>
                 <div class="logo-element">
