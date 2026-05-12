@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Backoffice;
 
+use App\Facades\Utils;
 use App\Jobs\SendInvoiceToMysondJob;
 use App\Models\Customer;
 use App\Models\InvoiceMysondLog;
@@ -128,7 +129,7 @@ class AccountingController extends BaseController
         }
         return response($invoice->xml_content, 200)
             ->header('Content-Type', 'application/xml')
-            ->header('Content-Disposition', 'inline; filename="' . ($invoice->invoice_name ?? 'fattura') . '.xml"');
+            ->header('Content-Disposition', 'inline; filename="' . $this->sdiFilename($invoice) . '"');
     }
 
     public function xmlDownload(TableOrderInvoice $invoice): Response
@@ -136,10 +137,16 @@ class AccountingController extends BaseController
         if (empty($invoice->xml_content)) {
             abort(404, 'XML non disponibile per questa fattura.');
         }
-        $filename = ($invoice->invoice_name ?? ('fattura-' . $invoice->id)) . '.xml';
         return response($invoice->xml_content, 200)
             ->header('Content-Type', 'application/xml')
-            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+            ->header('Content-Disposition', 'attachment; filename="' . $this->sdiFilename($invoice) . '"');
+    }
+
+    private function sdiFilename(TableOrderInvoice $invoice): string
+    {
+        $vat  = Utils::setting('company_vat_number');
+        $base = $invoice->invoice_name ?: ('fattura-' . $invoice->id);
+        return ($vat ? 'IT' . $vat . '_' : '') . $base . '.xml';
     }
 
     /**
@@ -245,11 +252,7 @@ class AccountingController extends BaseController
 
     public function resend(TableOrderInvoice $invoice): JsonResponse
     {
-        // Rigeneriamo l'XML se manca dal DB, se non abbiamo un path,
-        // oppure se il file fisico non esiste più in storage.
-        $needsRegeneration = empty($invoice->xml_content)
-            || empty($invoice->xml_path)
-            || !is_file($invoice->xml_path);
+        $needsRegeneration = empty($invoice->xml_content);
 
         if ($needsRegeneration) {
             $invoice->loadMissing('customer');
@@ -291,7 +294,6 @@ class AccountingController extends BaseController
 
             $invoice->update([
                 'status'          => 'pending',
-                'xml_path'        => $xmlResult['path'] ?? null,
                 'xml_content'     => $xmlResult['content'] ?? null,
                 'mysond_response' => $responsePayload,
             ]);

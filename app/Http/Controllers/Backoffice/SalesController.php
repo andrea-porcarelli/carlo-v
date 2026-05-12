@@ -149,9 +149,13 @@ class SalesController extends BaseController
             abort(404, 'XML non disponibile per questa fattura.');
         }
 
+        $vat  = Utils::setting('company_vat_number');
+        $base = $invoice->invoice_name ?: 'fattura';
+        $filename = ($vat ? 'IT' . $vat . '_' : '') . $base . '.xml';
+
         return response($invoice->xml_content, 200)
             ->header('Content-Type', 'application/xml')
-            ->header('Content-Disposition', 'inline; filename="' . ($invoice->invoice_name ?? 'fattura') . '.xml"');
+            ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
     }
 
     /**
@@ -174,7 +178,6 @@ class SalesController extends BaseController
             ];
 
             if (($result['response'] ?? '') === 'success') {
-                $updateData['xml_path']    = $result['path'] ?? null;
                 $updateData['xml_content'] = $result['content'] ?? null;
             } else {
                 $updateData['status'] = 'error';

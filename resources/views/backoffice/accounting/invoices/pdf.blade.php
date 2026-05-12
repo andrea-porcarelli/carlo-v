@@ -8,79 +8,79 @@
 
     body {
         font-family: "DejaVu Sans", sans-serif;
-        font-size: 10px;
+        font-size: 9.5px;
         color: #2d3748;
         background: #fff;
-        line-height: 1.55;
+        line-height: 1.4;
     }
 
     .page {
-        padding: 40px 48px 50px 48px;
+        padding: 26px 36px 30px 36px;
     }
 
     /* ── BANNER ──────────────────────────────────────────────── */
     .banner {
         background: #0b2545;
         color: #fff;
-        padding: 26px 32px;
-        margin-bottom: 32px;
+        padding: 18px 26px;
+        margin-bottom: 20px;
         border-bottom: 4px solid #c9a449;
     }
     .banner table { width: 100%; border-collapse: collapse; }
     .banner td { vertical-align: middle; }
 
     .banner-eyebrow {
-        font-size: 8px;
+        font-size: 7.5px;
         letter-spacing: 3px;
         text-transform: uppercase;
         color: #c9a449;
-        margin-bottom: 8px;
+        margin-bottom: 5px;
     }
     .banner-title {
-        font-size: 30px;
+        font-size: 24px;
         font-weight: bold;
-        letter-spacing: 6px;
+        letter-spacing: 5px;
         text-transform: uppercase;
         color: #fff;
         line-height: 1;
     }
     .banner-company {
-        font-size: 9px;
-        letter-spacing: 0.8px;
+        font-size: 8.5px;
+        letter-spacing: 0.6px;
         color: #aab9d4;
-        margin-top: 10px;
+        margin-top: 6px;
     }
 
     .banner-num-label {
-        font-size: 8px;
+        font-size: 7.5px;
         letter-spacing: 2.5px;
         text-transform: uppercase;
         color: #c9a449;
         text-align: right;
     }
     .banner-num {
-        font-size: 18px;
+        font-size: 15px;
         font-weight: bold;
         color: #fff;
         text-align: right;
-        margin-top: 4px;
+        margin-top: 3px;
         letter-spacing: 1px;
     }
     .banner-date {
-        font-size: 9px;
+        font-size: 8.5px;
         color: #aab9d4;
         text-align: right;
-        margin-top: 10px;
+        margin-top: 6px;
     }
 
     /* ── SECTION TITLE ───────────────────────────────────────── */
     .section-title {
-        font-size: 8px;
+        font-size: 7.5px;
         font-weight: bold;
         letter-spacing: 2.5px;
         text-transform: uppercase;
         color: #c9a449;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
     }
     .section-title .dash {
         display: inline-block;
@@ -92,41 +92,41 @@
     }
 
     /* ── PARTIES ─────────────────────────────────────────────── */
-    .parties { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+    .parties { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
     .parties td {
         width: 50%;
         vertical-align: top;
         padding: 0;
     }
-    .parties td.right-cell { padding-left: 24px; }
+    .parties td.right-cell { padding-left: 18px; }
 
     .party-card {
         background: #f7f9fc;
         border-left: 3px solid #0b2545;
-        padding: 18px 20px 18px 22px;
+        padding: 12px 14px 12px 16px;
     }
     .party-card.committente {
         border-left-color: #c9a449;
     }
     .party-role {
-        font-size: 7.5px;
+        font-size: 7px;
         font-weight: bold;
         letter-spacing: 2px;
         text-transform: uppercase;
         color: #8a96a8;
-        margin-bottom: 8px;
+        margin-bottom: 5px;
     }
     .party-name {
-        font-size: 13px;
+        font-size: 11.5px;
         font-weight: bold;
         color: #0b2545;
-        margin-bottom: 10px;
-        line-height: 1.3;
+        margin-bottom: 6px;
+        line-height: 1.25;
     }
     .party-detail {
-        font-size: 9.5px;
+        font-size: 9px;
         color: #4a5568;
-        line-height: 1.7;
+        line-height: 1.5;
     }
     .party-detail .row { margin-bottom: 2px; }
     .party-detail .k {
@@ -144,24 +144,24 @@
         background: #fff;
         border: 1px solid #e2e8f0;
         border-top: 3px solid #0b2545;
-        margin-bottom: 32px;
+        margin-bottom: 20px;
     }
     .meta-bar table { width: 100%; border-collapse: collapse; }
     .meta-cell {
-        padding: 14px 20px;
+        padding: 9px 14px;
         border-right: 1px solid #e2e8f0;
         vertical-align: top;
     }
     .meta-cell:last-child { border-right: none; }
     .meta-label {
-        font-size: 7.5px;
-        letter-spacing: 1.8px;
+        font-size: 7px;
+        letter-spacing: 1.6px;
         text-transform: uppercase;
         color: #8a96a8;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
     .meta-value {
-        font-size: 12px;
+        font-size: 10.5px;
         font-weight: bold;
         color: #0b2545;
         letter-spacing: 0.3px;
@@ -172,16 +172,16 @@
     table.lines {
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 28px;
-        font-size: 9.5px;
+        margin-bottom: 18px;
+        font-size: 9px;
     }
     table.lines thead tr { background: #0b2545; }
     table.lines thead th {
-        padding: 12px 12px;
+        padding: 8px 10px;
         text-align: left;
-        font-size: 7.5px;
+        font-size: 7px;
         text-transform: uppercase;
-        letter-spacing: 1.4px;
+        letter-spacing: 1.3px;
         font-weight: bold;
         color: #fff;
     }
@@ -192,7 +192,7 @@
     table.lines tbody tr:nth-child(odd) td  { background: #fff; }
 
     table.lines tbody td {
-        padding: 11px 12px;
+        padding: 7px 10px;
         border-bottom: 1px solid #e2e8f0;
         vertical-align: top;
         color: #2d3748;
@@ -203,8 +203,8 @@
     table.lines tbody td.um     { text-align: center; color: #8a96a8; font-size: 9px; }
 
     table.lines tfoot td {
-        padding: 12px 12px;
-        font-size: 9px;
+        padding: 8px 10px;
+        font-size: 8.5px;
         color: #4a5568;
         background: #fafbfd;
         border-top: 2px solid #0b2545;
@@ -223,57 +223,57 @@
         background: #fafbfd;
         border: 1px solid #e2e8f0;
         border-left: 3px solid #c9a449;
-        padding: 16px 20px;
-        margin-bottom: 28px;
-        font-size: 9.5px;
+        padding: 10px 14px;
+        margin-bottom: 18px;
+        font-size: 9px;
         color: #2d3748;
-        line-height: 1.6;
+        line-height: 1.5;
     }
 
     /* ── BOTTOM: PAGAMENTO + TOTALE ──────────────────────────── */
-    .bottom { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    .bottom td.pay { width: 52%; vertical-align: top; padding-right: 28px; }
+    .bottom { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    .bottom td.pay { width: 52%; vertical-align: top; padding-right: 20px; }
     .bottom td.tot { width: 48%; vertical-align: top; }
 
     .pay-box {
         background: #f7f9fc;
         border-left: 3px solid #c9a449;
-        padding: 18px 22px;
+        padding: 12px 16px;
     }
     .pay-row {
-        margin-bottom: 10px;
-        font-size: 9.5px;
+        margin-bottom: 6px;
+        font-size: 9px;
     }
     .pay-row:last-child { margin-bottom: 0; }
     .pay-k {
         display: block;
-        font-size: 7.5px;
-        letter-spacing: 1.6px;
+        font-size: 7px;
+        letter-spacing: 1.5px;
         text-transform: uppercase;
         color: #8a96a8;
-        margin-bottom: 2px;
+        margin-bottom: 1px;
         font-weight: bold;
     }
     .pay-v {
         font-weight: bold;
         color: #0b2545;
-        font-size: 10.5px;
+        font-size: 10px;
     }
 
     /* Totals card */
     .totals-card {
         background: #fff;
         border: 1px solid #e2e8f0;
-        padding: 16px 18px 0 18px;
+        padding: 10px 14px 0 14px;
     }
     table.totals {
         width: 100%;
         border-collapse: collapse;
-        font-size: 9.5px;
+        font-size: 9px;
         margin-bottom: 0;
     }
     table.totals td {
-        padding: 9px 4px;
+        padding: 6px 4px;
         color: #4a5568;
         border-bottom: 1px solid #eaeef4;
     }
@@ -292,21 +292,21 @@
     .grand-total-card {
         background: #0b2545;
         color: #fff;
-        padding: 18px 22px;
-        margin: 0 -18px -16px -18px;
-        border-top: 4px solid #c9a449;
+        padding: 12px 16px;
+        margin: 0 -14px -10px -14px;
+        border-top: 3px solid #c9a449;
     }
     .grand-total-card table { width: 100%; border-collapse: collapse; }
     .grand-total-card td { vertical-align: middle; }
     .grand-total-label {
-        font-size: 8.5px;
-        letter-spacing: 2.2px;
+        font-size: 8px;
+        letter-spacing: 2px;
         text-transform: uppercase;
         color: #c9a449;
         font-weight: bold;
     }
     .grand-total-value {
-        font-size: 18px;
+        font-size: 15px;
         font-weight: bold;
         color: #fff;
         text-align: right;
@@ -316,12 +316,12 @@
 
     /* ── FOOTER ──────────────────────────────────────────────── */
     .footer {
-        margin-top: 40px;
-        padding-top: 16px;
+        margin-top: 22px;
+        padding-top: 10px;
         border-top: 1px solid #e2e8f0;
-        font-size: 7.5px;
+        font-size: 7px;
         color: #8a96a8;
-        line-height: 1.6;
+        line-height: 1.5;
     }
     .footer table { width: 100%; border-collapse: collapse; }
     .footer td { vertical-align: top; }

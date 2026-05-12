@@ -424,7 +424,6 @@ class QuickInvoiceWizard extends Component
                 'mysond_response' => is_array($xmlResult) ? json_encode($xmlResult) : (string) $xmlResult,
             ];
             if (($xmlResult['response'] ?? '') === 'success') {
-                $update['xml_path']    = $xmlResult['path'] ?? null;
                 $update['xml_content'] = $xmlResult['content'] ?? null;
             } else {
                 $update['status'] = 'error';

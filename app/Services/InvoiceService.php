@@ -19,7 +19,6 @@ use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaHeader\Common\
 use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaHeader\Common\Sede;
 use Deved\FatturaElettronica\FatturaElettronicaFactory;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class InvoiceService
 {
@@ -106,23 +105,17 @@ class InvoiceService
             $datiRiepilogo,
         );
 
-        $file = 'IT' . Utils::setting('company_vat_number') . '_' . $invoice->invoice_name . '.xml';
         try {
-            $invoice_path = '/invoice/' . $invoice->year . '/' . $invoice->month . '/';
-            Storage::makeDirectory($invoice_path);
-            $path = storage_path("/app/private{$invoice_path}{$file}");
             $xml = $fattura->toXml();
-            file_put_contents($path, $xml);
             return [
-                'path' => $path,
-                'content' => $xml,
-                'response' => 'success'
+                'content'  => $xml,
+                'response' => 'success',
             ];
         } catch (\Exception $e) {
             Log::error($e->getMessage());
             return [
                 'response' => 'error',
-                'message' => $e->getMessage()
+                'message'  => $e->getMessage(),
             ];
         }
 

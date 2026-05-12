@@ -1515,7 +1515,6 @@ class TableOrderController extends Controller
                     'mysond_response' => is_array($result) ? json_encode($result) : (string) $result,
                 ];
                 if (($result['response'] ?? '') === 'success') {
-                    $updateData['xml_path']    = $result['path'] ?? null;
                     $updateData['xml_content'] = $result['content'] ?? null;
                     $ficResults[] = $result;
                 } else {
