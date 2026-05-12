@@ -243,6 +243,24 @@ class MysondFatturaService
         return $path;
     }
 
+    public function getLastRequestXml(): ?string
+    {
+        try {
+            return $this->client?->__getLastRequest();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function getLastResponseXml(): ?string
+    {
+        try {
+            return $this->client?->__getLastResponse();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function setWsdl($wsdl)
     {
         if ($this->wsdl === $wsdl) {

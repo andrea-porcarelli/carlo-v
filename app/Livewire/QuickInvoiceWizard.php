@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Customer;
 use App\Models\Dish;
+use App\Models\InvoiceMysondLog;
 use App\Models\Setting;
 use App\Models\TableOrderInvoice;
 use App\Services\MysondFatturaService;
@@ -417,6 +418,8 @@ class QuickInvoiceWizard extends Component
             $mySond = app(MysondFatturaService::class);
             $xmlResult = $mySond->createInvoice($invoice);
 
+            InvoiceMysondLog::logCreateInvoice($invoice->id, $xmlResult);
+
             $update = [
                 'mysond_response' => is_array($xmlResult) ? json_encode($xmlResult) : (string) $xmlResult,
             ];
@@ -437,6 +440,7 @@ class QuickInvoiceWizard extends Component
                 'invoice_id' => $invoice->id,
                 'error'      => $e->getMessage(),
             ]);
+            InvoiceMysondLog::logCreateInvoice($invoice->id, null, $e);
             $xmlError = $e->getMessage();
             $invoice->update([
                 'status'          => 'error',

@@ -69,7 +69,7 @@ class InvoiceService
             $datiGenerali->setScontoMaggiorazione($ScontoMaggiorazione);
         }
         $datiPagamento = new DatiPagamento(
-            $user->user_type === 'public_company' ? ModalitaPagamento::Bonifico : ModalitaPagamento::BollettinoPostale,
+            self::resolveModalitaPagamento($invoice->payment_method, $user->user_type === 'public_company'),
             Carbon::parse($invoice->created_at)->addDays(15)->format('Y-m-d'),
             $user->user_type === 'public_company' ? $invoice->amount - $invoice->tax : $invoice->amount,
             Utils::setting('iban'),
@@ -126,5 +126,26 @@ class InvoiceService
             ];
         }
 
+    }
+
+    private static function resolveModalitaPagamento(?string $paymentMethod, bool $isPublicCompany): string
+    {
+        $map = [
+            'contanti'           => ModalitaPagamento::Contanti,
+            'pos'                => ModalitaPagamento::CartaDiPagamento,
+            'carta'              => ModalitaPagamento::CartaDiPagamento,
+            'bancomat'           => ModalitaPagamento::CartaDiPagamento,
+            'bonifico'           => ModalitaPagamento::Bonifico,
+            'assegno'            => ModalitaPagamento::Assegno,
+            'bollettino'         => ModalitaPagamento::BollettinoPostale,
+            'bollettino_postale' => ModalitaPagamento::BollettinoPostale,
+        ];
+
+        $key = strtolower(trim((string) $paymentMethod));
+        if ($key !== '' && isset($map[$key])) {
+            return $map[$key];
+        }
+
+        return $isPublicCompany ? ModalitaPagamento::Bonifico : ModalitaPagamento::BollettinoPostale;
     }
 }

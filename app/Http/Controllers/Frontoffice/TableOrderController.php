@@ -19,6 +19,7 @@ use App\Models\PrecontoSplit;
 use App\Models\Printer;
 use App\Models\RestaurantTable;
 use App\Models\Customer;
+use App\Models\InvoiceMysondLog;
 use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Models\TableOrderInvoice;
@@ -1507,6 +1508,8 @@ class TableOrderController extends Controller
 
                 // 5. Generate XML and persist it — actual send is handled asynchronously by SendInvoiceToMysondJob
                 $result = $mySondFature->createInvoice($tableOrderInvoice);
+
+                InvoiceMysondLog::logCreateInvoice($tableOrderInvoice->id, $result);
 
                 $updateData = [
                     'mysond_response' => is_array($result) ? json_encode($result) : (string) $result,

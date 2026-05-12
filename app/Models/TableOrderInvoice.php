@@ -6,6 +6,7 @@ use App\Facades\Utils;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
 class TableOrderInvoice extends Model
@@ -55,6 +56,12 @@ class TableOrderInvoice extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function mysondLogs(): HasMany
+    {
+        return $this->hasMany(InvoiceMysondLog::class, 'table_order_invoice_id')
+            ->orderByDesc('created_at');
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Backoffice;
 
 use App\Jobs\SendInvoiceToMysondJob;
 use App\Models\Customer;
+use App\Models\InvoiceMysondLog;
 use App\Models\TableOrderInvoice;
 use App\Services\MysondFatturaService;
 use App\Traits\DatatableTrait;
@@ -105,12 +106,13 @@ class AccountingController extends BaseController
                                 . '<a href="' . route('accounting.invoices.xml-download', $item->id) . '" class="btn btn-xs btn-info" title="Scarica XML"><i class="fa fa-download"></i></a> '
                                 . '<a href="' . route('accounting.invoices.pdf', $item->id) . '" target="_blank" class="btn btn-xs btn-danger" title="PDF"><i class="fa fa-file-pdf"></i></a> ';
                     }
+                    $logBtn = '<button class="btn btn-xs btn-default btn-show-mysond-logs" data-id="' . $item->id . '" title="Log invio MySond"><i class="fa fa-list-alt"></i></button> ';
                     $resendBtn = '';
                     if (in_array($item->status, ['error', 'pending'])) {
                         $title = !empty($item->xml_content) ? 'Re-invia' : 'Rigenera XML e invia';
                         $resendBtn = '<button class="btn btn-xs btn-warning btn-resend-invoice" data-id="' . $item->id . '" title="' . $title . '"><i class="fa fa-paper-plane"></i></button>';
                     }
-                    return $xmlBtn . $resendBtn;
+                    return $xmlBtn . $logBtn . $resendBtn;
                 })
                 ->rawColumns(['code', 'status_badge', 'mysond_desc', 'action'])
                 ->make(true);
@@ -140,6 +142,107 @@ class AccountingController extends BaseController
             ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
     }
 
+    /**
+     * Render the invoice as PDF using the dedicated accounting template.
+     */
+    public function pdf(TableOrderInvoice $invoice)
+    {
+        if (empty($invoice->xml_content)) {
+            abort(404, 'XML non disponibile — impossibile generare il PDF.');
+        }
+
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($invoice->xml_content);
+        abort_if($xml === false, 422, 'XML non valido.');
+
+        $header      = $xml->FatturaElettronicaHeader;
+        $body        = $xml->FatturaElettronicaBody;
+        $cedente     = $header->CedentePrestatore;
+        $committente = $header->CessionarioCommittente;
+        $datiDoc     = $body->DatiGenerali->DatiGeneraliDocumento;
+
+        $cedenteName = (string)($cedente->DatiAnagrafici->Anagrafica->Denominazione ?? '');
+        if (!$cedenteName) {
+            $cedenteName = trim((string)($cedente->DatiAnagrafici->Anagrafica->Nome ?? '') . ' ' .
+                                (string)($cedente->DatiAnagrafici->Anagrafica->Cognome ?? ''));
+        }
+        $committenteName = (string)($committente->DatiAnagrafici->Anagrafica->Denominazione ?? '');
+        if (!$committenteName) {
+            $committenteName = trim((string)($committente->DatiAnagrafici->Anagrafica->Nome ?? '') . ' ' .
+                                    (string)($committente->DatiAnagrafici->Anagrafica->Cognome ?? ''));
+        }
+
+        $linee = [];
+        foreach ($body->DatiBeniServizi->DettaglioLinee as $linea) {
+            $linee[] = [
+                'numero'          => (string)$linea->NumeroLinea,
+                'descrizione'     => (string)$linea->Descrizione,
+                'quantita'        => (float)($linea->Quantita ?? 0),
+                'unita'           => (string)($linea->UnitaMisura ?? ''),
+                'prezzo_unitario' => (float)($linea->PrezzoUnitario ?? 0),
+                'prezzo_totale'   => (float)($linea->PrezzoTotale ?? 0),
+                'iva'             => (float)($linea->AliquotaIVA ?? 0),
+            ];
+        }
+
+        $riepilogo = [];
+        foreach (($body->DatiBeniServizi->DatiRiepilogo ?? []) as $r) {
+            $riepilogo[] = [
+                'aliquota'   => (float)$r->AliquotaIVA,
+                'imponibile' => (float)$r->ImponibileImporto,
+                'imposta'    => (float)($r->Imposta ?? 0),
+            ];
+        }
+
+        $pagamento = null;
+        if (isset($body->DatiPagamento->DettaglioPagamento)) {
+            $dp = $body->DatiPagamento->DettaglioPagamento;
+            $pagamento = [
+                'modalita' => (string)($dp->ModalitaPagamento ?? ''),
+                'scadenza' => (string)($dp->DataScadenzaPagamento ?? ''),
+                'importo'  => (float)($dp->ImportoPagamento ?? 0),
+            ];
+        }
+
+        $invoice->loadMissing('customer');
+
+        $data = [
+            'invoice'     => $invoice,
+            'cedente'     => [
+                'nome'      => $cedenteName,
+                'piva'      => (string)($cedente->DatiAnagrafici->IdFiscaleIVA->IdCodice ?? ''),
+                'indirizzo' => (string)($cedente->Sede->Indirizzo ?? ''),
+                'cap'       => (string)($cedente->Sede->CAP ?? ''),
+                'comune'    => (string)($cedente->Sede->Comune ?? ''),
+                'provincia' => (string)($cedente->Sede->Provincia ?? ''),
+            ],
+            'committente' => [
+                'nome'      => $committenteName,
+                'piva'      => (string)($committente->DatiAnagrafici->IdFiscaleIVA->IdCodice ?? ''),
+                'indirizzo' => (string)($committente->Sede->Indirizzo ?? ''),
+                'cap'       => (string)($committente->Sede->CAP ?? ''),
+                'comune'    => (string)($committente->Sede->Comune ?? ''),
+                'provincia' => (string)($committente->Sede->Provincia ?? ''),
+            ],
+            'documento'   => [
+                'numero' => (string)$datiDoc->Numero,
+                'data'   => (string)$datiDoc->Data,
+                'tipo'   => (string)($datiDoc->TipoDocumento ?? 'TD01'),
+                'divisa' => (string)($datiDoc->Divisa ?? 'EUR'),
+                'totale' => (float)($datiDoc->ImportoTotaleDocumento ?? 0),
+            ],
+            'linee'     => $linee,
+            'riepilogo' => $riepilogo,
+            'pagamento' => $pagamento,
+        ];
+
+        $filename = ($invoice->invoice_name ?? 'fattura') . '.pdf';
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('backoffice.accounting.invoices.pdf', $data)
+            ->setPaper('a4', 'portrait')
+            ->stream($filename);
+    }
+
     public function resend(TableOrderInvoice $invoice): JsonResponse
     {
         // Se manca l'XML (es. precedente errore in fase di generazione),
@@ -157,6 +260,7 @@ class AccountingController extends BaseController
                     'invoice_id' => $invoice->id,
                     'error'      => $e->getMessage(),
                 ]);
+                InvoiceMysondLog::logCreateInvoice($invoice->id, null, $e);
                 $invoice->update([
                     'status'          => 'error',
                     'mysond_response' => json_encode([
@@ -166,6 +270,8 @@ class AccountingController extends BaseController
                 ]);
                 return $this->error(['message' => 'Errore rigenerazione XML: ' . $e->getMessage()]);
             }
+
+            InvoiceMysondLog::logCreateInvoice($invoice->id, $xmlResult);
 
             $responsePayload = is_array($xmlResult) ? json_encode($xmlResult) : (string) $xmlResult;
 
@@ -192,6 +298,37 @@ class AccountingController extends BaseController
         SendInvoiceToMysondJob::dispatch($invoice->id);
 
         return $this->success(['message' => 'Fattura re-accodata per invio.']);
+    }
+
+    public function logs(TableOrderInvoice $invoice): JsonResponse
+    {
+        $logs = $invoice->mysondLogs()->get()->map(function (InvoiceMysondLog $log) {
+            return [
+                'id'                => $log->id,
+                'operation'         => $log->operation,
+                'outcome'           => $log->outcome,
+                'esito'             => $log->esito,
+                'codice'            => $log->codice,
+                'descrizione'       => $log->descrizione,
+                'request_xml'       => $log->request_xml,
+                'response_xml'      => $log->response_xml,
+                'exception_class'   => $log->exception_class,
+                'exception_message' => $log->exception_message,
+                'exception_trace'   => $log->exception_trace,
+                'duration_ms'       => $log->duration_ms,
+                'created_at'        => $log->created_at?->format('d/m/Y H:i:s'),
+            ];
+        });
+
+        return response()->json([
+            'invoice' => [
+                'id'           => $invoice->id,
+                'invoice_code' => $invoice->invoice_code,
+                'invoice_name' => $invoice->invoice_name,
+                'status'       => $invoice->status,
+            ],
+            'logs' => $logs,
+        ]);
     }
 
     public function customers(): View
