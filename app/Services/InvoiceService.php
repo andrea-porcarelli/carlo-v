@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Facades\Utils;
+use App\Helpers\VatHelper;
 use App\Models\Invoice;
 use App\Models\TableOrderInvoice;
 use Carbon\Carbon;
@@ -26,11 +27,12 @@ class InvoiceService
     {
 
         $user = $invoice->customer;
+        $cedenteVat = VatHelper::sanitize(Utils::setting('company_vat_number'));
         $anagraficaCedente = new DatiAnagrafici(
-            Utils::setting('company_vat_number'),
+            $cedenteVat,
             Utils::setting('company_name'),
             'IT',
-            Utils::setting('company_vat_number'),
+            $cedenteVat,
             RegimeFiscale::Ordinario
         );
         $sedeCedente = new Sede(
@@ -49,7 +51,8 @@ class InvoiceService
             Utils::setting('email_fatturazione')
         );
 
-        $anagraficaCessionario = new DatiAnagrafici($user->fiscal_code, $user->full_name, 'IT', $user->vat_number);
+        $cessionarioVat = VatHelper::sanitize($user->vat_number);
+        $anagraficaCessionario = new DatiAnagrafici($user->fiscal_code, $user->full_name, 'IT', $cessionarioVat);
 
         $sedeCessionario = new Sede('IT', $user->address, $user->zip_code, $user->city, $user->province);
 

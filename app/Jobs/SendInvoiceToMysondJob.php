@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Facades\Utils;
+use App\Helpers\VatHelper;
 use App\Models\InvoiceMysondLog;
 use App\Models\TableOrderInvoice;
 use App\Services\MysondFatturaService;
@@ -49,7 +50,32 @@ class SendInvoiceToMysondJob implements ShouldQueue
             return;
         }
 
-        $fileName = 'IT' . Utils::setting('company_vat_number') . '_' . $invoice->invoice_name . '.xml';
+        $vatDigits = VatHelper::sanitize(Utils::setting('company_vat_number'));
+        $fileName  = 'IT' . $vatDigits . '_' . $invoice->invoice_name . '.xml';
+
+        // Pre-validazione: la P.IVA italiana deve essere esattamente 11 cifre.
+        // Se il setting è degenere (vuoto, contiene caratteri non normalizzabili, ecc.)
+        // evitiamo di chiamare il WS — MySond risponderebbe comunque "formato non valido".
+        if (strlen($vatDigits) !== 11) {
+            $msg = 'P.IVA azienda non valida (attese 11 cifre, trovate ' . strlen($vatDigits)
+                 . '). Controllare il setting company_vat_number.';
+            $invoice->update([
+                'status'          => 'error',
+                'mysond_response' => json_encode([
+                    'esito'       => null,
+                    'descrizione' => $msg,
+                    'fileName'    => $fileName,
+                    'at'          => now()->toIso8601String(),
+                ]),
+            ]);
+            InvoiceMysondLog::create([
+                'table_order_invoice_id' => $invoice->id,
+                'operation'              => 'importFeAttivo',
+                'outcome'                => InvoiceMysondLog::OUTCOME_ERROR,
+                'descrizione'            => $msg,
+            ]);
+            return;
+        }
 
         $startedAt = microtime(true);
         $result    = null;
@@ -96,6 +122,7 @@ class SendInvoiceToMysondJob implements ShouldQueue
             'esito'       => $esito,
             'codice'      => $codice,
             'descrizione' => $descrizione,
+            'fileName'    => $fileName,
             'at'          => now()->toIso8601String(),
         ];
 

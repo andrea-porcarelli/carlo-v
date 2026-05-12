@@ -18,7 +18,7 @@ class TableOrderInvoice extends Model
         $baseDec = (int) base_convert(self::START_SERIES, 36, 10);
         $newDec  = $baseDec + $increment;
         $code    = strtoupper(base_convert((string) $newDec, 10, 36));
-        return substr($code, -5);
+        return str_pad(substr($code, -5), 5, '0', STR_PAD_LEFT);
     }
 
     protected $fillable = [
