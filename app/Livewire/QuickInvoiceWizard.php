@@ -364,7 +364,7 @@ class QuickInvoiceWizard extends Component
                 $counter     = (int) Setting::get('invoice_counter', 0) + 1;
                 Setting::set('invoice_counter', $counter, 'integer');
                 $year        = now()->format('Y');
-                $invoiceCode = 'ORD-' . $year . '-' . str_pad((string) $counter, 4, '0', STR_PAD_LEFT);
+                $invoiceCode = $year . '-' . str_pad((string) $counter, 5, '0', STR_PAD_LEFT);
                 $invoiceName = TableOrderInvoice::toAlphanumeric($counter);
 
                 // 3) Persist invoice (no table_order_id, multi-line lines payload)
