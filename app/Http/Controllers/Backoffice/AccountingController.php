@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\InvoiceMysondLog;
 use App\Models\TableOrderInvoice;
 use App\Services\MysondFatturaService;
+use App\Services\SdiStatusNotifier;
 use App\Traits\DatatableTrait;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -345,6 +346,9 @@ class AccountingController extends BaseController
             $label = (string) $tipo;
         }
 
+        $previousStatus = $invoice->sdi_status;
+        $statusChanged  = $code !== null && $previousStatus !== $code;
+
         $invoice->update([
             'sdi_status'       => $code,
             'sdi_status_label' => $label,
@@ -357,6 +361,11 @@ class AccountingController extends BaseController
                 'at'          => now()->toIso8601String(),
             ]),
         ]);
+
+        if ($statusChanged) {
+            $invoice->loadMissing('customer');
+            SdiStatusNotifier::notifyStatusChange($invoice, $previousStatus, $code, $label, $descrizione);
+        }
 
         InvoiceMysondLog::create([
             'table_order_invoice_id' => $invoice->id,

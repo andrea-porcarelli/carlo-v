@@ -145,6 +145,45 @@ class MysondFatturaService
         }
     }
 
+    /**
+     * Batch: ultima notifica per più file in una sola chiamata SOAP.
+     * MySond accetta i file separati da pipe `|`. Le estensioni `.xml` vengono rimosse.
+     * Restituisce un array di oggetti notifica (ordine non garantito dalla doc).
+     */
+    public function getUltimaNotificaList(array $fileNames): array
+    {
+        if (empty($fileNames)) {
+            return [];
+        }
+
+        $this->setWsdl('mysond');
+
+        $cleaned = array_map(fn($n) => preg_replace('/\.xml$/i', '', $n), $fileNames);
+        $joined  = implode('|', $cleaned);
+
+        $params = [
+            'arg0' => [
+                'aziendaCod' => $this->auth['codiceAzienda'],
+                'utenteCod'  => $this->auth['username'],
+                'fileName'   => $joined,
+            ],
+        ];
+
+        try {
+            $response = $this->client->getUltimaNotificaList($params);
+            $this->logDebug('getUltimaNotificaList', ['count' => count($cleaned)]);
+            $return = $response->return ?? null;
+            if ($return === null) {
+                return [];
+            }
+            // La risposta può essere singolo oggetto o array a seconda del numero di elementi.
+            return is_array($return) ? $return : [$return];
+        } catch (Exception $e) {
+            $this->logDebug('getUltimaNotificaList', ['count' => count($cleaned)], null, $e);
+            throw $e;
+        }
+    }
+
     public function riceviFatture(string $dal, string $al)
     {
 
