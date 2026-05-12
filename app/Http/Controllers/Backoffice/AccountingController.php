@@ -102,7 +102,8 @@ class AccountingController extends BaseController
                     $xmlBtn = '';
                     if (!empty($item->xml_content)) {
                         $xmlBtn = '<a href="' . route('accounting.invoices.xml', $item->id) . '" target="_blank" class="btn btn-xs btn-info" title="Apri XML"><i class="fa fa-file-code"></i></a> '
-                                . '<a href="' . route('accounting.invoices.xml-download', $item->id) . '" class="btn btn-xs btn-info" title="Scarica XML"><i class="fa fa-download"></i></a> ';
+                                . '<a href="' . route('accounting.invoices.xml-download', $item->id) . '" class="btn btn-xs btn-info" title="Scarica XML"><i class="fa fa-download"></i></a> '
+                                . '<a href="' . route('accounting.invoices.pdf', $item->id) . '" target="_blank" class="btn btn-xs btn-danger" title="PDF"><i class="fa fa-file-pdf"></i></a> ';
                     }
                     $resendBtn = '';
                     if (in_array($item->status, ['error', 'pending'])) {

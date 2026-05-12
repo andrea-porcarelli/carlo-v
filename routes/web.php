@@ -272,6 +272,7 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/datatable', [AccountingController::class, 'datatable'])->name('datatable');
                 Route::get('/{invoice}/xml', [AccountingController::class, 'xml'])->name('xml');
                 Route::get('/{invoice}/xml/download', [AccountingController::class, 'xmlDownload'])->name('xml-download');
+                Route::get('/{invoice}/pdf', [SalesController::class, 'invoicePdf'])->name('pdf');
                 Route::post('/{invoice}/resend', [AccountingController::class, 'resend'])->name('resend');
             });
             Route::group(['prefix' => '/customers', 'as' => 'customers.'], function() {
