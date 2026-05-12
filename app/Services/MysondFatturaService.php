@@ -116,6 +116,35 @@ class MysondFatturaService
         }
     }
 
+    /**
+     * Recupera l'ultima notifica SDI per un file fattura.
+     * $fileName può essere passato con o senza estensione `.xml` — viene rimossa.
+     * Restituisce l'oggetto `return` dalla risposta SOAP, oppure null in caso di errore.
+     */
+    public function getNotifica(string $fileName)
+    {
+        $this->setWsdl('mysond');
+
+        $baseName = preg_replace('/\.xml$/i', '', $fileName);
+
+        $params = [
+            'arg0' => [
+                'aziendaCod' => $this->auth['codiceAzienda'],
+                'utenteCod'  => $this->auth['username'],
+                'fileName'   => $baseName,
+            ],
+        ];
+
+        try {
+            $response = $this->client->getNotifica($params);
+            $this->logDebug('getNotifica', ['fileName' => $baseName]);
+            return $response->return ?? null;
+        } catch (Exception $e) {
+            $this->logDebug('getNotifica', ['fileName' => $baseName], null, $e);
+            throw $e;
+        }
+    }
+
     public function riceviFatture(string $dal, string $al)
     {
 

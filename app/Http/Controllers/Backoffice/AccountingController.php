@@ -111,11 +111,29 @@ class AccountingController extends BaseController
                     $resendBtn = '';
                     if (in_array($item->status, ['error', 'pending'])) {
                         $title = !empty($item->xml_content) ? 'Re-invia' : 'Rigenera XML e invia';
-                        $resendBtn = '<button class="btn btn-xs btn-warning btn-resend-invoice" data-id="' . $item->id . '" title="' . $title . '"><i class="fa fa-paper-plane"></i></button>';
+                        $resendBtn = '<button class="btn btn-xs btn-warning btn-resend-invoice" data-id="' . $item->id . '" title="' . $title . '"><i class="fa fa-paper-plane"></i></button> ';
                     }
-                    return $xmlBtn . $logBtn . $resendBtn;
+                    $sdiBtn = '';
+                    if ($item->status === 'sent' && !empty($item->invoice_name)) {
+                        $sdiBtn = '<button class="btn btn-xs btn-primary btn-refresh-sdi" data-id="' . $item->id . '" title="Aggiorna esito SDI"><i class="fa fa-sync"></i></button>';
+                    }
+                    return $xmlBtn . $logBtn . $resendBtn . $sdiBtn;
                 })
-                ->rawColumns(['code', 'status_badge', 'mysond_desc', 'action'])
+                ->addColumn('sdi_status_label_fmt', function ($item) {
+                    if ($item->sdi_status === null) {
+                        return '—';
+                    }
+                    $label = e($item->sdi_status_label ?? ('Stato ' . $item->sdi_status));
+                    $class = match (true) {
+                        in_array($item->sdi_status, [7, 9]) => 'label-success',
+                        in_array($item->sdi_status, [1, 6, 10]) => 'label-danger',
+                        in_array($item->sdi_status, [8, 11, 12]) => 'label-warning',
+                        default => 'label-default',
+                    };
+                    $when = $item->sdi_checked_at ? ' <small class="text-muted">' . $item->sdi_checked_at->format('d/m H:i') . '</small>' : '';
+                    return '<span class="label ' . $class . '">' . $label . '</span>' . $when;
+                })
+                ->rawColumns(['code', 'status_badge', 'mysond_desc', 'sdi_status_label_fmt', 'action'])
                 ->make(true);
         } catch (Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -248,6 +266,67 @@ class AccountingController extends BaseController
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('backoffice.accounting.invoices.pdf', $data)
             ->setPaper('a4', 'portrait')
             ->stream($filename);
+    }
+
+    /**
+     * Aggiorna lo stato SDI di una fattura interrogando MySond (getNotifica).
+     */
+    public function refreshSdi(TableOrderInvoice $invoice): JsonResponse
+    {
+        if (empty($invoice->invoice_name)) {
+            return $this->error(['message' => 'invoice_name mancante — impossibile interrogare MySond.']);
+        }
+
+        $vatDigits = \App\Helpers\VatHelper::sanitize(\App\Facades\Utils::setting('company_vat_number'));
+        $fileName  = 'IT' . $vatDigits . '_' . $invoice->invoice_name;
+
+        try {
+            $notifica = app(MysondFatturaService::class)->getNotifica($fileName);
+        } catch (\Throwable $e) {
+            Log::error('refreshSdi error', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+            return $this->error(['message' => 'Errore interrogazione MySond: ' . $e->getMessage()]);
+        }
+
+        if ($notifica === null) {
+            return $this->error(['message' => 'Nessuna notifica disponibile.']);
+        }
+
+        // I campi esatti dell'oggetto Notifica non sono documentati ma osservati
+        // comunemente: `tipo`/`tipoNotifica` (RC/NS/MC/...), `stato`/`esito` numerico,
+        // `descrizione`, `data`/`dataNotifica`. Estraiamo difensivamente.
+        $code = null;
+        foreach (['stato', 'esito', 'codice', 'codiceEsito'] as $k) {
+            if (isset($notifica->{$k}) && is_numeric($notifica->{$k})) {
+                $code = (int) $notifica->{$k};
+                break;
+            }
+        }
+        $descrizione = $notifica->descrizione ?? ($notifica->messaggio ?? null);
+        $tipo        = $notifica->tipo ?? ($notifica->tipoNotifica ?? null);
+
+        $label = TableOrderInvoice::sdiStatusLabel($code);
+        if (!$label && $tipo) {
+            $label = (string) $tipo;
+        }
+
+        $invoice->update([
+            'sdi_status'       => $code,
+            'sdi_status_label' => $label,
+            'sdi_checked_at'   => now(),
+            'sdi_response'     => json_encode([
+                'tipo'        => $tipo,
+                'stato'       => $code,
+                'descrizione' => $descrizione,
+                'raw'         => json_decode(json_encode($notifica), true),
+                'at'          => now()->toIso8601String(),
+            ]),
+        ]);
+
+        return $this->success([
+            'message' => 'Esito SDI aggiornato: ' . ($label ?? 'sconosciuto'),
+            'status'  => $code,
+            'label'   => $label,
+        ]);
     }
 
     public function resend(TableOrderInvoice $invoice): JsonResponse

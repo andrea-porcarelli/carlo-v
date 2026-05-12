@@ -51,6 +51,7 @@
                                         <th class="all">Cliente</th>
                                         <th class="all">Importo</th>
                                         <th class="all">Stato</th>
+                                        <th class="all">Esito SDI</th>
                                         <th class="all">Creata</th>
                                         <th class="all">Inviata</th>
                                         <th class="all">Risposta MySond</th>
@@ -105,11 +106,12 @@
                 $(document).trigger('datatable', [{
                     url: '{{ route('accounting.invoices.datatable') }}',
                     columns: [
-                        {data: 'action', orderable: false, searchable: false, width: '90px'},
+                        {data: 'action', orderable: false, searchable: false, width: '110px'},
                         {data: 'code'},
                         {data: 'customer_name'},
                         {data: 'amount_fmt', class: 'text-end'},
                         {data: 'status_badge', class: 'text-center'},
+                        {data: 'sdi_status_label_fmt', class: 'text-center'},
                         {data: 'created_fmt'},
                         {data: 'sent_fmt'},
                         {data: 'mysond_desc'},
@@ -227,6 +229,31 @@
                     error: function (xhr) {
                         const r = xhr.responseJSON || {};
                         App.sweet(r.message || 'Errore', 'Errore');
+                    }
+                });
+            });
+
+            $(document).on('click', '.btn-refresh-sdi', function () {
+                const id  = $(this).data('id');
+                const $btn = $(this);
+                const $icon = $btn.find('i');
+                $btn.prop('disabled', true);
+                $icon.addClass('fa-spin');
+                $.ajax({
+                    url: '/backoffice/accounting/invoices/' + id + '/refresh-sdi',
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    success: function (data) {
+                        App.sweet(data.message || 'Esito SDI aggiornato.', 'Operazione effettuata');
+                        $('.datatable_table').DataTable().ajax.reload(null, false);
+                    },
+                    error: function (xhr) {
+                        const r = xhr.responseJSON || {};
+                        App.sweet(r.message || 'Errore', 'Errore');
+                    },
+                    complete: function () {
+                        $btn.prop('disabled', false);
+                        $icon.removeClass('fa-spin');
                     }
                 });
             });

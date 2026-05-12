@@ -36,17 +36,49 @@ class TableOrderInvoice extends Model
         'xml_path',
         'xml_content',
         'mysond_response',
+        'sdi_status',
+        'sdi_status_label',
+        'sdi_checked_at',
+        'sdi_response',
         'status',
         'sent_at',
     ];
 
     protected $casts = [
-        'amount'   => 'decimal:2',
-        'discount' => 'decimal:2',
-        'tax'      => 'decimal:2',
-        'lines'    => 'array',
-        'sent_at'  => 'datetime',
+        'amount'         => 'decimal:2',
+        'discount'       => 'decimal:2',
+        'tax'            => 'decimal:2',
+        'lines'          => 'array',
+        'sent_at'        => 'datetime',
+        'sdi_checked_at' => 'datetime',
+        'sdi_status'     => 'integer',
     ];
+
+    /**
+     * Mapping dei codici di stato notifica SDI restituiti da MySond/ePortale (§1.3).
+     * Vedi https://guide.eportale.eu/webservice/ — sezione codici notifica.
+     */
+    public const SDI_STATUS_LABELS = [
+        -1 => 'In attesa invio SDI',
+        0  => 'Presa in carico',
+        1  => 'Rifiutata',
+        6  => 'Scartata',
+        7  => 'Consegnata',
+        8  => 'Mancata consegna',
+        9  => 'Accettata (PA)',
+        10 => 'Rifiutata (PA)',
+        11 => 'Decorrenza termini',
+        12 => 'Attestazione trasmissione impossibile',
+        20 => 'Notifica esito',
+    ];
+
+    public static function sdiStatusLabel(?int $code): ?string
+    {
+        if ($code === null) {
+            return null;
+        }
+        return self::SDI_STATUS_LABELS[$code] ?? ('Stato ' . $code);
+    }
 
     public function tableOrder(): BelongsTo
     {
