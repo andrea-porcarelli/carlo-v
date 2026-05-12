@@ -245,9 +245,13 @@ class AccountingController extends BaseController
 
     public function resend(TableOrderInvoice $invoice): JsonResponse
     {
-        // Se manca l'XML (es. precedente errore in fase di generazione),
-        // proviamo a rigenerarlo ora prima di rimettere la fattura in coda.
-        if (empty($invoice->xml_content)) {
+        // Rigeneriamo l'XML se manca dal DB, se non abbiamo un path,
+        // oppure se il file fisico non esiste più in storage.
+        $needsRegeneration = empty($invoice->xml_content)
+            || empty($invoice->xml_path)
+            || !is_file($invoice->xml_path);
+
+        if ($needsRegeneration) {
             $invoice->loadMissing('customer');
             if (!$invoice->customer) {
                 return $this->error(['message' => 'Cliente associato non trovato — impossibile rigenerare XML.']);
