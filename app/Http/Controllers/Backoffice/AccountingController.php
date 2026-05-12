@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Backoffice;
 use App\Jobs\SendInvoiceToMysondJob;
 use App\Models\Customer;
 use App\Models\TableOrderInvoice;
+use App\Services\MysondFatturaService;
 use App\Traits\DatatableTrait;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class AccountingController extends BaseController
@@ -102,8 +104,9 @@ class AccountingController extends BaseController
                         $xmlBtn = '<a href="' . route('accounting.invoices.xml', $item->id) . '" target="_blank" class="btn btn-xs btn-info" title="XML"><i class="fa fa-file-code"></i></a> ';
                     }
                     $resendBtn = '';
-                    if (in_array($item->status, ['error', 'pending']) && !empty($item->xml_content)) {
-                        $resendBtn = '<button class="btn btn-xs btn-warning btn-resend-invoice" data-id="' . $item->id . '" title="Re-invia"><i class="fa fa-paper-plane"></i></button>';
+                    if (in_array($item->status, ['error', 'pending'])) {
+                        $title = !empty($item->xml_content) ? 'Re-invia' : 'Rigenera XML e invia';
+                        $resendBtn = '<button class="btn btn-xs btn-warning btn-resend-invoice" data-id="' . $item->id . '" title="' . $title . '"><i class="fa fa-paper-plane"></i></button>';
                     }
                     return $xmlBtn . $resendBtn;
                 })
@@ -126,11 +129,53 @@ class AccountingController extends BaseController
 
     public function resend(TableOrderInvoice $invoice): JsonResponse
     {
+        // Se manca l'XML (es. precedente errore in fase di generazione),
+        // proviamo a rigenerarlo ora prima di rimettere la fattura in coda.
         if (empty($invoice->xml_content)) {
-            return $this->error(['message' => 'XML non disponibile — impossibile re-inviare.']);
+            $invoice->loadMissing('customer');
+            if (!$invoice->customer) {
+                return $this->error(['message' => 'Cliente associato non trovato — impossibile rigenerare XML.']);
+            }
+
+            try {
+                $xmlResult = app(MysondFatturaService::class)->createInvoice($invoice);
+            } catch (\Throwable $e) {
+                Log::error('Resend invoice XML regeneration error', [
+                    'invoice_id' => $invoice->id,
+                    'error'      => $e->getMessage(),
+                ]);
+                $invoice->update([
+                    'status'          => 'error',
+                    'mysond_response' => json_encode([
+                        'response' => 'error',
+                        'message'  => $e->getMessage(),
+                    ]),
+                ]);
+                return $this->error(['message' => 'Errore rigenerazione XML: ' . $e->getMessage()]);
+            }
+
+            $responsePayload = is_array($xmlResult) ? json_encode($xmlResult) : (string) $xmlResult;
+
+            if (($xmlResult['response'] ?? '') !== 'success') {
+                $invoice->update([
+                    'status'          => 'error',
+                    'mysond_response' => $responsePayload,
+                ]);
+                return $this->error([
+                    'message' => 'Errore rigenerazione XML: ' . ($xmlResult['message'] ?? 'sconosciuto'),
+                ]);
+            }
+
+            $invoice->update([
+                'status'          => 'pending',
+                'xml_path'        => $xmlResult['path'] ?? null,
+                'xml_content'     => $xmlResult['content'] ?? null,
+                'mysond_response' => $responsePayload,
+            ]);
+        } else {
+            $invoice->update(['status' => 'pending']);
         }
 
-        $invoice->update(['status' => 'pending']);
         SendInvoiceToMysondJob::dispatch($invoice->id);
 
         return $this->success(['message' => 'Fattura re-accodata per invio.']);
