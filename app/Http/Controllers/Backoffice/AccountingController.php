@@ -130,8 +130,10 @@ class AccountingController extends BaseController
                         in_array($item->sdi_status, [8, 11, 12]) => 'label-warning',
                         default => 'label-default',
                     };
-                    $when = $item->sdi_checked_at ? ' <small class="text-muted">' . $item->sdi_checked_at->format('d/m H:i') . '</small>' : '';
-                    return '<span class="label ' . $class . '">' . $label . '</span>' . $when;
+                    $when = $item->sdi_checked_at
+                        ? '<div class="text-muted" style="font-size:11px; white-space:nowrap; margin-top:3px;">' . $item->sdi_checked_at->format('d/m/Y H:i') . '</div>'
+                        : '';
+                    return '<div style="white-space:nowrap;"><span class="label ' . $class . '">' . $label . '</span></div>' . $when;
                 })
                 ->rawColumns(['code', 'status_badge', 'mysond_desc', 'sdi_status_label_fmt', 'action'])
                 ->make(true);
@@ -270,6 +272,7 @@ class AccountingController extends BaseController
 
     /**
      * Aggiorna lo stato SDI di una fattura interrogando MySond (getNotifica).
+     * Il tentativo viene tracciato in invoice_mysond_logs come l'importFeAttivo.
      */
     public function refreshSdi(TableOrderInvoice $invoice): JsonResponse
     {
@@ -280,14 +283,47 @@ class AccountingController extends BaseController
         $vatDigits = \App\Helpers\VatHelper::sanitize(\App\Facades\Utils::setting('company_vat_number'));
         $fileName  = 'IT' . $vatDigits . '_' . $invoice->invoice_name;
 
+        $service   = app(MysondFatturaService::class);
+        $startedAt = microtime(true);
+        $notifica  = null;
+        $exception = null;
+
         try {
-            $notifica = app(MysondFatturaService::class)->getNotifica($fileName);
+            $notifica = $service->getNotifica($fileName);
         } catch (\Throwable $e) {
+            $exception = $e;
             Log::error('refreshSdi error', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
-            return $this->error(['message' => 'Errore interrogazione MySond: ' . $e->getMessage()]);
+        }
+
+        $durationMs  = (int) round((microtime(true) - $startedAt) * 1000);
+        $requestXml  = $service->getLastRequestXml();
+        $responseXml = $service->getLastResponseXml();
+
+        if ($exception !== null) {
+            InvoiceMysondLog::create([
+                'table_order_invoice_id' => $invoice->id,
+                'operation'              => 'getNotifica',
+                'outcome'                => InvoiceMysondLog::OUTCOME_EXCEPTION,
+                'request_xml'            => $requestXml,
+                'response_xml'           => $responseXml,
+                'exception_class'        => get_class($exception),
+                'exception_message'      => $exception->getMessage(),
+                'exception_trace'        => $exception->getTraceAsString(),
+                'duration_ms'            => $durationMs,
+            ]);
+            return $this->error(['message' => 'Errore interrogazione MySond: ' . $exception->getMessage()]);
         }
 
         if ($notifica === null) {
+            InvoiceMysondLog::create([
+                'table_order_invoice_id' => $invoice->id,
+                'operation'              => 'getNotifica',
+                'outcome'                => InvoiceMysondLog::OUTCOME_ERROR,
+                'descrizione'            => 'Nessuna notifica disponibile per ' . $fileName,
+                'request_xml'            => $requestXml,
+                'response_xml'           => $responseXml,
+                'duration_ms'            => $durationMs,
+            ]);
             return $this->error(['message' => 'Nessuna notifica disponibile.']);
         }
 
@@ -320,6 +356,18 @@ class AccountingController extends BaseController
                 'raw'         => json_decode(json_encode($notifica), true),
                 'at'          => now()->toIso8601String(),
             ]),
+        ]);
+
+        InvoiceMysondLog::create([
+            'table_order_invoice_id' => $invoice->id,
+            'operation'              => 'getNotifica',
+            'outcome'                => InvoiceMysondLog::OUTCOME_SUCCESS,
+            'esito'                  => $code,
+            'codice'                 => $tipo ? (string) $tipo : null,
+            'descrizione'            => $descrizione ?: $label,
+            'request_xml'            => $requestXml,
+            'response_xml'           => $responseXml,
+            'duration_ms'            => $durationMs,
         ]);
 
         return $this->success([
