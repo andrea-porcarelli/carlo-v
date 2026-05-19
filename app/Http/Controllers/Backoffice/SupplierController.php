@@ -92,7 +92,6 @@ class SupplierController extends BaseController
                         'invoice_date' => $best->invoice->invoice_date?->format('d/m/Y'),
                         'price_per_unit' => $best->price_per_unit,
                     ],
-                    'purchases' => $allPurchases->values(),
                     'best_price' => $minPrice,
                 ];
             })
@@ -100,9 +99,48 @@ class SupplierController extends BaseController
                 ->sortBy(fn($r) => $r['material']->label)
                 ->values();
 
+            return view('backoffice.suppliers.product-comparison', compact('rows'));
+        } catch (Exception $e) {
+            dd($e);
+            return $this->exception($e);
+        }
+    }
+
+    public function productComparisonDetail(int $material): View
+    {
+        try {
+            $materialModel = Material::findOrFail($material);
+
+            $productNames = MappingProduct::where('material_id', $material)
+                ->whereNotNull('material_id')
+                ->pluck('product_name');
+
+            $allPurchases = SupplierInvoiceProduct::whereIn('product_name', $productNames)
+                ->whereHas('invoice', fn($q) => $q->whereNull('ignored_at'))
+                ->with(['invoice.supplier'])
+                ->orderBy('id')
+                ->get()
+                ->map(function ($p) {
+                    $p->price_per_unit = ($p->quantity_multiplier > 0)
+                        ? round($p->price / $p->quantity_multiplier, 4)
+                        : null;
+                    return $p;
+                });
+
+            $statPrices = $allPurchases
+                ->where('ignore_mapping', 0)
+                ->where('quantity_multiplier', '>', 0)
+                ->pluck('price_per_unit');
+            $minPrice = $statPrices->isEmpty() ? 0 : $statPrices->min();
+
             $materials = Material::orderBy('label')->get(['id', 'label']);
 
-            return view('backoffice.suppliers.product-comparison', compact('rows', 'materials'));
+            return view('backoffice.suppliers._product-comparison-detail', [
+                'material' => $materialModel,
+                'allPurchases' => $allPurchases->values(),
+                'minPrice' => $minPrice,
+                'materials' => $materials,
+            ]);
         } catch (Exception $e) {
             dd($e);
             return $this->exception($e);

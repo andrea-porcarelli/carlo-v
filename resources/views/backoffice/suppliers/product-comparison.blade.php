@@ -103,130 +103,10 @@
                                     </td>
                                 </tr>
 
-                                {{-- Riga espandibile con storico acquisti e editing inline --}}
+                                {{-- Riga espandibile: il dettaglio viene caricato via AJAX al primo click su "espandi" --}}
                                 <tr class="detail-row detail-row-{{ $row['material']->id }}" style="display:none;">
                                     <td colspan="9" style="padding:0; background:#f9f9f9;">
-                                        <div style="padding:8px 8px 8px 40px;">
-                                            <div class="table-responsive">
-                                            <table class="table table-condensed table-detail" style="margin:0; border:none; background:transparent;">
-                                                <thead style="background:#eef2f7;">
-                                                    <tr>
-                                                        <th style="width:60px;">#ID</th>
-                                                        <th>Nome prodotto</th>
-                                                        <th>Fornitore</th>
-                                                        <th style="width:90px;">Fattura</th>
-                                                        <th class="text-center" style="width:80px;">Data</th>
-                                                        <th class="text-right" style="width:90px;">Prezzo</th>
-                                                        <th class="text-right" style="width:70px;">Qtà</th>
-                                                        <th style="width:160px;">Moltiplicatore</th>
-                                                        <th class="text-right" style="width:110px;">Prezzo/u.b.</th>
-                                                        <th class="text-right" style="width:80px;">Δ min</th>
-                                                        <th style="width:200px;">Materiale</th>
-                                                        <th class="text-center" style="width:60px;">Ignora</th>
-                                                        <th style="width:70px;"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach($row['purchases'] as $purchase)
-                                                    @php
-                                                        $isIgnored = (bool) $purchase->ignore_mapping;
-                                                        $isBest = !$isIgnored && $purchase->price_per_unit == $row['min_price'];
-                                                        $delta = (!$isIgnored && $row['min_price'] > 0 && $purchase->price_per_unit !== null)
-                                                            ? round(($purchase->price_per_unit - $row['min_price']) / $row['min_price'] * 100, 1)
-                                                            : null;
-                                                        $purchaseAlert = $delta !== null && $delta > 20;
-                                                    @endphp
-                                                    <tr class="purchase-row {{ $isBest ? 'best-purchase-row' : '' }} {{ $isIgnored ? 'ignored-row' : '' }} {{ $purchaseAlert ? 'purchase-alert-row' : '' }}"
-                                                        data-id="{{ $purchase->id }}">
-                                                        <td>
-                                                            <code class="text-muted" style="font-size:11px;">#{{ $purchase->id }}</code>
-                                                        </td>
-                                                        <td>
-                                                            <span class="product-name-badge">{{ $purchase->product_name }}</span>
-                                                        </td>
-                                                        <td>
-                                                            @if($isBest)<i class="fa fa-trophy text-success"></i>@endif
-                                                            {{ $purchase->invoice->supplier->company_name ?? '—' }}
-                                                        </td>
-                                                        <td>
-
-                                                            <small>{{ $purchase->invoice->invoice_number }}</small><br />
-                                                            <a href="{{ route('invoices.pdf', $purchase->invoice->id) }}" target="_blank" title="Apri PDF fattura">
-                                                                <button class="btn btn-xs btn-danger">
-                                                                    Apri fattura
-                                                                </button>
-                                                            </a>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <small>{{ $purchase->invoice->invoice_date?->format('d/m/Y') }}</small>
-                                                        </td>
-                                                        <td class="text-right">
-                                                            € {{ number_format($purchase->price, 2, ',', '.') }}
-                                                        </td>
-                                                        <td>
-                                                            <input type="number"
-                                                                   class="form-control input-sm quantity-input"
-                                                                   value="{{ $purchase->quantity }}"
-                                                                   step="0.001" min="0.001"
-                                                                   style="width:80px;">
-                                                        </td>
-                                                        <td>
-                                                            <input type="number"
-                                                                   class="form-control input-sm multiplier-input"
-                                                                   value="{{ $purchase->quantity_multiplier }}"
-                                                                   step="0.0001" min="0.0001"
-                                                                   style="width:110px; display:inline-block;">
-                                                        </td>
-                                                        <td class="text-right price-per-unit-cell">
-                                                            @if($purchase->price_per_unit !== null)
-                                                                <strong class="{{ $isBest ? 'text-success' : '' }}">
-                                                                    € {{ number_format($purchase->price_per_unit, 4, ',', '.') }}
-                                                                </strong>
-                                                                <small>/{{ $row['material']->stock_type }}</small>
-                                                            @else
-                                                                <span class="text-muted">—</span>
-                                                            @endif
-                                                        </td>
-                                                        <td class="text-right">
-                                                            @if($isIgnored)
-                                                                <span class="text-muted">ignorato</span>
-                                                            @elseif($delta === null)
-                                                                <span class="text-muted">—</span>
-                                                            @elseif($delta == 0)
-                                                                <span class="text-success"><i class="fa fa-check"></i></span>
-                                                            @else
-                                                                <span class="{{ $purchaseAlert ? 'text-danger' : 'text-warning' }}">
-                                                                    @if($purchaseAlert)<i class="fa fa-exclamation-triangle"></i>@endif
-                                                                    +{{ number_format($delta, 1, ',', '.') }}%
-                                                                </span>
-                                                            @endif
-                                                        </td>
-                                                        <td>
-                                                            <select class="form-control input-sm material-select" style="min-width:180px;">
-                                                                @foreach($materials as $mat)
-                                                                    <option value="{{ $mat->id }}"
-                                                                        {{ $mat->id == $row['material']->id ? 'selected' : '' }}>
-                                                                        #{{ $mat->id }} {{ $mat->label }}
-                                                                    </option>
-                                                                @endforeach
-                                                            </select>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <input type="checkbox"
-                                                                   class="ignore-checkbox"
-                                                                   {{ $isIgnored ? 'checked' : '' }}>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <button class="btn btn-xs btn-primary btn-save-row" title="Salva">
-                                                                <i class="fa fa-save"></i>
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                            </div>
-                                        </div>
+                                        <div class="detail-content" data-loaded="0"></div>
                                     </td>
                                 </tr>
                                 @endforeach
@@ -266,21 +146,37 @@
 @section('custom-script')
     <script>
         var updateUrl = '{{ rtrim(route('suppliers.invoice-products.update', ['id' => 0]), '0') }}';
+        var detailUrlTpl = '{{ route('suppliers.product-comparison.detail', ['material' => '__ID__']) }}';
 
-        // Espandi / chiudi dettaglio + inizializza select2
+        // Espandi / chiudi dettaglio (lazy-load al primo click) + inizializza select2
         $(document).on('click', '.btn-expand-row', function () {
             var id = $(this).data('id');
             var $detail = $('.detail-row-' + id);
+            var $content = $detail.find('.detail-content');
             var visible = $detail.is(':visible');
             $detail.toggle(!visible);
             $(this).toggleClass('expanded', !visible);
-            if (!visible) {
-                $detail.find('.material-select').each(function () {
-                    if (!$(this).hasClass('select2-hidden-accessible')) {
-                        $(this).select2({ width: '220px', dropdownAutoWidth: true });
-                    }
-                });
+
+            if (visible) return;
+
+            if ($content.data('loaded') == 1) {
+                return;
             }
+
+            $content.html('<div style="padding:16px;"><i class="fa fa-spinner fa-spin"></i> Caricamento...</div>');
+            $.get(detailUrlTpl.replace('__ID__', id))
+                .done(function (html) {
+                    $content.html(html);
+                    $content.data('loaded', 1);
+                    $content.find('.material-select').each(function () {
+                        if (!$(this).hasClass('select2-hidden-accessible')) {
+                            $(this).select2({ width: '220px', dropdownAutoWidth: true });
+                        }
+                    });
+                })
+                .fail(function () {
+                    $content.html('<div class="alert alert-danger" style="margin:8px;">Errore nel caricamento del dettaglio.</div>');
+                });
         });
 
         // Filtro per nome materiale

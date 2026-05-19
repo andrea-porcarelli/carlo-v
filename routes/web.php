@@ -149,6 +149,7 @@ Route::group(['prefix' => '/backoffice'], function() {
         Route::group(['prefix' => '/suppliers'], function() {
             Route::get('/datatable', [SupplierController::class, 'datatable'])->name('suppliers.datatable');
             Route::get('/product-comparison', [SupplierController::class, 'productComparison'])->name('suppliers.product-comparison');
+            Route::get('/product-comparison/material/{material}/detail', [SupplierController::class, 'productComparisonDetail'])->name('suppliers.product-comparison.detail');
             Route::put('/invoice-products/{id}', [SupplierController::class, 'updateInvoiceProduct'])->name('suppliers.invoice-products.update');
         });
 
