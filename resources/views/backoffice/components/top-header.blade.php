@@ -1,15 +1,16 @@
 @php
+    $adeEnabled     = filter_var(\App\Models\Setting::get('agenzia_entrate.enabled', true), FILTER_VALIDATE_BOOLEAN);
     $adeStatus      = \App\Models\Setting::get('agenzia_entrate.check_last_status', null);
     $adeDesc        = \App\Models\Setting::get('agenzia_entrate.check_last_descrizione', '');
     $adeCodice      = \App\Models\Setting::get('agenzia_entrate.check_last_codice', '');
     $adeCheckedAtIso= \App\Models\Setting::get('agenzia_entrate.check_last_at', null);
     $adeCheckedAt   = $adeCheckedAtIso ? \Carbon\Carbon::parse($adeCheckedAtIso)->format('d/m/Y H:i') : 'mai';
-    $adeBannerLabel = match($adeStatus) {
+    $adeBannerLabel = $adeEnabled ? match($adeStatus) {
         'warning' => 'Pacchetto MySond non attivo',
         'error'   => 'Credenziali Agenzia Entrate: verifica fallita',
         null      => 'Credenziali Agenzia Entrate: nessun controllo eseguito',
         default   => null,
-    };
+    } : null;
 @endphp
 <div class="row border-bottom">
     <nav class="navbar navbar-static-top" role="navigation" style="margin-bottom: 0">
