@@ -31,7 +31,7 @@
         ];
         $currentProvider = (string) \App\Models\Setting::get('corrispettivo_provider', 'mysond');
     @endphp
-    <div class="panel panel-default">
+    <div class="panel panel-default" data-ade-password-panel="1">
         <div class="panel-body">
             <a href="{{ route('restaurant.settings.ade-cambio-password') }}" class="btn btn-warning">
                 <i class="fas fa-key"></i> Cambio password Agenzia Entrate
@@ -192,6 +192,7 @@
                                             form="update-or-create-element"
                                             value="1"
                                             {{ filter_var($setting->value, FILTER_VALIDATE_BOOLEAN) ? 'checked' : '' }}
+                                            @if($setting->key === 'agenzia_entrate.enabled') data-ade-enabled-toggle="1" @endif
                                         >
                                         <label for="{{ $setting->key }}"></label>
                                     </div>
@@ -248,6 +249,25 @@
                     });
                 };
                 cpSelect.addEventListener('change', sync);
+                sync();
+            }
+
+            const adeToggle = document.querySelector('[data-ade-enabled-toggle]');
+            if (adeToggle) {
+                const toggleName = adeToggle.getAttribute('name');
+                const adeFields = document.querySelectorAll('[name^="agenzia_entrate."], [name^="agenzia_entrate_"]');
+                const adePasswordPanel = document.querySelector('[data-ade-password-panel]');
+                const sync = () => {
+                    const visible = adeToggle.checked;
+                    adeFields.forEach(field => {
+                        if (field === adeToggle) return;
+                        if (field.getAttribute('name') === toggleName) return;
+                        const wrapper = field.closest('.col-xs-12');
+                        if (wrapper) wrapper.style.display = visible ? '' : 'none';
+                    });
+                    if (adePasswordPanel) adePasswordPanel.style.display = visible ? '' : 'none';
+                };
+                adeToggle.addEventListener('change', sync);
                 sync();
             }
         })();
