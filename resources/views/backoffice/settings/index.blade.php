@@ -21,6 +21,15 @@
             ['id' => 'none',    'label' => 'Scollegato'],
             ['id' => 'printer', 'label' => 'Stampante (ESC/POS)'],
         ];
+        $corrispettivoProviderOptions = [
+            ['id' => 'mysond', 'label' => 'Mysond (SOAP/SdI)'],
+            ['id' => 'ditron', 'label' => 'Ditron (agent + cassa RT)'],
+        ];
+        $providerBlocks = [
+            'Configurazione Mysond' => 'mysond',
+            'Configurazione Ditron' => 'ditron',
+        ];
+        $currentProvider = (string) \App\Models\Setting::get('corrispettivo_provider', 'mysond');
     @endphp
     <div class="panel panel-default">
         <div class="panel-body">
@@ -31,7 +40,13 @@
     </div>
     <form class="needs-validation update-or-create-element" id="update-or-create-element">
         @foreach($grouped as $groupName => $settings)
-            <div class="panel panel-default">
+            @php
+                $providerBlock = $providerBlocks[$groupName] ?? null;
+                $hiddenByProvider = $providerBlock && $providerBlock !== $currentProvider;
+            @endphp
+            <div class="panel panel-default"
+                @if($providerBlock) data-corrispettivo-provider-block="{{ $providerBlock }}" @endif
+                @if($hiddenByProvider) style="display:none" @endif>
                 <div class="panel-heading">
                     <h4 class="panel-title">
                         <i class="fas {{ $groupIcons[$groupName] ?? 'fa-cog' }}"></i> {{ $groupName }}
@@ -102,6 +117,33 @@
                                         'hide_first' => true,
                                     ])
                                     <small class="text-muted">{{ $setting->key }}</small>
+                                </div>
+                            @elseif($setting->key === 'corrispettivo_provider')
+                                <div class="col-xs-12 col-sm-4 m-t-sm">
+                                    <label>{{ $setting->description ?? $setting->key }}</label>
+                                    @include('backoffice.components.form.select', [
+                                        'field' => true,
+                                        'form' => 'update-or-create-element',
+                                        'name' => $setting->key,
+                                        'options' => $corrispettivoProviderOptions,
+                                        'value' => $setting->value,
+                                        'hide_first' => true,
+                                        'dataset' => ['corrispettivo-provider-select' => '1'],
+                                    ])
+                                    <small class="text-muted">{{ $setting->key }}</small>
+                                </div>
+                            @elseif($setting->key === 'corrispettivo_printer_id')
+                                <div class="col-xs-12 col-sm-4 m-t-sm">
+                                    <label>{{ $setting->description ?? $setting->key }}</label>
+                                    @include('backoffice.components.form.select', [
+                                        'field' => true,
+                                        'form' => 'update-or-create-element',
+                                        'name' => $setting->key,
+                                        'options' => $printers,
+                                        'value' => $setting->value,
+                                    ])
+                                    <small class="text-muted">{{ $setting->key }}</small>
+                                    <div class="invalid-feedback"></div>
                                 </div>
                             @elseif($setting->type === 'decimal')
                                 @include('backoffice.components.form.input', [
@@ -194,6 +236,18 @@
             if (cdSelect && cdBlock) {
                 const sync = () => { cdBlock.style.display = cdSelect.value === 'printer' ? '' : 'none'; };
                 cdSelect.addEventListener('change', sync);
+                sync();
+            }
+
+            const cpSelect = document.querySelector('[data-corrispettivo-provider-select]');
+            const cpBlocks = document.querySelectorAll('[data-corrispettivo-provider-block]');
+            if (cpSelect && cpBlocks.length) {
+                const sync = () => {
+                    cpBlocks.forEach(b => {
+                        b.style.display = b.dataset.corrispettivoProviderBlock === cpSelect.value ? '' : 'none';
+                    });
+                };
+                cpSelect.addEventListener('change', sync);
                 sync();
             }
         })();

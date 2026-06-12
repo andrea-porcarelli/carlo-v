@@ -24,6 +24,9 @@ class SettingController extends BaseController
         'Dati Azienda'          => ['company_vat_number', 'company_name', 'indirizzo_fatturazione', 'cap_fatturazione', 'comune_fatturazione', 'provincia_fatturazione', 'tel_fatturazione', 'email_fatturazione'],
         'Pagamenti & IVA'       => ['iban', 'istituto_finanziario', 'invoice_vat_rate', 'invoice_counter'],
         'Agenzia delle Entrate' => ['agenzia_entrate.username', 'agenzia_entrate.password', 'agenzia_entrate.pincode', 'agenzia_entrate.utenza'],
+        'Scontrini Elettronici' => ['corrispettivo_enabled', 'corrispettivo_provider', 'corrispettivo_aliquota_iva_default', 'corrispettivo_timeout_seconds', 'corrispettivo_max_attempts', 'corrispettivo_printer_id'],
+        'Configurazione Mysond' => ['corrispettivo_mock'],
+        'Configurazione Ditron' => ['ditron_agent_url', 'ditron_agent_token', 'ditron_agent_timeout_seconds', 'ditron_default_reparto', 'ditron_default_tender', 'ditron_cover_label'],
         'Sistema'               => ['deploy_git_user', 'carlov_url'],
     ];
 
@@ -34,6 +37,9 @@ class SettingController extends BaseController
         'Dati Azienda'          => 'fa-building',
         'Pagamenti & IVA'       => 'fa-file-invoice',
         'Agenzia delle Entrate' => 'fa-landmark',
+        'Scontrini Elettronici' => 'fa-receipt',
+        'Configurazione Mysond' => 'fa-cloud',
+        'Configurazione Ditron' => 'fa-network-wired',
         'Sistema'               => 'fa-server',
     ];
 
