@@ -1,0 +1,93 @@
+﻿<div id="inner-box">
+    <!-- fixed header content -->
+    <div id="wrapper" class="content-fixed-header">
+        <!-- filters -->
+        <!--<div class="row box cst-gray">
+            // calendar field
+            <div class="input-field col s12">
+                <i id="datepicker-icon" class="mdi-action-today prefix"></i>
+                <input type="date" class="datepicker" placeholder="filters.calendar">
+            </div>
+        </div>-->
+        <!-- grid header -->
+        <br />
+        <div class="row box">
+            <table id="gridH">
+                <thead>
+                    <tr id="headerH">
+                        <th class="lf" style="width:10%"><input type="checkbox" id="chk_all" onclick="setSelectionAll(this, 'select_group')" class="filled-in" /><label for="chk_all">&nbsp;</label></th>
+                        <th class="lf" style="width:20%"><res>id</res></th>
+                        <th class="lf" style="width:40%"><res>ipAddress</res></th>
+                        <th class="c" style="width:30%"><res>isConnected</res></th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+
+    <!-- page content -->
+    <div id="pullarea">
+        <!-- scales data -->
+        <table id="grid" class="bordered striped tablesorter white">
+            <thead>
+                <tr id="header" token="none" style="display:none;">
+                    <th />
+                    <th />
+                    <th />
+                    <th />
+                </tr>
+            </thead>
+            <tbody id="body"></tbody>
+        </table>
+
+    </div>
+
+    <div class="fixed-action-btn horizontal click-to-toggle">
+        <a class="btn-floating btn-large waves-effect red">
+            <i class="material-icons center">dashboard</i>
+        </a>
+        <ul>
+            <li><button id="restart" class="btn-floating btn waves-effect waves-light green" type="button" name="action"><i class="material-icons center">autorenew</i></button></li>
+            <li><button id="datetimeRenewal" class="btn-floating btn waves-effect waves-light orange" type="button" name="action"><i class="material-icons center">restore</i></button></li>
+        </ul>
+    </div>
+
+    <!-- Modal Structure -->
+    <div id="modal-for-settime" class="modal bottom-sheet">
+        <div class="modal-content">
+
+            <div class="row">
+                <div class="row">
+                    <div class="input-field col s12">
+                        <!--<i class="mdi-cst-mode-edit"></i>-->
+                        <h5><res>ask_datetime</res></h5>
+                        <i><res>ask_datetime_subtitle</res></i>
+                    </div>
+                </div>
+                <br />
+                <div class="row">
+                    <!-- date field -->
+                    <div class="input-field col s12">
+                        <i id="datepicker-icon" class="material-icons prefix">today</i>
+                        <input id="datepicker" type="date" class="datepicker" placeholder="filters.calendar">
+                    </div>
+                </div>
+                <div class="row">
+                    <!-- time field -->
+                    <div class="input-field col s12">
+                        <i class="material-icons prefix">restore</i>
+                        <input id="timepicker" class="timepicker" type="time" placeholder="filters.clock">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <!--<a href="#!" class="btn-floating btn waves-effect waves-light red modal-action modal-close"><i class="mdi-content-clear center"></i></a>-->
+                <!--<a id="setDateTime" href="#!" class="btn-floating btn waves-effect waves-light green modal-action modal-close"><i class="mdi-action-done center"></i></a>-->
+                <a id="setDateTime" class="waves-effect waves-green btn-flat modal-action modal-close">done</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript" src="js/app/page.scales.js"></script>
+    <!-- end javascript -->
+</div>

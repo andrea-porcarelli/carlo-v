@@ -1,0 +1,31 @@
+services:
+  dev:
+    build:
+      context: .
+      target: dev
+    image: ditron-agent-dev
+    container_name: ditron-agent-dev
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./:/app
+      - dev-bin:/app/bin
+      - dev-obj:/app/obj
+      - /tmp/ditron-dev:/tmp/ditron-dev
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:9090
+
+  build:
+    build:
+      context: .
+      target: build
+    image: ditron-agent-build
+    container_name: ditron-agent-build
+    command: ["sh", "-c", "cp -r /out/* /artifact/ && ls -la /artifact/"]
+    volumes:
+      - ./artifact:/artifact
+
+volumes:
+  dev-bin:
+  dev-obj:

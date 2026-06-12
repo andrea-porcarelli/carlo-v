@@ -34,6 +34,11 @@ use App\Repositories\MaterialRepository;
 use App\Interfaces\MenuOptionInterface;
 use App\Repositories\MenuOptionRepository;
 
+use App\Interfaces\ReceiptIssuerInterface;
+use App\Models\Setting;
+use App\Services\DitronReceiptService;
+use App\Services\MysondReceiptIssuerAdapter;
+
 class RepositoryServiceProvider extends ServiceProvider
 {
     /**
@@ -56,6 +61,15 @@ class RepositoryServiceProvider extends ServiceProvider
         $this->app->bind(MediaInterface::class, MediaRepository::class);
         $this->app->bind(MenuOptionInterface::class, MenuOptionRepository::class);
 
+        // Provider scontrini: scelta dinamica via setting `corrispettivo_provider`.
+        // Default: mysond (rollback istantaneo). Switch a ditron senza deploy.
+        $this->app->bind(ReceiptIssuerInterface::class, function ($app) {
+            $provider = (string) Setting::get('corrispettivo_provider', 'mysond');
+            return match ($provider) {
+                'ditron' => $app->make(DitronReceiptService::class),
+                default  => $app->make(MysondReceiptIssuerAdapter::class),
+            };
+        });
     }
 
     /**

@@ -1,0 +1,73 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>DITRON FCR Manager</title>
+
+    <meta charset="utf-8" />
+    <meta name="format-detection" content="telephone=no" />
+    <!--<meta name="msapplication-tap-highlight" content="no" />-->
+    <!--<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *">-->
+    <meta http-equiv="Content-Security-Policy" content="default-src *; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval';">
+    <!-- WARNING: for iOS 7, remove the width=device-width and height=device-height attributes. See https://issues.apache.org/jira/browse/CB-4323 -->
+    <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi" />
+
+    <!-- stylesheets -->
+    <link rel="stylesheet" href="css/global.css" type="text/css" media="screen" />
+    <!-- end stylesheets -->
+    <!-- javascript -->
+    <!-- script type="text/javascript" src="cordova.js"></script-->
+    <script type="text/javascript" src="scripts/platformOverrides.js"></script>
+    <!--<script type="text/javascript" src="scripts/index.js"></script>-->
+    <!-- jQUERY -->
+    <script type="text/javascript" src="js/jquery-3.2.1.min.js"></script>
+    <script type="text/javascript" src="js/jquery-ui-1.11.4.min.js"></script>
+    <script type="text/javascript" src="js/jquery.timer/jquery.plugin.min.js"></script>
+    <script type="text/javascript" src="js/jquery.timer/jquery.timer.min.js"></script>
+    <script type="text/javascript" src="js/materialize.js"></script> <!--  WARNING: no use the minified version because this version has been fixed! -->
+    <script type="text/javascript" src="js/materialize.clockpicker.js"></script>
+    <script type="text/javascript" src="js/jquery.validate.min.js"></script>
+
+    <script type="text/javascript" src="js/jquery.tablesorter.js"></script><!--  WARNING: no use the minified version because this version has been fixed! -->
+    <script type="text/javascript" src="js/numeral.min.js"></script>
+    <!-- INCLUDE -->
+    <script type="text/javascript" src="js/app/include.menu.js"></script>
+    <script type="text/javascript" src="js/app/include.preloader.js"></script>
+    <script type="text/javascript" src="js/app/include.localization.js"></script>
+    <!-- GENERAL FUNCTIONS -->
+    <script type="text/javascript" src="js/app/common.appSettings.js"></script>
+    <script type="text/javascript" src="js/app/common.tables.js"></script>
+    <script type="text/javascript" src="js/app/common.charts.js"></script>
+    <script type="text/javascript" src="js/app/common.picker.js"></script>
+    <script type="text/javascript" src="js/app/common.page.js"></script>
+    <!-- jQUERY: part II -->
+    <script type="text/javascript" src="js/jquery.xpull.js"></script>
+    <!--<script src="js/Chart.min.js"></script>-->
+    <!-- end javascript -->
+</head>
+<body class="authorize">   
+    <!-- javascript -->
+    <script type="text/javascript" src="js/app/include.authentication.js"></script>
+    <!--<script type="text/javascript" src="js/app/include.push.js"></script>-->
+    <!-- end javascript -->
+    <div id="menu"></div>
+
+    <div id="success">
+        <div id="inner-box">
+            <div class="app" style="height:290px;">
+                <!-- form -->
+                <!-- full response -->
+                <div id="wrapper">
+                    <!--<img src="img/lome.svg" height="30em" />-->
+                    <h4>Fiscal Cash Register Manager</h4>
+                    <br />
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="error" class="hide"></div>
+
+    <!-- javascript -->    
+    <script type="text/javascript" src="js/app/page.index.js"></script>
+    <!-- end javascript -->
+</body>
+</html>

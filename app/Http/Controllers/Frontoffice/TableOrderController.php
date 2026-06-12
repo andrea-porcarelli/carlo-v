@@ -24,8 +24,9 @@ use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Models\TableOrderInvoice;
 use App\Models\User;
-use App\Services\CorrispettivoService;
+use App\Interfaces\ReceiptIssuerInterface;
 use App\Services\MysondFatturaService;
+use App\Support\IssuedReceiptDto;
 use App\Services\RevolutPaymentCloser;
 use App\Services\RevolutTerminalService;
 use App\Services\TableOrderLoggerService;
@@ -38,16 +39,16 @@ class TableOrderController extends Controller
 {
     protected TableOrderLoggerService $logger;
     protected PrinterServiceInterface $printerService;
-    protected CorrispettivoService $corrispettivoService;
+    protected ReceiptIssuerInterface $receiptIssuer;
 
     public function __construct(
         TableOrderLoggerService $logger,
         PrinterServiceInterface $printerService,
-        CorrispettivoService $corrispettivoService,
+        ReceiptIssuerInterface $receiptIssuer,
     ) {
         $this->logger = $logger;
         $this->printerService = $printerService;
-        $this->corrispettivoService = $corrispettivoService;
+        $this->receiptIssuer = $receiptIssuer;
     }
 
     /**
@@ -918,7 +919,7 @@ class TableOrderController extends Controller
             $this->logger->logCashDrawerFailed($order, $operatorId);
 
             $corrispettivoInfo = $this->buildCorrispettivoResponse(
-                $this->corrispettivoService->emettiPerSplit($split, $paymentMethod, $operatorId)
+                $this->receiptIssuer->emettiPerSplit($split, $paymentMethod, $operatorId)
             );
         } else {
             // Pagamento del tavolo intero: comportamento originale.
@@ -928,7 +929,7 @@ class TableOrderController extends Controller
             $this->logger->logCashDrawerFailed($order, $operatorId);
 
             $corrispettivoInfo = $this->buildCorrispettivoResponse(
-                $this->corrispettivoService->emettiPerOrdine($order, $paymentMethod, $operatorId)
+                $this->receiptIssuer->emettiPerOrdine($order, $paymentMethod, $operatorId)
             );
         }
 
@@ -1054,7 +1055,7 @@ class TableOrderController extends Controller
             DB::commit();
 
             $corrispettivoInfo = $this->buildCorrispettivoResponse(
-                $this->corrispettivoService->emettiPerOrdine($order, $paymentMethod, $operatorId)
+                $this->receiptIssuer->emettiPerOrdine($order, $paymentMethod, $operatorId)
             );
 
             return response()->json([
@@ -1078,30 +1079,12 @@ class TableOrderController extends Controller
 
     /**
      * Costruisce il blocco 'corrispettivo' da inserire nella response API.
-     * Ritorna null se il corrispettivo non è stato emesso (metodo escluso o disabilitato).
+     * Accetta un DTO normalizzato indipendente dal provider (mysond/ditron).
+     * Ritorna null se l'emissione è stata saltata (metodo escluso o provider disabilitato).
      */
-    private function buildCorrispettivoResponse(?\App\Models\TableOrderCorrispettivo $corrispettivo): ?array
+    private function buildCorrispettivoResponse(?IssuedReceiptDto $receipt): ?array
     {
-        if (!$corrispettivo) {
-            return null;
-        }
-        $corrispettivo->refresh();
-
-        $warning = null;
-        if ($corrispettivo->status === \App\Models\TableOrderCorrispettivo::STATUS_FAILED) {
-            $warning = 'Scontrino non emesso. Verrà riprovato automaticamente.';
-        } elseif ($corrispettivo->status === \App\Models\TableOrderCorrispettivo::STATUS_PENDING
-            || $corrispettivo->status === \App\Models\TableOrderCorrispettivo::STATUS_SENDING) {
-            $warning = 'Scontrino in elaborazione.';
-        }
-
-        return [
-            'id'                 => $corrispettivo->id,
-            'status'             => $corrispettivo->status,
-            'progressivo_sdi'    => $corrispettivo->progressivo_sdi,
-            'identificativo_sdi' => $corrispettivo->identificativo_sdi,
-            'warning'            => $warning,
-        ];
+        return $receipt?->toResponseArray();
     }
 
     /**
@@ -1889,7 +1872,7 @@ class TableOrderController extends Controller
 
             // Ogni split emette il proprio corrispettivo (se metodo pagamento non è fattura)
             $corrispettivoInfo = $this->buildCorrispettivoResponse(
-                $this->corrispettivoService->emettiPerSplit($split, $paymentMethod, $operatorId)
+                $this->receiptIssuer->emettiPerSplit($split, $paymentMethod, $operatorId)
             );
 
             $splitPaidItems = collect($split->items ?? [])

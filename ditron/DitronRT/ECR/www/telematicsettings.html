@@ -1,0 +1,78 @@
+<div id="inner-box">
+    <!-- fixed header content -->
+    <div id="wrapper" class="content-fixed-header pad25">
+        <div class="scrolling">
+            <br />
+            <br />
+            <div class="row mw480">
+                <!-- form -->
+                <form id="form" class="col s12">
+
+                   
+                    <div class="row">
+                        <div class="input-field col s3">
+                            <label for="hostname" localize>hostname</label>
+                        </div>
+                        <div class="input-field col s9">
+                            <!-- Hostname field -->
+                            <input id="hostname" type="text" name="hostname" maxlength="40" rule-pattern="^\d{0,12}?$" rule-format-message="000000000000" validate />
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="input-field col s3">
+                            <label for="port" localize>port</label>
+                        </div>
+                        <div class="input-field col s9">
+                            <!-- Port number field -->
+                            <input id="port" type="text" name="port" maxlength="40" rule-pattern="^\d{0,12}?$" rule-format-message="000000000000" validate />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="input-field col s3">
+                            <label for="autosend" localize>autosend</label>
+                        </div>
+                        <div class="input-field col s9">
+                            <select id="autosend" name="autosend" class="form-select">
+                                <option value="0">No</option>
+                                <option value="1">Yes</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!--
+                    <div class="row">
+                        <div class="input-field col s12">
+                            <a id="1" class="waves-effect waves-light z-depth-0 btn dispb red darken-1"><i class="material-icons left">tv</i>Customer</a>
+                            <a id="2" class="waves-effect waves-light z-depth-0 btn dispb orange"><i class="material-icons left">tv</i>Customer Ext.</a>
+                            <a id="3" class="waves-effect waves-light z-depth-0 btn dispb lime darken-1"><i class="material-icons left">tv</i>Operator</a>
+                        </div>
+                    </div>
+                    -->
+                    <br>
+                    <br>
+
+                    <!-- keyboard lines -->
+                    <div class="row">
+                        <div id="pulsanti">
+                        <table class="btnT">
+                            <tr>
+                                <td colspan="2"><button id="61" class="btn waves-effect waves-light z-depth-0 savebtn orange" type="button" name="action"><span class="center">Save</span></button></td>
+                            </tr>   
+                            
+                        </table>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <br />
+            <br />
+            <h6 id="signal" style="position:fixed; bottom: 10px; right: 10px;"></h6>
+        </div>        
+    </div>
+
+
+    <!-- javascript -->
+    <script type="text/javascript" src="js/app/page.telematicsettings.js"></script>
+    <!-- end javascript -->
+</div>
