@@ -3084,9 +3084,15 @@ class TableOrdersManager {
         const data = await initialResp.json();
 
         if (data.skipped) {
-            // Integrazione disabilitata: chiudi direttamente come da onComplete (il callback fa /pay)
+            // Integrazione disabilitata: nessun overlay, nessun polling.
+            // Esegui onReady (può chiamare /pay) e poi onComplete come se il cassetto fosse OK.
+            // Se onReady restituisce false (es. errore lato /pay) interrompiamo il flusso.
             const onComp = this._cashDrawerOnComplete;
             this._cashDrawerOnComplete = null;
+            if (onReady) {
+                const proceed = await onReady();
+                if (proceed === false) return;
+            }
             if (onComp) await onComp();
             return;
         }
