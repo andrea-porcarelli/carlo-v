@@ -2298,4 +2298,150 @@ class PrinterService implements PrinterServiceInterface
 
         return $righe;
     }
+
+    /**
+     * Stampa scontrino "PRENOTAZIONE CORSO PAGATO" ricevuto dal sito booking
+     * (Misuraca). Layout esteso: titolo classe, slot, pax, cliente, contatti,
+     * note, totale, reference. Non logga su `print_logs` perché lo schema
+     * richiede un table_order_id (qui non c'è ordine tavolo associato).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function printCookingBooking(Printer $printer, array $data): bool
+    {
+        $printerIp = $printer->ip;
+        $reference = (string) ($data['reference'] ?? '');
+
+        try {
+            if (! $this->isPrinterReachable($printerIp)) {
+                Log::warning('Cooking booking: stampante non raggiungibile', [
+                    'ip' => $printerIp, 'reference' => $reference,
+                ]);
+                return false;
+            }
+
+            $connector = new NetworkPrintConnector($printerIp, 9100, 5);
+            $escpos = new EscposPrinter($connector);
+            $escpos->initialize();
+
+            // Intestazione
+            $escpos->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $escpos->setEmphasis(true);
+            $escpos->setTextSize(2, 2);
+            $escpos->text("PRENOTAZIONE CORSO\n");
+            $escpos->text("PAGATO\n");
+            $escpos->setTextSize(1, 1);
+            $escpos->setEmphasis(false);
+            $escpos->feed(1);
+
+            $escpos->text(str_repeat('-', 48) . "\n");
+
+            // Titolo classe (grande, centrato)
+            $title = trim((string) ($data['class_title'] ?? ''));
+            if ($title !== '') {
+                $escpos->setEmphasis(true);
+                $escpos->setTextSize(2, 1);
+                $escpos->text(wordwrap($title, 24, "\n", true) . "\n");
+                $escpos->setTextSize(1, 1);
+                $escpos->setEmphasis(false);
+                $escpos->feed(1);
+            }
+
+            // Slot data + ora
+            $slotStart = $this->parseSlotDatetime($data['slot_start'] ?? null);
+            $slotEnd = $this->parseSlotDatetime($data['slot_end'] ?? null);
+            if ($slotStart) {
+                $escpos->setEmphasis(true);
+                $escpos->setTextSize(1, 2);
+                $line = ucfirst($slotStart->translatedFormat('D d M Y'));
+                $line .= ' - ' . $slotStart->format('H:i');
+                if ($slotEnd) {
+                    $line .= '/' . $slotEnd->format('H:i');
+                }
+                $escpos->text($line . "\n");
+                $escpos->setTextSize(1, 1);
+                $escpos->setEmphasis(false);
+            }
+
+            $escpos->feed(1);
+            $escpos->setJustification(EscposPrinter::JUSTIFY_LEFT);
+
+            // Pax
+            $escpos->setEmphasis(true);
+            $escpos->text('Pax: ' . (int) ($data['pax'] ?? 0) . "\n");
+            $escpos->setEmphasis(false);
+
+            // Cliente
+            $customer = trim((string) ($data['customer_name'] ?? ''));
+            if ($customer !== '') {
+                $escpos->text($customer . "\n");
+            }
+
+            // Contatti
+            $email = trim((string) ($data['email'] ?? ''));
+            $phone = trim((string) ($data['phone'] ?? ''));
+            $contact = trim(implode(' - ', array_filter([$email, $phone])));
+            if ($contact !== '') {
+                $escpos->text($contact . "\n");
+            }
+
+            // Note
+            $notes = trim((string) ($data['notes'] ?? ''));
+            if ($notes !== '') {
+                $escpos->feed(1);
+                $escpos->setEmphasis(true);
+                $escpos->text("Note:\n");
+                $escpos->setEmphasis(false);
+                $escpos->text(wordwrap($notes, 48, "\n", true) . "\n");
+            }
+
+            // Totale
+            $escpos->feed(1);
+            $escpos->text(str_repeat('-', 48) . "\n");
+            $totalCents = (int) ($data['total_cents'] ?? 0);
+            $currency = strtoupper((string) ($data['currency'] ?? 'EUR'));
+            $escpos->setEmphasis(true);
+            $escpos->setTextSize(1, 2);
+            $escpos->text('Totale: ' . number_format($totalCents / 100, 2, ',', '.') . ' ' . $currency . "\n");
+            $escpos->setTextSize(1, 1);
+            $escpos->setEmphasis(false);
+
+            // Reference (piccola, in fondo)
+            if ($reference !== '') {
+                $escpos->feed(1);
+                $escpos->text('Rif: ' . $reference . "\n");
+            }
+            $escpos->text(now()->format('d/m/Y H:i') . "\n");
+
+            $escpos->feed(3);
+            $escpos->cut();
+            $escpos->close();
+
+            Log::info('Cooking booking: stampa OK', [
+                'reference' => $reference,
+                'printer' => $printer->label,
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Cooking booking: errore stampa', [
+                'reference' => $reference,
+                'printer_ip' => $printerIp,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    private function parseSlotDatetime(mixed $raw): ?\Carbon\Carbon
+    {
+        if (! is_string($raw) || $raw === '') {
+            return null;
+        }
+        try {
+            return \Carbon\Carbon::parse($raw)->locale('it');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
 }

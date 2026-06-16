@@ -131,4 +131,13 @@ interface PrinterServiceInterface
      * Stampa lo scontrino (non fiscale) del corrispettivo elettronico con progressivoSdi.
      */
     public function printCorrispettivoReceipt(\App\Models\TableOrderCorrispettivo $corrispettivo): bool;
+
+    /**
+     * Stampa lo scontrino "PRENOTAZIONE CORSO" generato dalla booking di Misuraca.
+     *
+     * @param  array<string, mixed>  $data Campi attesi: reference, class_title,
+     *                                     slot_start, slot_end, pax, customer_name,
+     *                                     email, phone, notes, total_cents, currency.
+     */
+    public function printCookingBooking(Printer $printer, array $data): bool;
 }
