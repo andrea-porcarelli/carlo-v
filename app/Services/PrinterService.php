@@ -2328,36 +2328,22 @@ class PrinterService implements PrinterServiceInterface
             $escpos->setJustification(EscposPrinter::JUSTIFY_CENTER);
             $escpos->setEmphasis(true);
             $escpos->setTextSize(2, 2);
-            $escpos->text("PRENOTAZIONE CORSO\n");
-            $escpos->text("PAGATO\n");
+            $escpos->text("COOKING CLASS\n");
             $escpos->setTextSize(1, 1);
             $escpos->setEmphasis(false);
             $escpos->feed(1);
 
-            $escpos->text(str_repeat('-', 48) . "\n");
-
-            // Titolo classe (grande, centrato)
-            $title = trim((string) ($data['class_title'] ?? ''));
-            if ($title !== '') {
-                $escpos->setEmphasis(true);
-                $escpos->setTextSize(2, 1);
-                $escpos->text(wordwrap($title, 24, "\n", true) . "\n");
-                $escpos->setTextSize(1, 1);
-                $escpos->setEmphasis(false);
-                $escpos->feed(1);
-            }
+            $escpos->text(str_repeat('-', 40) . "\n");
+            $escpos->feed(1);
 
             // Slot data + ora
             $slotStart = $this->parseSlotDatetime($data['slot_start'] ?? null);
-            $slotEnd = $this->parseSlotDatetime($data['slot_end'] ?? null);
             if ($slotStart) {
                 $escpos->setEmphasis(true);
                 $escpos->setTextSize(1, 2);
                 $line = ucfirst($slotStart->translatedFormat('D d M Y'));
                 $line .= ' - ' . $slotStart->format('H:i');
-                if ($slotEnd) {
-                    $line .= '/' . $slotEnd->format('H:i');
-                }
+
                 $escpos->text($line . "\n");
                 $escpos->setTextSize(1, 1);
                 $escpos->setEmphasis(false);
@@ -2367,6 +2353,7 @@ class PrinterService implements PrinterServiceInterface
             $escpos->setJustification(EscposPrinter::JUSTIFY_LEFT);
 
             // Pax
+            $escpos->setTextSize(2, 2);
             $escpos->setEmphasis(true);
             $escpos->text('Pax: ' . (int) ($data['pax'] ?? 0) . "\n");
             $escpos->setEmphasis(false);
@@ -2379,10 +2366,12 @@ class PrinterService implements PrinterServiceInterface
 
             // Contatti
             $email = trim((string) ($data['email'] ?? ''));
+            if (isset($email)) {
+                $escpos->text("Email " . $email . "\n");
+            }
             $phone = trim((string) ($data['phone'] ?? ''));
-            $contact = trim(implode(' - ', array_filter([$email, $phone])));
-            if ($contact !== '') {
-                $escpos->text($contact . "\n");
+            if (isset($phone)) {
+                $escpos->text("Phone " . $phone . "\n");
             }
 
             // Note
@@ -2397,14 +2386,8 @@ class PrinterService implements PrinterServiceInterface
 
             // Totale
             $escpos->feed(1);
-            $escpos->text(str_repeat('-', 48) . "\n");
-            $totalCents = (int) ($data['total_cents'] ?? 0);
-            $currency = strtoupper((string) ($data['currency'] ?? 'EUR'));
-            $escpos->setEmphasis(true);
-            $escpos->setTextSize(1, 2);
-            $escpos->text('Totale: ' . number_format($totalCents / 100, 2, ',', '.') . ' ' . $currency . "\n");
-            $escpos->setTextSize(1, 1);
-            $escpos->setEmphasis(false);
+            $escpos->text(str_repeat('-', 40) . "\n");
+
 
             // Reference (piccola, in fondo)
             if ($reference !== '') {

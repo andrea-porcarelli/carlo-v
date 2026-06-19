@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Gestionale comande — Scheda funzionalità</title>
+<style>
+  /* ---------- Reset / base ---------- */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #0F172A;
+    font-size: 11pt;
+    line-height: 1.5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ---------- Colors / vars ---------- */
+  :root {
+    --navy-900: #0B1F4D;
+    --navy-800: #142B5E;
+    --navy-700: #1E3A8A;
+    --blue-600: #2563EB;
+    --blue-500: #3B82F6;
+    --blue-50:  #EFF6FF;
+    --blue-100: #DBEAFE;
+    --gold:     #D4A437;
+    --gold-soft:#FBF3DE;
+    --emerald:  #047857;
+    --emerald-soft:#D1FAE5;
+    --rose:     #BE123C;
+    --rose-soft:#FFE4E6;
+    --slate-900:#0F172A;
+    --slate-700:#334155;
+    --slate-600:#475569;
+    --slate-500:#64748B;
+    --slate-400:#94A3B8;
+    --slate-300:#CBD5E1;
+    --slate-200:#E2E8F0;
+    --slate-100:#F1F5F9;
+    --slate-50: #F8FAFC;
+    --white:    #FFFFFF;
+  }
+
+  /* ---------- Page setup ---------- */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding: 18mm 16mm 16mm 16mm;
+    page-break-after: always;
+    position: relative;
+    background: #FFFFFF;
+    overflow: hidden;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ---------- Footer ---------- */
+  .page-footer {
+    position: absolute;
+    left: 16mm;
+    right: 16mm;
+    bottom: 8mm;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 8.5pt;
+    color: var(--slate-400);
+    letter-spacing: 0.02em;
+  }
+  .page-footer .brand-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--blue-600);
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  /* =====================================================
+     COVER PAGE
+     ===================================================== */
+  .cover {
+    padding: 0;
+    color: var(--white);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(59,130,246,0.55), transparent 60%),
+      radial-gradient(900px 700px at -10% 110%, rgba(212,164,55,0.18), transparent 55%),
+      linear-gradient(150deg, #0B1F4D 0%, #142B5E 45%, #1E3A8A 100%);
+  }
+  .cover-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding: 22mm 18mm 18mm 18mm;
+    display: flex;
+    flex-direction: column;
+  }
+  .cover-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #BFDBFE;
+  }
+  .cover-eyebrow .bar {
+    display: inline-block;
+    width: 28px;
+    height: 2px;
+    background: var(--gold);
+  }
+  .cover-title {
+    margin: 18px 0 14px 0;
+    font-size: 56pt;
+    line-height: 1.02;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--white);
+  }
+  .cover-title .accent {
+    color: #FCD34D;
+  }
+  .cover-sub {
+    font-size: 14pt;
+    line-height: 1.45;
+    font-weight: 400;
+    color: #CBD5E1;
+    max-width: 145mm;
+  }
+  .cover-rule {
+    margin: 28px 0 22px 0;
+    width: 56px;
+    height: 3px;
+    background: var(--gold);
+    border-radius: 2px;
+  }
+  .cover-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 8px;
+    max-width: 165mm;
+  }
+  .cover-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(191,219,254,0.35);
+    color: #E0E7FF;
+    font-size: 9.5pt;
+    font-weight: 500;
+    backdrop-filter: blur(4px);
+  }
+  .cover-chip.new {
+    background: linear-gradient(120deg, rgba(252,211,77,0.18), rgba(212,164,55,0.30));
+    border-color: rgba(252,211,77,0.55);
+    color: #FEF3C7;
+    font-weight: 600;
+  }
+  .cover-chip.new::before {
+    content: "NEW";
+    background: #FCD34D;
+    color: #422006;
+    font-size: 7.5pt;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-right: 4px;
+    letter-spacing: 0.05em;
+  }
+  .cover-stats {
+    margin-top: auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(191,219,254,0.2);
+  }
+  .cover-stat .n {
+    font-size: 22pt;
+    font-weight: 700;
+    color: #FCD34D;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .cover-stat .l {
+    margin-top: 6px;
+    font-size: 9pt;
+    color: #CBD5E1;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+  }
+  .cover-footer {
+    margin-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    color: #94A3B8;
+    font-size: 9pt;
+  }
+  .cover-footer .doc {
+    color: #E0E7FF;
+    font-weight: 600;
+    font-size: 10pt;
+    letter-spacing: 0.05em;
+  }
+  .cover-logo {
+    position: absolute;
+    top: 22mm;
+    right: 18mm;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #FCD34D, #D4A437);
+    color: #422006;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 18pt;
+    letter-spacing: -0.02em;
+    box-shadow: 0 8px 24px rgba(212,164,55,0.35);
+  }
+
+  /* =====================================================
+     STANDARD CONTENT PAGE
+     ===================================================== */
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--slate-200);
+  }
+  .page-header .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 9pt;
+    font-weight: 600;
+    color: var(--navy-900);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .page-header .brand-mark {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--navy-700), var(--blue-600));
+    color: #FCD34D;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 11pt;
+  }
+  .page-header .kicker {
+    font-size: 8.5pt;
+    color: var(--slate-500);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  h1.page-title {
+    font-size: 26pt;
+    font-weight: 800;
+    color: var(--navy-900);
+    letter-spacing: -0.02em;
+    margin: 0 0 4px 0;
+    line-height: 1.1;
+  }
+  p.page-lead {
+    font-size: 11pt;
+    color: var(--slate-600);
+    margin: 0 0 22px 0;
+    max-width: 165mm;
+  }
+
+  /* ---------- Section card ---------- */
+  .section {
+    margin-bottom: 16px;
+    break-inside: avoid;
+  }
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .section-num {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--navy-700), var(--blue-600));
+    color: var(--white);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 11pt;
+    box-shadow: 0 4px 8px rgba(37,99,235,0.18);
+  }
+  .section-icon {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--blue-50);
+    color: var(--blue-600);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .section-icon svg { width: 18px; height: 18px; }
+  .section-title {
+    flex: 1 1 auto;
+    font-size: 13pt;
+    font-weight: 700;
+    color: var(--navy-900);
+    letter-spacing: -0.01em;
+  }
+  .section-badge {
+    flex: 0 0 auto;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--blue-50);
+    color: var(--blue-600);
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .section-badge.gold {
+    background: var(--gold-soft);
+    color: #8A6914;
+  }
+  .section-badge.emerald {
+    background: var(--emerald-soft);
+    color: var(--emerald);
+  }
+
+  ul.feature-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 4px;
+    column-count: 1;
+  }
+  ul.feature-list.two-col { column-count: 2; column-gap: 18px; }
+  ul.feature-list li {
+    position: relative;
+    padding: 4px 0 4px 18px;
+    font-size: 10pt;
+    line-height: 1.45;
+    color: var(--slate-700);
+    break-inside: avoid;
+  }
+  ul.feature-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 11px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--blue-500);
+  }
+  ul.feature-list li strong {
+    color: var(--navy-900);
+    font-weight: 600;
+  }
+
+  /* =====================================================
+     INDEX PAGE
+     ===================================================== */
+  .index-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 28px;
+  }
+  .index-col h3 {
+    font-size: 9pt;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--blue-600);
+    margin: 0 0 12px 0;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--blue-100);
+    font-weight: 700;
+  }
+  .index-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--slate-200);
+  }
+  .index-item:last-child { border-bottom: none; }
+  .index-num {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--slate-100);
+    color: var(--navy-700);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 9pt;
+  }
+  .index-text {
+    flex: 1 1 auto;
+    font-size: 10pt;
+    color: var(--slate-700);
+    line-height: 1.4;
+  }
+  .index-text .label {
+    color: var(--navy-900);
+    font-weight: 600;
+  }
+  .index-text .desc {
+    color: var(--slate-500);
+    font-size: 9pt;
+    display: block;
+    margin-top: 1px;
+  }
+  .index-item.new .index-num {
+    background: var(--gold-soft);
+    color: #8A6914;
+  }
+  .index-item.new .label::after {
+    content: "NEW";
+    margin-left: 6px;
+    background: #FCD34D;
+    color: #422006;
+    font-size: 7pt;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+    vertical-align: 2px;
+  }
+
+  /* =====================================================
+     VALUE PROP PAGE
+     ===================================================== */
+  .value-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 6px;
+  }
+  .value-card {
+    background: linear-gradient(180deg, #FFFFFF 0%, var(--slate-50) 100%);
+    border: 1px solid var(--slate-200);
+    border-radius: 14px;
+    padding: 18px 18px;
+    position: relative;
+    break-inside: avoid;
+  }
+  .value-card.accent {
+    background: linear-gradient(180deg, #FFFFFF 0%, var(--blue-50) 100%);
+    border-color: var(--blue-100);
+  }
+  .value-card .vc-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .value-card .vc-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--navy-700), var(--blue-600));
+    color: var(--white);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .value-card .vc-icon svg { width: 20px; height: 20px; }
+  .value-card .vc-title {
+    font-size: 12pt;
+    font-weight: 700;
+    color: var(--navy-900);
+    letter-spacing: -0.01em;
+  }
+  .value-card .vc-body {
+    font-size: 10pt;
+    color: var(--slate-600);
+    line-height: 1.5;
+    margin: 0;
+  }
+  .value-card .vc-list {
+    margin: 8px 0 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 9.5pt;
+    color: var(--slate-700);
+  }
+  .value-card .vc-list li {
+    position: relative;
+    padding: 3px 0 3px 16px;
+  }
+  .value-card .vc-list li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    top: 2px;
+    color: var(--emerald);
+    font-weight: 700;
+    font-size: 10pt;
+  }
+
+  /* =====================================================
+     NOVITA PAGE (Ditron spotlight)
+     ===================================================== */
+  .novita-hero {
+    border-radius: 16px;
+    background:
+      radial-gradient(600px 200px at 100% 0%, rgba(252,211,77,0.18), transparent 65%),
+      linear-gradient(135deg, #0B1F4D 0%, #1E3A8A 100%);
+    color: var(--white);
+    padding: 24px 26px;
+    margin-bottom: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .novita-hero::before {
+    content: "";
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(252,211,77,0.15), transparent 70%);
+  }
+  .novita-hero .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(252,211,77,0.18);
+    color: #FCD34D;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .novita-hero .tag .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #FCD34D;
+  }
+  .novita-hero h2 {
+    margin: 4px 0 8px 0;
+    font-size: 22pt;
+    font-weight: 800;
+    color: var(--white);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .novita-hero h2 .accent { color: #FCD34D; }
+  .novita-hero p {
+    margin: 0 0 14px 0;
+    font-size: 11pt;
+    color: #DBEAFE;
+    line-height: 1.55;
+    max-width: 155mm;
+  }
+  .novita-hero .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .novita-hero .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(191,219,254,0.25);
+    color: #E0E7FF;
+    font-size: 9pt;
+    font-weight: 500;
+  }
+
+  .novita-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .novita-card {
+    border: 1px solid var(--slate-200);
+    border-radius: 12px;
+    padding: 14px 16px;
+    background: var(--white);
+    break-inside: avoid;
+  }
+  .novita-card .nc-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .novita-card .nc-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--blue-50);
+    color: var(--blue-600);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .novita-card .nc-icon svg { width: 16px; height: 16px; }
+  .novita-card .nc-title {
+    font-size: 11pt;
+    font-weight: 700;
+    color: var(--navy-900);
+  }
+  .novita-card ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 9.5pt;
+    color: var(--slate-700);
+    line-height: 1.45;
+  }
+  .novita-card ul li {
+    position: relative;
+    padding: 3px 0 3px 14px;
+  }
+  .novita-card ul li::before {
+    content: "›";
+    position: absolute;
+    left: 0;
+    top: 2px;
+    color: var(--blue-500);
+    font-weight: 700;
+  }
+
+  /* =====================================================
+     ARCHITECTURE TABLE
+     ===================================================== */
+  .arch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .arch-card {
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: var(--white);
+    break-inside: avoid;
+  }
+  .arch-card .ac-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .arch-card .ac-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: var(--slate-100);
+    color: var(--navy-700);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .arch-card .ac-icon svg { width: 14px; height: 14px; }
+  .arch-card .ac-label {
+    font-size: 9pt;
+    font-weight: 700;
+    color: var(--navy-900);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .arch-card .ac-value {
+    font-size: 9.5pt;
+    color: var(--slate-600);
+    line-height: 1.45;
+  }
+  .arch-card .ac-value strong { color: var(--navy-900); font-weight: 600; }
+
+  .summary-card {
+    margin-top: 16px;
+    border-left: 4px solid var(--blue-600);
+    background: var(--blue-50);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 10pt;
+    color: var(--slate-700);
+    line-height: 1.55;
+  }
+  .summary-card strong { color: var(--navy-900); }
+
+  /* =====================================================
+     CLOSING PAGE
+     ===================================================== */
+  .closing {
+    padding: 0;
+    color: var(--white);
+    background:
+      radial-gradient(900px 500px at 100% 0%, rgba(252,211,77,0.15), transparent 65%),
+      linear-gradient(160deg, #0B1F4D 0%, #142B5E 50%, #1E3A8A 100%);
+  }
+  .closing-inner {
+    width: 100%;
+    height: 100%;
+    padding: 28mm 18mm 18mm 18mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .closing h2 {
+    font-size: 40pt;
+    line-height: 1.05;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 18px 0;
+    color: var(--white);
+    max-width: 160mm;
+  }
+  .closing h2 .accent { color: #FCD34D; }
+  .closing p.lead {
+    font-size: 13pt;
+    color: #CBD5E1;
+    line-height: 1.5;
+    max-width: 160mm;
+    margin: 0 0 24px 0;
+  }
+  .closing-pillars {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 18px 0;
+  }
+  .closing-pillar {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(191,219,254,0.22);
+    border-radius: 12px;
+    padding: 16px 16px;
+  }
+  .closing-pillar .cp-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(252,211,77,0.18);
+    color: #FCD34D;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  .closing-pillar .cp-icon svg { width: 18px; height: 18px; }
+  .closing-pillar h4 {
+    margin: 0 0 6px 0;
+    font-size: 11pt;
+    font-weight: 700;
+    color: var(--white);
+  }
+  .closing-pillar p {
+    margin: 0;
+    font-size: 9.5pt;
+    color: #CBD5E1;
+    line-height: 1.5;
+  }
+  .closing-foot {
+    border-top: 1px solid rgba(191,219,254,0.18);
+    padding-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    color: #94A3B8;
+    font-size: 9.5pt;
+  }
+  .closing-foot .doc-info {
+    color: #E0E7FF;
+    font-weight: 600;
+    font-size: 10pt;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     PAGE 1 — COVER
+     ============================================================ -->
+<section class="page cover">
+  <div class="cover-inner">
+    <div class="cover-logo">G</div>
+
+    <div class="cover-eyebrow">
+      <span class="bar"></span>
+      Software gestionale per la ristorazione
+    </div>
+
+    <h1 class="cover-title">Gestionale<br>comande<span class="accent">.</span></h1>
+
+    <p class="cover-sub">
+      La piattaforma POS all-in-one che porta sala, cassa, cucina e amministrazione
+      in un unico sistema. Conforme alla normativa fiscale italiana, pronta per il
+      multi-locale e progettata per chi non può permettersi di fermarsi.
+    </p>
+
+    <div class="cover-rule"></div>
+
+    <div class="cover-chips">
+      <span class="cover-chip">Sala &amp; Cassa</span>
+      <span class="cover-chip">Stampe termiche ESC/POS</span>
+      <span class="cover-chip">Fatturazione elettronica</span>
+      <span class="cover-chip">Corrispettivi ADE</span>
+      <span class="cover-chip new">Cassa fiscale Ditron RT</span>
+      <span class="cover-chip">Multi-locale</span>
+      <span class="cover-chip">Mobile &amp; Tablet</span>
+    </div>
+
+    <div class="cover-stats">
+      <div class="cover-stat">
+        <div class="n">23</div>
+        <div class="l">Aree<br>funzionali</div>
+      </div>
+      <div class="cover-stat">
+        <div class="n">2</div>
+        <div class="l">Provider<br>corrispettivi</div>
+      </div>
+      <div class="cover-stat">
+        <div class="n">100%</div>
+        <div class="l">Conforme<br>normativa IT</div>
+      </div>
+      <div class="cover-stat">
+        <div class="n">24/7</div>
+        <div class="l">Backup<br>e monitoraggio</div>
+      </div>
+    </div>
+
+    <div class="cover-footer">
+      <div>
+        <div class="doc">SCHEDA FUNZIONALITÀ</div>
+        <div style="margin-top:4px;">Documento aggiornato al 13 giugno 2026</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:#E0E7FF; font-weight:600;">Edizione 2026</div>
+        <div style="margin-top:4px;">Per la presentazione a clienti</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 2 — VALUE PROPOSITION
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">La piattaforma in sintesi</div>
+  </div>
+
+  <h1 class="page-title">Una piattaforma. Tutto il servizio.</h1>
+  <p class="page-lead">
+    Gestionale comande copre l'intero ciclo di vita del servizio:
+    dall'apertura del tavolo all'incasso, dalla cucina alla fatturazione,
+    fino alla reportistica direzionale. Sei aree, un unico sistema.
+  </p>
+
+  <div class="value-grid">
+
+    <div class="value-card accent">
+      <div class="vc-head">
+        <div class="vc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <div class="vc-title">Operatività di sala</div>
+      </div>
+      <p class="vc-body">Mappa tavoli in tempo reale, presa comande touch, banco vendita rapida e sessioni di modifica in batch per zero attese.</p>
+      <ul class="vc-list">
+        <li>Apertura, modifica e spostamento tavoli con audit</li>
+        <li>Banco con sessioni multiple in parallelo</li>
+        <li>Interfaccia mobile per tablet e smartphone</li>
+      </ul>
+    </div>
+
+    <div class="value-card">
+      <div class="vc-head">
+        <div class="vc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M6 7v13a1 1 0 001 1h10a1 1 0 001-1V7M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/><path d="M10 12h4M10 16h4"/></svg></div>
+        <div class="vc-title">Incassi flessibili</div>
+      </div>
+      <p class="vc-body">Conto intero, suddiviso per persone o parziale per piatti. Pagamenti contanti, POS, fattura o misti, gestiti in un unico flusso.</p>
+      <ul class="vc-list">
+        <li>Preconti multipli sullo stesso tavolo</li>
+        <li>Sconti percentuali, assoluti o per preconto</li>
+        <li>Cassetto automatico VNE Self-Cash</li>
+      </ul>
+    </div>
+
+    <div class="value-card">
+      <div class="vc-head">
+        <div class="vc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12l4 4v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z"/><path d="M14 4v6h6M8 14h8M8 18h5"/></svg></div>
+        <div class="vc-title">Conformità fiscale IT</div>
+      </div>
+      <p class="vc-body">Fatturazione elettronica al Sistema di Interscambio, corrispettivi ADE con retry policy e annulli tracciati. Tutto a norma, tutto registrato.</p>
+      <ul class="vc-list">
+        <li>XML SDI conforme alle specifiche AdE</li>
+        <li>Doppio provider corrispettivi: Mysond + Ditron RT</li>
+        <li>Storico completo emissioni e annulli</li>
+      </ul>
+    </div>
+
+    <div class="value-card">
+      <div class="vc-head">
+        <div class="vc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></div>
+        <div class="vc-title">Stampe ESC/POS</div>
+      </div>
+      <p class="vc-body">Comande in cucina e bar, marcia tavolo, preconti e scontrini distribuiti automaticamente alle stampanti di reparto via TCP/IP.</p>
+      <ul class="vc-list">
+        <li>Multi-stampante con instradamento per categoria</li>
+        <li>Ristampa one-click dal log documenti</li>
+        <li>Notifiche di cambio piatto automatiche</li>
+      </ul>
+    </div>
+
+    <div class="value-card">
+      <div class="vc-head">
+        <div class="vc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l3 3 4-4 5 5 6-7"/><path d="M3 19h18"/></svg></div>
+        <div class="vc-title">Visibilità totale</div>
+      </div>
+      <p class="vc-body">Dashboard vendite in tempo reale, statistiche per operatore, best-seller, audit log integrale di ogni operazione e ogni stampa.</p>
+      <ul class="vc-list">
+        <li>Vendite per metodo, operatore, categoria</li>
+        <li>Audit log e timeline per tavolo</li>
+        <li>Esportazione CSV/Excel</li>
+      </ul>
+    </div>
+
+    <div class="value-card accent">
+      <div class="vc-head">
+        <div class="vc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg></div>
+        <div class="vc-title">Multi-locale</div>
+      </div>
+      <p class="vc-body">Architettura master/satellite con sincronizzazione automatica di menu, anagrafiche e immagini. Gestisci una catena come fosse un unico locale.</p>
+      <ul class="vc-list">
+        <li>Push automatico master → satellite</li>
+        <li>Sync media e anagrafiche complete</li>
+        <li>Alert Telegram su eventi critici</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 2</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 3 — INDICE
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Indice</div>
+  </div>
+
+  <h1 class="page-title">Indice delle funzionalità</h1>
+  <p class="page-lead">23 aree funzionali raggruppate per ambito operativo, dall'esperienza in sala alla conformità fiscale.</p>
+
+  <div class="index-grid">
+
+    <div class="index-col">
+      <h3>Sala, cassa e servizio</h3>
+      <div class="index-item">
+        <div class="index-num">01</div>
+        <div class="index-text"><span class="label">Gestione tavoli e sala</span><span class="desc">Mappa, apertura, coperti, soft-delete</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">02</div>
+        <div class="index-text"><span class="label">Presa comande e ordini</span><span class="desc">Sessione di modifica, segue, note</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">03</div>
+        <div class="index-text"><span class="label">Preconti</span><span class="desc">Intero, per persone, parziale</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">04</div>
+        <div class="index-text"><span class="label">Pagamenti e cassa</span><span class="desc">Contanti, POS, fattura, misti</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">08</div>
+        <div class="index-text"><span class="label">Sconti e abbuoni</span><span class="desc">% o €, distribuzione per preconto</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">09</div>
+        <div class="index-text"><span class="label">Autoconsumo</span><span class="desc">Totale o parziale, per operatore</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">10</div>
+        <div class="index-text"><span class="label">Banco (vendita rapida)</span><span class="desc">Sessioni multiple, chiusura immediata</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">21</div>
+        <div class="index-text"><span class="label">Aggiunzioni e rimozioni</span><span class="desc">Extras a pagamento, removals</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">22</div>
+        <div class="index-text"><span class="label">Coperti e tariffa coperto</span><span class="desc">Modalità solo bevande, allocazione</span></div>
+      </div>
+
+      <h3 style="margin-top:18px;">Conformità fiscale</h3>
+      <div class="index-item">
+        <div class="index-num">05</div>
+        <div class="index-text"><span class="label">Fatturazione elettronica B2B</span><span class="desc">XML SDI, trasmissione Mysond</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">06</div>
+        <div class="index-text"><span class="label">Corrispettivi elettronici</span><span class="desc">Provider Mysond (cloud SOAP)</span></div>
+      </div>
+      <div class="index-item new">
+        <div class="index-num">07</div>
+        <div class="index-text"><span class="label">Corrispettivi Ditron RT</span><span class="desc">Cassa fiscale nativa Ditron + Agent</span></div>
+      </div>
+    </div>
+
+    <div class="index-col">
+      <h3>Cucina, stampe e operatori</h3>
+      <div class="index-item">
+        <div class="index-num">11</div>
+        <div class="index-text"><span class="label">Stampe termiche ESC/POS</span><span class="desc">Comande, preconti, marcia tavolo</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">12</div>
+        <div class="index-text"><span class="label">Operatori e permessi</span><span class="desc">PIN, token, ruoli granulari</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">13</div>
+        <div class="index-text"><span class="label">Anagrafiche menu</span><span class="desc">Categorie, piatti, allergeni</span></div>
+      </div>
+
+      <h3 style="margin-top:18px;">Backoffice e direzione</h3>
+      <div class="index-item">
+        <div class="index-num">14</div>
+        <div class="index-text"><span class="label">Clienti, fornitori, magazzino</span><span class="desc">Fatture passive XML, giacenze</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">15</div>
+        <div class="index-text"><span class="label">Tracciabilità e audit log</span><span class="desc">Timeline eventi, log stampe</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">16</div>
+        <div class="index-text"><span class="label">Reportistica e statistiche</span><span class="desc">Dashboard, export CSV/Excel</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">17</div>
+        <div class="index-text"><span class="label">Backup automatico DB</span><span class="desc">Worker dedicato, retention</span></div>
+      </div>
+
+      <h3 style="margin-top:18px;">Multi-locale e integrazioni</h3>
+      <div class="index-item">
+        <div class="index-num">18</div>
+        <div class="index-text"><span class="label">Sincronizzazione multi-locale</span><span class="desc">Master + satellite, push automatico</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">19</div>
+        <div class="index-text"><span class="label">Notifiche Telegram</span><span class="desc">Alert critici, ordini, scorte</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">20</div>
+        <div class="index-text"><span class="label">Interfaccia mobile</span><span class="desc">Layout tablet/smartphone</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">23</div>
+        <div class="index-text"><span class="label">Cassa automatica VNE</span><span class="desc">Self-Cash via HTTPS</span></div>
+      </div>
+      <div class="index-item">
+        <div class="index-num">24</div>
+        <div class="index-text"><span class="label">Architettura tecnica</span><span class="desc">Stack, scalabilità, sicurezza</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 3</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 4 — LE NOVITÀ (Ditron spotlight)
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Le novità 2026</div>
+  </div>
+
+  <div class="novita-hero">
+    <span class="tag"><span class="dot"></span> Novità · giugno 2026</span>
+    <h2>Integrazione nativa con<br>cassa fiscale <span class="accent">Ditron RT</span></h2>
+    <p>
+      Gestionale comande dialoga direttamente con i Registratori Telematici Ditron tramite
+      un agent dedicato installato sul punto vendita. Lo scontrino fiscale viene emesso
+      sulla cassa hardware del cliente nello stesso istante in cui l'operatore conferma il
+      pagamento — senza più isole separate, senza più doppio inserimento.
+    </p>
+    <div class="pills">
+      <span class="pill">Provider selezionabile</span>
+      <span class="pill">Cloud (Mysond) o hardware (Ditron)</span>
+      <span class="pill">Auto-Run Spooler</span>
+      <span class="pill">Compatibile con casse esistenti</span>
+    </div>
+  </div>
+
+  <div class="novita-grid">
+
+    <div class="novita-card">
+      <div class="nc-head">
+        <div class="nc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v13H4z"/><path d="M8 7V4h8v3M8 11h8M8 15h5"/></svg></div>
+        <div class="nc-title">Doppio provider, scelta del cliente</div>
+      </div>
+      <ul>
+        <li>Setting <strong>corrispettivo_provider</strong>: mysond o ditron</li>
+        <li>Stesso flusso operatore, due tecnologie sottostanti</li>
+        <li>Mantiene il provider Mysond cloud SOAP per chi lo preferisce</li>
+        <li>Permette di passare a Ditron senza modificare la UI</li>
+      </ul>
+    </div>
+
+    <div class="novita-card">
+      <div class="nc-head">
+        <div class="nc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></div>
+        <div class="nc-title">Agent Windows dedicato</div>
+      </div>
+      <ul>
+        <li>Mini-agent .NET 8 self-contained installato sul PC del locale</li>
+        <li>Endpoint HTTP <strong>POST /emit-receipt</strong> sicuro</li>
+        <li>Modalità fiscale e non fiscale (test stampa)</li>
+        <li>Replica esatta del pattern Auto-Run Spooler già in produzione</li>
+      </ul>
+    </div>
+
+    <div class="novita-card">
+      <div class="nc-head">
+        <div class="nc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
+        <div class="nc-title">Idempotenza e tracciabilità</div>
+      </div>
+      <ul>
+        <li>Chiave di idempotenza per richiesta — zero scontrini doppi</li>
+        <li>Storico completo nella tabella <strong>ditron_receipts</strong></li>
+        <li>Registrazione di raw command, error file e tempo di esecuzione</li>
+        <li>Storico unificato con Mysond nella reportistica</li>
+      </ul>
+    </div>
+
+    <div class="novita-card">
+      <div class="nc-head">
+        <div class="nc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></div>
+        <div class="nc-title">Compatibile con il parco installato</div>
+      </div>
+      <ul>
+        <li>Funziona con il driver Ditron <strong>WinEcrCom 3.x</strong> standard</li>
+        <li>Comunica via TCP/IP con la cassa già fiscalizzata</li>
+        <li>Tender e reparto configurabili dal backoffice</li>
+        <li>Etichetta coperto personalizzabile</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="summary-card" style="margin-top:14px;">
+    <strong>Perché ne abbiamo bisogno.</strong> Molti ristoranti italiani hanno già investito
+    in una cassa fiscale hardware Ditron RT con un gestionale legacy separato. Con questa
+    integrazione, Gestionale comande unifica il flusso ordini → cassa senza richiedere
+    sostituzioni hardware: il personale lavora su un unico sistema, lo scontrino fiscale
+    esce sulla cassa di sempre.
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 4</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 5 — SALA, TAVOLI, COMANDE
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Operatività di sala</div>
+  </div>
+
+  <h1 class="page-title">Sala, tavoli e comande</h1>
+  <p class="page-lead">Dall'apertura del tavolo al separatore di portata, ogni gesto del cameriere è progettato per essere immediato.</p>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">01</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+      <div class="section-title">Gestione tavoli e sala</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Mappa interattiva dei tavoli con stato in tempo reale: <strong>libero, occupato, in pagamento</strong></li>
+      <li>Apertura tavolo con scelta del numero di coperti e assegnazione del cameriere</li>
+      <li>Modifica coperti durante il servizio con ricalcolo automatico del coperto</li>
+      <li>Spostamento di un ordine da un tavolo all'altro con tracciatura sull'audit log</li>
+      <li>Validazione della capacità massima dei tavoli al momento dell'apertura</li>
+      <li>Modalità "solo bevande" (zero coperti) con esclusione automatica della tariffa coperto</li>
+      <li>Soft-delete di ordini e tavoli per recupero successivo in caso di errore</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">02</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div>
+      <div class="section-title">Presa comande e gestione ordini</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Selezione piatti dal menu con quantità, aggiunzioni a pagamento e rimozioni</li>
+      <li>Sessione di modifica con add/remove/update locale e invio in batch al server</li>
+      <li>Note libere per piatto destinate alla cucina o al bar</li>
+      <li>Cambio piatto con stampa automatica di <strong>storno + nuovo piatto</strong></li>
+      <li>Inserimento del separatore "Segue" per organizzare le portate</li>
+      <li>Tasto rapido mobile per aggiungere o togliere "Segue" dopo l'ultimo piatto</li>
+      <li>Modifica del prezzo unitario con motivazione obbligatoria registrata a log</li>
+      <li>Calcolo automatico subtotale = <strong>(prezzo + extras) × quantità</strong></li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">22</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M14 20c0-2 2-4 4-4s3 1 4 2"/></svg></div>
+      <div class="section-title">Coperti e tariffa coperto</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Numero coperti modificabile in qualsiasi momento del servizio</li>
+      <li>Tariffa coperto per persona configurabile a livello impostazioni</li>
+      <li>Esclusione automatica del coperto in modalità "solo bevande"</li>
+      <li>Inclusione del coperto in totale, fatture e corrispettivi</li>
+      <li>Allocazione coperti per singolo preconto parziale</li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 5</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 6 — PRECONTI E PAGAMENTI
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Conto e incasso</div>
+  </div>
+
+  <h1 class="page-title">Preconti, pagamenti e cassa</h1>
+  <p class="page-lead">Conti interi, divisi per persone o parziali per piatti. Qualsiasi combinazione di pagamento, sempre tracciata.</p>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">03</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-3-6 3z"/><path d="M9 9h6M9 13h6"/></svg></div>
+      <div class="section-title">Preconti — intero, per persone, parziale</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Stampa preconto intero con totale, sconto e coperto in dettaglio</li>
+      <li>Preconto suddiviso per <strong>N persone</strong> con calcolo della quota a persona</li>
+      <li>Preconto parziale per piatti specifici scelti dall'operatore</li>
+      <li>Selezione coperti da includere nel preconto parziale (controlli +/-)</li>
+      <li>Sconto dedicato al singolo preconto, modificabile o ereditato</li>
+      <li>Preconti emessi cliccabili dal riepilogo tavolo per andare diretti all'incasso</li>
+      <li>Chiusura automatica della modale quando tutti i piatti sono stati assegnati</li>
+      <li>Eliminazione di un preconto pending con riallocazione degli items</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">04</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M5 10v4M19 10v4"/></svg></div>
+      <div class="section-title">Pagamenti e cassa</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Pagamento <strong>contanti</strong> con apertura cassetto automatico VNE Self-Cash</li>
+      <li>Pagamento <strong>POS</strong> con polling dell'esito sul terminale</li>
+      <li>Pagamento misto fattura + contanti / fattura + POS sul medesimo conto</li>
+      <li>Bonifico, assegno e altri metodi configurabili nel flusso fattura</li>
+      <li>"Chiusura conto" con apertura cassetto opzionale</li>
+      <li>Fallback manuale del cassetto in caso di mancato collegamento, con notifica Telegram</li>
+      <li>Pagamento per singolo preconto, con propagazione del metodo</li>
+      <li>Annullo della transazione in corso prima della conferma</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">08</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="3"/><circle cx="15" cy="15" r="3"/><path d="M3 21L21 3"/></svg></div>
+      <div class="section-title">Sconti e abbuoni</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Sconto <strong>percentuale</strong> (0–100%) o in <strong>valore assoluto</strong> (€) sul tavolo</li>
+      <li>Autorizzazione operatore via PIN per applicare lo sconto</li>
+      <li>Persistenza dello sconto sul tavolo, visibile dopo riapertura UI</li>
+      <li>Distribuzione proporzionale sui preconti parziali (sconto in €)</li>
+      <li>Possibilità di scegliere quanto sconto applicare a un preconto</li>
+      <li>Pulsante "Tutto residuo" per assegnare l'intero sconto rimanente</li>
+      <li>Sconto evidenziato nel preconto, scontrino fiscale e backoffice</li>
+      <li>Reset esplicito dello sconto applicato</li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 6</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 7 — CONFORMITÀ FISCALE
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Conformità fiscale italiana</div>
+  </div>
+
+  <h1 class="page-title">Fatturazione elettronica e corrispettivi</h1>
+  <p class="page-lead">Tutta la conformità fiscale italiana coperta dalla piattaforma. Due provider per i corrispettivi, una sola interfaccia operatore.</p>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">05</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div>
+      <div class="section-title">Fatturazione elettronica B2B</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Anagrafica clienti privati, aziende e pubbliche amministrazioni</li>
+      <li>Generazione XML <strong>Fattura Elettronica</strong> conforme alle specifiche AdE</li>
+      <li>Trasmissione SOAP verso il provider Mysond per inoltro al SDI</li>
+      <li>Numerazione progressiva automatica con serie alfanumerica configurabile</li>
+      <li>Più fatture sullo stesso conto con eventuale residuo pagato in altra modalità</li>
+      <li>Riemissione manuale dell'XML in caso di trasmissione fallita</li>
+      <li>Storico fatture emesse con stato di trasmissione e download XML/PDF</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">06</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1018 0 9 9 0 00-18 0z"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg></div>
+      <div class="section-title">Corrispettivi elettronici — provider Mysond</div>
+      <div class="section-badge">Cloud SOAP</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Emissione automatica del corrispettivo al pagamento contanti o POS</li>
+      <li>Un corrispettivo per ogni preconto pagato (in caso di conto diviso)</li>
+      <li>Esclusione automatica per pagamenti registrati come fattura o "chiusura conto"</li>
+      <li>Tentativo sincrono con timeout configurabile (default 10 secondi)</li>
+      <li>Retry asincrono fino a 3 tentativi con backoff <strong>30s, 2min, 5min</strong></li>
+      <li>Annullo del corrispettivo emesso direttamente dal backoffice</li>
+      <li>Storico completo emissioni e annulli con progressivo SDI e ID transazione</li>
+      <li>Stampa contestuale dello scontrino non fiscale con progressivo</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">07</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/><circle cx="17" cy="16" r="1.5" fill="currentColor"/></svg></div>
+      <div class="section-title">Corrispettivi su cassa Ditron RT</div>
+      <div class="section-badge gold">NEW · Hardware nativo</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Emissione dello scontrino fiscale direttamente sulla <strong>cassa Ditron RT</strong> del locale</li>
+      <li>Comunicazione via TCP/IP con il driver Ditron <strong>WinEcrCom</strong> già installato</li>
+      <li>Agent .NET 8 sul PC del punto vendita con endpoint HTTP sicuro</li>
+      <li>Pattern <strong>Auto-Run Spooler</strong> — nessun ActiveX, massima compatibilità</li>
+      <li>Idempotenza per chiave: <strong>zero scontrini doppi</strong> anche in caso di retry</li>
+      <li>Tabella <strong>ditron_receipts</strong> con raw command, error file ed elapsed</li>
+      <li>Reparto, tender e label coperto configurabili dal backoffice</li>
+      <li>Modalità fiscale e non-fiscale per test stampa senza scaricare il giornale</li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 7</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 8 — STAMPE, BANCO, AUTOCONSUMO
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Cucina, vendita rapida e gestione personale</div>
+  </div>
+
+  <h1 class="page-title">Stampe, banco e flessibilità</h1>
+  <p class="page-lead">La cucina riceve esattamente ciò che le serve. Il banco vende all'istante. Il personale è tracciato e tutelato.</p>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">11</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg></div>
+      <div class="section-title">Stampe termiche ESC/POS</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Comande in cucina e bar con raggruppamento automatico per stampante di reparto</li>
+      <li>"Marcia tavolo" per scandire l'avanzamento del servizio</li>
+      <li>Stampa preconto completo, parziale per split o suddiviso per persone</li>
+      <li>Scontrino non fiscale con intestazione aziendale, progressivo e ID transazione</li>
+      <li>Comunicazioni libere indirizzate a una stampante specifica</li>
+      <li>Notifica di cambio piatto: storno del vecchio + aggiunta del nuovo</li>
+      <li>Apertura cassetto contanti con messaggio personalizzabile</li>
+      <li>Ristampa di qualsiasi documento dal log stampe del backoffice</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">10</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M5 12V7a2 2 0 012-2h10a2 2 0 012 2v5M5 12v8M19 12v8M5 20h14"/></svg></div>
+      <div class="section-title">Banco — vendita rapida</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Tavolo dedicato al banco con identificativo riservato per la vendita rapida</li>
+      <li>Sessioni multiple aperte contemporaneamente sullo stesso banco</li>
+      <li>Pulsante "Invia ordine" visibile solo in modalità banco per inoltrare in cucina</li>
+      <li>Chiusura immediata di ordini banco vuoti senza passare dal pagamento</li>
+      <li>Notifiche Telegram con dicitura dedicata <strong>"Ordine al banco"</strong></li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">09</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 11V8a6 6 0 0112 0v3"/><rect x="4" y="11" width="16" height="10" rx="2"/><circle cx="12" cy="16" r="1.5" fill="currentColor"/></svg></div>
+      <div class="section-title">Autoconsumo</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Autoconsumo totale del tavolo (azzeramento dell'incasso)</li>
+      <li>Autoconsumo parziale per piatto, con assegnazione al singolo operatore</li>
+      <li>Annullo della procedura di autoconsumo con ripristino totale dell'ordine</li>
+      <li>Tracciatura dell'operatore beneficiario su ogni piatto autoconsumato</li>
+      <li>Banner dedicato nel dettaglio tavolo del backoffice con riepilogo per operatore</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">21</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></div>
+      <div class="section-title">Aggiunzioni e rimozioni di piatto</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Definizione di <strong>extras</strong> (a pagamento) e <strong>removals</strong> come opzioni di menu</li>
+      <li>Selezione multipla per ogni piatto al momento dell'ordine</li>
+      <li>Calcolo automatico del prezzo finale con somma delle aggiunzioni</li>
+      <li>Visualizzazione dettagliata su comande di cucina, preconti e scontrini</li>
+      <li>Indicazione esplicita degli extras anche nelle notifiche Telegram</li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 8</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 9 — OPERATORI E ANAGRAFICHE
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Personale e anagrafiche</div>
+  </div>
+
+  <h1 class="page-title">Operatori, menu e relazioni</h1>
+  <p class="page-lead">Permessi granulari, anagrafiche pulite e magazzino integrato per gestire ogni aspetto del locale dal backoffice.</p>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">12</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg></div>
+      <div class="section-title">Operatori e permessi</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Autenticazione operatore via <strong>PIN</strong> con token temporaneo (TTL 1 ora)</li>
+      <li>Permessi granulari: presa comande, visualizzazione, contanti, POS, fatture, chiusura</li>
+      <li>Bypass completo per gli utenti con ruolo amministratore</li>
+      <li>Verifica permessi a ogni operazione critica (incasso, modifica prezzo, sconto)</li>
+      <li>Accesso backoffice con utenza separata e password dedicata</li>
+      <li>Tracciamento autore di ogni azione su ordini, items, pagamenti e log fiscali</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">13</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+      <div class="section-title">Anagrafiche menu</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Categorie menu con riordinamento, attivazione e colore identificativo</li>
+      <li>Piatti con nome, prezzo, descrizione, categoria, allergeni e media</li>
+      <li>Aggiunzioni a pagamento (extras) e rimozioni configurabili come opzioni</li>
+      <li>Mapping piatto ↔ materiali (con quantità e unità di misura)</li>
+      <li>Allergeni con icona standard riconosciuta</li>
+      <li>Stampante di reparto associata alla categoria (cucina/bar/secondo reparto)</li>
+      <li>Cambio massivo di stato (attivo/inattivo) con audit</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">14</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h14l4 4v8a2 2 0 01-2 2H3z"/><path d="M3 7V5a2 2 0 012-2h10a2 2 0 012 2v2M7 14h6M7 17h4"/></svg></div>
+      <div class="section-title">Clienti, fornitori, fatture passive e magazzino</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Anagrafica clienti completa per emissione fatture B2B</li>
+      <li>Anagrafica fornitori con riferimenti fiscali</li>
+      <li>Caricamento e archiviazione delle <strong>fatture passive</strong> (fornitori) con XML</li>
+      <li>Mapping prodotti del fornitore verso le materie prime del magazzino</li>
+      <li>Aggiornamento automatico delle giacenze a partire dalle fatture importate</li>
+      <li>Confronto prezzi prodotti tra fornitori diversi</li>
+      <li>Soglie di stock minimo con alert automatici via Telegram</li>
+      <li>Movimentazione manuale delle giacenze con storico</li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 9</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 10 — VISIBILITÀ DIREZIONALE
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Direzione e affidabilità</div>
+  </div>
+
+  <h1 class="page-title">Visibilità, controllo e continuità</h1>
+  <p class="page-lead">Ogni euro contato. Ogni azione tracciata. Ogni notte un backup. Nessuna sorpresa, mai.</p>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">15</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg></div>
+      <div class="section-title">Tracciabilità e audit log</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Audit log completo di ogni operazione su ordini e singoli piatti</li>
+      <li>Timeline degli eventi consultabile dal dettaglio tavolo nel backoffice</li>
+      <li>Log delle stampe con preview HTML e <strong>ristampa one-click</strong></li>
+      <li>Filtri avanzati per data, operatore, tipo stampa, tavolo</li>
+      <li>Statistiche per operatore: ordini gestiti, piatti aggiunti, modifiche, rimozioni</li>
+      <li>Esportazione log in CSV per analisi esterne</li>
+      <li>Tracciamento separato dei fallimenti del cassetto contanti</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">16</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l4 4 6-6 4 4 4-4"/><path d="M3 19h18"/></svg></div>
+      <div class="section-title">Reportistica e statistiche vendite</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Dashboard con vendite giornaliere, totali per metodo di pagamento e operatore</li>
+      <li>Tabella vendite filtrabile per data, tavolo, stato e operatore</li>
+      <li>Statistiche per categoria e per piatto (<strong>best-seller</strong>, ricavi)</li>
+      <li>Esportazione vendite in CSV/Excel</li>
+      <li>Storico fatture emesse con download PDF e XML</li>
+      <li>Vista corrispettivi elettronici con stato e azioni di retry/annullo</li>
+      <li>Dettaglio singola vendita con linea temporale, log stampe e log cassetto</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">17</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/><circle cx="12" cy="12" r="3"/></svg></div>
+      <div class="section-title">Backup automatico del database</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Backup pianificato gestito da worker dedicato in coda</li>
+      <li>Compressione gzip dei dump SQL con timestamp nel nome file</li>
+      <li>Conservazione configurabile per giorni di retention</li>
+      <li>Trigger manuale del backup on-demand dal backoffice o da webhook</li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 10</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 11 — MULTI-LOCALE E INTEGRAZIONI
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Multi-locale e integrazioni</div>
+  </div>
+
+  <h1 class="page-title">Multi-locale e periferiche</h1>
+  <p class="page-lead">Per chi opera in catena, per chi vuole la sala in tablet, per chi pretende l'integrazione con la cassa automatica.</p>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">18</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg></div>
+      <div class="section-title">Sincronizzazione multi-locale</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Architettura sede principale (<strong>master</strong>) + locali satellite (<strong>local</strong>)</li>
+      <li>Esportazione completa di menu, anagrafiche, opzioni e media in pacchetto ZIP</li>
+      <li>Push automatico dal master verso i satelliti</li>
+      <li>Importazione lato satellite con deserializzazione di tutte le entità</li>
+      <li>Sincronizzazione delle immagini dei piatti (file media)</li>
+      <li>Trigger manuale dal backoffice + status polling visivo</li>
+      <li>Log di ogni operazione di sync con origine (manuale, webhook, schedulata)</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">19</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div>
+      <div class="section-title">Notifiche Telegram</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Alert critico in caso di cassetto contanti non raggiungibile</li>
+      <li>Notifica completa dei piatti del tavolo, aggiunzioni e rimozioni con prezzi</li>
+      <li>Etichetta dedicata "Ordine al banco" per le vendite rapide</li>
+      <li>Avviso automatico in caso di scorte di magazzino sotto soglia</li>
+      <li>Configurazione di token bot e chat ID dalle impostazioni del backoffice</li>
+      <li>Invio asincrono per non rallentare le operazioni di cassa</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">20</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M11 18h2"/></svg></div>
+      <div class="section-title">Interfaccia mobile</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Layout dedicato ottimizzato per tablet e smartphone</li>
+      <li>Griglia tavoli compatta e action bar adatta al touch</li>
+      <li>Modali a tutto schermo per modifica ordine, preconto e incasso</li>
+      <li>Tastiera virtuale numerica per inserimento PIN operatore</li>
+      <li>Tasto rapido "Segue" sempre visibile durante la presa comanda</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-num">23</div>
+      <div class="section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V5a2 2 0 012-2h6a2 2 0 012 2v3"/><circle cx="12" cy="14" r="2"/></svg></div>
+      <div class="section-title">Cassa automatica VNE Self-Cash</div>
+    </div>
+    <ul class="feature-list two-col">
+      <li>Apertura cassetto via API HTTP con importo e identificativo operatore</li>
+      <li>Polling dello stato dell'operazione su intervallo configurabile</li>
+      <li>Gestione completa del fallback in caso di timeout o cassa offline</li>
+      <li>Chiusura del tavolo come "contanti" con tracciamento dell'anomalia</li>
+      <li>Annullo dell'operazione di cassa pendente prima della conferma</li>
+      <li>Emissione del corrispettivo elettronico garantita anche in caso di fallback</li>
+    </ul>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 11</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 12 — ARCHITETTURA TECNICA
+     ============================================================ -->
+<section class="page">
+  <div class="page-header">
+    <div class="brand"><span class="brand-mark">G</span> Gestionale comande</div>
+    <div class="kicker">Architettura tecnica</div>
+  </div>
+
+  <h1 class="page-title">Stack moderno, infrastruttura affidabile</h1>
+  <p class="page-lead">Tecnologie aperte, scalabili e dimostrate. Nessun lock-in, nessuna sorpresa.</p>
+
+  <div class="arch-grid">
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7l8-4 8 4-8 4z"/><path d="M4 7v10l8 4 8-4V7"/></svg></div>
+        <div class="ac-label">Backend</div>
+      </div>
+      <div class="ac-value"><strong>PHP 8.3</strong> · framework <strong>Laravel 12</strong>, code base modulare con servizi dedicati.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
+        <div class="ac-label">Database</div>
+      </div>
+      <div class="ac-value"><strong>MySQL 8.0</strong>, oltre <strong>80 migrazioni</strong> gestite con versionamento.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 8h18M8 18v3M16 18v3M6 21h12"/></svg></div>
+        <div class="ac-label">Frontend backoffice</div>
+      </div>
+      <div class="ac-value"><strong>Blade</strong> templating + <strong>Livewire</strong> per le componenti dinamiche.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M11 18h2M9 6h6"/></svg></div>
+        <div class="ac-label">Frontend cassa</div>
+      </div>
+      <div class="ac-value">JavaScript vanilla con architettura SPA-like, fetch API, gestione stato locale.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+        <div class="ac-label">UI styling</div>
+      </div>
+      <div class="ac-value"><strong>Tailwind CSS</strong>, layout responsive ottimizzato per tablet POS.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
+        <div class="ac-label">Code asincrone</div>
+      </div>
+      <div class="ac-value"><strong>Redis</strong> + <strong>Supervisor</strong> con worker dedicati per stampe, fatture, corrispettivi e backup.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg></div>
+        <div class="ac-label">Stampa termica</div>
+      </div>
+      <div class="ac-value">Protocollo <strong>ESC/POS</strong> su rete TCP/IP, supporto multi-stampante.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div>
+        <div class="ac-label">Fattura elettronica</div>
+      </div>
+      <div class="ac-value">Integrazione <strong>SOAP</strong> con Mysond, generazione XML conforme SDI.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg></div>
+        <div class="ac-label">Corrispettivi Mysond</div>
+      </div>
+      <div class="ac-value">Trasmissione asincrona ad <strong>AdE</strong> con retry policy e annulli tracciati.</div>
+    </div>
+
+    <div class="arch-card" style="border-color: var(--gold); background: linear-gradient(180deg, #FFFFFF 0%, var(--gold-soft) 100%);">
+      <div class="ac-head">
+        <div class="ac-icon" style="background: var(--gold-soft); color: #8A6914;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></div>
+        <div class="ac-label" style="color: #8A6914;">Corrispettivi Ditron RT <span style="background:#FCD34D; color:#422006; font-size:7pt; padding:1px 5px; border-radius:3px; margin-left:4px;">NEW</span></div>
+      </div>
+      <div class="ac-value">Agent <strong>.NET 8</strong> self-contained su Windows, integrazione HTTP con WinEcrCom 3.x. Idempotenza, retry, raw log.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V5a2 2 0 012-2h6a2 2 0 012 2v3"/><circle cx="12" cy="14" r="2"/></svg></div>
+        <div class="ac-label">Cassa automatica</div>
+      </div>
+      <div class="ac-value">Integrazione <strong>HTTPS</strong> con VNE Self-Cash (apertura, polling, annullo).</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <div class="ac-label">Containerizzazione</div>
+      </div>
+      <div class="ac-value"><strong>Docker Compose</strong>: PHP-FPM, worker, MySQL, Redis, Nginx, phpMyAdmin.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+        <div class="ac-label">Autenticazione</div>
+      </div>
+      <div class="ac-value">Sessioni Laravel backoffice + token operatore con <strong>PIN</strong> per il frontoffice.</div>
+    </div>
+
+    <div class="arch-card">
+      <div class="ac-head">
+        <div class="ac-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+        <div class="ac-label">Logging</div>
+      </div>
+      <div class="ac-value">Canali multipli (default, telegram, corrispettivi) con rotazione giornaliera.</div>
+    </div>
+
+  </div>
+
+  <div class="summary-card">
+    <strong>Gestionale comande</strong> integra in un'unica piattaforma la presa comande, la cassa, la
+    cucina e l'amministrazione. È pensato per ristoranti che necessitano di un sistema affidabile,
+    conforme alla normativa fiscale italiana e capace di operare anche in ambienti multi-locale —
+    senza vincoli di hardware, senza compromessi di tracciabilità.
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Gestionale comande · Scheda funzionalità</div>
+    <div>pag. 12</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 13 — CLOSING
+     ============================================================ -->
+<section class="page closing">
+  <div class="closing-inner">
+
+    <div>
+      <div class="cover-eyebrow">
+        <span class="bar"></span>
+        Pronti a partire
+      </div>
+
+      <h2>Un solo sistema.<br>Tutto il <span class="accent">tuo ristorante.</span></h2>
+
+      <p class="lead">
+        Gestionale comande è pensato per chi vuole servire meglio, contare di più
+        e dormire la notte. Una piattaforma sola, conforme alle normative, integrata
+        con la tua cassa fiscale e pronta a crescere con te.
+      </p>
+
+      <div class="closing-pillars">
+        <div class="closing-pillar">
+          <div class="cp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l3 3 4-4 5 5 6-7"/></svg></div>
+          <h4>Operatività più veloce</h4>
+          <p>Presa comande touch, banco con sessioni multiple, mobile-first per il personale di sala.</p>
+        </div>
+        <div class="closing-pillar">
+          <div class="cp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg></div>
+          <h4>Conformità garantita</h4>
+          <p>Fatturazione elettronica, corrispettivi ADE su cloud o sulla tua cassa Ditron RT.</p>
+        </div>
+        <div class="closing-pillar">
+          <div class="cp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg></div>
+          <h4>Pronto per crescere</h4>
+          <p>Multi-locale master/satellite, integrazioni hardware, backup automatici e audit log.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="closing-foot">
+      <div>
+        <div class="doc-info">Vuoi vederlo in azione?</div>
+        <div style="margin-top:4px; color:#CBD5E1;">Possiamo organizzare una demo personalizzata sul tuo flusso di servizio.</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="doc-info">Edizione 2026</div>
+        <div style="margin-top:4px; color:#CBD5E1;">Documento aggiornato al 13 giugno 2026</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</body>
+</html>
