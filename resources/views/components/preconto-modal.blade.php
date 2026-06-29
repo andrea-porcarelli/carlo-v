@@ -28,6 +28,14 @@
                 </label>
 
                 <label class="preconto-option-label">
+                    <input type="radio" name="precontoType" value="amounts">
+                    <span class="preconto-option-text">
+                        <i class="fas fa-euro-sign"></i>
+                        Dividi per importi
+                    </span>
+                </label>
+
+                <label class="preconto-option-label">
                     <input type="radio" name="precontoType" value="items">
                     <span class="preconto-option-text">
                         <i class="fas fa-list-check"></i>
@@ -45,6 +53,30 @@
                 </div>
                 <div class="split-preview" id="splitPreview">
                     <span>Quota per persona: <strong id="perPersonAmount">€0.00</strong></span>
+                </div>
+            </div>
+
+            <div id="amountsContainer" class="split-count-container" style="display: none;">
+                <label>Importi dei preconti:</label>
+                <div id="amountsList" class="amounts-list"></div>
+                <div class="amounts-actions">
+                    <button type="button" class="amounts-add-btn" id="addAmountRow">
+                        <i class="fas fa-plus"></i> Aggiungi riga
+                    </button>
+                </div>
+                <div class="amounts-summary" id="amountsSummary">
+                    <div class="amounts-summary-row">
+                        <span>Totale tavolo:</span>
+                        <strong id="amountsOrderTotal">€0.00</strong>
+                    </div>
+                    <div class="amounts-summary-row">
+                        <span>Somma importi:</span>
+                        <strong id="amountsCurrentSum">€0.00</strong>
+                    </div>
+                    <div class="amounts-summary-row" id="amountsRemainingRow">
+                        <span>Residuo da assegnare:</span>
+                        <strong id="amountsRemaining">€0.00</strong>
+                    </div>
                 </div>
             </div>
 
@@ -285,6 +317,115 @@
 .split-preview strong {
     color: #17a2b8;
     font-size: 1.3rem;
+}
+
+/* Dividi per importi */
+.amounts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.amount-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+
+.amount-row .amount-row-label {
+    flex: 1;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.amount-row .amount-row-input {
+    width: 100px;
+    height: 38px;
+    text-align: right;
+    font-size: 1rem;
+    font-weight: 600;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    padding: 0 8px;
+    -moz-appearance: textfield;
+}
+
+.amount-row .amount-row-input::-webkit-inner-spin-button,
+.amount-row .amount-row-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+.amount-row-remove {
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.amount-row-remove:disabled {
+    background: #adb5bd;
+    cursor: not-allowed;
+}
+
+.amounts-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.amounts-add-btn {
+    background: white;
+    color: #17a2b8;
+    border: 2px solid #17a2b8;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.amounts-add-btn:hover {
+    background: #17a2b8;
+    color: white;
+}
+
+.amounts-summary {
+    background: white;
+    border-radius: 6px;
+    padding: 10px 14px;
+    border: 2px solid #17a2b8;
+}
+
+.amounts-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.95rem;
+    color: #333;
+    padding: 3px 0;
+}
+
+.amounts-summary-row strong {
+    color: #17a2b8;
+    font-size: 1.05rem;
+}
+
+.amounts-summary-row.match strong {
+    color: #28a745;
+}
+
+.amounts-summary-row.over strong {
+    color: #dc3545;
 }
 
 /* Items select */

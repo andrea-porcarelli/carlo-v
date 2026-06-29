@@ -4783,6 +4783,9 @@ class TableOrdersManager {
         const splitContainer = document.getElementById('splitCountContainer');
         if (splitContainer) splitContainer.style.display = 'none';
 
+        const amountsContainer = document.getElementById('amountsContainer');
+        if (amountsContainer) amountsContainer.style.display = 'none';
+
         const itemsContainer = document.getElementById('itemsSelectContainer');
         if (itemsContainer) itemsContainer.style.display = 'none';
 
@@ -4790,6 +4793,7 @@ class TableOrdersManager {
         if (splitCountInput) splitCountInput.value = 2;
 
         this.updateSplitPreview();
+        this._initAmountsContainer();
 
         // Pre-populate discount from table-level authorized discount (if any)
         const discountRow = document.querySelector('.preconto-discount-row');
@@ -4828,15 +4832,18 @@ class TableOrdersManager {
         document.querySelectorAll('input[name="precontoType"]').forEach(radio => {
             radio.onchange = function() {
                 const splitContainer = document.getElementById('splitCountContainer');
+                const amountsContainer = document.getElementById('amountsContainer');
                 const itemsContainer = document.getElementById('itemsSelectContainer');
                 const partialTotalRow = document.getElementById('precontoPartialTotalRow');
                 splitContainer.style.display = this.value === 'split' ? 'block' : 'none';
                 if (this.value === 'split') self.updateSplitPreview();
+                amountsContainer.style.display = this.value === 'amounts' ? 'block' : 'none';
+                if (this.value === 'amounts') self._initAmountsContainer();
                 itemsContainer.style.display = this.value === 'items' ? 'block' : 'none';
                 if (this.value === 'items') self._renderPrecontoItemsList();
-                // Show partial total row for full/split (items has its own via _updatePrecontoPartialTotal)
-                if (partialTotalRow) partialTotalRow.style.display = this.value !== 'items' ? 'block' : 'none';
-                if (this.value !== 'items') self._updateGlobalTotal();
+                // Show partial total row only for full bill (split/amounts/items hanno il loro riepilogo)
+                if (partialTotalRow) partialTotalRow.style.display = this.value === 'full' ? 'block' : 'none';
+                if (this.value === 'full') self._updateGlobalTotal();
                 // Discount only allowed on full bill
                 const discountRow = document.querySelector('.preconto-discount-row');
                 if (discountRow) discountRow.style.display = this.value === 'full' ? '' : 'none';
@@ -5271,6 +5278,99 @@ class TableOrdersManager {
     }
 
     /**
+     * Inizializza il container "Dividi per importi" con 2 righe vuote
+     * e attacca i listener per gestire add/remove/oninput.
+     */
+    _initAmountsContainer() {
+        const list = document.getElementById('amountsList');
+        if (!list) return;
+        list.innerHTML = '';
+        this._addAmountRow();
+        this._addAmountRow();
+        this._updateAmountsSummary();
+
+        const addBtn = document.getElementById('addAmountRow');
+        if (addBtn) {
+            addBtn.onclick = () => {
+                this._addAmountRow();
+                this._updateAmountsSummary();
+            };
+        }
+    }
+
+    _addAmountRow(value = '') {
+        const list = document.getElementById('amountsList');
+        if (!list) return;
+        const row = document.createElement('div');
+        row.className = 'amount-row';
+
+        const label = document.createElement('span');
+        label.className = 'amount-row-label';
+        row.appendChild(label);
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = 'amount-row-input';
+        input.step = '0.01';
+        input.min = '0';
+        input.placeholder = '0.00';
+        input.value = typeof value === 'number' ? String(value) : (value || '');
+        input.oninput = () => this._updateAmountsSummary();
+        row.appendChild(input);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'amount-row-remove';
+        removeBtn.title = 'Rimuovi';
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-times';
+        removeBtn.appendChild(icon);
+        removeBtn.onclick = () => {
+            const total = list.querySelectorAll('.amount-row').length;
+            if (total <= 2) return; // minimo 2 righe
+            row.remove();
+            this._relabelAmountRows();
+            this._updateAmountsSummary();
+        };
+        row.appendChild(removeBtn);
+
+        list.appendChild(row);
+        this._relabelAmountRows();
+    }
+
+    _relabelAmountRows() {
+        const rows = document.querySelectorAll('#amountsList .amount-row');
+        rows.forEach((r, i) => {
+            const lbl = r.querySelector('.amount-row-label');
+            if (lbl) lbl.textContent = `Preconto ${i + 1}`;
+            const rm = r.querySelector('.amount-row-remove');
+            if (rm) rm.disabled = (rows.length <= 2);
+        });
+    }
+
+    _updateAmountsSummary() {
+        if (!this.currentTable?.order) return;
+        const orderTotal = this._applyPrecontoDiscount(parseFloat(this.currentTable.order.total_amount) || 0);
+        const inputs = document.querySelectorAll('#amountsList .amount-row-input');
+        const sum = Array.from(inputs).reduce((acc, i) => acc + (parseFloat(i.value) || 0), 0);
+        const remaining = +(orderTotal - sum).toFixed(2);
+
+        const totalEl = document.getElementById('amountsOrderTotal');
+        const sumEl   = document.getElementById('amountsCurrentSum');
+        const remEl   = document.getElementById('amountsRemaining');
+        const remRow  = document.getElementById('amountsRemainingRow');
+
+        if (totalEl) totalEl.textContent = `€${orderTotal.toFixed(2)}`;
+        if (sumEl)   sumEl.textContent   = `€${sum.toFixed(2)}`;
+        if (remEl)   remEl.textContent   = `€${remaining.toFixed(2)}`;
+        if (remRow) {
+            remRow.classList.remove('match', 'over');
+            if (Math.abs(remaining) < 0.01) remRow.classList.add('match');
+            else if (remaining < 0) remRow.classList.add('over');
+        }
+    }
+
+    /**
      * Close PreConto modal
      */
     closePrecontoModal() {
@@ -5301,6 +5401,22 @@ class TableOrdersManager {
             }
         }
 
+        // Validate amounts split
+        if (precontoType === 'amounts') {
+            const inputs = document.querySelectorAll('#amountsList .amount-row-input');
+            const amounts = Array.from(inputs).map(i => parseFloat(i.value) || 0);
+            if (amounts.length < 2 || amounts.some(a => a <= 0)) {
+                this.showNotification('Inserisci almeno 2 importi positivi', 'error');
+                return;
+            }
+            const orderTotal = this._applyPrecontoDiscount(parseFloat(this.currentTable.order.total_amount) || 0);
+            const sum = amounts.reduce((a, b) => a + b, 0);
+            if (Math.abs(sum - orderTotal) > 0.01) {
+                this.showNotification(`La somma degli importi (€${sum.toFixed(2)}) deve essere uguale al totale (€${orderTotal.toFixed(2)})`, 'error');
+                return;
+            }
+        }
+
         // Request operator authentication
         let auth;
         try {
@@ -5314,6 +5430,9 @@ class TableOrdersManager {
         let body = { type: precontoType };
         if (precontoType === 'split') {
             body.split_count = parseInt(document.getElementById('splitCount').value) || null;
+        } else if (precontoType === 'amounts') {
+            const inputs = document.querySelectorAll('#amountsList .amount-row-input');
+            body.amounts = Array.from(inputs).map(i => parseFloat(i.value) || 0);
         } else if (precontoType === 'items') {
             const selectedItems = [];
             document.querySelectorAll('#precontoItemsList .preconto-item-qty-input').forEach(input => {

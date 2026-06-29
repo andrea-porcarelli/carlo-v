@@ -1041,7 +1041,14 @@ class PrinterService implements PrinterServiceInterface
             $dev->setEmphasis(true);
             $dev->text(str_repeat('-', 48) . "\n");
 
-            foreach ($split->items as $item) {
+            $splitItems = is_array($split->items) ? $split->items : [];
+            if (empty($splitItems)) {
+                // Split senza items dettagliati (divisione equa o per importi): mostra
+                // solo la quota sul totale tavolo come unica riga descrittiva.
+                $dev->text(str_pad("Quota su totale tavolo", 38) . str_pad(number_format($split->total, 2, ',', '.'), 10, ' ', STR_PAD_LEFT) . "\n");
+                $dev->setEmphasis(false);
+            }
+            foreach ($splitItems as $item) {
                 $name = $item['dish_name'] ?? 'N/D';
                 $qty  = $item['quantity'] ?? 1;
                 $sub  = number_format($item['subtotal'] ?? 0, 2, ',', '.');

@@ -1608,10 +1608,12 @@ class TableOrderController extends Controller
     {
         $validated = $request->validate([
             'split_count'     => 'nullable|integer|min:1',
-            'type'            => 'nullable|string|in:full,split,items',
+            'type'            => 'nullable|string|in:full,split,items,amounts',
             'items'           => 'nullable|array',
             'items.*.order_item_id' => 'required_with:items|integer',
             'items.*.quantity'      => 'required_with:items|integer|min:1',
+            'amounts'         => 'nullable|array|min:2',
+            'amounts.*'       => 'required_with:amounts|numeric|min:0.01',
             'covers'          => 'nullable|integer|min:0',
             'label'           => 'nullable|string|max:100',
             'discount_type'   => 'nullable|string|in:none,value,percent',
@@ -1754,20 +1756,96 @@ class TableOrderController extends Controller
                 ]);
             }
 
-            // ── Full or split-by-count preconto ──────────────────────────────
-            $splitCount     = ($type === 'split') ? ($validated['split_count'] ?? null) : null;
+            // ── Split-by-count / Split-by-amounts ─────────────────────────────
+            // Entrambi producono N PrecontoSplit persistiti e N stampe separate.
+            if ($type === 'split' || $type === 'amounts') {
+                // Totale effettivo da ripartire = totale ordine (include già coperti) − sconto applicato.
+                $effectiveTotal = $order->hasDiscount() ? $order->getDiscountedTotal() : (float) $order->total_amount;
+
+                // Non consentire split su ordini gia parzialmente coperti da preconti pending.
+                $existingAssigned = (float) $order->precontoSplits()->sum('total');
+                if ($existingAssigned > 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Esistono gia preconti parziali per questo tavolo: completa o elimina quelli esistenti prima di dividere l\'intero conto.',
+                    ], 422);
+                }
+
+                // Costruisco la lista delle quote.
+                $quotas = [];
+                if ($type === 'split') {
+                    $splitCount = (int) ($validated['split_count'] ?? 0);
+                    if ($splitCount < 2) {
+                        return response()->json(['success' => false, 'message' => 'Numero di persone non valido'], 422);
+                    }
+                    // Divisione equa con resto sull'ultimo per evitare arrotondamenti.
+                    $per = floor(($effectiveTotal / $splitCount) * 100) / 100;
+                    $sum = 0;
+                    for ($i = 0; $i < $splitCount - 1; $i++) {
+                        $quotas[] = round($per, 2);
+                        $sum += $per;
+                    }
+                    $quotas[] = round($effectiveTotal - $sum, 2);
+                } else { // amounts
+                    $amounts = array_map('floatval', $validated['amounts'] ?? []);
+                    if (count($amounts) < 2) {
+                        return response()->json(['success' => false, 'message' => 'Devi specificare almeno 2 importi'], 422);
+                    }
+                    $sum = round(array_sum($amounts), 2);
+                    if (abs($sum - round($effectiveTotal, 2)) > 0.01) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'La somma degli importi (' . number_format($sum, 2) . ') deve essere uguale al totale (' . number_format($effectiveTotal, 2) . ')',
+                        ], 422);
+                    }
+                    foreach ($amounts as $a) {
+                        $quotas[] = round($a, 2);
+                    }
+                }
+
+                $total = count($quotas);
+                $createdSplits = DB::transaction(function () use ($order, $quotas, $total) {
+                    $splits = [];
+                    foreach ($quotas as $i => $q) {
+                        $splits[] = \App\Models\PrecontoSplit::create([
+                            'table_order_id'  => $order->id,
+                            'label'           => 'Preconto ' . ($i + 1) . '/' . $total,
+                            'items'           => null,
+                            'covers'          => 0,
+                            'total'           => $q,
+                            'discount_type'   => 'none',
+                            'discount_amount' => 0,
+                            'discount_value'  => 0,
+                            'status'          => 'pending',
+                        ]);
+                    }
+                    return $splits;
+                });
+
+                // Stampa N ricevute separate, una per split.
+                foreach ($createdSplits as $s) {
+                    PrintPrecontoJob::dispatch($order->id, $operatorId, null, null, 0, $s->id);
+                }
+
+                $this->logger->logPrintPreconto($order, $operatorId, $total, [
+                    'split_type' => $type,
+                    'split_ids'  => collect($createdSplits)->pluck('id')->all(),
+                ]);
+                $order->update(['preconto_requested_at' => now()]);
+
+                $message = $type === 'split'
+                    ? "PreConto diviso per $total persone (stampate $total ricevute)"
+                    : "PreConto diviso in $total importi (stampate $total ricevute)";
+                return response()->json(['success' => true, 'message' => $message]);
+            }
+
+            // ── Full preconto (intero) ────────────────────────────────────────
             $discountType   = $validated['discount_type'] ?? 'none';
             $discountAmount = (float) ($validated['discount_amount'] ?? 0);
-            Log::info(__METHOD__ . ': ' . __LINE__);
-            PrintPrecontoJob::dispatch($order->id, $operatorId, $splitCount, $discountType, $discountAmount);
-            Log::info(__METHOD__ . ': ' . __LINE__);
-            $this->logger->logPrintPreconto($order, $operatorId, $splitCount);
+            PrintPrecontoJob::dispatch($order->id, $operatorId, null, $discountType, $discountAmount);
+            $this->logger->logPrintPreconto($order, $operatorId, null);
             $order->update(['preconto_requested_at' => now()]);
-            $message = 'PreConto stampato con successo';
-            if ($splitCount && $splitCount > 1) {
-                $message .= " (diviso per $splitCount persone)";
-            }
-            return response()->json(['success' => true, 'message' => $message]);
+            return response()->json(['success' => true, 'message' => 'PreConto stampato con successo']);
 
         } catch (\Exception $e) {
             Log::error('Error printing preconto: ' . $e->getMessage());
