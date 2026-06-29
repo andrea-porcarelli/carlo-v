@@ -102,6 +102,15 @@ $permissionMeta = [
                                 <div class="alert alert-info">
                                     <i class="fas fa-key"></i>
                                     <strong>PIN di Autenticazione:</strong> Codice numerico univoco, da 1 a 5 cifre. Lascia vuoto per non modificare.
+                                    @if(!empty($_user->authentication_pin))
+                                        <div class="m-t-xs" style="display:flex; align-items:center; gap:8px;">
+                                            <span>PIN attuale:</span>
+                                            <code style="font-size:1.1rem; font-weight:700; padding:2px 10px; background:#fff; border:1px solid #c2e0ff; border-radius:4px; color:#1c84c6; letter-spacing:2px;">{{ $_user->authentication_pin }}</code>
+                                            <button type="button" class="btn btn-xs btn-default js-copy-pin" data-pin="{{ $_user->authentication_pin }}" title="Copia">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                             @include('backoffice.components.form.input', [
@@ -150,6 +159,15 @@ $permissionMeta = [
                                 <div class="alert alert-info">
                                     <i class="fas fa-key"></i>
                                     <strong>PIN di Autenticazione:</strong> Codice numerico univoco, da 1 a 5 cifre. Lascia vuoto per non modificare.
+                                    @if(!empty($_user->authentication_pin))
+                                        <div class="m-t-xs" style="display:flex; align-items:center; gap:8px;">
+                                            <span>PIN attuale:</span>
+                                            <code style="font-size:1.1rem; font-weight:700; padding:2px 10px; background:#fff; border:1px solid #c2e0ff; border-radius:4px; color:#1c84c6; letter-spacing:2px;">{{ $_user->authentication_pin }}</code>
+                                            <button type="button" class="btn btn-xs btn-default js-copy-pin" data-pin="{{ $_user->authentication_pin }}" title="Copia">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                             @include('backoffice.components.form.input', [
@@ -306,6 +324,28 @@ $(document).ready(function () {
         document.querySelectorAll('#permissionsPanel .js-switch').forEach(function (el, i) {
             if (el.checked) switchInstances[i].setPosition(true);
         });
+    });
+
+    // ── Copia PIN ─────────────────────────────────────────────────────────────
+    $(document).on('click', '.js-copy-pin', function () {
+        const pin = $(this).data('pin');
+        const btn = $(this);
+        if (!pin) return;
+        const done = () => {
+            const old = btn.html();
+            btn.html('<i class="fas fa-check"></i>');
+            setTimeout(() => btn.html(old), 1200);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(String(pin)).then(done).catch(() => {});
+        } else {
+            const tmp = document.createElement('textarea');
+            tmp.value = String(pin);
+            document.body.appendChild(tmp);
+            tmp.select();
+            try { document.execCommand('copy'); done(); } catch (e) {}
+            document.body.removeChild(tmp);
+        }
     });
 
     // ── Submit ────────────────────────────────────────────────────────────────
