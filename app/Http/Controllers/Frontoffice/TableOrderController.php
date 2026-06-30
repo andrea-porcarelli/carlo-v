@@ -1437,7 +1437,7 @@ class TableOrderController extends Controller
                 ])->values(),
                 // L'admin acka da Backoffice → Contabilità → Fatture (le righe
                 // scartate non risolte espongono il bottone "Riconosci").
-                'ack_url' => route('backoffice.accounting.invoices'),
+                'ack_url' => route('accounting.invoices.index'),
             ], 409);
         }
 

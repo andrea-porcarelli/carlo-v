@@ -6,6 +6,7 @@ use App\Facades\Utils;
 use App\Jobs\SendInvoiceToMysondJob;
 use App\Models\Customer;
 use App\Models\InvoiceMysondLog;
+use App\Models\MirroredInvoice;
 use App\Models\TableOrderInvoice;
 use App\Services\MysondFatturaService;
 use App\Services\MysondInvoiceMirror;
@@ -36,7 +37,47 @@ class AccountingController extends BaseController
             return ['id' => $c->id, 'label' => $c->full_name];
         })->toArray();
 
-        return view('backoffice.accounting.invoices.index', compact('customers'));
+        // Fatture viste su MySond ma non emesse da Carlo V (carlo-v o altri
+        // software della stessa azienda, o emesse manualmente da MySond).
+        $externalInvoices = MirroredInvoice::whereNull('local_invoice_id')
+            ->orderByDesc('mysond_date')
+            ->limit(100)
+            ->get();
+
+        $pendingAcks = MirroredInvoice::pendingAck()
+            ->orderBy('first_synced_at')
+            ->get();
+
+        return view('backoffice.accounting.invoices.index', compact(
+            'customers', 'externalInvoices', 'pendingAcks'
+        ));
+    }
+
+    public function ackMirroredRejection(Request $request, MirroredInvoice $mirrored)
+    {
+        abort_unless($mirrored->isRejected(), 422, 'Fattura non in stato di scarto.');
+
+        $data = $request->validate([
+            'note' => 'required|string|min:5|max:500',
+        ]);
+
+        $mirrored->update([
+            'acknowledged_at'   => now(),
+            'acknowledged_by'   => auth()->user()?->email ?: 'admin',
+            'acknowledged_note' => $data['note'],
+        ]);
+
+        return back()->with('flash', 'Scartata riconosciuta. Emissioni nuovamente sbloccate (se non ce ne sono altre pendenti).');
+    }
+
+    public function mirroredXml(MirroredInvoice $mirrored)
+    {
+        abort_if(empty($mirrored->xml_content), 404, 'XML non ancora scaricato. Funzione lazy download da implementare.');
+
+        return response($mirrored->xml_content, 200, [
+            'Content-Type' => 'application/xml; charset=utf-8',
+            'Content-Disposition' => 'inline; filename="'.$mirrored->file_name.'.xml"',
+        ]);
     }
 
     /**

@@ -6,6 +6,14 @@
     ])
 @endsection
 @section('main-content')
+    @if (!empty($pendingAcks) && $pendingAcks->isNotEmpty())
+        <div class="alert alert-danger">
+            <strong>⛔️ Emissione fatture bloccata.</strong>
+            {{ $pendingAcks->count() }} scartata/e SDI su MySond da riconoscere prima di poter emettere nuove fatture.
+            Vedi sezione "Scartate SDI da riconoscere" sotto.
+        </div>
+    @endif
+
     <div class="row">
         <div class="col-lg-12">
             <div class="panel panel-default">
@@ -65,6 +73,119 @@
             </div>
         </div>
     </div>
+
+    @if (!empty($pendingAcks) && $pendingAcks->isNotEmpty())
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="panel panel-danger">
+                    <div class="panel-heading"><strong>⚠️ Scartate SDI da riconoscere ({{ $pendingAcks->count() }})</strong></div>
+                    <div class="panel-body">
+                        <p>MySond ha rifiutato queste fatture. L'emissione di nuove fatture è bloccata finché non vengono riconosciute con nota di come sono state gestite.</p>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered">
+                                <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Numero</th>
+                                    <th>Cliente</th>
+                                    <th>Stato</th>
+                                    <th>Scoperta</th>
+                                    <th style="min-width:380px;">Riconosci</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                @foreach ($pendingAcks as $r)
+                                    <tr>
+                                        <td><code>{{ $r->file_name }}</code></td>
+                                        <td><code>{{ $r->mysond_code ?? '—' }}</code></td>
+                                        <td>{{ $r->customer_name ?? '—' }}</td>
+                                        <td><span class="label label-danger">{{ $r->stato_label ?? ('Stato '.$r->stato) }}</span></td>
+                                        <td>{{ $r->first_synced_at?->format('d/m/Y H:i') }}</td>
+                                        <td>
+                                            <form method="POST" action="{{ route('accounting.mirrored.ack', $r) }}" class="form-inline"
+                                                  onsubmit="const n=this.querySelector('input[name=note]'); if(!n.value || n.value.length<5){alert('Inserisci una nota di almeno 5 caratteri.'); n.focus(); return false;}">
+                                            @csrf
+                                            <input type="text" name="note" class="form-control input-sm" placeholder="Nota (min 5 char)" required minlength="5" style="width:240px;">
+                                            <button type="submit" class="btn btn-success btn-sm">Riconosci</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if (!empty($externalInvoices) && $externalInvoices->isNotEmpty())
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="panel panel-default">
+                    <div class="panel-heading"><strong>Fatture da MySond (esterne)</strong></div>
+                    <div class="panel-body">
+                        <p class="text-muted">Fatture visibili sull'Azienda MySond ma non emesse da Carlo V (emesse da altri software o manualmente dal portale). Sola lettura.</p>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered">
+                                <thead>
+                                <tr>
+                                    <th>Numero</th>
+                                    <th>Data</th>
+                                    <th>Cliente</th>
+                                    <th>Importo</th>
+                                    <th>SDI</th>
+                                    <th>Azione</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                @foreach ($externalInvoices as $m)
+                                    <tr>
+                                        <td>
+                                            <code>{{ $m->mysond_code ?? '—' }}</code>
+                                            <small class="text-muted d-block">{{ $m->file_name }}</small>
+                                        </td>
+                                        <td>{{ $m->mysond_date?->format('d/m/Y') ?? '—' }}</td>
+                                        <td>
+                                            {{ $m->customer_name ?? '—' }}
+                                            @if ($m->customer_vat) <small class="text-muted d-block">P.IVA {{ $m->customer_vat }}</small>
+                                            @elseif ($m->customer_cf) <small class="text-muted d-block">CF {{ $m->customer_cf }}</small>
+                                            @endif
+                                        </td>
+                                        <td>{{ $m->mysond_total !== null ? number_format((float) $m->mysond_total, 2, ',', '.').' €' : '—' }}</td>
+                                        <td>
+                                            @if ($m->stato !== null)
+                                                @php
+                                                    $cls = match(true) {
+                                                        in_array($m->stato, [7, 9]) => 'label-success',
+                                                        in_array($m->stato, [1, 6, 10]) => 'label-danger',
+                                                        in_array($m->stato, [8, 11, 12]) => 'label-warning',
+                                                        default => 'label-default',
+                                                    };
+                                                @endphp
+                                                <span class="label {{ $cls }}">{{ $m->stato_label ?? ('Stato '.$m->stato) }}</span>
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if (!empty($m->xml_content))
+                                                <a href="{{ route('accounting.mirrored.xml', $m) }}" target="_blank" class="btn btn-xs btn-info">XML</a>
+                                            @else
+                                                <span class="text-muted" title="Download XML lazy non ancora implementato">XML —</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div class="modal fade" id="mysond-logs-modal" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-lg" role="document" style="max-width: 1100px;">

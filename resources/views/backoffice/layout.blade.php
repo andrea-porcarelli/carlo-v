@@ -10,6 +10,22 @@
     <div id="page-wrapper" class="gray-bg   ">
         @include('backoffice.components.top-header')
         <div class="m-t-sm">
+            @php
+                try {
+                    $globalPendingAcks = \Illuminate\Support\Facades\Schema::hasTable('mirrored_invoices')
+                        ? \App\Models\MirroredInvoice::pendingAck()->count()
+                        : 0;
+                } catch (\Throwable $e) {
+                    $globalPendingAcks = 0;
+                }
+            @endphp
+            @if ($globalPendingAcks > 0 && !request()->routeIs('accounting.invoices.*'))
+                <div class="alert alert-danger" style="margin:10px 20px;">
+                    <strong>⛔️ Emissione fatture bloccata.</strong>
+                    {{ $globalPendingAcks }} scartata/e SDI su MySond da riconoscere.
+                    <a href="{{ route('accounting.invoices.index') }}" class="alert-link">Vai a Contabilità → Fatture →</a>
+                </div>
+            @endif
             @yield('main-content')
         </div>
     </div>

@@ -285,6 +285,12 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/', [AccountingController::class, 'customers'])->name('index');
                 Route::get('/datatable', [AccountingController::class, 'customersDatatable'])->name('datatable');
             });
+
+            // Mirror MySond: fatture viste su MySond ma non emesse da Carlo V.
+            Route::group(['prefix' => '/mirrored', 'as' => 'mirrored.'], function() {
+                Route::get('/{mirrored}/xml', [AccountingController::class, 'mirroredXml'])->name('xml');
+                Route::post('/{mirrored}/ack', [AccountingController::class, 'ackMirroredRejection'])->name('ack');
+            });
         });
 
         // Sync
