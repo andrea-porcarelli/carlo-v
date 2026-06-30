@@ -151,9 +151,11 @@ final class DitronReceiptService implements ReceiptIssuerInterface
         }
 
         // Split equi (type 'split'/'amounts') hanno items=null: emettiamo una riga unica con il totale.
+        // Lo scontrino fiscale riporta "Pasto completo" per evitare descrizioni come "Preconto 3/3"
+        // che non sono conformi sul Fiscal Ditron.
         if (empty($items)) {
             $items[] = [
-                'description' => (string) ($split->label ?: 'Quota parziale'),
+                'description' => 'Pasto completo',
                 'unit_price'  => round((float) $split->total, 2),
                 'quantity'    => 1.0,
             ];
