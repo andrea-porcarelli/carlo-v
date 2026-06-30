@@ -1419,24 +1419,25 @@ class TableOrderController extends Controller
             ], 404);
         }
 
-        // Pre-emissione: allinea contatore con MySond + verifica scartate SDI
-        // non riconosciute. Fuori transazione: la chiamata SOAP non deve
-        // tenere lock sulla tabella settings.
+        // Pre-emissione: sync mirror MySond (allinea contatore + scartate SDI)
+        // e blocca se ci sono rifiuti non riconosciuti. Fuori transazione.
         try {
-            app(\App\Services\PreEmissionGuard::class)->run();
+            app(\App\Services\MysondInvoiceMirror::class)->runOrThrow();
         } catch (\App\Exceptions\PendingSdiRejectionsException $e) {
             return response()->json([
                 'success' => false,
                 'code'    => 'sdi_rejections_pending',
                 'message' => 'Emissione bloccata: ci sono fatture scartate dallo SDI da risolvere prima di poter emettere nuove fatture.',
                 'rejections' => $e->rejections->map(fn ($r) => [
-                    'file_name'     => $r->file_name,
-                    'mysond_code'   => $r->mysond_code,
-                    'stato'         => $r->stato,
-                    'stato_label'   => $r->stato_label,
-                    'first_seen_at' => $r->first_seen_at?->toIso8601String(),
+                    'file_name'       => $r->file_name,
+                    'mysond_code'     => $r->mysond_code,
+                    'stato'           => $r->stato,
+                    'stato_label'     => $r->stato_label,
+                    'first_synced_at' => $r->first_synced_at?->toIso8601String(),
                 ])->values(),
-                'ack_url' => route('backoffice.sdi-rejections.index'),
+                // L'admin acka da Backoffice → Contabilità → Fatture (le righe
+                // scartate non risolte espongono il bottone "Riconosci").
+                'ack_url' => route('backoffice.accounting.invoices'),
             ], 409);
         }
 

@@ -43,6 +43,11 @@ return [
         // qualsiasi errore (MySond down, parsing fallito) lascia il contatore
         // locale invariato e l'emissione prosegue.
         'sync_counter_on_issue' => env('MYSOND_SYNC_COUNTER_ON_ISSUE', true),
+        // Quando true, prima di emettere una fattura controlla se ci sono
+        // scartate SDI non ancora riconosciute sull'Azienda MySond (anche
+        // provenienti da altri progetti che condividono le stesse credenziali)
+        // e blocca l'emissione finché l'admin non le acka dal backoffice.
+        'block_on_unack_rejections' => env('MYSOND_BLOCK_ON_UNACK_REJECTIONS', true),
     ],
 
 ];

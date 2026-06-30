@@ -563,4 +563,53 @@ class MysondFatturaService
         // conteggio degli item così almeno non ripartiamo da 1.
         return $matches > 0 ? $matches : count($items);
     }
+
+    /**
+     * Elenco fatture in stato di scarto/rifiuto per l'anno indicato. Usata dal
+     * PreEmissionGuard per bloccare l'emissione finché ogni scartata non è
+     * stata riconosciuta dall'admin.
+     *
+     * Ritorna array di array associativi:
+     *   ['file_name'=>..., 'code'=>..., 'stato'=>int, 'stato_label'=>?string]
+     */
+    public function listRejectedForYear(int $year): array
+    {
+        $items = $this->getFeInviateLink($year);
+        if (empty($items)) {
+            return [];
+        }
+
+        $rejectedCodes = [
+            \App\Models\SdiRejectionAck::STATO_RIFIUTATA,
+            \App\Models\SdiRejectionAck::STATO_SCARTATA,
+            \App\Models\SdiRejectionAck::STATO_RIFIUTATA_PA,
+        ];
+
+        $out = [];
+        foreach ($items as $item) {
+            $stato = isset($item->stato) && is_numeric($item->stato) ? (int) $item->stato : null;
+            if ($stato === null || !in_array($stato, $rejectedCodes, true)) {
+                continue;
+            }
+
+            // MySond docFeLink espone `docName` come filename del documento
+            // (es. "IT01234567890_00042"). Usato come chiave stabile per gli
+            // ack — non possiamo usare solo il numero perché può ripetersi
+            // tra progetti diversi che condividono l'Azienda.
+            $fileName = (string) ($item->docName ?? $item->fileName ?? '');
+            if ($fileName === '') {
+                continue;
+            }
+            $fileName = preg_replace('/\.xml$/i', '', $fileName);
+
+            $out[] = [
+                'file_name'   => $fileName,
+                'code'        => isset($item->code) ? (string) $item->code : null,
+                'stato'       => $stato,
+                'stato_label' => \App\Models\TableOrderInvoice::sdiStatusLabel($stato),
+            ];
+        }
+
+        return $out;
+    }
 }

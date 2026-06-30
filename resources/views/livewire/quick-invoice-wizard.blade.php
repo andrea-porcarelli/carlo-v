@@ -379,9 +379,24 @@
         <div class="qiw-card">
             <div class="qiw-card-header">
                 <i class="fa fa-paper-plane"></i>
-                Step 3 — Riepilogo {{ $result ? '& esito' : '& invio' }}
+                Step 3 — Riepilogo {{ $result ? '& esito' : ($this->isEditMode() ? '& re-invio' : '& invio') }}
             </div>
             <div class="qiw-card-body">
+
+                @if($this->isEditMode() && !$result)
+                    <div class="alert alert-warning" style="font-size:13px;">
+                        <i class="fa fa-pencil"></i>
+                        Stai modificando una fattura precedentemente <strong>scartata</strong> o in errore.
+                        Verrà rigenerato l'XML e re-inviata a MySond con lo stesso codice file SDI
+                        (<strong>{{ \App\Models\TableOrderInvoice::find($invoiceId)->invoice_name ?? '—' }}</strong>).
+                    </div>
+                    <div class="form-group" style="max-width:320px;">
+                        <label for="invoiceCode"><strong>Numero fattura</strong></label>
+                        <input type="text" id="invoiceCode" class="form-control" wire:model.live="invoiceCode" maxlength="50">
+                        @error('invoiceCode')<span class="text-danger" style="font-size:12px;">{{ $message }}</span>@enderror
+                        <small class="text-muted">Editabile. Deve essere univoco rispetto alle altre fatture.</small>
+                    </div>
+                @endif
 
                 @if($result)
                     {{-- Esito --}}
@@ -487,7 +502,8 @@
                     </button>
                     <button type="button" class="btn btn-success pull-right" wire:click="submit" wire:loading.attr="disabled" @if($submitting) disabled @endif>
                         <span wire:loading.remove wire:target="submit">
-                            <i class="fa fa-paper-plane"></i> Genera ed invia a MySond
+                            <i class="fa fa-paper-plane"></i>
+                            {{ $this->isEditMode() ? 'Salva e re-invia a MySond' : 'Genera ed invia a MySond' }}
                         </span>
                         <span wire:loading wire:target="submit">
                             <i class="fa fa-spinner fa-spin"></i> Invio in corso...

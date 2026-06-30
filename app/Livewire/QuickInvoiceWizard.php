@@ -16,6 +16,10 @@ class QuickInvoiceWizard extends Component
 {
     public int $step = 1;
 
+    // ── Edit mode ──────────────────────────────────────────────────────────
+    public ?int $invoiceId = null;
+    public string $invoiceCode = '';
+
     // ── Step 1 – Customer ──────────────────────────────────────────────────
     public string $customerSearch = '';
     public array $customerSearchResults = [];
@@ -48,9 +52,52 @@ class QuickInvoiceWizard extends Component
     public ?array $result = null;
     public bool $submitting = false;
 
-    public function mount(): void
+    public function mount(?int $invoiceId = null): void
     {
         $this->vatRate = (float) Setting::get('invoice_vat_rate', 10);
+
+        if ($invoiceId !== null) {
+            $this->loadInvoiceForEdit($invoiceId);
+        }
+    }
+
+    public function isEditMode(): bool
+    {
+        return $this->invoiceId !== null;
+    }
+
+    private function loadInvoiceForEdit(int $invoiceId): void
+    {
+        $invoice = TableOrderInvoice::with('customer')->findOrFail($invoiceId);
+        if (!$invoice->isEditable()) {
+            abort(403, 'Fattura non modificabile.');
+        }
+
+        $this->invoiceId   = $invoice->id;
+        $this->invoiceCode = (string) $invoice->invoice_code;
+
+        $customer = $invoice->customer;
+        if ($customer) {
+            $this->selectCustomer($customer->id);
+        }
+
+        $this->discount       = (float) $invoice->discount;
+        $this->description    = (string) ($invoice->description ?? '');
+        $this->paymentMethod  = (string) ($invoice->payment_method ?? 'bonifico');
+
+        $persistedLines = is_array($invoice->lines) ? $invoice->lines : [];
+        $this->lines = array_map(function ($line) {
+            return [
+                'label'      => (string) ($line['label'] ?? ''),
+                'quantity'   => (float) ($line['quantity'] ?? 0),
+                'unit_price' => (float) ($line['unit_price'] ?? 0),
+                'dish_id'    => isset($line['dish_id']) ? (int) $line['dish_id'] : null,
+            ];
+        }, $persistedLines);
+
+        if (!empty($persistedLines) && isset($persistedLines[0]['vat_rate'])) {
+            $this->vatRate = (float) $persistedLines[0]['vat_rate'];
+        }
     }
 
     // ────────────────────── Customer search ────────────────────────────────
@@ -334,15 +381,39 @@ class QuickInvoiceWizard extends Component
     {
         $this->validateCustomerStep();
         $this->validateLinesStep();
+        if ($this->isEditMode()) {
+            $this->validateInvoiceCode();
+        }
 
         $this->submitting = true;
 
         $invoice = null;
 
-        // Allinea il contatore locale al massimo progressivo già emesso su
-        // MySond per l'anno corrente. Fuori transazione: la chiamata SOAP non
-        // deve tenere lock sulla tabella settings. Fail-soft (vedi syncer).
-        app(\App\Services\InvoiceCounterSyncer::class)->syncFromMysond();
+        // Pre-emissione: sync mirror MySond (allinea contatore + scartate SDI)
+        // e blocca se ci sono rifiuti non riconosciuti. Saltato in edit mode:
+        // stiamo proprio rettificando una scartata.
+        if (!$this->isEditMode()) {
+            try {
+                app(\App\Services\MysondInvoiceMirror::class)->runOrThrow();
+            } catch (\App\Exceptions\PendingSdiRejectionsException $e) {
+                $this->result = [
+                    'success' => false,
+                    'code'    => 'sdi_rejections_pending',
+                    'message' => sprintf(
+                        'Emissione bloccata: %d scartata/e SDI da riconoscere prima di emettere nuove fatture. Vai a Backoffice → SDI scartate.',
+                        $e->rejections->count()
+                    ),
+                    'rejections' => $e->rejections->map(fn ($r) => [
+                        'file_name'   => $r->file_name,
+                        'mysond_code' => $r->mysond_code,
+                        'stato_label' => $r->stato_label,
+                    ])->values()->all(),
+                ];
+                $this->step = 3;
+                $this->submitting = false;
+                return;
+            }
+        }
 
         try {
             // ── Fase 1: persistenza atomica di customer + fattura ─────────────
@@ -365,14 +436,6 @@ class QuickInvoiceWizard extends Component
                     $customer = Customer::create($this->customerPayload());
                 }
 
-                // 2) Generate invoice code & progressivo
-                $counter     = (int) Setting::get('invoice_counter', 0) + 1;
-                Setting::set('invoice_counter', $counter, 'integer');
-                $year        = now()->format('Y');
-                $invoiceCode = $year . '-' . str_pad((string) $counter, 5, '0', STR_PAD_LEFT);
-                $invoiceName = TableOrderInvoice::toAlphanumeric($counter);
-
-                // 3) Persist invoice (no table_order_id, multi-line lines payload)
                 $persistedLines = array_map(function ($line) {
                     return [
                         'label'      => (string) ($line['label'] ?? ''),
@@ -383,19 +446,50 @@ class QuickInvoiceWizard extends Component
                     ];
                 }, $this->lines);
 
-                $invoice = TableOrderInvoice::create([
-                    'table_order_id'  => null,
-                    'customer_id'     => $customer->id,
-                    'invoice_code'    => $invoiceCode,
-                    'invoice_name'    => $invoiceName,
-                    'amount'          => $this->totalAmount,
-                    'discount'        => (float) $this->discount,
-                    'tax'             => $this->tax,
-                    'description'     => $this->description !== '' ? $this->description : null,
-                    'lines'           => $persistedLines,
-                    'payment_method'  => $this->paymentMethod,
-                    'status'          => 'pending',
-                ]);
+                if ($this->isEditMode()) {
+                    $invoice = TableOrderInvoice::findOrFail($this->invoiceId);
+                    if (!$invoice->isEditable()) {
+                        throw new \RuntimeException('Fattura non più modificabile.');
+                    }
+                    $invoice->update([
+                        'customer_id'     => $customer->id,
+                        'invoice_code'    => trim($this->invoiceCode),
+                        'amount'          => $this->totalAmount,
+                        'discount'        => (float) $this->discount,
+                        'tax'             => $this->tax,
+                        'description'     => $this->description !== '' ? $this->description : null,
+                        'lines'           => $persistedLines,
+                        'payment_method'  => $this->paymentMethod,
+                        'status'          => 'pending',
+                        'sdi_status'      => null,
+                        'sdi_status_label'=> null,
+                        'sdi_checked_at'  => null,
+                        'sdi_response'    => null,
+                        'mysond_response' => null,
+                        'xml_content'     => null,
+                        'sent_at'         => null,
+                    ]);
+                } else {
+                    $counter     = (int) Setting::get('invoice_counter', 0) + 1;
+                    Setting::set('invoice_counter', $counter, 'integer');
+                    $year        = now()->format('Y');
+                    $invoiceCode = $year . '-' . str_pad((string) $counter, 5, '0', STR_PAD_LEFT);
+                    $invoiceName = TableOrderInvoice::toAlphanumeric($counter);
+
+                    $invoice = TableOrderInvoice::create([
+                        'table_order_id'  => null,
+                        'customer_id'     => $customer->id,
+                        'invoice_code'    => $invoiceCode,
+                        'invoice_name'    => $invoiceName,
+                        'amount'          => $this->totalAmount,
+                        'discount'        => (float) $this->discount,
+                        'tax'             => $this->tax,
+                        'description'     => $this->description !== '' ? $this->description : null,
+                        'lines'           => $persistedLines,
+                        'payment_method'  => $this->paymentMethod,
+                        'status'          => 'pending',
+                    ]);
+                }
 
                 // Attach in-memory customer so XML factory has access immediately
                 $invoice->setRelation('customer', $customer);
@@ -466,6 +560,24 @@ class QuickInvoiceWizard extends Component
         ];
         $this->step = 3;
         $this->submitting = false;
+    }
+
+    private function validateInvoiceCode(): void
+    {
+        $code = trim($this->invoiceCode);
+        if ($code === '') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'invoiceCode' => 'Il numero fattura è obbligatorio.',
+            ]);
+        }
+        $exists = TableOrderInvoice::where('invoice_code', $code)
+            ->where('id', '!=', $this->invoiceId)
+            ->exists();
+        if ($exists) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'invoiceCode' => 'Numero fattura già usato da un\'altra fattura.',
+            ]);
+        }
     }
 
     private function customerPayload(): array

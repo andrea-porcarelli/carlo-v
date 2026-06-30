@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\InvoiceMysondLog;
 use App\Models\TableOrderInvoice;
 use App\Services\MysondFatturaService;
+use App\Services\MysondInvoiceMirror;
 use App\Services\SdiStatusNotifier;
 use App\Traits\DatatableTrait;
 use Exception;
@@ -23,8 +24,14 @@ class AccountingController extends BaseController
 
     protected string $name = 'accounting.invoices';
 
-    public function invoices(): View
+    public function invoices(MysondInvoiceMirror $mirror): View
     {
+        // All'apertura della sezione fatture sincronizziamo il mirror locale
+        // con MySond — single source of truth per stato SDI, contatore e
+        // visibilità delle fatture emesse anche dall'altro progetto.
+        // Fail-soft internamente: se MySond è giù la pagina si apre comunque.
+        $mirror->sync();
+
         $customers = Customer::orderBy('full_name')->get(['id', 'full_name'])->map(function ($c) {
             return ['id' => $c->id, 'label' => $c->full_name];
         })->toArray();
@@ -38,6 +45,12 @@ class AccountingController extends BaseController
     public function createInvoice(): View
     {
         return view('backoffice.accounting.invoices.create');
+    }
+
+    public function editInvoice(TableOrderInvoice $invoice): View
+    {
+        abort_unless($invoice->isEditable(), 403, 'Solo le fatture Scartate o in errore possono essere modificate.');
+        return view('backoffice.accounting.invoices.edit', compact('invoice'));
     }
 
     public function datatable(Request $request): JsonResponse
@@ -112,6 +125,10 @@ class AccountingController extends BaseController
                                 . '<a href="' . route('accounting.invoices.pdf', $item->id) . '" target="_blank" class="btn btn-xs btn-danger" title="PDF"><i class="fa fa-file-pdf"></i></a> ';
                     }
                     $logBtn = '<button class="btn btn-xs btn-default btn-show-mysond-logs" data-id="' . $item->id . '" title="Log invio MySond"><i class="fa fa-list-alt"></i></button> ';
+                    $editBtn = '';
+                    if ($item->isEditable()) {
+                        $editBtn = '<a href="' . route('accounting.invoices.edit', $item->id) . '" class="btn btn-xs btn-success" title="Modifica e re-invia"><i class="fa fa-pencil"></i></a> ';
+                    }
                     $resendBtn = '';
                     if (in_array($item->status, ['error', 'pending'])) {
                         $title = !empty($item->xml_content) ? 'Re-invia' : 'Rigenera XML e invia';
@@ -121,7 +138,7 @@ class AccountingController extends BaseController
                     if ($item->status === 'sent' && !empty($item->invoice_name)) {
                         $sdiBtn = '<button class="btn btn-xs btn-primary btn-refresh-sdi" data-id="' . $item->id . '" title="Aggiorna esito SDI"><i class="fa fa-sync"></i></button>';
                     }
-                    return $xmlBtn . $logBtn . $resendBtn . $sdiBtn;
+                    return $xmlBtn . $logBtn . $editBtn . $resendBtn . $sdiBtn;
                 })
                 ->addColumn('sdi_status_label_fmt', function ($item) {
                     if ($item->sdi_status === null) {
