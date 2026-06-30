@@ -133,16 +133,31 @@ final class DitronReceiptService implements ReceiptIssuerInterface
 
     private function buildPayloadForSplit(PrecontoSplit $split, string $paymentMethod): array
     {
-        $order = $split->tableOrder;
+        $order = $split->order;
         $order?->loadMissing(['restaurantTable']);
 
-        $items = $split->orderItems()
-            ->with('dish')
-            ->get()
-            ->filter(fn(OrderItem $i) => !$i->isSegueItem() && (float) $i->subtotal > 0)
-            ->map(fn(OrderItem $i) => $this->itemToPayload($i))
-            ->values()
-            ->all();
+        $items = [];
+        foreach ((array) ($split->items ?? []) as $it) {
+            $qty = max(1, (int) ($it['quantity'] ?? 1));
+            $subtotal = (float) ($it['subtotal'] ?? 0);
+            if ($subtotal <= 0) {
+                continue;
+            }
+            $items[] = [
+                'description' => (string) ($it['dish_name'] ?? 'ARTICOLO'),
+                'unit_price'  => round($subtotal / $qty, 2),
+                'quantity'    => (float) $qty,
+            ];
+        }
+
+        // Split equi (type 'split'/'amounts') hanno items=null: emettiamo una riga unica con il totale.
+        if (empty($items)) {
+            $items[] = [
+                'description' => (string) ($split->label ?: 'Quota parziale'),
+                'unit_price'  => round((float) $split->total, 2),
+                'quantity'    => 1.0,
+            ];
+        }
 
         return [
             'idempotency_key'         => $this->idempotencyKeyForSplit($split),
