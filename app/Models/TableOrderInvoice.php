@@ -80,7 +80,7 @@ class TableOrderInvoice extends Model
         return self::SDI_STATUS_LABELS[$code] ?? ('Stato ' . $code);
     }
 
-    public const SDI_REJECTED_CODES = [1, 6, 10];
+    public const SDI_REJECTED_CODES = [1, 6, 8, 10];
 
     /**
      * Una fattura è modificabile se è stata scartata da SDI o se la generazione
