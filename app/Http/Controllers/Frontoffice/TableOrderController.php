@@ -1620,7 +1620,10 @@ class TableOrderController extends Controller
             'discount_amount' => 'nullable|numeric|min:0',
             'discount_override_value' => 'nullable|numeric|min:0',
             'order_id'        => 'nullable|integer',
+            'pay_now'         => 'nullable|boolean',
         ]);
+
+        $payNow = (bool) ($validated['pay_now'] ?? false);
 
         $operatorId = $this->verifyOperatorToken(request()->header('X-Operator-Token'));
         if (!$operatorId) {
@@ -1746,13 +1749,21 @@ class TableOrderController extends Controller
                     'status'         => 'pending',
                 ]);
 
-                PrintPrecontoJob::dispatch($order->id, $operatorId, null, null, 0, $split->id);
-                $this->logger->logPrintPreconto($order, $operatorId, null, ['split_id' => $split->id, 'label' => $label]);
+                if (!$payNow) {
+                    PrintPrecontoJob::dispatch($order->id, $operatorId, null, null, 0, $split->id);
+                }
+                $this->logger->logPrintPreconto($order, $operatorId, null, ['split_id' => $split->id, 'label' => $label], !$payNow);
                 $order->update(['preconto_requested_at' => now()]);
                 return response()->json([
                     'success' => true,
-                    'message' => "Preconto parziale \"$label\" stampato (€" . number_format($splitTotal, 2) . ")",
-                    'data'    => ['split_id' => $split->id, 'total' => $splitTotal],
+                    'message' => $payNow
+                        ? "Quota \"$label\" creata (€" . number_format($splitTotal, 2) . ") — procedi all'incasso"
+                        : "Preconto parziale \"$label\" stampato (€" . number_format($splitTotal, 2) . ")",
+                    'data'    => [
+                        'split_id' => $split->id,
+                        'total'    => $splitTotal,
+                        'pay_now'  => $payNow,
+                    ],
                 ]);
             }
 
@@ -1822,21 +1833,36 @@ class TableOrderController extends Controller
                     return $splits;
                 });
 
-                // Stampa N ricevute separate, una per split.
-                foreach ($createdSplits as $s) {
-                    PrintPrecontoJob::dispatch($order->id, $operatorId, null, null, 0, $s->id);
+                // Stampa N ricevute separate, una per split (salvo incasso diretto).
+                if (!$payNow) {
+                    foreach ($createdSplits as $s) {
+                        PrintPrecontoJob::dispatch($order->id, $operatorId, null, null, 0, $s->id);
+                    }
                 }
 
                 $this->logger->logPrintPreconto($order, $operatorId, $total, [
                     'split_type' => $type,
                     'split_ids'  => collect($createdSplits)->pluck('id')->all(),
-                ]);
+                ], !$payNow);
                 $order->update(['preconto_requested_at' => now()]);
 
-                $message = $type === 'split'
-                    ? "PreConto diviso per $total persone (stampate $total ricevute)"
-                    : "PreConto diviso in $total importi (stampate $total ricevute)";
-                return response()->json(['success' => true, 'message' => $message]);
+                if ($payNow) {
+                    $message = $type === 'split'
+                        ? "Conto diviso per $total persone — procedi all'incasso"
+                        : "Conto diviso in $total importi — procedi all'incasso";
+                } else {
+                    $message = $type === 'split'
+                        ? "PreConto diviso per $total persone (stampate $total ricevute)"
+                        : "PreConto diviso in $total importi (stampate $total ricevute)";
+                }
+                return response()->json([
+                    'success' => true,
+                    'message' => $message,
+                    'data'    => [
+                        'pay_now'   => $payNow,
+                        'split_ids' => collect($createdSplits)->pluck('id')->all(),
+                    ],
+                ]);
             }
 
             // ── Full preconto (intero) ────────────────────────────────────────

@@ -344,17 +344,18 @@ class TableOrderLoggerService
     }
 
     /**
-     * Log per stampa preconto
+     * Log per stampa preconto (o per creazione split senza stampa se $printed=false)
      */
-    public function logPrintPreconto(TableOrder $order, int $operatorId = 0, ?int $splitCount = null): TableOrderLog
+    public function logPrintPreconto(TableOrder $order, int $operatorId = 0, ?int $splitCount = null, array $extra = [], bool $printed = true): TableOrderLog
     {
         $splitInfo = $splitCount && $splitCount > 1 ? " (diviso per {$splitCount})" : '';
+        $verb = $printed ? 'Stampato preconto' : 'Creati split per incasso diretto';
         return $this->log(
-            action: 'print_preconto',
+            action: $printed ? 'print_preconto' : 'create_splits_pay_now',
             entityType: 'table_order',
             entity: $order,
-            dataAfter: array_merge($this->getOrderData($order), ['split_count' => $splitCount]),
-            notes: "Stampato preconto per tavolo #{$order->restaurantTable->table_number}{$splitInfo}",
+            dataAfter: array_merge($this->getOrderData($order), ['split_count' => $splitCount], $extra),
+            notes: "{$verb} per tavolo #{$order->restaurantTable->table_number}{$splitInfo}",
             userId: $operatorId,
         );
     }

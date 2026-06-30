@@ -4815,6 +4815,13 @@ class TableOrdersManager {
         // Discount row is only shown for full bill (default selection)
         if (discountRow) discountRow.style.display = '';
 
+        // Reset "incassa subito" toggle (visibile solo su split/amounts/items)
+        const payNowCb = document.getElementById('precontoPayNow');
+        if (payNowCb) payNowCb.checked = false;
+        const payNowRow = document.getElementById('precontoPayNowRow');
+        if (payNowRow) payNowRow.style.display = 'none';
+        this._updateConfirmPrecontoLabel();
+
         // Show modal
         if (modal) modal.style.display = 'flex';
 
@@ -4847,6 +4854,14 @@ class TableOrdersManager {
                 // Discount only allowed on full bill
                 const discountRow = document.querySelector('.preconto-discount-row');
                 if (discountRow) discountRow.style.display = this.value === 'full' ? '' : 'none';
+                // "Incassa subito" disponibile solo per gli split (no full)
+                const payNowRow = document.getElementById('precontoPayNowRow');
+                if (payNowRow) payNowRow.style.display = this.value === 'full' ? 'none' : 'block';
+                if (this.value === 'full') {
+                    const payNowCb = document.getElementById('precontoPayNow');
+                    if (payNowCb) payNowCb.checked = false;
+                }
+                self._updateConfirmPrecontoLabel();
             };
         });
 
@@ -4928,6 +4943,29 @@ class TableOrdersManager {
         // Confirm button
         const confirmBtn = document.getElementById('confirmPreconto');
         if (confirmBtn) confirmBtn.onclick = () => this.printPreconto();
+
+        // Toggle "incassa subito"
+        const payNowCb = document.getElementById('precontoPayNow');
+        if (payNowCb) payNowCb.onchange = () => this._updateConfirmPrecontoLabel();
+    }
+
+    /**
+     * Aggiorna il testo (e l'icona) del bottone conferma del modal preconto:
+     * "STAMPA" quando si emette il preconto, "INCASSA" quando l'operatore
+     * sceglie di saltare la stampa e passare subito al pagamento.
+     */
+    _updateConfirmPrecontoLabel() {
+        const labelEl = document.getElementById('confirmPrecontoLabel');
+        const btn = document.getElementById('confirmPreconto');
+        if (!labelEl || !btn) return;
+        const payNowCb = document.getElementById('precontoPayNow');
+        const type = document.querySelector('input[name="precontoType"]:checked')?.value || 'full';
+        const payNow = !!(payNowCb && payNowCb.checked) && type !== 'full';
+        labelEl.textContent = payNow ? 'INCASSA' : 'STAMPA';
+        const iconEl = btn.querySelector('i');
+        if (iconEl) {
+            iconEl.className = payNow ? 'fas fa-cash-register me-2' : 'fas fa-print me-2';
+        }
     }
 
     async _renderPrecontoItemsList() {
@@ -5427,7 +5465,13 @@ class TableOrdersManager {
             return;
         }
 
+        // "Incassa subito": salta la stampa del preconto e apre subito la
+        // selezione del metodo di pagamento per ogni quota generata.
+        const payNowCb = document.getElementById('precontoPayNow');
+        const payNow = !!(payNowCb && payNowCb.checked) && precontoType !== 'full';
+
         let body = { type: precontoType };
+        if (payNow) body.pay_now = true;
         if (precontoType === 'split') {
             body.split_count = parseInt(document.getElementById('splitCount').value) || null;
         } else if (precontoType === 'amounts') {
@@ -5484,6 +5528,17 @@ class TableOrdersManager {
             if (result.success) {
                 this.showNotification(result.message || 'PreConto stampato con successo', 'success');
                 await this.loadTables();
+
+                // Incasso diretto: chiudo il modal preconto e apro subito il
+                // selettore del metodo di pagamento (vista split). Vale per tutti
+                // i type (items, split, amounts).
+                if (payNow) {
+                    this.closePrecontoModal();
+                    await this._refreshPendingSplitsIntoSession();
+                    this.updateModifyReceiptItems();
+                    await this.showPaymentMethodModal();
+                    return;
+                }
 
                 if (precontoType === 'items') {
                     // Stay in modal: reload item list with remaining (non-assigned) items

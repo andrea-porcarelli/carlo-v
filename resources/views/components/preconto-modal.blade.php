@@ -123,11 +123,24 @@
             <div id="precontoPartialTotalRow" class="preconto-partial-total" style="display:none;">
                 Totale parziale: <strong id="precontoPartialTotal">€0.00</strong>
             </div>
+
+            <div id="precontoPayNowRow" class="preconto-paynow-row" style="display:none;">
+                <label class="preconto-paynow-label">
+                    <input type="checkbox" id="precontoPayNow">
+                    <span>
+                        <i class="fas fa-cash-register"></i>
+                        Incassa subito senza stampare il preconto
+                    </span>
+                </label>
+                <p class="preconto-paynow-hint">
+                    Dopo la conferma si aprirà il selettore del metodo di pagamento per ogni quota.
+                </p>
+            </div>
         </div>
         <div class="preconto-modal-footer">
             <button type="button" class="btn-preconto-cancel" id="cancelPreconto">ANNULLA</button>
             <button type="button" class="btn-preconto-print" id="confirmPreconto">
-                <i class="fas fa-print me-2"></i>STAMPA
+                <i class="fas fa-print me-2"></i><span id="confirmPrecontoLabel">STAMPA</span>
             </button>
         </div>
     </div>
@@ -647,6 +660,43 @@
 .preconto-partial-total strong {
     color: #dc3545;
     font-size: 1.2rem;
+}
+
+.preconto-paynow-row {
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: #fff8e1;
+    border: 2px solid #ffb300;
+    border-radius: 8px;
+}
+
+.preconto-paynow-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #6d4c00;
+    margin: 0;
+}
+
+.preconto-paynow-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #ffb300;
+    cursor: pointer;
+}
+
+.preconto-paynow-label i {
+    color: #ffb300;
+    font-size: 1.1rem;
+}
+
+.preconto-paynow-hint {
+    margin: 6px 0 0 30px;
+    font-size: 0.8rem;
+    color: #6d4c00;
+    opacity: 0.8;
 }
 
 .preconto-modal-footer {
