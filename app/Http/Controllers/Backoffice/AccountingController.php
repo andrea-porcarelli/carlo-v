@@ -136,6 +136,8 @@ class AccountingController extends BaseController
                         : '';
                     return '<div style="white-space:nowrap;"><span class="label ' . $class . '">' . $label . '</span></div>' . $when;
                 })
+                ->orderColumn('created_fmt', 'created_at $1')
+                ->orderColumn('sent_fmt', 'sent_at $1')
                 ->rawColumns(['code', 'status_badge', 'mysond_desc', 'sdi_status_label_fmt', 'action'])
                 ->make(true);
         } catch (Exception $e) {

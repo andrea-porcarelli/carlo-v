@@ -414,4 +414,153 @@ class MysondFatturaService
     {
         return InvoiceService::make_xml($invoice);
     }
+
+    /**
+     * True when credenziali MySond sono configurate. Usato dai chiamanti per
+     * disattivare silenziosamente sync/operazioni SOAP se l'integrazione non è
+     * configurata (es. ambienti dev senza credenziali reali).
+     */
+    public function isConfigured(): bool
+    {
+        return !empty($this->auth['codiceAzienda'])
+            && !empty($this->auth['username'])
+            && !empty($this->auth['password']);
+    }
+
+    /**
+     * Lista fatture emesse (FatturaPA attivo) per un anno. Variante "Link"
+     * idempotente: ri-interrogare restituisce lo stesso set e non marca i
+     * documenti come "scaricati" (a differenza di getFattureInviate). Usata
+     * da `maxIssuedNumberForYear` per allineare il contatore locale con il
+     * progressivo già presente su MySond.
+     */
+    public function getFeInviateLink(?int $year = null): array
+    {
+        if (!$this->isConfigured()) {
+            return [];
+        }
+
+        $this->setWsdl('mysond');
+
+        $filter = ['utente' => $this->auth];
+        if ($year !== null) {
+            $filter['dataDal'] = sprintf('%d-01-01T00:00:00', $year);
+            $filter['dataAl']  = sprintf('%d-12-31T23:59:59', $year);
+        }
+
+        $params = ['arg0' => $filter];
+
+        try {
+            $response = $this->client->getFeInviateLink($params);
+            $this->logDebug('getFeInviateLink', ['year' => $year]);
+
+            $return = $response->return ?? null;
+            if ($return === null) {
+                return [];
+            }
+            return is_array($return) ? $return : [$return];
+        } catch (Exception $e) {
+            $this->logDebug('getFeInviateLink', ['year' => $year], null, $e);
+            throw $e;
+        }
+    }
+
+    /**
+     * Estrazione "best-effort" dell'anno dal campo data della docFe. MySond
+     * può restituire stringhe ISO, DateTime (quando il SoapClient mappa
+     * xsd:dateTime), epoch in ms o null. In caso di parsing fallito accettiamo
+     * comunque l'item (meglio sovrastimare che perdere una fattura).
+     */
+    private function itemYear($item): ?int
+    {
+        $date = $item->date ?? $item->dateLong ?? null;
+
+        if ($date instanceof \DateTimeInterface) {
+            return (int) $date->format('Y');
+        }
+        if (is_int($date) || (is_string($date) && ctype_digit($date))) {
+            $ts = (int) $date;
+            if ($ts > 10_000_000_000) {
+                $ts = (int) ($ts / 1000);
+            }
+            return (int) date('Y', $ts);
+        }
+        if (is_string($date) && preg_match('/(20\d{2})/', $date, $m)) {
+            return (int) $m[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Estrae un intero ordinabile da un "Numero" fattura.
+     *   "42"          -> 42
+     *   "2026-00042"  -> 42 (run finale)
+     *   "00042/2026"  -> 42 (run iniziale)
+     *   "FT 42 2026"  -> 2026 (max wins; fallback sicuro)
+     */
+    private function numeroToInt(string $numero): ?int
+    {
+        if (preg_match('/-(\d+)\s*$/', $numero, $m)) {
+            return (int) $m[1];
+        }
+        if (preg_match('/^\s*(\d+)/', $numero, $m)) {
+            return (int) $m[1];
+        }
+        if (preg_match_all('/\d+/', $numero, $m)) {
+            return max(array_map('intval', $m[0]));
+        }
+        return null;
+    }
+
+    /**
+     * Numero più alto già presente su MySond per ($year), o null se non
+     * possiamo determinarlo (MySond irraggiungibile, lista vuota, nessun
+     * numero parsabile). Usato per allineare il contatore locale prima di
+     * emettere una nuova fattura, evitando collisioni di numerazione.
+     */
+    public function maxIssuedNumberForYear(int $year): ?int
+    {
+        $allItems = $this->getFeInviateLink($year);
+        if (empty($allItems)) {
+            return null;
+        }
+
+        $items = array_values(array_filter($allItems, function ($item) use ($year) {
+            $y = $this->itemYear($item);
+            return $y === null || $y === $year;
+        }));
+
+        if (empty($items)) {
+            return null;
+        }
+
+        $max = null;
+        $matches = 0;
+
+        foreach ($items as $item) {
+            $code = $item->code ?? null;
+            if (!is_string($code) || $code === '') {
+                continue;
+            }
+
+            $n = $this->numeroToInt($code);
+            if ($n === null) {
+                continue;
+            }
+
+            $matches++;
+            if ($max === null || $n > $max) {
+                $max = $n;
+            }
+        }
+
+        if ($max !== null) {
+            return $max;
+        }
+
+        // Ultimo fallback: nessun `code` parsabile come intero. Restituiamo il
+        // conteggio degli item così almeno non ripartiamo da 1.
+        return $matches > 0 ? $matches : count($items);
+    }
 }

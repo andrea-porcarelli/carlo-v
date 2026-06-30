@@ -1419,6 +1419,11 @@ class TableOrderController extends Controller
             ], 404);
         }
 
+        // Allinea il contatore locale al massimo progressivo già emesso su
+        // MySond per l'anno corrente. Fuori transazione: la chiamata SOAP non
+        // deve tenere lock sulla tabella settings. Fail-soft (vedi syncer).
+        app(\App\Services\InvoiceCounterSyncer::class)->syncFromMysond();
+
         try {
             DB::beginTransaction();
 

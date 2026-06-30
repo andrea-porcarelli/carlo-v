@@ -116,7 +116,7 @@
                         {data: 'sent_fmt'},
                         {data: 'mysond_desc'},
                     ],
-                    order: [[5, 'desc']],
+                    order: [[6, 'desc']],
                     dataForm: ['invoice_code', 'customer_id', 'status'],
                     serverSide: true,
                 }]);

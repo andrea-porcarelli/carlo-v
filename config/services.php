@@ -38,6 +38,11 @@ return [
         'codice_azienda' => env('MYSOND_AZIENDA'),
         'username' => env('MYSOND_USER'),
         'password' => env('MYSOND_PASS'),
+        // Prima di emettere una fattura, allinea il contatore locale al massimo
+        // progressivo già presente su MySond per l'anno corrente. Fail-soft:
+        // qualsiasi errore (MySond down, parsing fallito) lascia il contatore
+        // locale invariato e l'emissione prosegue.
+        'sync_counter_on_issue' => env('MYSOND_SYNC_COUNTER_ON_ISSUE', true),
     ],
 
 ];

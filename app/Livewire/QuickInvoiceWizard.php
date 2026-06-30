@@ -339,6 +339,11 @@ class QuickInvoiceWizard extends Component
 
         $invoice = null;
 
+        // Allinea il contatore locale al massimo progressivo già emesso su
+        // MySond per l'anno corrente. Fuori transazione: la chiamata SOAP non
+        // deve tenere lock sulla tabella settings. Fail-soft (vedi syncer).
+        app(\App\Services\InvoiceCounterSyncer::class)->syncFromMysond();
+
         try {
             // ── Fase 1: persistenza atomica di customer + fattura ─────────────
             // Customer e fattura devono essere salvati anche se la successiva

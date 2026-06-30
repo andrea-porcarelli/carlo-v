@@ -1,39 +1,100 @@
-B.3 — Crea il servizio Windows
+## Avvio DitronAgent.exe da PowerShell
 
-Sempre in cmd come amministratore, una riga sola. Attenzione agli spazi: binPath= "..." ha uno spazio dopo = obbligatorio (è una stranezza di sc):
+Tutti i comandi vanno eseguiti in **Windows PowerShell aperto come Amministratore**
+(Start → digita "PowerShell" → tasto destro → *Esegui come amministratore*).
 
-sc create DitronAgent binPath= "\"C:\Program Files\DitronAgent\DitronAgent.exe\"" start= auto DisplayName= "Ditron Agent (Carlo V)"
+---
 
-Le doppie virgolette annidate (\"…\") servono perché il path contiene spazi.
+### A — Avvio manuale (debug / test)
 
-Risposta attesa:                                                                                                                                                                                                                  
-[SC] CreateService SUCCESS
+Usalo quando vuoi vedere i log a schermo e tenere l'agent attaccato a una finestra.
+Il processo muore quando chiudi PowerShell.
 
-B.4 — Imposta descrizione (cosmetica, utile in services.msc)
+```powershell
+cd 'C:\Program Files\DitronAgent'
+.\DitronAgent.exe
+```
 
-sc description DitronAgent "Ponte HTTP tra Carlo V e WinEcrCom per cassa Ditron RT."
+Verifica rapida da un'altra finestra PowerShell:
 
-B.5 — Avvia il servizio
+```powershell
+Invoke-RestMethod http://localhost:9090/health
+```
 
-sc start DitronAgent
+Per fermarlo: `Ctrl+C` nella finestra dell'agent.
 
-Risposta attesa:
-SERVICE_NAME: DitronAgent                                                                                                                                                                                                         
-STATE              : 2  START_PENDING                                                                                                                                                                                   
-... poi STATE: 4 RUNNING
+> Se hai già avviato il `.exe` "come amministratore" con doppio clic, **chiudilo prima** di
+> proseguire alla sezione B — Windows non lascia girare due istanze sulla stessa porta.
 
-B.6 — Verifica
+---
 
-curl http://localhost:9090/health
+### B — Promozione a servizio Windows (produzione)
 
-Se torna il JSON di prima, il servizio è up. Importante: ora gira come LocalSystem (default di sc create), che ha tutti i permessi — quindi niente più problema su C:\ProgramData\DitronAgent\counter.txt.
+Così l'agent parte da solo al boot, si riavvia se crasha e non dipende dalla sessione utente.
 
-Note su log e gestione
+#### B.1 — Crea il servizio
 
-- I log dell'agent (che prima vedevi nella console) ora vanno nel Visualizzatore eventi Windows → Registri di Windows → Applicazione, filtro per origine DitronAgent. Per il debug è meno comodo della console, ma in produzione è
-  quello che vuoi.
-- Per fermare/riavviare il servizio: sc stop DitronAgent, sc start DitronAgent.
-- Per disinstallare: sc delete DitronAgent.
-- Si avvia automaticamente al boot del PC (start= auto).
+```powershell
+New-Service `
+    -Name        'DitronAgent' `
+    -BinaryPathName '"C:\Program Files\DitronAgent\DitronAgent.exe"' `
+    -DisplayName 'Ditron Agent (Carlo V)' `
+    -Description 'Ponte HTTP tra Carlo V e WinEcrCom per cassa Ditron RT.' `
+    -StartupType Automatic
+```
 
-Conferma quando arrivi al passo B.6 con JSON OK, poi passiamo ad A.       
+Le doppie virgolette annidate `'"..."'` servono perché il path contiene spazi.
+
+#### B.2 — Avvia il servizio
+
+```powershell
+Start-Service -Name DitronAgent
+Get-Service  -Name DitronAgent     # deve mostrare Status: Running
+```
+
+#### B.3 — Verifica HTTP
+
+```powershell
+Invoke-RestMethod http://localhost:9090/health
+```
+
+Se torna il JSON di health l'agent è up. Gira come `LocalSystem` (default di
+`New-Service`), quindi ha pieno accesso a `C:\ProgramData\DitronAgent\counter.txt`.
+
+#### B.4 — Comandi di gestione
+
+```powershell
+Stop-Service   -Name DitronAgent          # ferma
+Restart-Service -Name DitronAgent         # riavvia
+Get-Service    -Name DitronAgent          # stato
+Remove-Service -Name DitronAgent          # disinstalla (Windows 10+/Server 2019+)
+# In alternativa: sc.exe delete DitronAgent
+```
+
+#### B.5 — Auto-restart in caso di crash (opzionale ma consigliato)
+
+`New-Service` non espone le recovery actions. Vanno settate con `sc.exe`:
+
+```powershell
+sc.exe failure DitronAgent reset= 86400 actions= restart/5000/restart/5000/restart/10000
+```
+
+Significa: dopo qualunque crash riavvia dopo 5 s, poi ancora 5 s, poi 10 s; reset
+del contatore fallimenti dopo 24 h.
+
+---
+
+### Note operative
+
+- I log dell'agent finiscono nel **Visualizzatore eventi** → *Registri di Windows
+  → Applicazione*, filtro per origine `DitronAgent`. Meno comodo della console
+  ma è quello che vuoi in produzione.
+- Per il debug live torna alla sezione A (avvio manuale).
+- Il servizio si avvia automaticamente al boot (`-StartupType Automatic`).
+- Firewall: assicurati che la porta `9090` sia raggiungibile dal container Docker
+  di Carlo V. Se serve, regola di inbound:
+
+  ```powershell
+  New-NetFirewallRule -DisplayName 'DitronAgent HTTP' -Direction Inbound `
+      -Protocol TCP -LocalPort 9090 -Action Allow
+  ```
