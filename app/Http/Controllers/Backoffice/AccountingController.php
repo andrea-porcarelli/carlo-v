@@ -46,7 +46,8 @@ class AccountingController extends BaseController
             $filters = $request->get('filters') ?? [];
 
             $query = TableOrderInvoice::with(['customer', 'tableOrder'])
-                ->orderBy('created_at', 'desc');
+                ->orderByDesc('created_at')
+                ->orderByDesc('id');
 
             if (!empty($filters['customer_id'])) {
                 $query->where('customer_id', $filters['customer_id']);
@@ -62,9 +63,11 @@ class AccountingController extends BaseController
                 $query->where('status', $filters['status']);
             }
 
-            $elements = $query->get();
-
-            return datatables()->of($elements)
+            return datatables()->eloquent($query)
+                ->order(function () {
+                    // Ordinamento forzato a livello di query: created_at DESC.
+                    // Sovrascrive il default ordering di yajra che applica i parametri DataTables.
+                })
                 ->addColumn('code', function ($item) {
                     $name = $item->invoice_name ? ' <small class="text-muted">(' . $item->invoice_name . ')</small>' : '';
                     return '<strong>' . e($item->invoice_code) . '</strong>' . $name;
