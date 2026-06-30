@@ -82,10 +82,10 @@ class AccountingController extends BaseController
                         default   => '<span class="label label-warning">In coda</span>',
                     };
                 })
-                ->addColumn('created_fmt', function ($item) {
+                ->editColumn('created_at', function ($item) {
                     return $item->created_at ? $item->created_at->format('d/m/Y H:i') : '—';
                 })
-                ->addColumn('sent_fmt', function ($item) {
+                ->editColumn('sent_at', function ($item) {
                     return $item->sent_at ? $item->sent_at->format('d/m/Y H:i') : '—';
                 })
                 ->addColumn('mysond_desc', function ($item) {
@@ -136,8 +136,6 @@ class AccountingController extends BaseController
                         : '';
                     return '<div style="white-space:nowrap;"><span class="label ' . $class . '">' . $label . '</span></div>' . $when;
                 })
-                ->orderColumn('created_fmt', 'created_at $1')
-                ->orderColumn('sent_fmt', 'sent_at $1')
                 ->rawColumns(['code', 'status_badge', 'mysond_desc', 'sdi_status_label_fmt', 'action'])
                 ->make(true);
         } catch (Exception $e) {
