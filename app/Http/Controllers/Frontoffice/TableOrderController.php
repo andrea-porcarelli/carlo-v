@@ -1419,10 +1419,26 @@ class TableOrderController extends Controller
             ], 404);
         }
 
-        // Allinea il contatore locale al massimo progressivo già emesso su
-        // MySond per l'anno corrente. Fuori transazione: la chiamata SOAP non
-        // deve tenere lock sulla tabella settings. Fail-soft (vedi syncer).
-        app(\App\Services\InvoiceCounterSyncer::class)->syncFromMysond();
+        // Pre-emissione: allinea contatore con MySond + verifica scartate SDI
+        // non riconosciute. Fuori transazione: la chiamata SOAP non deve
+        // tenere lock sulla tabella settings.
+        try {
+            app(\App\Services\PreEmissionGuard::class)->run();
+        } catch (\App\Exceptions\PendingSdiRejectionsException $e) {
+            return response()->json([
+                'success' => false,
+                'code'    => 'sdi_rejections_pending',
+                'message' => 'Emissione bloccata: ci sono fatture scartate dallo SDI da risolvere prima di poter emettere nuove fatture.',
+                'rejections' => $e->rejections->map(fn ($r) => [
+                    'file_name'     => $r->file_name,
+                    'mysond_code'   => $r->mysond_code,
+                    'stato'         => $r->stato,
+                    'stato_label'   => $r->stato_label,
+                    'first_seen_at' => $r->first_seen_at?->toIso8601String(),
+                ])->values(),
+                'ack_url' => route('backoffice.sdi-rejections.index'),
+            ], 409);
+        }
 
         try {
             DB::beginTransaction();
