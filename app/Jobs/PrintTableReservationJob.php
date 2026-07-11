@@ -39,15 +39,28 @@ class PrintTableReservationJob implements ShouldQueue
 
     public function handle(PrinterServiceInterface $printerService): void
     {
+        $reference = $this->data['reference'] ?? null;
+        $context = [
+            'reference' => $reference,
+            'reservation_date' => $this->data['reservation_date'] ?? null,
+            'slot_time' => $this->data['slot_time'] ?? null,
+            'last_name' => $this->data['last_name'] ?? null,
+            'attempt' => $this->attempts(),
+        ];
+
         $printer = Setting::getPrecontoPrinter();
         if (! $printer) {
-            Log::error('Table reservation print: preconto printer not configured', [
-                'reference' => $this->data['reference'] ?? null,
-            ]);
+            Log::error('Table reservation print: preconto printer not configured', $context);
 
             return;
         }
 
+        Log::info('Table reservation print job started', $context + [
+            'printer' => $printer->name ?? $printer->id ?? null,
+        ]);
+
         $printerService->printTableReservation($printer, $this->data);
+
+        Log::info('Table reservation print job completed', $context);
     }
 }

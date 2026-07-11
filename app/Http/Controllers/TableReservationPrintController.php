@@ -53,6 +53,15 @@ class TableReservationPrintController extends Controller
             'country_code' => 'nullable|string|max:2',
         ]);
 
+        Log::info('Table reservation print request received', [
+            'reference' => $data['reference'],
+            'reservation_date' => $data['reservation_date'],
+            'slot_time' => $data['slot_time'],
+            'total_pax' => $data['total_pax'] ?? ((int) $data['adults'] + (int) ($data['children'] ?? 0)),
+            'last_name' => $data['last_name'] ?? null,
+            'ip' => $request->ip(),
+        ]);
+
         PrintTableReservationJob::dispatch($data);
 
         return response()->json(['ok' => true, 'queued' => true], 202);
