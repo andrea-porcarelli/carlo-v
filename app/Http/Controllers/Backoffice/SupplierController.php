@@ -233,8 +233,11 @@ class SupplierController extends BaseController
         try {
             $request->validate([
                 'company_name' => 'required',
-                'fiscal_code' => 'required',
-                'vat_number' => 'required',
+                'fiscal_code'  => 'required_without:vat_number',
+                'vat_number'   => 'required_without:fiscal_code',
+            ], [
+                'fiscal_code.required_without' => 'Serve almeno uno tra Codice fiscale e Partita IVA.',
+                'vat_number.required_without'  => 'Serve almeno uno tra Codice fiscale e Partita IVA.',
             ]);
             $item = $this->interface->find($id);
             if ($item->id) {
@@ -264,8 +267,11 @@ class SupplierController extends BaseController
         try {
             $request->validate([
                 'company_name' => 'required',
-                'fiscal_code' => 'required',
-                'vat_number' => 'required',
+                'fiscal_code'  => 'required_without:vat_number',
+                'vat_number'   => 'required_without:fiscal_code',
+            ], [
+                'fiscal_code.required_without' => 'Serve almeno uno tra Codice fiscale e Partita IVA.',
+                'vat_number.required_without'  => 'Serve almeno uno tra Codice fiscale e Partita IVA.',
             ]);
             $store = $request->all();
             $item = $this->interface->store($store);

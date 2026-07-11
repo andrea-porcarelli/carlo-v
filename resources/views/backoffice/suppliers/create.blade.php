@@ -16,8 +16,11 @@
                     <form class="needs-validation create-supplier" id="create-supplier" novalidate>
                         <div class="row">
                             @include('backoffice.components.form.input',['name' => 'company_name', 'label' => 'Ragione sociale *', 'col' => 6])
-                            @include('backoffice.components.form.input',['name' => 'fiscal_code', 'type' => 'number', 'label' => 'Codice fiscale *', 'col' => 3])
-                            @include('backoffice.components.form.input',['name' => 'vat_number', 'type' => 'number', 'label' => 'Partita IVA *', 'col' => 3])
+                            @include('backoffice.components.form.input',['name' => 'fiscal_code', 'type' => 'number', 'label' => 'Codice fiscale', 'col' => 3])
+                            @include('backoffice.components.form.input',['name' => 'vat_number', 'type' => 'number', 'label' => 'Partita IVA', 'col' => 3])
+                            <div class="col-xs-12">
+                                <small class="text-muted">Serve almeno uno tra Codice fiscale e Partita IVA.</small>
+                            </div>
                         </div>
                         <div class="row">
                             <div class="col-xs-12">
