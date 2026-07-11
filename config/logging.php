@@ -139,7 +139,7 @@ return [
 
         'telegram' => [
             'driver' => 'monolog',
-            'level' => 'warning',
+            'level' => 'info',
             'handler' => TelegramBotHandler::class,
             'handler_with' => [
                 'apiKey' => env('TELEGRAM_BOT_TOKEN'),
