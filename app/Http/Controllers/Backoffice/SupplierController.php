@@ -243,6 +243,8 @@ class SupplierController extends BaseController
             if ($item->id) {
                 $store = $request->all();
                 $store['ignore_mapping'] = $request->boolean('ignore_mapping');
+                $store['fiscal_code']    = $request->filled('fiscal_code') ? $request->input('fiscal_code') : null;
+                $store['vat_number']     = $request->filled('vat_number')  ? $request->input('vat_number')  : null;
                 if ($this->interface->edit($item, $store)) {
                     return $this->success(['user' => $item->toArray()]);
                 }
@@ -274,6 +276,8 @@ class SupplierController extends BaseController
                 'vat_number.required_without'  => 'Serve almeno uno tra Codice fiscale e Partita IVA.',
             ]);
             $store = $request->all();
+            $store['fiscal_code'] = $request->filled('fiscal_code') ? $request->input('fiscal_code') : null;
+            $store['vat_number']  = $request->filled('vat_number')  ? $request->input('vat_number')  : null;
             $item = $this->interface->store($store);
             return $this->success(['item' => $item->toArray()]);
         }
