@@ -27,6 +27,11 @@ class Supplier extends Model
         'city',
         'province',
         'nation',
+        'ignore_mapping',
+    ];
+
+    protected $casts = [
+        'ignore_mapping' => 'boolean',
     ];
 
     public function invoices(): HasMany {

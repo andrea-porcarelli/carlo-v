@@ -382,6 +382,7 @@ class MysondRicezione extends Command
                     'invoice_date' => $invoiceData['date'],
                     'amount' => $invoiceData['total_amount'],
                     'filename' => basename($path),
+                    'ignored_at' => $supplier->ignore_mapping ? now() : null,
                 ]);
                 $invoice->load('supplier');
                 $createdInvoice = $invoice;

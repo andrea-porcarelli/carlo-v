@@ -26,6 +26,7 @@
                                         <th class="all">Ragione sociale</th>
                                         <th class="all">Cod. Fiscale / Partita IVA</th>
                                         <th class="all text-center">Fatture</th>
+                                        <th class="all text-center no-sort">Mappatura</th>
                                     </tr>
                                     </thead>
                                     <tfoot>
@@ -35,6 +36,7 @@
                                         <th class="all">Ragione sociale</th>
                                         <th class="all">Cod. Fiscale / Partita IVA</th>
                                         <th class="all text-center">Fatture</th>
+                                        <th class="all text-center no-sort">Mappatura</th>
                                     </tr>
                                     </tfoot>
                                 </table>
@@ -58,6 +60,7 @@
                         {data: 'company_name'},
                         {data: 'fiscal_code'},
                         {data: 'invoices', class: 'text-center'},
+                        {data: 'ignore_mapping', class: 'text-center', orderable: false, searchable: false, width: '120px'},
                     ],
                     order: [[1, 'desc']],
                     dataForm: ['mixed'],

@@ -21,6 +21,26 @@
                         <div class="row">
                             <div class="col-xs-12">
                                 <hr />
+                                <h4>Opzioni</h4>
+                            </div>
+                            <div class="col-xs-12 col-sm-6 m-t-sm">
+                                <label>Ignora fatture di questo fornitore per la mappatura</label><br />
+                                <input type="hidden" name="ignore_mapping" value="0" />
+                                @include('backoffice.components.form.switch', [
+                                    'field' => true,
+                                    'name' => 'ignore_mapping',
+                                    'value' => $object->ignore_mapping,
+                                ])
+                                <small class="text-muted d-block">
+                                    Se attivo: le fatture nuove nascono già ignorate,
+                                    e all'attivazione anche quelle esistenti vengono
+                                    marcate come ignorate.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-xs-12">
+                                <hr />
                                 <h4>Dati della sede</h4>
                             </div>
                             @include('backoffice.components.form.input',['name' => 'address', 'label' => 'Indirizzo', 'col' => 4])

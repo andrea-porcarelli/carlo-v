@@ -860,6 +860,7 @@ class InvoiceController extends BaseController
             'filename' => $filename,
             'amount' => $totalAmount,
             'invoice_date' => $invoiceDate,
+            'ignored_at' => $supplier->ignore_mapping ? now() : null,
         ]);
     }
 

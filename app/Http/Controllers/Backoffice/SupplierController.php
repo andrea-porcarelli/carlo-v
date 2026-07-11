@@ -202,7 +202,12 @@ class SupplierController extends BaseController
                 ->addColumn('fiscal_code', function ($item) {
                     return $item->fiscal_code . ' / ' . $item->vat_number;
                 })
-                ->rawColumns(['referer'])
+                ->addColumn('ignore_mapping', function ($item) {
+                    return $item->ignore_mapping
+                        ? '<span class="label label-warning" title="Fatture di questo fornitore ignorate dalla mappatura"><i class="fas fa-eye-slash"></i> Ignorato</span>'
+                        : '';
+                })
+                ->rawColumns(['referer', 'ignore_mapping'])
                 ->toJson();
         } catch (\Exception $e) {
             return $this->exception($e);
@@ -234,6 +239,7 @@ class SupplierController extends BaseController
             $item = $this->interface->find($id);
             if ($item->id) {
                 $store = $request->all();
+                $store['ignore_mapping'] = $request->boolean('ignore_mapping');
                 if ($this->interface->edit($item, $store)) {
                     return $this->success(['user' => $item->toArray()]);
                 }
