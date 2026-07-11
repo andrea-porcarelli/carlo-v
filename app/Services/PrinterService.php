@@ -2434,4 +2434,154 @@ class PrinterService implements PrinterServiceInterface
             return null;
         }
     }
+
+    /**
+     * Stampa scontrino "PRENOTAZIONE TAVOLO" ricevuto dal sito booking
+     * (Misuraca). Layout dedicato alla sala: orario grosso, pax con
+     * dettaglio adulti/bambini, cliente, telefono in evidenza e richieste
+     * particolari. Non logga su `print_logs` perché lo schema richiede
+     * un table_order_id (qui non c'è ordine tavolo associato).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function printTableReservation(Printer $printer, array $data): bool
+    {
+        $printerIp = $printer->ip;
+        $reference = (string) ($data['reference'] ?? '');
+
+        try {
+            if (! $this->isPrinterReachable($printerIp)) {
+                Log::warning('Table reservation: stampante non raggiungibile', [
+                    'ip' => $printerIp, 'reference' => $reference,
+                ]);
+
+                return false;
+            }
+
+            $connector = new NetworkPrintConnector($printerIp, 9100, 5);
+            $escpos = new EscposPrinter($connector);
+            $escpos->initialize();
+
+            // Intestazione
+            $escpos->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $escpos->setEmphasis(true);
+            $escpos->setTextSize(2, 2);
+            $escpos->text("PRENOTAZIONE\nTAVOLO\n");
+            $escpos->setTextSize(1, 1);
+            $escpos->setEmphasis(false);
+            $escpos->feed(1);
+
+            $escpos->text(str_repeat('-', 40)."\n");
+            $escpos->feed(1);
+
+            // Data + ora (formato Misuraca: reservation_date "Y-m-d", slot_time "HH:MM")
+            $dateFmt = null;
+            $rawDate = (string) ($data['reservation_date'] ?? '');
+            if ($rawDate !== '') {
+                try {
+                    $dateFmt = \Carbon\Carbon::parse($rawDate)->locale('it')->translatedFormat('D d M Y');
+                    $dateFmt = ucfirst($dateFmt);
+                } catch (\Throwable) {
+                    $dateFmt = $rawDate;
+                }
+            }
+            $time = (string) ($data['slot_time'] ?? '');
+
+            $escpos->setEmphasis(true);
+            $escpos->setTextSize(1, 2);
+            if ($dateFmt) {
+                $line = $dateFmt;
+                if ($time !== '') {
+                    $line .= ' - '.$time;
+                }
+                $escpos->text($line."\n");
+            } elseif ($time !== '') {
+                $escpos->text($time."\n");
+            }
+            $escpos->setTextSize(1, 1);
+            $escpos->setEmphasis(false);
+
+            $escpos->feed(1);
+            $escpos->setJustification(EscposPrinter::JUSTIFY_LEFT);
+
+            // Pax con dettaglio adulti/bambini in evidenza
+            $adults = (int) ($data['adults'] ?? 0);
+            $children = (int) ($data['children'] ?? 0);
+            $totalPax = isset($data['total_pax']) ? (int) $data['total_pax'] : ($adults + $children);
+
+            $escpos->setTextSize(2, 2);
+            $escpos->setEmphasis(true);
+            $escpos->text('Pax: '.$totalPax."\n");
+            $escpos->setEmphasis(false);
+            $escpos->setTextSize(1, 1);
+
+            if ($children > 0) {
+                $escpos->text($adults.' adulti + '.$children.' bambini'."\n");
+            }
+
+            // Cliente
+            $customer = trim((string) ($data['customer_name'] ?? ''));
+            if ($customer === '') {
+                $customer = trim(((string) ($data['first_name'] ?? '')).' '.((string) ($data['last_name'] ?? '')));
+            }
+            if ($customer !== '') {
+                $escpos->feed(1);
+                $escpos->setEmphasis(true);
+                $escpos->text($customer."\n");
+                $escpos->setEmphasis(false);
+            }
+
+            // Telefono in evidenza (utile per chiamare il cliente in caso di problemi)
+            $phone = trim((string) ($data['phone'] ?? ''));
+            if ($phone !== '') {
+                $escpos->setEmphasis(true);
+                $escpos->text('Tel: '.$phone."\n");
+                $escpos->setEmphasis(false);
+            }
+
+            $email = trim((string) ($data['email'] ?? ''));
+            if ($email !== '') {
+                $escpos->text('Email: '.$email."\n");
+            }
+
+            // Richieste particolari
+            $requests = trim((string) ($data['special_requests'] ?? ''));
+            if ($requests !== '') {
+                $escpos->feed(1);
+                $escpos->setEmphasis(true);
+                $escpos->text("Richieste:\n");
+                $escpos->setEmphasis(false);
+                $escpos->text(wordwrap($requests, 48, "\n", true)."\n");
+            }
+
+            // Footer
+            $escpos->feed(1);
+            $escpos->text(str_repeat('-', 40)."\n");
+
+            if ($reference !== '') {
+                $escpos->feed(1);
+                $escpos->text('Rif: '.$reference."\n");
+            }
+            $escpos->text(now()->format('d/m/Y H:i')."\n");
+
+            $escpos->feed(3);
+            $escpos->cut();
+            $escpos->close();
+
+            Log::info('Table reservation: stampa OK', [
+                'reference' => $reference,
+                'printer' => $printer->label,
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Table reservation: errore stampa', [
+                'reference' => $reference,
+                'printer_ip' => $printerIp,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
 }

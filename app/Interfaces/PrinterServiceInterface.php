@@ -140,4 +140,15 @@ interface PrinterServiceInterface
      *                                     email, phone, notes, total_cents, currency.
      */
     public function printCookingBooking(Printer $printer, array $data): bool;
+
+    /**
+     * Stampa lo scontrino "PRENOTAZIONE TAVOLO" generato dalla prenotazione
+     * tavoli di Misuraca (ristorante, non cooking class).
+     *
+     * @param  array<string, mixed>  $data Campi attesi: reference, reservation_date,
+     *                                     slot_time, adults, children, total_pax,
+     *                                     customer_name, first_name, last_name,
+     *                                     email, phone, special_requests, country_code.
+     */
+    public function printTableReservation(Printer $printer, array $data): bool;
 }

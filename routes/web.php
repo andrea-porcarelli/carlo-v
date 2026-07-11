@@ -7,6 +7,7 @@ use App\Http\Controllers\Backoffice\MenuOptionController;
 use App\Http\Controllers\Backoffice\DeployController;
 use App\Http\Controllers\CookingBookingPrintController;
 use App\Http\Controllers\RevolutWebhookController;
+use App\Http\Controllers\TableReservationPrintController;
 use App\Http\Controllers\Backoffice\CategoryController;
 use App\Http\Controllers\Backoffice\DishController;
 use App\Http\Controllers\Backoffice\InvoiceController;
@@ -40,6 +41,7 @@ Route::match(['GET', 'POST'], '/webhook/deploy', [DeployController::class, 'trig
 Route::match(['GET', 'POST'], '/webhook/migrate', [DeployController::class, 'migrate'])->name('webhook.migrate');
 Route::post('/webhook/revolut', [RevolutWebhookController::class, 'handle'])->name('webhook.revolut');
 Route::post('/webhook/cooking-booking-paid', [CookingBookingPrintController::class, 'handle'])->name('webhook.cookingBookingPaid');
+Route::post('/webhook/table-reservation', [TableReservationPrintController::class, 'handle'])->name('webhook.tableReservation');
 
 // API Routes for Operator Authentication
 Route::group(['prefix' => '/api/operators', 'as' => 'api.operators.'], function() {
