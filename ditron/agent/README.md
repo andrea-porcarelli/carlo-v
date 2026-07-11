@@ -19,6 +19,11 @@ Carlo V (Laravel)  ──HTTP POST /emit-receipt──▶  DitronAgent  ──fi
 ## Endpoint
 
 - `GET /health` — stato agent + counter + folder
+- `POST /close-day` — chiusura giornaliera fiscale (Z-report). Corpo JSON:
+  ```json
+  { "idempotency_key": "close_day:2026-07-11", "tipo": 2 }
+  ```
+  `tipo` opzionale (1=lungo, 2=breve, 3=medio; default 2). In `Fiscal` emette `azzgio tipo=N`; in `NonFiscal` emette una sequenza `nofis` di simulazione. Risposta: `{ "ok": true, "receipt_number": 201, "elapsed_ms": 1842, "raw_command": "...", "raw_err": "", "mode": "Fiscal" }`.
 - `POST /emit-receipt` — corpo JSON:
   ```json
   {
