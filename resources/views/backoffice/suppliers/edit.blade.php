@@ -28,7 +28,6 @@
                             </div>
                             <div class="col-xs-12 col-sm-6 m-t-sm">
                                 <label>Ignora fatture di questo fornitore per la mappatura</label><br />
-                                <input type="hidden" name="ignore_mapping" value="0" />
                                 @include('backoffice.components.form.switch', [
                                     'field' => true,
                                     'name' => 'ignore_mapping',
@@ -71,4 +70,12 @@
             </div>
         </div>
     </div>
+@endsection
+
+@section('custom-script')
+    <script>
+        $(document).ready(function () {
+            $(document).trigger('loadSwitchTrigger', [{ container: '.update-or-create-element' }]);
+        });
+    </script>
 @endsection
