@@ -24,6 +24,11 @@ Carlo V (Laravel)  ──HTTP POST /emit-receipt──▶  DitronAgent  ──fi
   { "idempotency_key": "close_day:2026-07-11", "tipo": 2 }
   ```
   `tipo` opzionale (1=lungo, 2=breve, 3=medio; default 2). In `Fiscal` emette `azzgio tipo=N`; in `NonFiscal` emette una sequenza `nofis` di simulazione. Risposta: `{ "ok": true, "receipt_number": 201, "elapsed_ms": 1842, "raw_command": "...", "raw_err": "", "mode": "Fiscal" }`.
+- `POST /read-x` — Lettura X giornaliera (X-Report, non fiscale, non azzera i contatori). Corpo JSON:
+  ```json
+  { "idempotency_key": "read_x:20260714_183045_abc123" }
+  ```
+  In `Fiscal` emette `azzgio tipo=1`; in `NonFiscal` una simulazione `nofis`. Risposta simile a `/close-day`.
 - `POST /emit-receipt` — corpo JSON:
   ```json
   {

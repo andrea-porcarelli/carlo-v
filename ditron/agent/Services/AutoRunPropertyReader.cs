@@ -65,11 +65,15 @@ public sealed class AutoRunPropertyReader : IPropertyReader
         }
         if (File.Exists(errPath)) File.Delete(errPath);
 
+        // Sintassi WinEcrCom (vedi WinEcrCom2.pdf pag.14): gli operandi di una
+        // stessa istruzione vanno separati da virgola. Senza virgola il parser
+        // interpreta `FILE=...` come continuazione del valore di CODICE e
+        // solleva "ERRORE DI SINTASSI 8: VALORE ALFABETICO NON VALIDO".
         var sb = new StringBuilder();
         foreach (var (num, outPath) in propOutPaths)
         {
             sb.Append("INFO CODICE=").Append(num.ToString(Inv))
-              .Append(" FILE='").Append(outPath).AppendLine("'");
+              .Append(", FILE='").Append(outPath).AppendLine("'");
         }
         var command = sb.ToString();
 

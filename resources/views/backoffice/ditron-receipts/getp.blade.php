@@ -78,13 +78,35 @@
                                 </tbody>
                             </table>
                         @else
+                            @php
+                                $rawError = trim((string) ($result['error'] ?? ''));
+                                // WinEcrCom concatena e ripete ogni riga di errore due volte nel .err.
+                                // Splittiamo prima di ogni "ERRORE N/M in line ..." e deduplichiamo,
+                                // così il messaggio diventa una lista leggibile per l'operatore.
+                                $errorLines = [];
+                                if ($rawError !== '') {
+                                    $parts = preg_split('/(?=ERRORE\s+\d+\/\d+\s+in\s+line)/i', $rawError, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                                    $errorLines = array_values(array_unique(array_map('trim', $parts)));
+                                    if (empty($errorLines)) {
+                                        $errorLines = [$rawError];
+                                    }
+                                }
+                            @endphp
                             <div class="alert alert-danger">
-                                <strong>Lettura fallita.</strong>
-                                @if(!empty($result['error']))
-                                    <br><strong>Errore:</strong> {{ $result['error'] }}
-                                @endif
-                                @if(!empty($result['elapsed_ms']))
-                                    <br><small>Elapsed: {{ $result['elapsed_ms'] }}ms</small>
+                                <div>
+                                    <strong>Lettura fallita.</strong>
+                                    @if(!empty($result['elapsed_ms']))
+                                        <small class="text-muted ml-2">Elapsed: {{ $result['elapsed_ms'] }}ms</small>
+                                    @endif
+                                </div>
+                                @if(count($errorLines))
+                                    <hr class="my-2">
+                                    <div class="small mb-1"><strong>Dettagli dal driver WinEcrCom:</strong></div>
+                                    <ul class="mb-0" style="font-family:monospace; font-size:12px; padding-left:20px;">
+                                        @foreach($errorLines as $line)
+                                            <li>{{ $line }}</li>
+                                        @endforeach
+                                    </ul>
                                 @endif
                             </div>
                             <p class="text-muted">
