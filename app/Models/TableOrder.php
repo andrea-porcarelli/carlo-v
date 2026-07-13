@@ -100,6 +100,33 @@ class TableOrder extends Model
     }
 
     /**
+     * Scontrini emessi via DitronAgent (provider alternativo a Mysond).
+     */
+    public function ditronReceipts(): HasMany
+    {
+        return $this->hasMany(DitronReceipt::class)->orderBy('id');
+    }
+
+    /**
+     * Mappa payment_method → etichetta leggibile. Fonte di verità unica per
+     * datatable, KPI, log e stampa (evita mappe duplicate sparse nel codice).
+     */
+    public static function paymentMethodLabels(): array
+    {
+        return [
+            'pos'              => 'POS',
+            'contanti'         => 'Contanti',
+            'fattura'          => 'Fattura',
+            'fattura_contanti' => 'Fattura + Contanti',
+            'fattura_pos'      => 'Fattura + POS',
+            'bonifico'         => 'Bonifico',
+            'assegno'          => 'Assegno',
+            'chiusura_conto'   => 'Chiusura conto',
+            'misto'            => 'Misto',
+        ];
+    }
+
+    /**
      * Calculate and update the total amount (including cover charge)
      */
     public function updateTotal(): void

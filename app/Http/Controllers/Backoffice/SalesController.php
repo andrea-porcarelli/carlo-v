@@ -45,9 +45,9 @@ class SalesController extends BaseController
             $filters = $request->get('filters') ?? [];
 
             // Get only paid orders (completed sales)
-            $query = TableOrder::with(['restaurantTable', 'items.dish', 'waiter'])
+            $query = TableOrder::with(['restaurantTable', 'items.dish', 'waiter', 'ditronReceipts'])
                 ->where('status', 'paid')
-                ->orderBy('closed_at', 'desc');
+                ->orderBy('updated_at', 'desc');
 
             // Apply filters
             if (!empty($filters['date_from'])) {
@@ -64,7 +64,12 @@ class SalesController extends BaseController
                 });
             }
 
+            if (!empty($filters['payment_method'])) {
+                $query->where('payment_method', $filters['payment_method']);
+            }
+
             $elements = $query->get();
+            $paymentLabels = TableOrder::paymentMethodLabels();
 
             return $this->editColumns(datatables()->of($elements), $this->name, ['edit'], null, 'restaurant.sales')
                 ->addColumn('sale_info', function ($item) {
@@ -78,6 +83,49 @@ class SalesController extends BaseController
                 ->addColumn('total', function ($item) {
                     return '<strong>' . Utils::price($item->total_amount) . '</strong>';
                 })
+                ->addColumn('payment', function ($item) use ($paymentLabels) {
+                    $method = $item->payment_method;
+                    $label = $method ? ($paymentLabels[$method] ?? $method) : '-';
+                    $badgeClass = match ($method) {
+                        'contanti'                            => 'success',
+                        'pos'                                 => 'info',
+                        'fattura', 'fattura_contanti', 'fattura_pos' => 'purple',
+                        'bonifico', 'assegno'                 => 'warning',
+                        'misto'                               => 'primary',
+                        'chiusura_conto'                      => 'secondary',
+                        default                               => 'light',
+                    };
+                    $badgeStyle = $badgeClass === 'purple'
+                        ? 'background:#6f42c1;color:#fff;'
+                        : '';
+                    $badge = '<span class="badge badge-' . $badgeClass . '" style="' . $badgeStyle . '">' . e($label) . '</span>';
+
+                    // Info Ditron: mostriamo l'ultimo scontrino di vendita associato (numero fiscale se
+                    // disponibile, altrimenti il receipt_number dell'agent).
+                    $ditronBlock = '';
+                    $ditronSale = $item->ditronReceipts
+                        ->where('type', \App\Models\DitronReceipt::TYPE_SALE)
+                        ->last();
+                    if ($ditronSale) {
+                        $number = $ditronSale->fiscal_number ?: $ditronSale->receipt_number;
+                        $statusLabel = $ditronSale->getStatusLabel();
+                        $statusColor = match ($ditronSale->status) {
+                            \App\Models\DitronReceipt::STATUS_SENT    => '#28a745',
+                            \App\Models\DitronReceipt::STATUS_FAILED  => '#dc3545',
+                            default                                   => '#6c757d',
+                        };
+                        $cancelledSuffix = $ditronSale->isCancelled()
+                            ? ' <span style="color:#dc3545;font-weight:600;">(ANNULLATO)</span>'
+                            : '';
+                        $ditronBlock = '<div style="margin-top:4px;font-size:0.75rem;color:#495057;">'
+                            . '<i class="fas fa-receipt"></i> Ditron: '
+                            . ($number !== null ? '<strong>#' . e((string) $number) . '</strong>' : '<em>—</em>')
+                            . ' <span style="color:' . $statusColor . ';">' . e($statusLabel) . '</span>'
+                            . $cancelledSuffix
+                            . '</div>';
+                    }
+                    return $badge . $ditronBlock;
+                })
                 ->addColumn('waiter', function ($item) {
                     return $item->waiter ? $item->waiter->name : '-';
                 })
@@ -88,7 +136,7 @@ class SalesController extends BaseController
                     }
                     return '-';
                 })
-                ->rawColumns(['sale_info', 'total', 'action'])
+                ->rawColumns(['sale_info', 'total', 'payment', 'action'])
                 ->make(true);
 
         } catch (Exception $e) {
@@ -184,6 +232,10 @@ class SalesController extends BaseController
             $query->whereHas('restaurantTable', function ($q) use ($filters) {
                 $q->where('table_number', $filters['table_number']);
             });
+        }
+
+        if (!empty($filters['payment_method'])) {
+            $query->where('payment_method', $filters['payment_method']);
         }
 
         $paid = $query->get(['id', 'restaurant_table_id', 'total_amount', 'payment_method', 'autoconsumo', 'closed_at']);

@@ -95,6 +95,15 @@
                                     'class' => 'table_number',
                                     'type' => 'number'
                                 ])
+                                <div class="col-xs-12 col-sm-2">
+                                    <label>Metodo di pagamento</label>
+                                    <select class="form-control payment_method" name="payment_method">
+                                        <option value="">Tutti</option>
+                                        @foreach(\App\Models\TableOrder::paymentMethodLabels() as $key => $label)
+                                            <option value="{{ $key }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
                                 <div class="col-xs-12 col-sm-3" style="display:flex; gap: 5px">
                                     <button type="button" class="btn btn-info btn-find">Cerca</button>
                                     <button type="button" class="btn btn-warning" id="btnPrintLogs">
@@ -120,6 +129,7 @@
                                         <th class="all">Tavolo / Data</th>
                                         <th class="all">N° Prodotti</th>
                                         <th class="all">Totale</th>
+                                        <th class="all">Pagamento</th>
                                         <th class="all">Cameriere</th>
                                         <th class="all">Durata</th>
                                     </tr>
@@ -131,6 +141,7 @@
                                         <th class="all">Tavolo / Data</th>
                                         <th class="all">N° Prodotti</th>
                                         <th class="all">Totale</th>
+                                        <th class="all">Pagamento</th>
                                         <th class="all">Cameriere</th>
                                         <th class="all">Durata</th>
                                     </tr>
@@ -271,9 +282,10 @@
 
             function loadSalesKpis() {
                 const filters = {
-                    date_from:    $('.date_from').val() || '',
-                    date_to:      $('.date_to').val()   || '',
-                    table_number: $('.table_number').val() || '',
+                    date_from:      $('.date_from').val()      || '',
+                    date_to:        $('.date_to').val()        || '',
+                    table_number:   $('.table_number').val()   || '',
+                    payment_method: $('.payment_method').val() || '',
                 };
                 $.ajax({
                     url: '{{ route('restaurant.sales.kpis') }}',
@@ -300,11 +312,15 @@
                         {data: 'sale_info'},
                         {data: 'items_count', class: 'text-center'},
                         {data: 'total', class: 'text-end'},
+                        {data: 'payment'},
                         {data: 'waiter'},
                         {data: 'duration', class: 'text-center'},
                     ],
-                    order: [[1, 'desc']],
-                    dataForm: ['date_from', 'date_to', 'table_number'],
+                    // L'ordinamento vero è imposto lato server (updated_at DESC).
+                    // Disabilitiamo l'ordinamento default del client per non generare un
+                    // sort su una colonna che il server non applica comunque.
+                    order: [],
+                    dataForm: ['date_from', 'date_to', 'table_number', 'payment_method'],
                     serverSide: true,
                     drawCallback: function() {
                         loadSalesKpis();
