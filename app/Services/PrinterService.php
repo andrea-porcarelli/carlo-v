@@ -162,7 +162,7 @@ class PrinterService implements PrinterServiceInterface
 
             $printer->setTextSize(1, 1);
             // Linea separatrice
-            $printer->text(str_repeat('-', 48) . "\n");
+            $printer->text(str_repeat('-', 42) . "\n");
 
             // Banner operazione
             if ($operation === 'remove') {
@@ -174,7 +174,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setReverseColors(false);
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
                 $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
             } elseif ($operation === 'update') {
                 $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
@@ -185,7 +185,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setReverseColors(false);
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
                 $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
             }
 
@@ -195,7 +195,7 @@ class PrinterService implements PrinterServiceInterface
             }
 
             // Linea separatrice finale
-            $printer->text(str_repeat('-', 48) . "\n");
+            $printer->text(str_repeat('-', 42) . "\n");
             $printer->feed(1);
 
             // Stampa articoli delle altre stampanti in piccolo (non per gli annullamenti/modifiche)
@@ -213,7 +213,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setReverseColors(false);
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
                 $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
             }
             $printer->feed(2);
@@ -820,7 +820,7 @@ class PrinterService implements PrinterServiceInterface
             $printer->feed(1);
 
             // Linea separatrice
-            $printer->text(str_repeat('-', 48) . "\n");
+            $printer->text(str_repeat('-', 42) . "\n");
 
 
             $printer->setEmphasis(true);
@@ -864,7 +864,7 @@ class PrinterService implements PrinterServiceInterface
             }
 
             // Linea separatrice
-            $printer->text(str_repeat('-', 48) . "\n");
+            $printer->text(str_repeat('-', 42) . "\n");
 
             // Calcola sconto: se il chiamante non passa nulla o passa 'none',
             // usiamo lo sconto persistito sull'ordine (evidenza dello sconto applicato).
@@ -895,7 +895,7 @@ class PrinterService implements PrinterServiceInterface
                     : "Abbuono";
                 $discountFormatted = '-' . number_format($discountValue, 2, ',', '.');
                 $printer->text(str_pad($discountLabel, 38) . str_pad($discountFormatted, 10, ' ', STR_PAD_LEFT) . "\n");
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
             }
 
             // Totale
@@ -912,14 +912,14 @@ class PrinterService implements PrinterServiceInterface
             if ($splitCount && $splitCount > 1) {
                 $perPerson = $finalTotal / $splitCount;
                 $perPersonFormatted = number_format($perPerson, 2, ',', '.');
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
                 $printer->setEmphasis(true);
                 $printer->setTextSize(1, 1);
                 $printer->text("DIVISO PER $splitCount PERSONE\n");
                 $printer->setTextSize(1, 1);
                 $printer->text("EUR $perPersonFormatted a persona\n");
                 $printer->setEmphasis(false);
-                $printer->text(str_repeat('=', 48) . "\n");
+                $printer->text(str_repeat('=', 42) . "\n");
             }
 
             $printer->feed(1);
@@ -1049,7 +1049,7 @@ class PrinterService implements PrinterServiceInterface
             // Items
             $dev->setJustification(EscposPrinter::JUSTIFY_LEFT);
             $dev->setEmphasis(true);
-            $dev->text(str_repeat('-', 48) . "\n");
+            $dev->text(str_repeat('-', 42) . "\n");
 
             $splitItems = is_array($split->items) ? $split->items : [];
             if (empty($splitItems)) {
@@ -1084,7 +1084,7 @@ class PrinterService implements PrinterServiceInterface
                 $dev->setEmphasis(false);
             }
 
-            $dev->text(str_repeat('-', 48) . "\n");
+            $dev->text(str_repeat('-', 42) . "\n");
 
             // Discount line
             $dev->setJustification(EscposPrinter::JUSTIFY_LEFT);
@@ -1097,7 +1097,7 @@ class PrinterService implements PrinterServiceInterface
                 }
                 $discountFormatted = '-' . number_format($split->discount_value, 2, ',', '.');
                 $dev->text(str_pad($discountLabel, 38) . str_pad($discountFormatted, 10, ' ', STR_PAD_LEFT) . "\n");
-                $dev->text(str_repeat('-', 48) . "\n");
+                $dev->text(str_repeat('-', 42) . "\n");
             }
 
             // Total
@@ -1210,7 +1210,7 @@ class PrinterService implements PrinterServiceInterface
             $escposPrinter->feed(1);
 
             // Linea separatrice
-            $escposPrinter->text(str_repeat('-', 48) . "\n");
+            $escposPrinter->text(str_repeat('-', 42) . "\n");
             $escposPrinter->feed(1);
 
             // Messaggio
@@ -1227,7 +1227,7 @@ class PrinterService implements PrinterServiceInterface
             $escposPrinter->feed(1);
 
             // Linea separatrice finale
-            $escposPrinter->text(str_repeat('-', 48) . "\n");
+            $escposPrinter->text(str_repeat('-', 42) . "\n");
 
             $escposPrinter->feed(3);
 
@@ -1358,7 +1358,7 @@ class PrinterService implements PrinterServiceInterface
             $printer->feed(1);
 
             // Linea separatrice
-            $printer->text(str_repeat('=', 48) . "\n");
+            $printer->text(str_repeat('=', 42) . "\n");
             $printer->feed(1);
 
             // --- ELENCO OPERAZIONI ---
@@ -1404,14 +1404,14 @@ class PrinterService implements PrinterServiceInterface
                 }
 
                 // Linea separatrice sottile
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
             }
 
             $printer->feed(1);
 
             // --- RIEPILOGO ---
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
-            $printer->text(str_repeat('=', 48) . "\n");
+            $printer->text(str_repeat('=', 42) . "\n");
             $printer->setEmphasis(true);
             $printer->text("FINE STORICO\n");
             $printer->setEmphasis(false);
@@ -1523,7 +1523,7 @@ class PrinterService implements PrinterServiceInterface
             $printer->feed(1);
 
             // Linea separatrice
-            $printer->text(str_repeat('=', 48) . "\n");
+            $printer->text(str_repeat('=', 42) . "\n");
             $printer->feed(1);
 
             // --- ELENCO OPERAZIONI ---
@@ -1586,14 +1586,14 @@ class PrinterService implements PrinterServiceInterface
                 }
 
                 // Linea separatrice sottile
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
             }
 
             $printer->feed(1);
 
             // --- RIEPILOGO ---
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
-            $printer->text(str_repeat('=', 48) . "\n");
+            $printer->text(str_repeat('=', 42) . "\n");
             $printer->setEmphasis(true);
             $printer->text("FINE LOG\n");
             $printer->text("Stampato: " . now()->format('d/m/Y H:i') . "\n");
@@ -1736,13 +1736,13 @@ class PrinterService implements PrinterServiceInterface
                         $printer->setEmphasis(false);
                     }
                 } else {
-                    $printer->feed(1);
+                    $printer->feed(2);
                     $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
                     $printer->setEmphasis(true);
                     $printer->text("*** SEGUE ***\n");
                     $printer->setEmphasis(false);
                     $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
-                    $printer->feed(1);
+                    $printer->feed(2);
                 }
             }
 
@@ -1971,7 +1971,7 @@ class PrinterService implements PrinterServiceInterface
 
             // STORNO section
             if ($oldDishName !== null) {
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
                 $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
                 $printer->setEmphasis(true);
                 $printer->setTextSize(2, 2);
@@ -1981,7 +1981,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
                 $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
                 $qty = $newItem ? $newItem->quantity : 1;
                 $printer->setEmphasis(true);
                 $printer->setTextSize(2, 2);
@@ -1993,7 +1993,7 @@ class PrinterService implements PrinterServiceInterface
 
             // AGGIUNTA section
             if ($newItem !== null) {
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
                 $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
                 $printer->setEmphasis(true);
                 $printer->setTextSize(2, 2);
@@ -2004,11 +2004,11 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
                 $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
-                $printer->text(str_repeat('-', 48) . "\n");
+                $printer->text(str_repeat('-', 42) . "\n");
                 $this->printItem($printer, $newItem);
             }
 
-            $printer->text(str_repeat('-', 48) . "\n");
+            $printer->text(str_repeat('-', 42) . "\n");
             $printer->feed(2);
             $printer->cut();
             $printer->close();
@@ -2141,7 +2141,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->text("Preconto: {$splitLabel}\n");
             }
             $printer->text("Data: " . ($corrispettivo->sent_at?->format('d/m/Y H:i:s') ?? now()->format('d/m/Y H:i:s')) . "\n");
-            $printer->text(str_repeat('-', 48) . "\n");
+            $printer->text(str_repeat('-', 42) . "\n");
 
             // Righe — leggiamo dai dati originali (split o ordine) per poter mostrare
             // anche il dettaglio delle aggiunzioni (extras) sotto ogni piatto.
@@ -2161,7 +2161,7 @@ class PrinterService implements PrinterServiceInterface
                 }
             }
 
-            $printer->text(str_repeat('-', 48) . "\n");
+            $printer->text(str_repeat('-', 42) . "\n");
 
             // Sconto applicato (split o ordine): riga informativa se presente.
             $discountSource = $corrispettivo->precontoSplit ?: $corrispettivo->tableOrder;
@@ -2404,7 +2404,7 @@ class PrinterService implements PrinterServiceInterface
                 $escpos->setEmphasis(true);
                 $escpos->text("Note:\n");
                 $escpos->setEmphasis(false);
-                $escpos->text(wordwrap($notes, 48, "\n", true) . "\n");
+                $escpos->text(wordwrap($notes, 42, "\n", true) . "\n");
             }
 
             // Totale
@@ -2567,7 +2567,7 @@ class PrinterService implements PrinterServiceInterface
                 $escpos->setEmphasis(true);
                 $escpos->text("Richieste:\n");
                 $escpos->setEmphasis(false);
-                $escpos->text(wordwrap($requests, 48, "\n", true)."\n");
+                $escpos->text(wordwrap($requests, 42, "\n", true)."\n");
             }
 
             // Footer
