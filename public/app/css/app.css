@@ -749,10 +749,9 @@ body {
 
 .receipt-item {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 2px 3px;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 6px;
     border-bottom: 1px solid #dee2e6;
     min-height: 0;
 }
@@ -760,14 +759,12 @@ body {
 .receipt-item-body {
     flex: 1;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
 }
 
 .receipt-item-buttons {
     display: flex;
     gap: 4px;
+    flex-shrink: 0;
 }
 
 .receipt-item-price {
@@ -776,6 +773,7 @@ body {
     white-space: nowrap;
     font-size: 0.95rem;
     line-height: 1.2;
+    flex-shrink: 0;
 }
 
 /* Compact action buttons for modify overlay */

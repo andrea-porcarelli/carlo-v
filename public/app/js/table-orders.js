@@ -764,10 +764,15 @@ class TableOrdersManager {
             const _displayName = this.isMobile && _rawName.length > 30 ? _rawName.substring(0, 30) + '…' : _rawName;
             itemsHtml += `
             <div class="receipt-item" onclick="tableOrdersManager._mobileItemTap(${item.id}, event)" data-item-id="${item.id}" data-was-printed="${item.was_printed ? '1' : '0'}" data-is-new="${item._isNew ? '1' : '0'}">
+                <div class="receipt-item-buttons">
+                    <button class="btn-quick-add" onclick="tableOrdersManager.openProductModal({id:${item.dish_id}, name:'${(item.dish_name || '').replace(/'/g, "\\'")}', price:${item.unit_price}})" title="Aggiungi ancora"><i class="fas fa-plus"></i></button>
+                    <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
+                    <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})" title="Rimuovi piatto"><i class="fas fa-trash"></i></button>
+                </div>
                 <div class="receipt-item-body">
                     <div style="font-size:13px;font-weight:600;line-height:1.3; color:#3d3d3d;">
                         ${item.quantity} × <span class="receipt-dish-name" title="${_rawName.replace(/"/g, '&quot;')}">${_displayName}</span>
-                        ${item.notes ? `<br /><div class="receipt-item-notes"> ${item.notes}</div>` : ''}
+                        ${item.notes ? `<div class="receipt-item-notes"> ${item.notes}</div>` : ''}
                         ${item.extras && Object.keys(item.extras).length > 0 ? `
                             <div class="receipt-item-extras">
                                 ${Object.entries(item.extras).map(([name, price]) =>
@@ -780,11 +785,6 @@ class TableOrdersManager {
                                 ${item.removals.map(removal => `<span><i class="fas fa-minus-circle me-1"></i>${removal}</span>`).join(' ')}
                             </div>
                             ` : ''}
-                    </div>
-                    <div class="receipt-item-buttons">
-                        <button class="btn-quick-add" onclick="tableOrdersManager.openProductModal({id:${item.dish_id}, name:'${(item.dish_name || '').replace(/'/g, "\\'")}', price:${item.unit_price}})" title="Aggiungi ancora"><i class="fas fa-plus"></i></button>
-                        <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
-                        <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})" title="Rimuovi piatto"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>
                 <span class="receipt-item-price">€${parseFloat(item.subtotal).toFixed(2)}</span>
