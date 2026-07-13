@@ -23,6 +23,38 @@ public sealed class DitronAgentOptions
     public string? AuthToken { get; set; }
 
     public string LogwecFile { get; set; } = @"C:\logwec_1.txt";
+
+    /// <summary>
+    /// Politica di classificazione del contenuto di scontrinoNN.err.
+    /// - Strict: qualsiasi contenuto non-whitespace = errore (comportamento originale).
+    /// - KeywordBased: errore solo se il contenuto matcha una keyword di ErrErrorKeywords,
+    ///   altrimenti trattato come warning/info benigno (ok=true, RawErr conservato).
+    /// </summary>
+    public ErrClassificationPolicy ErrPolicy { get; set; } = ErrClassificationPolicy.KeywordBased;
+
+    /// <summary>
+    /// Regex/keyword (case-insensitive) che marcano il .err come errore reale.
+    /// Usate solo se ErrPolicy = KeywordBased.
+    /// </summary>
+    public string[] ErrErrorKeywords { get; set; } = new[]
+    {
+        @"\berrore\b",
+        @"\berror\b",
+        @"\babort(?:ed)?\b",
+        @"\btimeout\b",
+        @"\bfault\b",
+        @"\bfail(ed|ure)?\b",
+        @"\bimpossibile\b",
+        @"\bnon\s+ammess",
+        @"\billegale\b",
+        @"^\s*\d+\s+\d+\s+\S",
+    };
+}
+
+public enum ErrClassificationPolicy
+{
+    Strict,
+    KeywordBased,
 }
 
 public sealed class ReceiptDefaults

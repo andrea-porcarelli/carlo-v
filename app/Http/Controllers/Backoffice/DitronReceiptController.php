@@ -63,6 +63,37 @@ class DitronReceiptController extends Controller
         ]);
     }
 
+    public function retry(DitronReceipt $receipt): RedirectResponse
+    {
+        $admin = $this->assertAdmin();
+
+        if (!$receipt->canRetry()) {
+            return back()->with('error', "Scontrino #{$receipt->id} non è ritentabile (status={$receipt->status}, {$receipt->attempts}/{$receipt->max_attempts} tentativi).");
+        }
+
+        Log::channel('corrispettivi')->info('Retry Ditron da backoffice', [
+            'receipt_id'    => $receipt->id,
+            'admin_user_id' => $admin->id,
+            'attempts'      => $receipt->attempts,
+        ]);
+
+        try {
+            $updated = $this->service->retry($receipt);
+        } catch (Throwable $e) {
+            return back()->with('error', 'Errore nel retry: ' . $e->getMessage());
+        }
+
+        if ($updated->isSent()) {
+            $msg = "Scontrino riemesso.";
+            if ($updated->fiscal_number) {
+                $msg .= " N° fiscale: {$updated->fiscal_number}";
+            }
+            return back()->with('success', $msg);
+        }
+
+        return back()->with('error', 'Retry eseguito ma l\'invio non è riuscito: ' . ($updated->last_error ?? 'errore sconosciuto'));
+    }
+
     public function cancel(Request $request, DitronReceipt $receipt): RedirectResponse
     {
         $admin = $this->assertAdmin();

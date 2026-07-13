@@ -55,19 +55,34 @@ public sealed class ScontriniWriter : IScontriniWriter
         }
 
         response.RawErr = errContent;
-        if (string.IsNullOrWhiteSpace(errContent))
+        var classification = ErrClassifier.Classify(errContent, _options);
+        switch (classification.Kind)
         {
-            response.Ok = true;
-            _logger.LogInformation("Receipt {ReceiptNumber} succeeded in {Elapsed}ms", receiptNumber, response.ElapsedMs);
-        }
-        else
-        {
-            response.Ok = false;
-            response.Error = errContent.Trim();
-            _logger.LogWarning("Receipt {ReceiptNumber} failed: {Error}", receiptNumber, response.Error);
+            case ErrClassifier.ErrKind.Empty:
+                response.Ok = true;
+                _logger.LogInformation("Receipt {ReceiptNumber} succeeded in {Elapsed}ms (err vuoto)", receiptNumber, response.ElapsedMs);
+                break;
+            case ErrClassifier.ErrKind.Warning:
+                response.Ok = true;
+                _logger.LogInformation("Receipt {ReceiptNumber} succeeded in {Elapsed}ms (err presente ma classificato info/warning: {Preview})",
+                    receiptNumber, response.ElapsedMs, TrimForLog(errContent));
+                break;
+            case ErrClassifier.ErrKind.Error:
+            default:
+                response.Ok = false;
+                response.Error = errContent.Trim();
+                _logger.LogWarning("Receipt {ReceiptNumber} failed (match '{Keyword}'): {Error}",
+                    receiptNumber, classification.DetectedKeyword, response.Error);
+                break;
         }
 
         return response;
+    }
+
+    private static string TrimForLog(string s)
+    {
+        var t = s.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return t.Length > 200 ? t.Substring(0, 200) + "…" : t;
     }
 
     private async Task<string?> WaitForErrAsync(string txtPath, string errPath, CancellationToken cancellationToken)

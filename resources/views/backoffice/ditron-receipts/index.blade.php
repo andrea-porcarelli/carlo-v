@@ -124,6 +124,18 @@
                                                     data-toggle="modal" data-target="#cancelModal-{{ $r->id }}">
                                                 <i class="fa fa-ban"></i> Annulla
                                             </button>
+                                        @elseif($r->canRetry())
+                                            <form method="POST" action="{{ route('backoffice.ditron.receipts.retry', $r) }}"
+                                                  style="display:inline"
+                                                  onsubmit="return confirm('Riemettere lo scontrino #{{ $r->id }} (€{{ number_format((float) $r->importo_totale, 2, ',', '.') }})?\n\nSe è già uscito dalla cassa lo scontrino verrà stampato una seconda volta.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-warning">
+                                                    <i class="fa fa-redo"></i> Riemetti
+                                                </button>
+                                            </form>
+                                            <br><small>{{ $r->attempts }}/{{ $r->max_attempts }} tentativi</small>
+                                        @elseif($r->isFailed())
+                                            <small class="text-muted">tentativi esauriti ({{ $r->attempts }}/{{ $r->max_attempts }})</small>
                                         @elseif($r->isCancel() && $r->cancelsReceipt)
                                             <small>annulla #{{ $r->cancels_receipt_id }}</small>
                                         @elseif($r->isCancelled() && $r->cancelledByReceipt)

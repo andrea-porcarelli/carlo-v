@@ -368,6 +368,42 @@ final class DitronReceiptService implements ReceiptIssuerInterface
     }
 
     /**
+     * Ritenta l'invio di uno scontrino di vendita marcato `failed`. Riusa il
+     * `request_payload` originale ma genera una nuova `idempotency_key` (l'agent oggi
+     * non depuplica, ma se in futuro lo farà evitiamo di collidere con il tentativo fallito).
+     */
+    public function retry(DitronReceipt $receipt): DitronReceipt
+    {
+        if ($receipt->isCancel()) {
+            throw new RuntimeException("Scontrino #{$receipt->id} è un annullo: non ritentabile con questo flusso.");
+        }
+        if (!$receipt->canRetry()) {
+            throw new RuntimeException(
+                "Scontrino #{$receipt->id} non ritentabile: status={$receipt->status}, tentativi {$receipt->attempts}/{$receipt->max_attempts}."
+            );
+        }
+        $payload = (array) $receipt->request_payload;
+        if (empty($payload)) {
+            throw new RuntimeException("Scontrino #{$receipt->id} privo di request_payload: retry impossibile.");
+        }
+
+        $newKey = $receipt->idempotency_key . ':r' . ($receipt->attempts + 1);
+        $payload['idempotency_key'] = $newKey;
+
+        $receipt->update([
+            'idempotency_key' => $newKey,
+            'last_error'      => null,
+        ]);
+
+        $this->log('info', 'Retry Ditron da backoffice', $receipt->getLogContext() + [
+            'previous_error' => $receipt->last_error,
+        ]);
+
+        $this->dispatch($receipt, $payload);
+        return $receipt->refresh();
+    }
+
+    /**
      * Emette un documento di annullamento (DOCANNULLO opcode 124) per uno scontrino
      * di vendita già emesso. Crea un nuovo record `ditron_receipts` con type=cancel,
      * chiama l'agent su /emit-cancel, e — a successo — marca la sale originale come

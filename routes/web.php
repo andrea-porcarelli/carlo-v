@@ -329,6 +329,7 @@ Route::group(['prefix' => '/backoffice'], function() {
         // Ditron — scontrini emessi e annullo (DOCANNULLO) solo admin
         Route::prefix('/ditron/receipts')->name('backoffice.ditron.receipts.')->group(function () {
             Route::get('/', [DitronReceiptController::class, 'index'])->name('index');
+            Route::post('/{receipt}/retry', [DitronReceiptController::class, 'retry'])->name('retry');
             Route::post('/{receipt}/cancel', [DitronReceiptController::class, 'cancel'])->name('cancel');
         });
 
