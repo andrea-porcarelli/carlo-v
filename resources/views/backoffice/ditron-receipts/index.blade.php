@@ -17,15 +17,78 @@
                 <div class="alert alert-warning">{{ session('warning') }}</div>
             @endif
 
+            @if($currentProvider === 'ditron' && auth()->user()?->role === 'admin')
+                <div class="panel panel-default" data-ditron-operations-panel="1">
+                    <div class="panel-heading">
+                        <h4 class="panel-title">
+                            <i class="fas fa-cash-register"></i> Operazioni cassa Ditron
+                        </h4>
+                    </div>
+                    <div class="panel-body">
+                        <div class="row">
+                            {{-- Chiusura Z --}}
+                            <div class="col-md-4 m-b-sm">
+                                <h5><i class="fas fa-lock text-danger"></i> Chiusura giornaliera (Z)</h5>
+                                <p class="text-muted small m-b-sm">
+                                    Emette lo scontrino di azzeramento fiscale sulla cassa. La chiusura automatica è schedulata alle 23:59; usa questo pulsante solo se non è stata eseguita.
+                                </p>
+                                @if($lastDitronClosure)
+                                    <p class="small">
+                                        <span class="text-muted">Ultima Z:</span>
+                                        <b>{{ $lastDitronClosure->closure_date->format('d/m/Y') }}</b>
+                                        —
+                                        @if($lastDitronClosure->isDone())
+                                            <span class="text-success">eseguita</span>
+                                            ({{ $lastDitronClosure->source === 'auto' ? 'auto' : 'manuale' }}, {{ $lastDitronClosure->elapsed_ms }}ms)
+                                        @elseif($lastDitronClosure->isFailed())
+                                            <span class="text-danger">fallita</span> — {{ $lastDitronClosure->last_error }}
+                                        @else
+                                            <span class="text-warning">{{ $lastDitronClosure->status }}</span>
+                                        @endif
+                                    </p>
+                                @endif
+                                <form method="POST" action="{{ route('backoffice.ditron.close-day') }}"
+                                      onsubmit="return confirm('Eseguire ora la chiusura fiscale Ditron per oggi?\n\nATTENZIONE: emette lo scontrino Z e chiude la giornata fiscale sulla cassa.');">
+                                    @csrf
+                                    <button type="submit" class="btn btn-danger btn-block">
+                                        <i class="fas fa-lock"></i> Esegui chiusura Z ora
+                                    </button>
+                                </form>
+                            </div>
+
+                            {{-- Lettura X --}}
+                            <div class="col-md-4 m-b-sm">
+                                <h5><i class="fas fa-file-alt text-primary"></i> Lettura fiscale (X)</h5>
+                                <p class="text-muted small m-b-sm">
+                                    Stampa i totali della giornata in corso <b>senza azzerare</b> i contatori.
+                                    Non ha valore fiscale: può essere ripetuta più volte al giorno per verifica.
+                                </p>
+                                <form method="POST" action="{{ route('backoffice.ditron.receipts.read-x') }}"
+                                      onsubmit="return confirm('Eseguire la lettura X sulla cassa Ditron?\n\nStamperà un report dei totali giornalieri senza chiudere la giornata.');">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary btn-block">
+                                        <i class="fas fa-file-alt"></i> Esegui lettura X ora
+                                    </button>
+                                </form>
+                            </div>
+
+                            {{-- GETP --}}
+                            <div class="col-md-4 m-b-sm">
+                                <h5><i class="fas fa-eye text-info"></i> Interrogazione (GETP)</h5>
+                                <p class="text-muted small m-b-sm">
+                                    Interroga direttamente la cassa per leggere matricola, ultimo scontrino, ultima Z, gran totale ecc. senza stampare nulla.
+                                </p>
+                                <a href="{{ route('backoffice.ditron.receipts.getp') }}" class="btn btn-info btn-block">
+                                    <i class="fa fa-eye"></i> Apri lettura GETP
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="panel panel-default">
                 <div class="panel-body">
-                    <div class="mb-3">
-                        <a href="{{ route('backoffice.ditron.receipts.getp') }}" class="btn btn-info">
-                            <i class="fa fa-eye"></i> Leggi cassa (GETP)
-                        </a>
-                        <small class="text-muted ml-2">Interroga direttamente la cassa: matricola, ultimo scontrino, Z, gran totale…</small>
-                    </div>
-
                     <form method="GET" action="{{ route('backoffice.ditron.receipts.index') }}" class="mb-4">
                         <div class="row g-1 advanced-search">
                             <div class="col-md-2">

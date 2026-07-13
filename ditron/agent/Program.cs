@@ -13,6 +13,7 @@ builder.Services.Configure<DitronAgentOptions>(builder.Configuration.GetSection(
 builder.Services.AddSingleton<IReceiptNumberAllocator, ReceiptNumberAllocator>();
 builder.Services.AddSingleton<IReceiptBuilder, ReceiptBuilder>();
 builder.Services.AddSingleton<ICloseDayCommandBuilder, CloseDayCommandBuilder>();
+builder.Services.AddSingleton<IReadXCommandBuilder, ReadXCommandBuilder>();
 builder.Services.AddSingleton<ICancelCommandBuilder, CancelCommandBuilder>();
 builder.Services.AddSingleton<IScontriniWriter, ScontriniWriter>();
 builder.Services.AddSingleton<IPropertyReader, AutoRunPropertyReader>();
@@ -185,6 +186,41 @@ app.MapPost("/close-day", async (
     var emitResponse = await writer.WriteAndAwaitAsync(receiptNumber, command, cancellationToken);
 
     var response = new CloseDayResponse
+    {
+        Ok = emitResponse.Ok,
+        ReceiptNumber = emitResponse.ReceiptNumber,
+        Error = emitResponse.Error,
+        RawCommand = emitResponse.RawCommand,
+        RawErr = emitResponse.RawErr,
+        ElapsedMs = emitResponse.ElapsedMs,
+        Mode = opt.Value.Mode.ToString(),
+    };
+
+    return response.Ok ? Results.Ok(response) : Results.UnprocessableEntity(response);
+});
+
+app.MapPost("/read-x", async (
+    ReadXRequest request,
+    IReadXCommandBuilder builder,
+    IReceiptNumberAllocator allocator,
+    IScontriniWriter writer,
+    Microsoft.Extensions.Options.IOptions<DitronAgentOptions> opt,
+    CancellationToken cancellationToken) =>
+{
+    if (request is null)
+    {
+        return Results.BadRequest(new ReadXResponse { Ok = false, Error = "Empty body" });
+    }
+    if (string.IsNullOrWhiteSpace(request.IdempotencyKey))
+    {
+        return Results.BadRequest(new ReadXResponse { Ok = false, Error = "idempotency_key is required" });
+    }
+
+    var command = builder.Build(request);
+    var receiptNumber = allocator.Allocate();
+    var emitResponse = await writer.WriteAndAwaitAsync(receiptNumber, command, cancellationToken);
+
+    var response = new ReadXResponse
     {
         Ok = emitResponse.Ok,
         ReceiptNumber = emitResponse.ReceiptNumber,

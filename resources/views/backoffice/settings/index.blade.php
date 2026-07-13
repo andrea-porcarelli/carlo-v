@@ -40,43 +40,15 @@
     </div>
 
     @if($currentProvider === 'ditron' && auth()->user()?->role === 'admin')
-        @php
-            $lastDitronClosure = \App\Models\DitronDailyClosure::orderByDesc('closure_date')->first();
-        @endphp
-        <div class="panel panel-default" data-ditron-close-day-panel="1">
-            <div class="panel-heading">
-                <h4 class="panel-title">
-                    <i class="fas fa-lock"></i> Chiusura giornaliera Ditron
-                </h4>
-            </div>
+        <div class="panel panel-default" data-ditron-operations-shortcut="1">
             <div class="panel-body">
-                <p class="text-muted m-b-sm">
-                    Emette lo scontrino di azzeramento fiscale (Z) sulla cassa Ditron RT.
-                    La chiusura automatica è schedulata ogni giorno alle 23:59.
-                    Usa questo pulsante solo se la Z automatica non è stata eseguita.
+                <p class="m-b-sm">
+                    <i class="fas fa-cash-register"></i>
+                    <strong>Operazioni cassa Ditron</strong> — chiusura Z, lettura X, GETP e storico scontrini si trovano nel cruscotto dedicato.
                 </p>
-                @if($lastDitronClosure)
-                    <p>
-                        <small class="text-muted">Ultima chiusura registrata:</small>
-                        <b>{{ $lastDitronClosure->closure_date->format('d/m/Y') }}</b>
-                        —
-                        @if($lastDitronClosure->isDone())
-                            <span class="text-success">eseguita</span>
-                            ({{ $lastDitronClosure->source === 'auto' ? 'auto' : 'manuale' }}, {{ $lastDitronClosure->elapsed_ms }}ms)
-                        @elseif($lastDitronClosure->isFailed())
-                            <span class="text-danger">fallita</span> — {{ $lastDitronClosure->last_error }}
-                        @else
-                            <span class="text-warning">{{ $lastDitronClosure->status }}</span>
-                        @endif
-                    </p>
-                @endif
-                <form method="POST" action="{{ route('backoffice.ditron.close-day') }}"
-                      onsubmit="return confirm('Eseguire ora la chiusura fiscale Ditron per oggi?\n\nATTENZIONE: emette lo scontrino Z e chiude la giornata fiscale sulla cassa.');">
-                    @csrf
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-lock"></i> Esegui chiusura Ditron ora
-                    </button>
-                </form>
+                <a href="{{ route('backoffice.ditron.receipts.index') }}" class="btn btn-primary">
+                    <i class="fas fa-external-link-alt"></i> Vai al cruscotto Ditron
+                </a>
             </div>
         </div>
     @endif

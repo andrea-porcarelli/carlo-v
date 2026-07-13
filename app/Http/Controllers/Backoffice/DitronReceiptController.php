@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Backoffice;
 
 use App\Http\Controllers\Controller;
+use App\Models\DitronDailyClosure;
 use App\Models\DitronReceipt;
+use App\Models\Setting;
+use App\Services\DitronReadXService;
 use App\Services\DitronReceiptService;
 use App\Services\TableOrderLoggerService;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +22,7 @@ class DitronReceiptController extends Controller
     public function __construct(
         private DitronReceiptService $service,
         private TableOrderLoggerService $logger,
+        private DitronReadXService $readX,
     ) {}
 
     public function index(Request $request): View
@@ -54,13 +58,46 @@ class DitronReceiptController extends Controller
         $receipts = $query->paginate(50)->withQueryString();
 
         return view('backoffice.ditron-receipts.index', [
-            'receipts'    => $receipts,
-            'from'        => $from,
-            'to'          => $to,
-            'status'      => $status,
-            'tableNumber' => $tableNumber,
-            'type'        => $type,
+            'receipts'         => $receipts,
+            'from'             => $from,
+            'to'               => $to,
+            'status'           => $status,
+            'tableNumber'      => $tableNumber,
+            'type'             => $type,
+            'currentProvider'  => (string) Setting::get('corrispettivo_provider', 'mysond'),
+            'lastDitronClosure'=> DitronDailyClosure::orderByDesc('closure_date')->first(),
         ]);
+    }
+
+    /**
+     * Emette una Lettura X giornaliera (X-Report, non fiscale) sulla cassa
+     * Ditron. Solo admin. A differenza della Z non azzera i contatori: può
+     * essere ripetuta più volte al giorno per verifica.
+     */
+    public function runReadX(): RedirectResponse
+    {
+        $admin = $this->assertAdmin();
+
+        if ((string) Setting::get('corrispettivo_provider', 'mysond') !== 'ditron') {
+            return back()->with('error', 'Provider corrispettivi non è "ditron": lettura non applicabile.');
+        }
+
+        Log::channel('corrispettivi')->info('Ditron Lettura X avviata da backoffice', [
+            'triggered_by_user_id' => $admin->id,
+        ]);
+
+        try {
+            $result = $this->readX->read($admin->id);
+        } catch (Throwable $e) {
+            return back()->with('error', 'Errore durante la lettura X: ' . $e->getMessage());
+        }
+
+        if (($result['ok'] ?? false) === true) {
+            $elapsed = $result['elapsed_ms'] ?? '?';
+            return back()->with('success', "Lettura X Ditron eseguita ({$elapsed}ms).");
+        }
+
+        return back()->with('error', 'Lettura X Ditron fallita: ' . ($result['error'] ?? 'errore sconosciuto'));
     }
 
     /**
