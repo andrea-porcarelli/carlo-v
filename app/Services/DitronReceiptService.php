@@ -144,7 +144,7 @@ final class DitronReceiptService implements ReceiptIssuerInterface
             'cover_charge_unit_price' => $this->coverChargeUnitPrice($order),
             'items'                   => $items,
             'reparto'                 => (int) Setting::get('ditron_default_reparto', 1),
-            'tender'                  => (int) Setting::get('ditron_default_tender', 5),
+            'tender'                  => $this->tenderForPaymentMethod($paymentMethod),
             'payment_method'          => $paymentMethod,
             'discount'                => $this->discountPayload($order),
         ];
@@ -242,7 +242,7 @@ final class DitronReceiptService implements ReceiptIssuerInterface
             'cover_charge_unit_price' => $split->covers > 0 && $order ? (float) $order->getCoverChargePerPerson() : null,
             'items'                   => $items,
             'reparto'                 => (int) Setting::get('ditron_default_reparto', 1),
-            'tender'                  => (int) Setting::get('ditron_default_tender', 5),
+            'tender'                  => $this->tenderForPaymentMethod($paymentMethod),
             'payment_method'          => $paymentMethod,
             'discount'                => $discount,
         ];
@@ -272,6 +272,21 @@ final class DitronReceiptService implements ReceiptIssuerInterface
             return null;
         }
         return (float) $order->getCoverChargePerPerson();
+    }
+
+    /**
+     * Codice tender (T=N) usato nella chiusura fiscale della cassa Ditron RT.
+     * Mappa il payment_method (whitelist contanti/pos) al setting dedicato.
+     * Per metodi non ammessi ricadiamo sul default storico: emettiPer* filtra
+     * comunque a monte, quindi questo fallback non dovrebbe mai essere raggiunto.
+     */
+    private function tenderForPaymentMethod(string $paymentMethod): int
+    {
+        return match ($paymentMethod) {
+            'contanti' => (int) Setting::get('ditron_tender_contanti', 1),
+            'pos'      => (int) Setting::get('ditron_tender_pos', 5),
+            default    => (int) Setting::get('ditron_default_tender', 5),
+        };
     }
 
     private function idempotencyKeyForOrder(TableOrder $order): string

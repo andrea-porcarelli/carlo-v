@@ -26,7 +26,7 @@ class SettingController extends BaseController
         'Agenzia delle Entrate' => ['agenzia_entrate.enabled', 'agenzia_entrate.username', 'agenzia_entrate.password', 'agenzia_entrate.pincode', 'agenzia_entrate.utenza'],
         'Scontrini Elettronici' => ['corrispettivo_enabled', 'corrispettivo_provider', 'corrispettivo_timeout_seconds', 'corrispettivo_max_attempts', 'corrispettivo_printer_id'],
         'Configurazione Mysond' => ['corrispettivo_aliquota_iva_default', 'corrispettivo_mock'],
-        'Configurazione Ditron' => ['ditron_agent_url', 'ditron_agent_token', 'ditron_agent_timeout_seconds', 'ditron_default_reparto', 'ditron_default_tender', 'ditron_cover_label'],
+        'Configurazione Ditron' => ['ditron_agent_url', 'ditron_agent_token', 'ditron_agent_timeout_seconds', 'ditron_default_reparto', 'ditron_default_tender', 'ditron_tender_contanti', 'ditron_tender_pos', 'ditron_cover_label'],
         'Sistema'               => ['deploy_git_user', 'carlov_url'],
     ];
 
