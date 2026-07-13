@@ -368,6 +368,54 @@ final class DitronReceiptService implements ReceiptIssuerInterface
     }
 
     /**
+     * Legge N proprietà GETP dalla cassa via agent. Ritorna array associativo
+     * [ok, values, error, elapsed_ms, raw_command, raw_err] già decodificato.
+     * Non tocca database — è una lettura pura.
+     */
+    public function readProperties(array $propertyNumbers): array
+    {
+        $baseUrl = (string) Setting::get('ditron_agent_url', '');
+        if ($baseUrl === '') {
+            return ['ok' => false, 'error' => 'ditron_agent_url non configurato', 'values' => []];
+        }
+
+        $token = (string) Setting::get('ditron_agent_token', '');
+        $timeout = (int) Setting::get('ditron_agent_timeout_seconds', 20);
+
+        $request = Http::timeout($timeout)->acceptJson();
+        if ($token !== '') {
+            $request = $request->withToken($token);
+        }
+
+        try {
+            $response = $request->post(rtrim($baseUrl, '/') . '/read-properties', [
+                'properties' => array_values(array_map('intval', $propertyNumbers)),
+            ]);
+        } catch (ConnectionException $e) {
+            return ['ok' => false, 'error' => 'connect_error: ' . Str::limit($e->getMessage(), 250), 'values' => []];
+        } catch (Throwable $e) {
+            return ['ok' => false, 'error' => 'unexpected_error: ' . Str::limit($e->getMessage(), 250), 'values' => []];
+        }
+
+        $body = $response->json() ?? [];
+        $this->log('info', 'GETP letto da backoffice', [
+            'properties' => $propertyNumbers,
+            'http'       => $response->status(),
+            'ok'         => $body['ok'] ?? false,
+            'elapsed_ms' => $body['elapsed_ms'] ?? null,
+        ]);
+
+        return [
+            'ok'          => (bool) ($body['ok'] ?? false),
+            'error'       => $body['error'] ?? null,
+            'values'      => (array) ($body['values'] ?? []),
+            'raw_command' => $body['raw_command'] ?? null,
+            'raw_err'     => $body['raw_err'] ?? null,
+            'elapsed_ms'  => $body['elapsed_ms'] ?? null,
+        ];
+    }
+
+    /**
      * Ritenta l'invio di uno scontrino di vendita marcato `failed`. Riusa il
      * `request_payload` originale ma genera una nuova `idempotency_key` (l'agent oggi
      * non depuplica, ma se in futuro lo farà evitiamo di collidere con il tentativo fallito).

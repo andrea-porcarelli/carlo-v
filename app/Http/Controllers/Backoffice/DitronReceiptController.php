@@ -63,6 +63,69 @@ class DitronReceiptController extends Controller
         ]);
     }
 
+    /**
+     * Preset di proprietà GETP interrogabili dal backoffice, in linea con
+     * ecrcomrt.ini [49]. Espansi da UI, non da utente free-text.
+     */
+    private const GETP_PRESETS = [
+        'last_receipt' => [
+            'label'      => 'Ultimo scontrino emesso',
+            'properties' => [1, 10, 12],
+        ],
+        'cash_status' => [
+            'label'      => 'Stato cassa (matricola + subtotale corrente)',
+            'properties' => [1, 9, 10, 11],
+        ],
+        'last_z' => [
+            'label'      => 'Ultimo azzeramento Z',
+            'properties' => [12, 16],
+        ],
+        'last_credit_note' => [
+            'label'      => 'Ultima nota di credito',
+            'properties' => [1, 17],
+        ],
+    ];
+
+    public function readGetp(Request $request): View
+    {
+        $admin = $this->assertAdmin();
+
+        $preset = $request->input('preset', 'last_receipt');
+        if (!isset(self::GETP_PRESETS[$preset])) {
+            $preset = 'last_receipt';
+        }
+        $properties = self::GETP_PRESETS[$preset]['properties'];
+
+        Log::channel('corrispettivi')->info('GETP invoked from backoffice', [
+            'admin_user_id' => $admin->id,
+            'preset'        => $preset,
+            'properties'    => $properties,
+        ]);
+
+        $result = $this->service->readProperties($properties);
+
+        return view('backoffice.ditron-receipts.getp', [
+            'result'     => $result,
+            'preset'     => $preset,
+            'properties' => $properties,
+            'presets'    => self::GETP_PRESETS,
+            'labels'     => self::propertyLabels(),
+        ]);
+    }
+
+    private static function propertyLabels(): array
+    {
+        return [
+            1  => 'Matricola ECR',
+            9  => 'N° ultimo scontrino (in transazione)',
+            10 => 'N° ultimo scontrino emesso',
+            11 => 'Subtotale corrente / ultimo totale',
+            12 => 'Data / N° ultimo Z',
+            16 => 'Gran Totale ultimo Z',
+            17 => 'N° ultima nota di credito',
+        ];
+    }
+
     public function retry(DitronReceipt $receipt): RedirectResponse
     {
         $admin = $this->assertAdmin();

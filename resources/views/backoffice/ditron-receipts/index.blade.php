@@ -19,6 +19,13 @@
 
             <div class="panel panel-default">
                 <div class="panel-body">
+                    <div class="mb-3">
+                        <a href="{{ route('backoffice.ditron.receipts.getp') }}" class="btn btn-info">
+                            <i class="fa fa-eye"></i> Leggi cassa (GETP)
+                        </a>
+                        <small class="text-muted ml-2">Interroga direttamente la cassa: matricola, ultimo scontrino, Z, gran totale…</small>
+                    </div>
+
                     <form method="GET" action="{{ route('backoffice.ditron.receipts.index') }}" class="mb-4">
                         <div class="row g-1 advanced-search">
                             <div class="col-md-2">

@@ -15,6 +15,7 @@ builder.Services.AddSingleton<IReceiptBuilder, ReceiptBuilder>();
 builder.Services.AddSingleton<ICloseDayCommandBuilder, CloseDayCommandBuilder>();
 builder.Services.AddSingleton<ICancelCommandBuilder, CancelCommandBuilder>();
 builder.Services.AddSingleton<IScontriniWriter, ScontriniWriter>();
+builder.Services.AddSingleton<IPropertyReader, AutoRunPropertyReader>();
 builder.Services.AddSingleton<IFiscalInfoReader, AutoRunFiscalInfoReader>();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -133,6 +134,31 @@ app.MapPost("/emit-cancel", async (
         response.ZNumber = fiscal.ZNumber;
         response.Matricola = fiscal.Matricola;
     }
+
+    return response.Ok ? Results.Ok(response) : Results.UnprocessableEntity(response);
+});
+
+app.MapPost("/read-properties", async (
+    ReadPropertiesRequest request,
+    IPropertyReader reader,
+    CancellationToken cancellationToken) =>
+{
+    if (request is null || request.Properties is null || request.Properties.Length == 0)
+    {
+        return Results.BadRequest(new ReadPropertiesResponse { Ok = false, Error = "properties is required" });
+    }
+
+    var result = await reader.ReadAsync(request.Properties, cancellationToken);
+
+    var response = new ReadPropertiesResponse
+    {
+        Ok = result.Ok,
+        Error = result.Error,
+        RawCommand = result.RawCommand,
+        RawErr = result.RawErr,
+        ElapsedMs = result.ElapsedMs,
+        Values = result.Values,
+    };
 
     return response.Ok ? Results.Ok(response) : Results.UnprocessableEntity(response);
 });
