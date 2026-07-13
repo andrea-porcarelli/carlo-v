@@ -15,7 +15,7 @@
     <link rel="apple-touch-icon" href="{{ asset('app/images/apple-touch-icon.png') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @include('app.components.css')
-    <link href="{{ asset('/app/css/mobile.css') }}?v={{ time() }}" rel="stylesheet">
+    <link href="{{ asset('/app/css/mobile.css') }}?v={{ config('view.assets_version') }}" rel="stylesheet">
     @livewireStyles
 </head>
 <body class="mobile-body">
@@ -23,7 +23,7 @@
     @yield('main-content')
 
     @include('app.components.javascript')
-    <script src="{{ asset('app/js/mobile.js') }}?v={{ time() }}"></script>
+    <script src="{{ asset('app/js/mobile.js') }}?v={{ config('view.assets_version') }}"></script>
     @livewireScripts
 </body>
 </html>

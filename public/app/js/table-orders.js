@@ -753,7 +753,7 @@ class TableOrdersManager {
                     <div style="display:flex;gap:4px;">
                         <button class="btn-quick-add" onclick="tableOrdersManager.openProductModal({id:${item.dish_id}, name:'${(item.dish_name || '').replace(/'/g, "\\'")}', price:${item.unit_price}})" title="Aggiungi ancora"><i class="fas fa-plus"></i></button>
                         <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
-                        ${nonSegueItems.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})" title="Rimuovi piatto"><i class="fas fa-trash"></i></button>` : ''}
+                        <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})" title="Rimuovi piatto"><i class="fas fa-trash"></i></button>
                     </div>
                     <span class="receipt-item-price">€${parseFloat(item.subtotal).toFixed(2)}</span>
                 </div>
@@ -1126,9 +1126,9 @@ class TableOrdersManager {
                     <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica note/extra">
                         <i class="fas fa-pen"></i>
                     </button>
-                    ${items.length > 1 ? `<button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
+                    <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})">
                         <i class="fas fa-trash"></i>
-                    </button>` : ''}
+                    </button>
                 </div>
             </div>
         `).join('');
