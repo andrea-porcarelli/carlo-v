@@ -7,18 +7,21 @@ using Microsoft.Extensions.Options;
 namespace DitronAgent.Services;
 
 /// <summary>
-/// Legge proprietà via GETP in modalità WinEcrCom Auto-Run: scrive un file `scontrinoNN.txt`
-/// con una riga `getp num=X` per ogni proprietà, e attende un file di output.
+/// Legge proprietà dalla cassa Ditron RT via istruzione <c>INFO</c> (opcode 71
+/// definito in <c>ecrcomrt.ini</c>) in modalità WinEcrCom Auto-Run Spooler.
 ///
-/// TODO after spike: il formato del file di risposta va verificato sulla cassa reale.
-/// Ipotesi in ordine di probabilità decrescente:
-///   1) WinEcrCom scrive un file `scontrinoNN.out` (o `.rsp`) accanto al `.err` con
-///      righe `num=X val=YYY` o simili.
-///   2) La risposta di GETP finisce nel `.err` stesso quando non c'è un errore vero.
-///   3) Auto-Run non supporta GETP e serve passare a `CoEcrCom.ocx` (ActiveX, COM).
+/// Nota storica: la prima implementazione usava <c>getp num=X</c> (opcode 49).
+/// WinEcrCom rifiuta quella sintassi con "ERRORE DI SINTASSI 4: OPERANDO NON
+/// TROVATO" perché su Ditron RT l'opcode <c>GETP</c> supporta solo gli operandi
+/// simbolici <c>ERR</c> e <c>CURDIR</c>, non un numero di proprietà. Le info
+/// fiscali (matricola, ultimo scontrino, data Z, gran totale…) vivono
+/// sull'opcode <c>INFO CODICE=X</c>.
 ///
-/// Per gestire tutte e tre le ipotesi il reader cerca in ordine: `.out`, `.rsp`, e
-/// (se l'`.err` è vuoto o non matcha una keyword di errore) prova a parsarlo come output.
+/// Auto-Run non popola il campo COM <c>ResultString</c>: per catturare
+/// l'output dell'istruzione usiamo l'operando <c>FILE='&lt;path&gt;'</c>
+/// (introdotto in WinEcrCom 1.9.0) che copia il ResultString in un file di
+/// testo. Emettiamo un file per proprietà per evitare ambiguità di
+/// append/overwrite tra letture consecutive.
 /// </summary>
 public sealed class AutoRunPropertyReader : IPropertyReader
 {
@@ -49,40 +52,35 @@ public sealed class AutoRunPropertyReader : IPropertyReader
         var nn = _allocator.Allocate().ToString("D2", Inv);
         var txtPath = Path.Combine(_options.ScontriniFolder, $"scontrino{nn}.txt");
         var errPath = Path.Combine(_options.ScontriniFolder, $"scontrino{nn}.err");
-        var outPath = Path.Combine(_options.ScontriniFolder, $"scontrino{nn}.out");
-        var rspPath = Path.Combine(_options.ScontriniFolder, $"scontrino{nn}.rsp");
 
-        foreach (var p in new[] { errPath, outPath, rspPath })
+        // Un file di output per ogni proprietà, così ogni ResultString finisce
+        // in un file dedicato e possiamo mapparlo al numero di proprietà.
+        var propOutPaths = propertyNumbers.ToDictionary(
+            p => p,
+            p => Path.Combine(_options.ScontriniFolder, $"scontrino{nn}_prop{p}.out"));
+
+        foreach (var p in propOutPaths.Values)
         {
             if (File.Exists(p)) File.Delete(p);
         }
+        if (File.Exists(errPath)) File.Delete(errPath);
 
         var sb = new StringBuilder();
-        foreach (var n in propertyNumbers)
+        foreach (var (num, outPath) in propOutPaths)
         {
-            sb.Append("getp num=").AppendLine(n.ToString(Inv));
+            sb.Append("INFO CODICE=").Append(num.ToString(Inv))
+              .Append(" FILE='").Append(outPath).AppendLine("'");
         }
         var command = sb.ToString();
 
         var stopwatch = Stopwatch.StartNew();
         await File.WriteAllTextAsync(txtPath, command, new UTF8Encoding(false), cancellationToken);
-        _logger.LogInformation("GETP command written to {Path}: {Cmd}", txtPath, command.Replace("\n", "; "));
+        _logger.LogInformation("INFO command written to {Path}: {Cmd}", txtPath, command.Replace("\n", "; "));
 
-        var (rawResponse, rawErr) = await WaitForResponseAsync(txtPath, outPath, rspPath, errPath, cancellationToken);
+        var rawErr = await WaitForBatchCompletionAsync(txtPath, errPath, cancellationToken);
         stopwatch.Stop();
 
-        if (rawResponse is null && rawErr is null)
-        {
-            return new PropertyReadResult
-            {
-                Ok = false,
-                RawCommand = command,
-                ElapsedMs = stopwatch.ElapsedMilliseconds,
-                Error = $"Timeout: nessun file di risposta prodotto entro {_options.ErrPollingTimeoutMs}ms",
-            };
-        }
-
-        // Se l'`.err` non-vuoto matcha una keyword di errore, lo consideriamo fallito.
+        // Se il .err contiene un errore riconosciuto, la lettura è fallita.
         if (!string.IsNullOrWhiteSpace(rawErr))
         {
             var classification = ErrClassifier.Classify(rawErr, _options);
@@ -97,11 +95,34 @@ public sealed class AutoRunPropertyReader : IPropertyReader
                     Error = rawErr.Trim(),
                 };
             }
-            // altrimenti (warning/info) potrebbe contenere anche la risposta — proviamo a parsare
-            rawResponse ??= rawErr;
         }
 
-        var values = ParseGetpOutput(rawResponse ?? string.Empty);
+        // Timeout: né .err né alcun file di output prodotto.
+        if (rawErr is null && !propOutPaths.Values.Any(File.Exists))
+        {
+            return new PropertyReadResult
+            {
+                Ok = false,
+                RawCommand = command,
+                ElapsedMs = stopwatch.ElapsedMilliseconds,
+                Error = $"Timeout: nessun file di risposta prodotto entro {_options.ErrPollingTimeoutMs}ms",
+            };
+        }
+
+        var values = new Dictionary<int, string>();
+        foreach (var (num, path) in propOutPaths)
+        {
+            if (!File.Exists(path)) continue;
+
+            var raw = await TryReadAsync(path, cancellationToken);
+            var value = NormalizeInfoOutput(raw);
+            if (!string.IsNullOrEmpty(value))
+            {
+                values[num] = value;
+            }
+
+            try { File.Delete(path); } catch (IOException) { /* best effort */ }
+        }
 
         return new PropertyReadResult
         {
@@ -110,11 +131,11 @@ public sealed class AutoRunPropertyReader : IPropertyReader
             RawCommand = command,
             RawErr = rawErr,
             ElapsedMs = stopwatch.ElapsedMilliseconds,
-            Error = values.Count == 0 ? "Nessun valore riconosciuto nella risposta della cassa. Verifica formato .out/.rsp." : null,
+            Error = values.Count == 0 ? "Nessun valore letto dai file di output INFO." : null,
         };
     }
 
-    private async Task<(string? response, string? err)> WaitForResponseAsync(string txtPath, string outPath, string rspPath, string errPath, CancellationToken cancellationToken)
+    private async Task<string?> WaitForBatchCompletionAsync(string txtPath, string errPath, CancellationToken cancellationToken)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(_options.ErrPollingTimeoutMs);
         while (DateTime.UtcNow < deadline)
@@ -122,20 +143,11 @@ public sealed class AutoRunPropertyReader : IPropertyReader
             cancellationToken.ThrowIfCancellationRequested();
             if (!File.Exists(txtPath))
             {
-                string? response = null;
-                string? err = null;
-                if (File.Exists(outPath)) response = await TryReadAsync(outPath, cancellationToken);
-                if (response is null && File.Exists(rspPath)) response = await TryReadAsync(rspPath, cancellationToken);
-                if (File.Exists(errPath)) err = await TryReadAsync(errPath, cancellationToken);
-
-                if (response is not null || err is not null)
-                {
-                    return (response, err);
-                }
+                return File.Exists(errPath) ? await TryReadAsync(errPath, cancellationToken) : null;
             }
             await Task.Delay(_options.ErrPollingIntervalMs, cancellationToken);
         }
-        return (null, null);
+        return File.Exists(errPath) ? await TryReadAsync(errPath, cancellationToken) : null;
     }
 
     private static async Task<string?> TryReadAsync(string path, CancellationToken cancellationToken)
@@ -151,65 +163,15 @@ public sealed class AutoRunPropertyReader : IPropertyReader
     }
 
     /// <summary>
-    /// Parser euristico. Le forme più probabili sono:
-    ///   `num=1 val=EU84011934`
-    ///   `1=EU84011934`
-    ///   `getp num=1 val=EU84011934`
-    ///   `1 EU84011934`
-    /// TODO after spike: sostituire con parser preciso quando abbiamo un file reale.
+    /// Il file prodotto da <c>INFO ... FILE=</c> contiene il ResultString grezzo
+    /// (una singola stringa, senza formattazione), tipicamente su una riga.
+    /// Ripuliamo whitespace, terminatori CR/LF e — se WinEcrCom decidesse di
+    /// racchiudere il valore fra apici — anche quelli.
     /// </summary>
-    private static Dictionary<int, string> ParseGetpOutput(string raw)
+    private static string NormalizeInfoOutput(string? raw)
     {
-        var result = new Dictionary<int, string>();
-        if (string.IsNullOrWhiteSpace(raw)) return result;
-
-        foreach (var lineRaw in raw.Split('\n'))
-        {
-            var line = lineRaw.Replace("\r", string.Empty).Trim();
-            if (line.Length == 0) continue;
-
-            var propIdx = line.IndexOf("num=", StringComparison.OrdinalIgnoreCase);
-            var eqIdx = line.LastIndexOf('=');
-
-            int? prop = null;
-            string? val = null;
-
-            if (propIdx >= 0)
-            {
-                var afterNum = line[(propIdx + 4)..];
-                var spaceIdx = afterNum.IndexOfAny(new[] { ' ', '=', ',', ';' });
-                var numStr = spaceIdx > 0 ? afterNum[..spaceIdx] : afterNum;
-                if (int.TryParse(numStr, out var n)) prop = n;
-
-                if (eqIdx > propIdx && eqIdx < line.Length - 1)
-                {
-                    val = line[(eqIdx + 1)..].Trim().Trim('\'', '"');
-                }
-            }
-            else if (eqIdx > 0)
-            {
-                var left = line[..eqIdx].Trim();
-                if (int.TryParse(left, out var n))
-                {
-                    prop = n;
-                    val = line[(eqIdx + 1)..].Trim().Trim('\'', '"');
-                }
-            }
-            else
-            {
-                var parts = line.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                if (parts.Length == 2 && int.TryParse(parts[0], out var n))
-                {
-                    prop = n;
-                    val = parts[1];
-                }
-            }
-
-            if (prop.HasValue && !string.IsNullOrWhiteSpace(val))
-            {
-                result[prop.Value] = val!;
-            }
-        }
-        return result;
+        if (string.IsNullOrEmpty(raw)) return string.Empty;
+        var trimmed = raw.Trim().Trim('\r', '\n').Trim();
+        return trimmed.Trim('\'', '"');
     }
 }
