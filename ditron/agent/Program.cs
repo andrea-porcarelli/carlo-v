@@ -13,7 +13,9 @@ builder.Services.Configure<DitronAgentOptions>(builder.Configuration.GetSection(
 builder.Services.AddSingleton<IReceiptNumberAllocator, ReceiptNumberAllocator>();
 builder.Services.AddSingleton<IReceiptBuilder, ReceiptBuilder>();
 builder.Services.AddSingleton<ICloseDayCommandBuilder, CloseDayCommandBuilder>();
+builder.Services.AddSingleton<ICancelCommandBuilder, CancelCommandBuilder>();
 builder.Services.AddSingleton<IScontriniWriter, ScontriniWriter>();
+builder.Services.AddSingleton<IFiscalInfoReader, AutoRunFiscalInfoReader>();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -67,6 +69,7 @@ app.MapPost("/emit-receipt", async (
     IReceiptBuilder builder,
     IReceiptNumberAllocator allocator,
     IScontriniWriter writer,
+    IFiscalInfoReader fiscalReader,
     CancellationToken cancellationToken) =>
 {
     if (request is null)
@@ -81,6 +84,56 @@ app.MapPost("/emit-receipt", async (
     var command = builder.Build(request);
     var receiptNumber = allocator.Allocate();
     var response = await writer.WriteAndAwaitAsync(receiptNumber, command, cancellationToken);
+
+    if (response.Ok)
+    {
+        var fiscal = await fiscalReader.ReadLastReceiptAsync(cancellationToken);
+        response.FiscalNumber = fiscal.FiscalNumber;
+        response.FiscalDate = fiscal.FiscalDate;
+        response.ZNumber = fiscal.ZNumber;
+        response.Matricola = fiscal.Matricola;
+    }
+
+    return response.Ok ? Results.Ok(response) : Results.UnprocessableEntity(response);
+});
+
+app.MapPost("/emit-cancel", async (
+    CancelReceiptRequest request,
+    ICancelCommandBuilder builder,
+    IReceiptNumberAllocator allocator,
+    IScontriniWriter writer,
+    IFiscalInfoReader fiscalReader,
+    CancellationToken cancellationToken) =>
+{
+    if (request is null)
+    {
+        return Results.BadRequest(new EmitReceiptResponse { Ok = false, Error = "Empty body" });
+    }
+    if (string.IsNullOrWhiteSpace(request.IdempotencyKey))
+    {
+        return Results.BadRequest(new EmitReceiptResponse { Ok = false, Error = "idempotency_key is required" });
+    }
+    if (string.IsNullOrWhiteSpace(request.FiscalNumber)
+        || string.IsNullOrWhiteSpace(request.FiscalDate)
+        || string.IsNullOrWhiteSpace(request.Matricola)
+        || request.ZNumber <= 0)
+    {
+        return Results.BadRequest(new EmitReceiptResponse { Ok = false, Error = "Missing required fields (fiscal_number, fiscal_date, z_number, matricola)" });
+    }
+
+    var command = builder.Build(request);
+    var receiptNumber = allocator.Allocate();
+    var response = await writer.WriteAndAwaitAsync(receiptNumber, command, cancellationToken);
+
+    if (response.Ok)
+    {
+        var fiscal = await fiscalReader.ReadLastReceiptAsync(cancellationToken);
+        response.FiscalNumber = fiscal.FiscalNumber;
+        response.FiscalDate = fiscal.FiscalDate;
+        response.ZNumber = fiscal.ZNumber;
+        response.Matricola = fiscal.Matricola;
+    }
+
     return response.Ok ? Results.Ok(response) : Results.UnprocessableEntity(response);
 });
 

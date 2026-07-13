@@ -24,6 +24,7 @@ use App\Http\Controllers\Backoffice\PrintLogController;
 use App\Http\Controllers\Backoffice\SyncController;
 use App\Http\Controllers\Backoffice\CorrispettivoController;
 use App\Http\Controllers\Backoffice\DitronCloseDayController;
+use App\Http\Controllers\Backoffice\DitronReceiptController;
 use App\Http\Controllers\Backoffice\TableOrderLogController;
 use App\Http\Controllers\Backoffice\UploadController;
 use App\Http\Controllers\Backoffice\UserController;
@@ -324,6 +325,12 @@ Route::group(['prefix' => '/backoffice'], function() {
 
         // Ditron — chiusura giornaliera manuale
         Route::post('/ditron/close-day', [DitronCloseDayController::class, 'run'])->name('backoffice.ditron.close-day');
+
+        // Ditron — scontrini emessi e annullo (DOCANNULLO) solo admin
+        Route::prefix('/ditron/receipts')->name('backoffice.ditron.receipts.')->group(function () {
+            Route::get('/', [DitronReceiptController::class, 'index'])->name('index');
+            Route::post('/{receipt}/cancel', [DitronReceiptController::class, 'cancel'])->name('cancel');
+        });
 
 
 

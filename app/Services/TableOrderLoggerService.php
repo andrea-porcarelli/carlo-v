@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\DitronReceipt;
 use App\Models\TableOrderLog;
 use App\Models\TableOrder;
 use App\Models\OrderItem;
@@ -719,6 +720,42 @@ class TableOrderLoggerService
         }
 
         return $stats;
+    }
+
+    /**
+     * Log per emissione DOCANNULLO Ditron su uno scontrino già emesso.
+     * Il tavolo NON cambia stato: serve solo la traccia dell'annullo con motivazione.
+     */
+    public function logDitronCancelEmitted(DitronReceipt $sale, DitronReceipt $cancel, string $reason, int $adminUserId): TableOrderLog
+    {
+        $fiscalRef = trim(($sale->fiscal_number ?? '?') . ' del ' . (optional($sale->fiscal_date)->format('d/m/Y') ?? '?'));
+        $tableNum = $sale->tableOrder?->restaurantTable?->table_number;
+        $tableInfo = $tableNum ? " tavolo #{$tableNum}" : '';
+        $importo = number_format((float) $sale->importo_totale, 2, ',', '.');
+
+        return $this->log(
+            action: TableOrderLog::ACTION_DITRON_CANCEL_EMITTED,
+            entityType: 'ditron_receipt',
+            dataBefore: [
+                'sale_receipt_id' => $sale->id,
+                'fiscal_number'   => $sale->fiscal_number,
+                'fiscal_date'     => optional($sale->fiscal_date)->toDateString(),
+                'z_number'        => $sale->z_number,
+                'matricola'       => $sale->matricola,
+                'importo_totale'  => (float) $sale->importo_totale,
+                'payment_method'  => $sale->payment_method,
+            ],
+            dataAfter: [
+                'cancel_receipt_id'      => $cancel->id,
+                'cancel_status'          => $cancel->status,
+                'cancel_fiscal_number'   => $cancel->fiscal_number,
+                'cancel_fiscal_date'     => optional($cancel->fiscal_date)->toDateString(),
+                'reason'                 => $reason,
+            ],
+            tableOrderId: $sale->table_order_id,
+            notes: "⚠️ ANNULLO SCONTRINO Ditron{$tableInfo} — rif. {$fiscalRef} — importo €{$importo} — Motivazione: {$reason}",
+            userId: $adminUserId,
+        );
     }
 
     /**

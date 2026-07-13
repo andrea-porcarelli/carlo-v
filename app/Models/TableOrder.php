@@ -129,8 +129,7 @@ class TableOrder extends Model
             return 0.00;
         }
 
-        $coverChargePerPerson = Setting::getCoverCharge();
-        return $coverChargePerPerson * $this->covers;
+        return $this->getCoverChargePerPerson() * $this->covers;
     }
 
     /**

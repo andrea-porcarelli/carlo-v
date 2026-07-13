@@ -52,6 +52,12 @@
                         <span class="nav-label">Logs</span>
                     </a>
                 </li>
+                <li class="{{ Request::is('backoffice/ditron/receipts*') ? 'active' : '' }}">
+                    <a href="{{ route('backoffice.ditron.receipts.index') }}">
+                        <i class="fa fa-receipt"></i>
+                        <span class="nav-label">Scontrini Ditron</span>
+                    </a>
+                </li>
             @else
                 @include('backoffice.components.nav-bar-item', ['route' => 'technician.events', 'icon' => 'fa-cogs', 'label' => 'Attività di oggi'])
             @endif

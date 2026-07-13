@@ -42,6 +42,7 @@ class TableOrderLog extends Model
     const ACTION_APPLY_DISCOUNT = 'apply_discount';
     const ACTION_CHANGE_DISH = 'change_dish';
     const ACTION_PAY_PRECONTO_SPLIT = 'pay_preconto_split';
+    const ACTION_DITRON_CANCEL_EMITTED = 'ditron_cancel_emitted';
 
     // Mapping azione -> categoria
     const ACTION_CATEGORY_MAP = [
@@ -73,6 +74,7 @@ class TableOrderLog extends Model
         self::ACTION_AUTOCONSUMO => self::CATEGORY_ORDER,
         self::ACTION_AUTOCONSUMO_PARTIAL => self::CATEGORY_ORDER,
         self::ACTION_APPLY_DISCOUNT => self::CATEGORY_ORDER,
+        self::ACTION_DITRON_CANCEL_EMITTED => self::CATEGORY_ORDER,
     ];
 
     protected $fillable = [
@@ -189,6 +191,7 @@ class TableOrderLog extends Model
             'autoconsumo_partial' => 'Autoconsumo per operatore',
             'pay_order' => 'Pagamento ordine',
             'pay_preconto_split' => 'Incasso preconto',
+            'ditron_cancel_emitted' => 'Emesso annullo scontrino Ditron',
         ];
 
         return $descriptions[$this->action] ?? $this->action;
@@ -365,6 +368,7 @@ class TableOrderLog extends Model
             'print_marcia' => 'warning',
             'print_preconto' => 'warning',
             'pay_preconto_split' => 'success',
+            'ditron_cancel_emitted' => 'danger',
         ];
         return $classes[$action] ?? 'secondary';
     }
@@ -387,6 +391,7 @@ class TableOrderLog extends Model
             'print_marcia' => 'print',
             'print_preconto' => 'file-invoice',
             'pay_preconto_split' => 'cash-register',
+            'ditron_cancel_emitted' => 'ban',
         ];
         return $icons[$action] ?? 'circle';
     }

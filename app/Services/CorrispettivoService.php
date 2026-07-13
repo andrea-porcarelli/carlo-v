@@ -20,12 +20,14 @@ use Throwable;
  */
 class CorrispettivoService
 {
-    /** Metodi di pagamento per cui NON emettere corrispettivo. */
-    private const PAYMENT_METHODS_EXCLUDED = [
-        'fattura',
-        'fattura_contanti',
-        'fattura_pos',
-        'chiusura_conto',
+    /**
+     * Whitelist esplicita: il corrispettivo va emesso SOLO per un incasso effettivo
+     * in contanti o pagamento elettronico (POS). Qualsiasi altro metodo (chiusura_conto,
+     * fattura_*, bonifico, assegno, misto, ecc.) NON deve emettere il corrispettivo.
+     */
+    private const PAYMENT_METHODS_ALLOWED = [
+        'contanti',
+        'pos',
     ];
 
     /** Log channel dedicato per tracciare l'intero flusso. */
@@ -47,7 +49,7 @@ class CorrispettivoService
     public function emettiPerOrdine(TableOrder $order, string $paymentMethod, ?int $operatorId): ?TableOrderCorrispettivo
     {
         if ($this->isExcludedPaymentMethod($paymentMethod)) {
-            $this->log('info', 'Emissione saltata: metodo escluso (fattura)', [
+            $this->log('info', 'Emissione saltata: metodo non ammesso (solo contanti/pos)', [
                 'table_order_id' => $order->id,
                 'payment_method' => $paymentMethod,
             ]);
@@ -84,7 +86,7 @@ class CorrispettivoService
     public function emettiPerSplit(PrecontoSplit $split, string $paymentMethod, ?int $operatorId): ?TableOrderCorrispettivo
     {
         if ($this->isExcludedPaymentMethod($paymentMethod)) {
-            $this->log('info', 'Emissione split saltata: metodo escluso (fattura)', [
+            $this->log('info', 'Emissione split saltata: metodo non ammesso (solo contanti/pos)', [
                 'preconto_split_id' => $split->id,
                 'payment_method'    => $paymentMethod,
             ]);
@@ -692,7 +694,7 @@ class CorrispettivoService
 
     private function isExcludedPaymentMethod(string $method): bool
     {
-        return in_array($method, self::PAYMENT_METHODS_EXCLUDED, true);
+        return !in_array($method, self::PAYMENT_METHODS_ALLOWED, true);
     }
 
     /**

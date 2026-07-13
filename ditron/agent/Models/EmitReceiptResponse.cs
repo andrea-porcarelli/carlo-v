@@ -13,6 +13,17 @@ public sealed class EmitReceiptResponse
     public string? RawErr { get; set; }
 
     public long ElapsedMs { get; set; }
+
+    // Dati fiscali restituiti dalla cassa RT dopo l'emissione (via GETP prop 1/10/12).
+    // Popolati solo quando Mode = Fiscal e il reader è riuscito a interrogare la cassa.
+
+    public string? FiscalNumber { get; set; }
+
+    public string? FiscalDate { get; set; }
+
+    public int? ZNumber { get; set; }
+
+    public string? Matricola { get; set; }
 }
 
 public sealed class HealthResponse
