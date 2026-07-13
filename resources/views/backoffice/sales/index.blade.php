@@ -6,37 +6,61 @@
 @endsection
 @section('main-content')
 
-    <!-- Summary Stats -->
+    <!-- Summary Stats: same KPIs as the "Log Operativo" modal (Venduto) -->
     <div class="row mt-3">
-        <div class="col-lg-3">
-            <div class="panel panel-primary">
-                <div class="panel-body text-center">
-                    <h3 class="mb-0" id="totalSales">€0.00</h3>
-                    <small>Totale Vendite</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3">
-            <div class="panel panel-info">
-                <div class="panel-body text-center">
-                    <h3 class="mb-0" id="totalOrders">0</h3>
-                    <small>Numero Ordini</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3">
+        <div class="col-lg-2 col-md-4 col-sm-6">
             <div class="panel panel-success">
                 <div class="panel-body text-center">
-                    <h3 class="mb-0" id="avgOrder">€0.00</h3>
-                    <small>Media per Ordine</small>
+                    <h4 class="mb-0" id="kpiContanti">€0,00</h4>
+                    <small><i class="fas fa-coins"></i> Contanti</small>
                 </div>
             </div>
         </div>
-        <div class="col-lg-3">
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="panel panel-info">
+                <div class="panel-body text-center">
+                    <h4 class="mb-0" id="kpiPos">€0,00</h4>
+                    <small><i class="fas fa-credit-card"></i> POS</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="panel panel-default">
+                <div class="panel-body text-center">
+                    <h4 class="mb-0" id="kpiScontrino">€0,00</h4>
+                    <small><i class="fas fa-receipt"></i> Scontrino (tot.)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="panel" style="border-color:#6f42c1;">
+                <div class="panel-body text-center" style="background:#6f42c1; color:#fff; border-radius:4px;">
+                    <h4 class="mb-0" id="kpiFatture">€0,00</h4>
+                    <small><i class="fas fa-file-invoice"></i> Fatture</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
             <div class="panel panel-warning">
                 <div class="panel-body text-center">
-                    <h3 class="mb-0" id="totalItems">0</h3>
-                    <small>Prodotti Venduti</small>
+                    <h4 class="mb-0" id="kpiOmaggi">€0,00</h4>
+                    <small><i class="fas fa-gift"></i> Omaggi / Autoconsumo</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="panel" style="border-color:#fd7e14;">
+                <div class="panel-body text-center" style="background:#fd7e14; color:#fff; border-radius:4px;">
+                    <h4 class="mb-0" id="kpiBanco">€0,00</h4>
+                    <small><i class="fas fa-store"></i> Vendite al banco</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-12">
+            <div class="panel panel-primary">
+                <div class="panel-body text-center" style="padding:14px 20px;">
+                    <h2 class="mb-0" id="kpiTotaleIncassato" style="font-weight:700; letter-spacing:1px;">€0,00</h2>
+                    <small style="font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Totale Incassato (Contanti + POS + Fatture)</small>
                 </div>
             </div>
         </div>
@@ -53,14 +77,16 @@
                                     'name' => 'date_from',
                                     'col' => 2,
                                     'class' => 'date_from',
-                                    'type' => 'date'
+                                    'type' => 'date',
+                                    'value' => date('Y-m-d'),
                                 ])
                                 @include('backoffice.components.form.input', [
                                     'label' => 'Data a',
                                     'name' => 'date_to',
                                     'col' => 2,
                                     'class' => 'date_to',
-                                    'type' => 'date'
+                                    'type' => 'date',
+                                    'value' => date('Y-m-d'),
                                 ])
                                 @include('backoffice.components.form.input', [
                                     'label' => 'Numero Tavolo',
@@ -239,6 +265,32 @@
         $(document).ready(function(){
             let dataTable;
 
+            function fmtMoney(v) {
+                return '€' + Number(v || 0).toFixed(2).replace('.', ',');
+            }
+
+            function loadSalesKpis() {
+                const filters = {
+                    date_from:    $('.date_from').val() || '',
+                    date_to:      $('.date_to').val()   || '',
+                    table_number: $('.table_number').val() || '',
+                };
+                $.ajax({
+                    url: '{{ route('restaurant.sales.kpis') }}',
+                    method: 'GET',
+                    data: { filters: filters },
+                    success: function(k) {
+                        $('#kpiContanti').text(fmtMoney(k.contanti));
+                        $('#kpiPos').text(fmtMoney(k.pos));
+                        $('#kpiScontrino').text(fmtMoney(k.scontrino));
+                        $('#kpiFatture').text(fmtMoney(k.fatture));
+                        $('#kpiOmaggi').text(fmtMoney(k.omaggi_autoconsumo));
+                        $('#kpiBanco').text(fmtMoney(k.vendite_banco));
+                        $('#kpiTotaleIncassato').text(fmtMoney(k.totale_incassato));
+                    }
+                });
+            }
+
             setTimeout(() => {
                 $(document).trigger('datatable', [{
                     url: '{{ route('restaurant.sales.datatable') }}',
@@ -254,31 +306,13 @@
                     order: [[1, 'desc']],
                     dataForm: ['date_from', 'date_to', 'table_number'],
                     serverSide: true,
-                    drawCallback: function(settings) {
-                        // Calculate totals from current data
-                        let api = this.api();
-                        let data = api.rows({search: 'applied'}).data();
-
-                        let totalSales = 0;
-                        let totalOrders = data.length;
-                        let totalItems = 0;
-
-                        data.each(function(row) {
-                            totalSales += parseFloat(row.total_amount || 0);
-                            totalItems += parseInt(row.items_count || 0);
-                        });
-
-                        let avgOrder = totalOrders > 0 ? totalSales / totalOrders : 0;
-
-                        // Update summary cards
-                        $('#totalSales').text('€' + totalSales.toFixed(2));
-                        $('#totalOrders').text(totalOrders);
-                        $('#avgOrder').text('€' + avgOrder.toFixed(2));
-                        $('#totalItems').text(totalItems);
+                    drawCallback: function() {
+                        loadSalesKpis();
                     }
                 }]);
 
                 dataTable = $('.datatable_table').DataTable();
+                loadSalesKpis();
             }, 500);
 
             // Open print logs modal

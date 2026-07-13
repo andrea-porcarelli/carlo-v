@@ -106,12 +106,6 @@ class Setting extends Model
         $id = self::get('preconto_printer_id', null);
         return $id ? (int) $id : null;
     }
-    public static function getCashDrawerPrinterId(): ?int
-    {
-        $id = self::get('cash_drawer_printer_id', null);
-        return $id ? (int) $id : null;
-    }
-
     private static function getPrinterBySettingKey(string $idKey): ?Printer
     {
         Log::info(__METHOD__ . ': ' . __LINE__, ['id' => $idKey]);
@@ -124,10 +118,10 @@ class Setting extends Model
         return self::getPrinterBySettingKey('preconto_printer_id');
     }
 
-    public static function getCashDrawerPrinter(): ?string
+    public static function getCashDrawerIp(): ?string
     {
-        $rawSetting = self::where('key', 'cash_drawer_printer_id')->first();
-        return $rawSetting->value ?? null;
+        $ip = self::get('cash_drawer_ip', null);
+        return $ip !== null && $ip !== '' ? (string) $ip : null;
     }
 
     /**

@@ -115,16 +115,16 @@
                                     ])
                                     <small class="text-muted">{{ $setting->key }}</small>
                                 </div>
-                            @elseif($setting->key === 'cash_drawer_printer_id')
+                            @elseif($setting->key === 'cash_drawer_ip')
                                 <div class="col-xs-12 col-sm-4 m-t-sm" data-cash-drawer-block="printer" style="{{ \App\Models\Setting::getCashDrawerIntegration() === 'printer' ? '' : 'display:none' }}">
                                     @include('backoffice.components.form.input', [
                                         'form' => 'update-or-create-element',
                                         'name' => $setting->key,
                                         'label' => $setting->description ?? $setting->key,
                                         'col' => 12,
-                                        'type' => 'number',
-                                        'step' => '1',
+                                        'type' => 'text',
                                         'value' => $setting->value,
+                                        'placeholder' => '192.168.1.150',
                                         'small' => $setting->key,
                                     ])
                                 </div>

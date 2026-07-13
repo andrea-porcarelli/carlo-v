@@ -164,6 +164,83 @@ class SalesController extends BaseController
     }
 
     /**
+     * KPI aggregate for the Sales page — mirrors the "Venduto" section
+     * of the operational log modal, but honours the date range and table filters.
+     */
+    public function kpis(Request $request): JsonResponse
+    {
+        $filters = $request->get('filters') ?? [];
+
+        $query = TableOrder::where('status', 'paid')
+            ->with('restaurantTable:id,table_number,is_banco');
+
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('closed_at', '>=', $filters['date_from']);
+        }
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('closed_at', '<=', $filters['date_to']);
+        }
+        if (!empty($filters['table_number'])) {
+            $query->whereHas('restaurantTable', function ($q) use ($filters) {
+                $q->where('table_number', $filters['table_number']);
+            });
+        }
+
+        $paid = $query->get(['id', 'restaurant_table_id', 'total_amount', 'payment_method', 'autoconsumo', 'closed_at']);
+
+        $buckets = [
+            'contanti'           => 0.0,
+            'pos'                => 0.0,
+            'scontrino'          => 0.0,
+            'fatture'            => 0.0,
+            'omaggi_autoconsumo' => 0.0,
+            'vendite_banco'      => 0.0,
+        ];
+
+        foreach ($paid as $order) {
+            $amount  = (float) $order->total_amount;
+            $isBanco = (bool) $order->restaurantTable?->is_banco;
+
+            if ($isBanco) {
+                $buckets['vendite_banco'] += $amount;
+            }
+
+            if ($order->autoconsumo) {
+                $buckets['omaggi_autoconsumo'] += $amount;
+                continue;
+            }
+
+            switch ($order->payment_method) {
+                case 'contanti':
+                    $buckets['contanti']  += $amount;
+                    $buckets['scontrino'] += $amount;
+                    break;
+                case 'pos':
+                    $buckets['pos']       += $amount;
+                    $buckets['scontrino'] += $amount;
+                    break;
+                case 'fattura':
+                case 'fattura_contanti':
+                case 'fattura_pos':
+                case 'bonifico':
+                case 'assegno':
+                case 'misto':
+                    $buckets['fatture'] += $amount;
+                    break;
+                case 'chiusura_conto':
+                    $buckets['omaggi_autoconsumo'] += $amount;
+                    break;
+            }
+        }
+
+        $totaleIncassato = $buckets['contanti'] + $buckets['pos'] + $buckets['fatture'];
+
+        return response()->json(array_map(fn($v) => round($v, 2), $buckets) + [
+            'totale_incassato' => round($totaleIncassato, 2),
+        ]);
+    }
+
+    /**
      * Export sales data (future implementation)
      */
     public function export(Request $request)

@@ -193,6 +193,7 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::group(['prefix' => '/sales', 'as' => 'sales.'], function() {
                 Route::get('/', [SalesController::class, 'index'])->name('index');
                 Route::get('/datatable', [SalesController::class, 'datatable'])->name('datatable');
+                Route::get('/kpis', [SalesController::class, 'kpis'])->name('kpis');
                 Route::get('/tables', [SalesController::class, 'tables'])->name('tables');
                 Route::get('/datatable-tables', [SalesController::class, 'datatable_tables'])->name('datatable.tables');
                 Route::get('/{id}', [SalesController::class, 'show'])->name('show');

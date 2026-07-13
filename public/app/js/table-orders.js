@@ -3330,7 +3330,7 @@ class TableOrdersManager {
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
                             'X-Operator-Token': auth.token,
                         },
-                        body: JSON.stringify({ payment_method: 'contanti' }),
+                        body: JSON.stringify({ payment_method: 'chiusura_conto' }),
                     });
                     const result = await response.json();
                     if (!result.success) {
@@ -3346,7 +3346,9 @@ class TableOrdersManager {
                     return false;
                 }
             },
-            tableId
+            tableId,
+            null,
+            'chiusura_conto'
         );
     }
 

@@ -2248,13 +2248,13 @@ class TableOrderController extends Controller
 
         $amount = $request->input('amount');
         $table_order_id = $request->input('table_order_id');
-        $printer = Setting::getCashDrawerPrinter();
-        if (!$printer) {
-            return response()->json(['success' => false, 'message' => 'Nessuna stampante cassa configurata'], 422);
+        $ip = Setting::getCashDrawerIp();
+        if (!$ip) {
+            return response()->json(['success' => false, 'message' => 'Nessun IP cassa automatica configurato'], 422);
         }
 
         $opName = User::find($operatorId)?->name ?? 'auth_login';
-        $opened = $this->printerService->openCashDrawer($printer, $amount, $opName);
+        $opened = $this->printerService->openCashDrawer($ip, $amount, $opName);
 
         CashDrawerLog::create([
             'table_order_id' => $table_order_id ?: null,
@@ -2283,12 +2283,12 @@ class TableOrderController extends Controller
         }
 
         $operationId = $request->input('operation_id');
-        $printer = Setting::getCashDrawerPrinter();
-        if (!$printer) {
-            return response()->json(['success' => false, 'message' => 'Nessuna stampante cassa configurata'], 422);
+        $ip = Setting::getCashDrawerIp();
+        if (!$ip) {
+            return response()->json(['success' => false, 'message' => 'Nessun IP cassa automatica configurato'], 422);
         }
 
-        $result = $this->printerService->pollCashDrawer($printer, $operationId);
+        $result = $this->printerService->pollCashDrawer($ip, $operationId);
         $last_log = CashDrawerLog::where('operation_id', $operationId)
             ->whereNotNull('table_order_id')
             ->orderBy('created_at', 'desc')
@@ -2318,12 +2318,12 @@ class TableOrderController extends Controller
         }
 
         $operationId = $request->input('operation_id');
-        $printer = Setting::getCashDrawerPrinter();
-        if (!$printer) {
-            return response()->json(['success' => false, 'message' => 'Nessuna stampante cassa configurata'], 422);
+        $ip = Setting::getCashDrawerIp();
+        if (!$ip) {
+            return response()->json(['success' => false, 'message' => 'Nessun IP cassa automatica configurato'], 422);
         }
 
-        $result = $this->printerService->cancelCashDrawer($printer, $operationId);
+        $result = $this->printerService->cancelCashDrawer($ip, $operationId);
         $last_log = CashDrawerLog::where('operation_id', $operationId)
             ->whereNotNull('table_order_id')
             ->orderBy('created_at', 'desc')

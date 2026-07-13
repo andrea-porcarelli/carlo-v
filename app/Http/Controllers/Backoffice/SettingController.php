@@ -19,7 +19,7 @@ class SettingController extends BaseController
      */
     private const GROUPS = [
         'Generali'              => ['restaurant_name', 'cover_charge', 'preconto_printer_id'],
-        'Cassa Automatica'      => ['cash_drawer_integration', 'cash_drawer_printer_id'],
+        'Cassa Automatica'      => ['cash_drawer_integration', 'cash_drawer_ip'],
         'Pagamento Elettronico' => ['pos_integration', 'revolut.environment', 'revolut.api_key', 'revolut.location_id', 'revolut.webhook_secret', 'revolut.timeout_seconds', 'revolut.mock_mode'],
         'Dati Azienda'          => ['company_vat_number', 'company_name', 'indirizzo_fatturazione', 'cap_fatturazione', 'comune_fatturazione', 'provincia_fatturazione', 'tel_fatturazione', 'email_fatturazione'],
         'Pagamenti & IVA'       => ['iban', 'istituto_finanziario', 'invoice_vat_rate', 'invoice_counter'],
