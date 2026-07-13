@@ -43,6 +43,15 @@ class TableOrder extends Model
         'revolut_payment_started_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $order) {
+            if (empty($order->opened_at)) {
+                $order->opened_at = now();
+            }
+        });
+    }
+
     /**
      * Get the table for this order
      */

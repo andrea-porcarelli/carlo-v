@@ -76,8 +76,8 @@ body {
 }
 
 .table-item {
-    width: 85px;
-    height: 85px;
+    width: 76px;
+    height: 76px;
     border: 3px solid #333;
     border-radius: 0;
     display: flex;
@@ -85,9 +85,9 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    margin: 6px;
+    margin: 3px;
     font-weight: 700;
-    font-size: 16px;
+    font-size: 15px;
     position: relative;
     background: white;
     color: #333;
