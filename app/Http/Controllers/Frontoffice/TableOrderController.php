@@ -2795,6 +2795,8 @@ class TableOrderController extends Controller
     {
         $validated = $request->validate([
             'covers' => 'required|integer|min:0',
+            // NULL o assente = ripristina il default globale (Setting::getCoverCharge).
+            'cover_charge_per_person' => 'nullable|numeric|min:0',
         ]);
 
         // Verify operator token from header
@@ -2818,22 +2820,45 @@ class TableOrderController extends Controller
             DB::beginTransaction();
 
             $oldCovers = $order->covers;
-            $order->covers = $validated['covers'];
-            $order->save();
+            $oldCoverCharge = $order->cover_charge_per_person !== null
+                ? (float) $order->cover_charge_per_person
+                : null;
 
+            $order->covers = $validated['covers'];
+
+            $coverChargeProvided = $request->has('cover_charge_per_person');
+            if ($coverChargeProvided) {
+                $order->cover_charge_per_person = $validated['cover_charge_per_person'] === null
+                    ? null
+                    : (float) $validated['cover_charge_per_person'];
+            }
+
+            $order->save();
             $order->updateTotal();
 
-            $this->logger->logUpdateCovers($order, $oldCovers, $validated['covers'], $operatorId);
+            if ($oldCovers !== $order->covers) {
+                $this->logger->logUpdateCovers($order, $oldCovers, $order->covers, $operatorId);
+            }
+
+            $newCoverCharge = $order->cover_charge_per_person !== null
+                ? (float) $order->cover_charge_per_person
+                : null;
+
+            if ($coverChargeProvided && $oldCoverCharge !== $newCoverCharge) {
+                $this->logger->logUpdateCoverCharge($order, $oldCoverCharge, $newCoverCharge, $operatorId);
+            }
 
             DB::commit();
 
+            $fresh = $order->fresh();
             return response()->json([
                 'success' => true,
                 'message' => 'Coperti aggiornati',
                 'data' => [
-                    'covers' => $order->covers,
-                    'cover_charge_total' => $order->getCoverChargeAmount(),
-                    'total_amount' => $order->fresh()->total_amount,
+                    'covers' => $fresh->covers,
+                    'cover_charge_per_person' => $fresh->getCoverChargePerPerson(),
+                    'cover_charge_total' => $fresh->getCoverChargeAmount(),
+                    'total_amount' => $fresh->total_amount,
                 ],
             ]);
         } catch (\Exception $e) {

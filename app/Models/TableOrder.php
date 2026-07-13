@@ -15,6 +15,7 @@ class TableOrder extends Model
     protected $fillable = [
         'restaurant_table_id',
         'covers',
+        'cover_charge_per_person',
         'status',
         'total_amount',
         'autoconsumo',
@@ -35,6 +36,7 @@ class TableOrder extends Model
 
     protected $casts = [
         'total_amount'    => 'decimal:2',
+        'cover_charge_per_person' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'discount_value'  => 'decimal:2',
         'opened_at'       => 'datetime',
@@ -132,10 +134,15 @@ class TableOrder extends Model
     }
 
     /**
-     * Get cover charge per person
+     * Get cover charge per person.
+     * Se l'ordine ha un override esplicito (cover_charge_per_person non NULL), lo usa.
+     * Altrimenti ricade sul valore globale in Setting.
      */
     public function getCoverChargePerPerson(): float
     {
+        if ($this->cover_charge_per_person !== null) {
+            return (float) $this->cover_charge_per_person;
+        }
         return Setting::getCoverCharge();
     }
 

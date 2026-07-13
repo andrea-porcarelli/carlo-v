@@ -810,7 +810,7 @@ class TableOrdersManager {
                     <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
                         <strong><i class="fas fa-utensils me-2"></i>Coperto</strong>
                         <span>
-                            <span id="coversDisplay" style="cursor:pointer;" onclick="tableOrdersManager.editCovers()" title="Modifica coperti">
+                            <span id="coversDisplay" style="cursor:pointer;" onclick="tableOrdersManager.editCovers()" title="Modifica coperti / valore">
                                 ${coverLabel}
                                 <i class="fas fa-pencil-alt" style="font-size:0.7rem;color:#6c757d;margin-left:4px;"></i>
                             </span>
@@ -818,6 +818,8 @@ class TableOrdersManager {
                                 <button onclick="tableOrdersManager.changeCovers(-1)" style="background:#dc3545;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">−</button>
                                 <span id="coversEditValue" style="display:inline-block;min-width:30px;text-align:center;font-weight:700;">${order.covers}</span>
                                 <button onclick="tableOrdersManager.changeCovers(1)" style="background:#28a745;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">+</button>
+                                <span style="margin-left:8px;color:#6c757d;font-size:0.8rem;">x €</span>
+                                <input id="coverChargeEditValue" type="number" step="0.10" min="0" value="${coverPerPerson.toFixed(2)}" style="width:70px;padding:2px 4px;border:1px solid #ced4da;border-radius:3px;font-size:0.85rem;text-align:right;" title="Valore coperto per persona">
                                 <button onclick="tableOrdersManager.saveCovers()" style="background:#17a2b8;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;margin-left:4px;font-size:0.8rem;"><i class="fas fa-check"></i> Salva</button>
                                 <button onclick="tableOrdersManager.cancelEditCovers()" style="background:#6c757d;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-times"></i></button>
                             </span>
@@ -831,13 +833,15 @@ class TableOrdersManager {
                     <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
                         <strong><i class="fas fa-glass-cheers me-2"></i>Consumo Bevande (no coperto)</strong>
                         <span>
-                            <span id="coversDisplay" style="cursor:pointer;" onclick="tableOrdersManager.editCovers()" title="Modifica coperti">
+                            <span id="coversDisplay" style="cursor:pointer;" onclick="tableOrdersManager.editCovers()" title="Modifica coperti / valore">
                                 <i class="fas fa-pencil-alt" style="font-size:0.7rem;color:#6c757d;"></i>
                             </span>
                             <span id="coversEdit" style="display:none;">
                                 <button onclick="tableOrdersManager.changeCovers(-1)" style="background:#dc3545;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">−</button>
                                 <span id="coversEditValue" style="display:inline-block;min-width:30px;text-align:center;font-weight:700;">0</span>
                                 <button onclick="tableOrdersManager.changeCovers(1)" style="background:#28a745;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">+</button>
+                                <span style="margin-left:8px;color:#6c757d;font-size:0.8rem;">x €</span>
+                                <input id="coverChargeEditValue" type="number" step="0.10" min="0" value="${coverPerPerson.toFixed(2)}" style="width:70px;padding:2px 4px;border:1px solid #ced4da;border-radius:3px;font-size:0.85rem;text-align:right;" title="Valore coperto per persona">
                                 <button onclick="tableOrdersManager.saveCovers()" style="background:#17a2b8;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;margin-left:4px;font-size:0.8rem;"><i class="fas fa-check"></i> Salva</button>
                                 <button onclick="tableOrdersManager.cancelEditCovers()" style="background:#6c757d;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-times"></i></button>
                             </span>
@@ -2209,6 +2213,15 @@ class TableOrdersManager {
 
         const newCovers = parseInt(valueEl.textContent) || 0;
 
+        // Nuovo valore coperto per persona (override per-ordine). Se l'input è vuoto o non
+        // parsabile, non lo mandiamo e il backend lascia invariato l'override esistente.
+        const coverChargeInput = document.getElementById('coverChargeEditValue');
+        const rawCoverCharge = coverChargeInput?.value?.trim();
+        const parsedCoverCharge = rawCoverCharge !== undefined && rawCoverCharge !== ''
+            ? parseFloat(rawCoverCharge)
+            : NaN;
+        const hasCoverChargeValue = Number.isFinite(parsedCoverCharge) && parsedCoverCharge >= 0;
+
         // Request operator authentication
         let auth;
         try {
@@ -2216,6 +2229,11 @@ class TableOrdersManager {
             if (!auth) return;
         } catch (error) {
             return;
+        }
+
+        const body = { covers: newCovers };
+        if (hasCoverChargeValue) {
+            body.cover_charge_per_person = parsedCoverCharge;
         }
 
         try {
@@ -2226,7 +2244,7 @@ class TableOrdersManager {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
                     'X-Operator-Token': auth.token
                 },
-                body: JSON.stringify({ covers: newCovers })
+                body: JSON.stringify(body)
             });
 
             const result = await response.json();

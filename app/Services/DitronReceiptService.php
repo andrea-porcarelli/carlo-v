@@ -48,6 +48,12 @@ final class DitronReceiptService implements ReceiptIssuerInterface
             ]);
             return null;
         }
+        if (!$this->isEnabled()) {
+            $this->log('info', 'Emissione Ditron saltata: corrispettivi disabilitati da settings', [
+                'table_order_id' => $order->id,
+            ]);
+            return null;
+        }
 
         $payload = $this->buildPayloadForOrder($order, $paymentMethod);
         $importo = $order->hasDiscount() ? (float) $order->getDiscountedTotal() : (float) $order->total_amount;
@@ -79,6 +85,12 @@ final class DitronReceiptService implements ReceiptIssuerInterface
             $this->log('info', 'Emissione Ditron split saltata: metodo escluso (fattura)', [
                 'preconto_split_id' => $split->id,
                 'payment_method'    => $paymentMethod,
+            ]);
+            return null;
+        }
+        if (!$this->isEnabled()) {
+            $this->log('info', 'Emissione Ditron split saltata: corrispettivi disabilitati da settings', [
+                'preconto_split_id' => $split->id,
             ]);
             return null;
         }
@@ -296,6 +308,11 @@ final class DitronReceiptService implements ReceiptIssuerInterface
             'status'     => $receipt->status,
             'elapsed_ms' => $receipt->elapsed_ms,
         ]);
+    }
+
+    private function isEnabled(): bool
+    {
+        return (bool) Setting::get('corrispettivo_enabled', true);
     }
 
     private function log(string $level, string $message, array $context = []): void

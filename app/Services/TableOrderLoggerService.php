@@ -222,6 +222,24 @@ class TableOrderLoggerService
     }
 
     /**
+     * Log dell'override del valore del coperto per il singolo tavolo.
+     * $old / $new = null significa "usa default globale" (Setting::getCoverCharge).
+     */
+    public function logUpdateCoverCharge(TableOrder $order, ?float $old, ?float $new, int $operatorId = 0): TableOrderLog
+    {
+        $fmt = fn(?float $v) => $v === null ? 'default' : ('€' . number_format($v, 2, ',', '.'));
+        return $this->log(
+            action: 'update_cover_charge',
+            entityType: 'table_order',
+            entity: $order,
+            dataBefore: ['cover_charge_per_person' => $old],
+            dataAfter: ['cover_charge_per_person' => $new],
+            notes: "Modificato valore coperto da {$fmt($old)} a {$fmt($new)}",
+            userId: $operatorId,
+        );
+    }
+
+    /**
      * Log per chiusura ordine
      */
     public function logCloseOrder(TableOrder $order, int $operatorId = 0): TableOrderLog
