@@ -128,7 +128,32 @@ final class DitronReceiptService implements ReceiptIssuerInterface
             'reparto'                 => (int) Setting::get('ditron_default_reparto', 1),
             'tender'                  => (int) Setting::get('ditron_default_tender', 5),
             'payment_method'          => $paymentMethod,
+            'discount'                => $this->discountPayload($order),
         ];
+    }
+
+    private function discountPayload(TableOrder $order): ?array
+    {
+        if (!$order->hasDiscount()) {
+            return null;
+        }
+        $value = round((float) $order->discount_value, 2);
+        if ($value <= 0) {
+            return null;
+        }
+        return [
+            'value'       => $value,
+            'description' => $this->discountDescription($order),
+        ];
+    }
+
+    private function discountDescription(TableOrder $order): string
+    {
+        if ($order->discount_type === 'percent') {
+            $percent = (float) $order->discount_amount;
+            return 'SCONTO ' . rtrim(rtrim(number_format($percent, 2, '.', ''), '0'), '.') . '%';
+        }
+        return 'SCONTO';
     }
 
     private function buildPayloadForSplit(PrecontoSplit $split, string $paymentMethod): array

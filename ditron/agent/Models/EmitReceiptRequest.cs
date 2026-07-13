@@ -15,6 +15,8 @@ public sealed class EmitReceiptRequest
     public int? Tender { get; set; }
 
     public int? Reparto { get; set; }
+
+    public ReceiptDiscount? Discount { get; set; }
 }
 
 public sealed class ReceiptItem
@@ -26,4 +28,11 @@ public sealed class ReceiptItem
     public decimal Quantity { get; set; } = 1m;
 
     public int? Reparto { get; set; }
+}
+
+public sealed class ReceiptDiscount
+{
+    public decimal Value { get; set; }
+
+    public string? Description { get; set; }
 }

@@ -35,6 +35,10 @@ public sealed class ReceiptBuilder : IReceiptBuilder
                 var line = FormatNonFiscalLine(item, defaults);
                 sb.Append("nofis riga='").Append(line).AppendLine("'");
             }
+            if (TryGetDiscount(request, out var nofisDiscountValue, out var nofisDiscountLabel))
+            {
+                sb.Append("nofis riga='").Append(FormatNonFiscalDiscountLine(nofisDiscountLabel, nofisDiscountValue, defaults)).AppendLine("'");
+            }
             sb.AppendLine("nofis chiudi");
             return sb.ToString();
         }
@@ -50,10 +54,48 @@ public sealed class ReceiptBuilder : IReceiptBuilder
             sb.AppendLine(FormatVendLine(item, defaults));
         }
 
+        if (TryGetDiscount(request, out var discountValue, out var discountLabel))
+        {
+            sb.AppendLine("subt");
+            sb.AppendLine(FormatDiscountLine(discountLabel, discountValue, defaults));
+        }
+
         var tender = request.Tender ?? defaults.Tender;
         sb.Append("chius T=").AppendLine(tender.ToString(Inv));
 
         return sb.ToString();
+    }
+
+    private static bool TryGetDiscount(EmitReceiptRequest request, out decimal value, out string label)
+    {
+        if (request.Discount is { Value: > 0m } d)
+        {
+            value = decimal.Round(d.Value, 2);
+            label = string.IsNullOrWhiteSpace(d.Description) ? string.Empty : d.Description!;
+            return true;
+        }
+        value = 0m;
+        label = string.Empty;
+        return false;
+    }
+
+    private string FormatDiscountLine(string label, decimal value, ReceiptDefaults defaults)
+    {
+        var descr = string.IsNullOrWhiteSpace(label) ? defaults.DiscountLabel : label;
+        var sanitizedDescr = SanitizeDescription(descr);
+        var sb = new StringBuilder();
+        sb.Append("sconto valore=").Append(value.ToString("0.00", Inv));
+        sb.Append(", subt=1");
+        sb.Append(", descr='").Append(sanitizedDescr).Append('\'');
+        return sb.ToString();
+    }
+
+    private static string FormatNonFiscalDiscountLine(string label, decimal value, ReceiptDefaults defaults)
+    {
+        var descr = string.IsNullOrWhiteSpace(label) ? defaults.DiscountLabel : label;
+        var description = PadDescription(descr, defaults.DescrMaxLen);
+        var amount = (-value).ToString("0.00", Inv);
+        return $"{description}      = {amount}";
     }
 
     private IEnumerable<ReceiptItem> EnumerateAllItems(EmitReceiptRequest request, ReceiptDefaults defaults)

@@ -64,7 +64,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div id="modifyReceiptItems" style="flex:1;padding:12px;">
+                            <div id="modifyReceiptItems" style="flex:1;min-height:0;overflow-y:auto;padding:12px;">
                                 <div class="empty-state">
                                     <i class="fas fa-shopping-cart"></i>
                                     <p>Nessun ordine</p>

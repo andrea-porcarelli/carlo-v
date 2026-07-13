@@ -33,6 +33,8 @@ public sealed class ReceiptDefaults
 
     public string CoverLabel { get; set; } = "COPERTO";
 
+    public string DiscountLabel { get; set; } = "SCONTO";
+
     public int DescrMaxLen { get; set; } = 16;
 }
 
