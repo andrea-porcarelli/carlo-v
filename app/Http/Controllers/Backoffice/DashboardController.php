@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OrderItem;
 use App\Models\TableOrder;
 use App\Models\TableOrderLog;
+use App\Services\DishCostEstimatorService;
 use App\Services\StockService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -161,11 +162,41 @@ class DashboardController extends Controller
         $stocks        = $stockService->calculateAllStocks();
         $lowStockCount = $stocks->filter(fn($s) => $s['is_low'])->count();
 
+        // ── Costo stimato per i piatti in top 10 ──────────────────────────────
+        $costEstimator = app(DishCostEstimatorService::class);
+        $topDishIds    = $topDishes->pluck('dish_id')->filter()->all();
+        $topDishCosts  = $topDishIds ? $costEstimator->estimateCostsByDish($topDishIds) : [];
+
+        // ── Stima costi materie prime per periodo ─────────────────────────────
+        $costEstimates = $costEstimator->estimateCostsForPeriods([
+            'today' => ['from' => $now->toDateString(),                        'to' => $now->toDateString()],
+            'week'  => ['from' => $now->copy()->startOfWeek()->toDateString(), 'to' => $now->copy()->endOfWeek()->toDateString()],
+            'month' => ['from' => $now->copy()->startOfMonth()->toDateString(),'to' => $now->copy()->endOfMonth()->toDateString()],
+            'year'  => ['from' => $now->copy()->startOfYear()->toDateString(), 'to' => $now->copy()->endOfYear()->toDateString()],
+        ]);
+        $costToday = $costEstimates['today'];
+        $costWeek  = $costEstimates['week'];
+        $costMonth = $costEstimates['month'];
+        $costYear  = $costEstimates['year'];
+
+        $marginToday = round($revenueToday - $costToday, 2);
+        $marginWeek  = round($revenueWeek  - $costWeek,  2);
+        $marginMonth = round($revenueMonth - $costMonth, 2);
+        $marginYear  = round($revenueYear  - $costYear,  2);
+
+        $marginPctToday = $revenueToday > 0 ? round($marginToday / $revenueToday * 100, 1) : null;
+        $marginPctWeek  = $revenueWeek  > 0 ? round($marginWeek  / $revenueWeek  * 100, 1) : null;
+        $marginPctMonth = $revenueMonth > 0 ? round($marginMonth / $revenueMonth * 100, 1) : null;
+        $marginPctYear  = $revenueYear  > 0 ? round($marginYear  / $revenueYear  * 100, 1) : null;
+
         return compact(
             'revenueToday', 'revenueWeek', 'revenueMonth', 'revenueYear',
             'ordersToday', 'ordersWeek', 'ordersMonth', 'avgTicketMonth',
             'bestReceipt', 'weeklyTrend', 'monthlyTrend', 'topDishes',
-            'topOperators', 'stocks', 'lowStockCount'
+            'topOperators', 'stocks', 'lowStockCount', 'topDishCosts',
+            'costToday', 'costWeek', 'costMonth', 'costYear',
+            'marginToday', 'marginWeek', 'marginMonth', 'marginYear',
+            'marginPctToday', 'marginPctWeek', 'marginPctMonth', 'marginPctYear'
         );
     }
 

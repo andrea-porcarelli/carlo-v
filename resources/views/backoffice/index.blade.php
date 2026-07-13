@@ -73,6 +73,62 @@
     </div>
 </div>
 
+{{-- KPI Costi materie prime & Margine (stima) --}}
+<div class="row m-t-sm">
+    <div class="col-lg-12" style="display:flex; align-items:baseline; justify-content:space-between;">
+        <h4 class="m-t-none m-b-xs" style="color:#8a6d3b;">
+            <i class="fa fa-balance-scale"></i> Costi Materie Prime &amp; Margine Stimato
+            <small class="text-muted" style="font-size:12px;">
+                stima dal costo medio ponderato dei materiali &mdash; esclude personale, utenze, oneri
+            </small>
+        </h4>
+    </div>
+</div>
+<div class="row">
+    @php
+        $costCards = [
+            ['label' => 'Oggi',      'cost' => $costToday, 'margin' => $marginToday, 'pct' => $marginPctToday, 'rev' => $revenueToday],
+            ['label' => 'Settimana', 'cost' => $costWeek,  'margin' => $marginWeek,  'pct' => $marginPctWeek,  'rev' => $revenueWeek],
+            ['label' => 'Mese',      'cost' => $costMonth, 'margin' => $marginMonth, 'pct' => $marginPctMonth, 'rev' => $revenueMonth],
+            ['label' => 'Anno ' . date('Y'), 'cost' => $costYear, 'margin' => $marginYear, 'pct' => $marginPctYear, 'rev' => $revenueYear],
+        ];
+    @endphp
+    @foreach($costCards as $card)
+        <div class="col-lg-3 col-md-6">
+            <div class="panel panel-default" style="border-top: 3px solid #8a6d3b;">
+                <div class="panel-body">
+                    <div class="text-muted small text-uppercase" style="letter-spacing:.5px;">{{ $card['label'] }}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:6px;">
+                        <div>
+                            <div style="color:#8a6d3b; font-weight:600; font-size:18px;">
+                                € {{ number_format($card['cost'], 2, ',', '.') }}
+                            </div>
+                            <small class="text-muted">Costo stimato</small>
+                        </div>
+                        <div class="text-right">
+                            <div class="{{ $card['margin'] >= 0 ? 'text-success' : 'text-danger' }}" style="font-weight:700; font-size:20px;">
+                                € {{ number_format($card['margin'], 2, ',', '.') }}
+                            </div>
+                            <small class="text-muted">
+                                Margine
+                                @if($card['pct'] !== null)
+                                    &middot; {{ number_format($card['pct'], 1, ',', '.') }}%
+                                @endif
+                            </small>
+                        </div>
+                    </div>
+                    @php
+                        $costPct = $card['rev'] > 0 ? min(100, round($card['cost'] / $card['rev'] * 100)) : 0;
+                    @endphp
+                    <div class="progress progress-mini m-t-sm m-b-none" title="Incidenza costo su fatturato">
+                        <div class="progress-bar progress-bar-warning" style="width:{{ $costPct }}%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endforeach
+</div>
+
 {{-- Miglior scontrino (banner) --}}
 @if($bestReceipt)
 <div class="row">
@@ -139,11 +195,20 @@
                             <th style="width:50px;">#</th>
                             <th>Piatto</th>
                             <th class="text-right">Quantità</th>
-                            <th class="text-right">Ricavo Totale</th>
+                            <th class="text-right">Ricavo</th>
+                            <th class="text-right" title="Stima costo materie prime totale (all-time)">Costo stim.</th>
+                            <th class="text-right">Margine</th>
                         </tr>
                         </thead>
                         <tbody>
                         @forelse($topDishes as $i => $item)
+                            @php
+                                $dishCost   = $topDishCosts[$item->dish_id] ?? null;
+                                $dishMargin = $dishCost !== null ? $item->total_revenue - $dishCost : null;
+                                $dishPct    = ($dishMargin !== null && $item->total_revenue > 0)
+                                    ? round($dishMargin / $item->total_revenue * 100, 1)
+                                    : null;
+                            @endphp
                             <tr>
                                 <td>
                                     @if($i === 0)
@@ -161,10 +226,29 @@
                                     <strong>{{ number_format($item->total_qty, 0, ',', '.') }}</strong> pz
                                 </td>
                                 <td class="text-right">€ {{ number_format($item->total_revenue, 2, ',', '.') }}</td>
+                                <td class="text-right" style="color:#8a6d3b;">
+                                    @if($dishCost !== null)
+                                        € {{ number_format($dishCost, 2, ',', '.') }}
+                                    @else
+                                        <span class="text-muted" title="Nessun costo disponibile">—</span>
+                                    @endif
+                                </td>
+                                <td class="text-right">
+                                    @if($dishMargin !== null)
+                                        <strong class="{{ $dishMargin >= 0 ? 'text-success' : 'text-danger' }}">
+                                            € {{ number_format($dishMargin, 2, ',', '.') }}
+                                        </strong>
+                                        @if($dishPct !== null)
+                                            <br><small class="text-muted">{{ number_format($dishPct, 1, ',', '.') }}%</small>
+                                        @endif
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="text-center text-muted">Nessun dato disponibile</td>
+                                <td colspan="6" class="text-center text-muted">Nessun dato disponibile</td>
                             </tr>
                         @endforelse
                         </tbody>

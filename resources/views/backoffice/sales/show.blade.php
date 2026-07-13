@@ -325,6 +325,9 @@ window._boSale = {
                                             <th>Addebitato a</th>
                                         @endif
                                         <th width="100" class="text-right">Prezzo Unit.</th>
+                                        <th width="110" class="text-right" title="Stima costo materie prime unitario / totale riga">
+                                            <i class="fas fa-coins text-warning"></i> Costo stim.
+                                        </th>
                                         <th width="100" class="text-right">Subtotale</th>
                                     </tr>
                                 </thead>
@@ -332,7 +335,7 @@ window._boSale = {
                                     @foreach($sale->items()->withTrashed()->orderBy('id', 'DESC')->get() as $index => $item)
                                         <tr class="@if($item->status == 'cancelled') trashed @endif" data-item-id="{{ $item->id }}">
                                             @if(!isset($item->dish))
-                                                <td colspan="5"> ----- SEGUE ----- </td>
+                                                <td colspan="{{ $sale->autoconsumo ? 6 : 5 }}"> ----- SEGUE ----- </td>
                                             @else
                                                 <td class="text-center" style="vertical-align:middle;">
                                                     <span style="font-size:18px; font-weight:700; color:#333;">{{ $item->quantity }}</span>
@@ -461,6 +464,29 @@ window._boSale = {
                                                     @endif
                                                 </td>
                                                 <td class="text-right">
+                                                    @php
+                                                        $costInfo = $itemCostEstimates[$item->id] ?? null;
+                                                    @endphp
+                                                    @if($costInfo && ($costInfo['unit_cost'] > 0 || $costInfo['coverage'] > 0))
+                                                        <span style="font-size: 13px; color:#8a6d3b;">
+                                                            €{{ number_format($costInfo['line_cost'], 2, ',', '.') }}
+                                                        </span>
+                                                        <br>
+                                                        <small class="text-muted" style="font-size:11px;">
+                                                            unit. €{{ number_format($costInfo['unit_cost'], 2, ',', '.') }}
+                                                            @if($costInfo['coverage'] < 1 && $costInfo['coverage'] > 0)
+                                                                <br><span class="text-warning" title="Costo di alcuni materiali non disponibile">
+                                                                    <i class="fas fa-exclamation-triangle"></i> parziale ({{ round($costInfo['coverage']*100) }}%)
+                                                                </span>
+                                                            @endif
+                                                        </small>
+                                                    @else
+                                                        <span class="text-muted" title="Nessun costo materiali disponibile" style="font-size:12px;">
+                                                            <i class="fas fa-question-circle"></i> n/d
+                                                        </span>
+                                                    @endif
+                                                </td>
+                                                <td class="text-right">
                                                     <strong style="font-size: 15px;">
                                                         €{{ number_format($item->subtotal, 2, ',', '.') }}
                                                     </strong>
@@ -471,16 +497,20 @@ window._boSale = {
                                     @endforeach
                                 </tbody>
                                 <tfoot>
+                                    @php
+                                        // colspan della label: totali con "Costo stim." aggiunto → 4 base, 5 se autoconsumo
+                                        $labelSpan = $sale->autoconsumo ? 5 : 4;
+                                    @endphp
                                     @if($sale->autoconsumo)
                                         <tr class="table-success">
-                                            <td colspan="4" class="text-right" style="font-size: 16px">
+                                            <td colspan="{{ $labelSpan + 1 }}" class="text-right" style="font-size: 16px">
                                                 <b>AUTOCONSUMO</b>
                                             </td>
                                         </tr>
                                     @endif
                                     @if($sale->hasCoverCharge())
                                         <tr>
-                                            <td colspan="3" class="text-right text-muted">
+                                            <td colspan="{{ $labelSpan }}" class="text-right text-muted">
                                                 <i class="fas fa-utensils"></i>
                                                 Coperto
                                                 ({{ $sale->covers }} × €{{ number_format($sale->getCoverChargePerPerson(), 2, ',', '.') }}):
@@ -492,7 +522,7 @@ window._boSale = {
                                     @endif
                                     @if($sale->hasDiscount())
                                         <tr>
-                                            <td colspan="3" class="text-right text-muted">
+                                            <td colspan="{{ $labelSpan }}" class="text-right text-muted">
                                                 Subtotale:
                                             </td>
                                             <td class="text-right text-muted">
@@ -500,7 +530,7 @@ window._boSale = {
                                             </td>
                                         </tr>
                                         <tr class="warning">
-                                            <td colspan="3" class="text-right">
+                                            <td colspan="{{ $labelSpan }}" class="text-right">
                                                 <span class="text-danger">
                                                     <i class="fas fa-percent"></i>
                                                     Sconto
@@ -520,7 +550,7 @@ window._boSale = {
                                     @if(isset($paidSplits) && $paidSplits->count() > 0)
                                         @foreach($paidSplits as $split)
                                         <tr style="color:#888; font-size:13px;">
-                                            <td colspan="3" class="text-right">
+                                            <td colspan="{{ $labelSpan }}" class="text-right">
                                                 <i class="fas fa-check-circle text-success"></i>
                                                 Preconto pagato ( ) — {{ $split->label ?? '' }}
                                                 @if($split->paid_at)<small class="text-muted">({{ $split->paid_at->format('H:i') }})</small>@endif:
@@ -531,7 +561,7 @@ window._boSale = {
                                         </tr>
                                         @endforeach
                                         <tr style="background:#fff3cd;">
-                                            <td colspan="3" class="text-right">
+                                            <td colspan="{{ $labelSpan }}" class="text-right">
                                                 <strong>RIMANENTE DA PAGARE:</strong>
                                             </td>
                                             <td class="text-right">
@@ -542,7 +572,7 @@ window._boSale = {
                                         </tr>
                                     @endif
                                     <tr class="table-success">
-                                        <td colspan="3" class="text-right">
+                                        <td colspan="{{ $labelSpan }}" class="text-right">
                                             <strong style="font-size: 16px;" class="@if($sale->status == 'cancelled') trashed @endif">TOTALE:</strong>
                                         </td>
                                         <td class="text-right">
@@ -551,6 +581,46 @@ window._boSale = {
                                             </strong>
                                         </td>
                                     </tr>
+
+                                    {{-- ── Stima costi/margine ── --}}
+                                    @if($totalEstimatedCost > 0)
+                                        <tr style="background:#fff8e1;">
+                                            <td colspan="{{ $labelSpan }}" class="text-right" style="color:#8a6d3b;">
+                                                <i class="fas fa-coins"></i>
+                                                Costo materie prime <em>(stima)</em>
+                                                @if($costPercent !== null)
+                                                    <small class="text-muted">— incidenza {{ number_format($costPercent, 1, ',', '.') }}%</small>
+                                                @endif
+                                                :
+                                            </td>
+                                            <td class="text-right" style="color:#8a6d3b;">
+                                                <strong>€{{ number_format($totalEstimatedCost, 2, ',', '.') }}</strong>
+                                            </td>
+                                        </tr>
+                                        <tr style="background:#f1f8e9;">
+                                            <td colspan="{{ $labelSpan }}" class="text-right">
+                                                <strong>
+                                                    <i class="fas fa-chart-line text-success"></i>
+                                                    Margine lordo stimato
+                                                    @if($marginPercent !== null)
+                                                        <small class="text-muted">({{ number_format($marginPercent, 1, ',', '.') }}%)</small>
+                                                    @endif
+                                                    :
+                                                </strong>
+                                            </td>
+                                            <td class="text-right">
+                                                <strong style="font-size: 15px;" class="@if($estimatedMargin >= 0) text-success @else text-danger @endif">
+                                                    €{{ number_format($estimatedMargin, 2, ',', '.') }}
+                                                </strong>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="{{ $labelSpan + 1 }}" class="text-right text-muted" style="font-size:11px; padding-top:2px;">
+                                                <i class="fas fa-info-circle"></i>
+                                                Stima basata sul costo medio ponderato dei materiali (esclude personale, utenze, oneri).
+                                            </td>
+                                        </tr>
+                                    @endif
                                 </tfoot>
                             </table>
                         </div>

@@ -7,6 +7,7 @@ use App\Models\CashDrawerLog;
 use App\Models\PrintLog;
 use App\Models\TableOrder;
 use App\Models\TableOrderInvoice;
+use App\Services\DishCostEstimatorService;
 use App\Services\MysondFatturaService;
 use App\Services\TableOrderLoggerService;
 use App\Traits\DatatableTrait;
@@ -98,12 +99,13 @@ class SalesController extends BaseController
     /**
      * Show sale details
      */
-    public function show($id): View
+    public function show($id, DishCostEstimatorService $costEstimator): View
     {
         $sale = TableOrder::with([
             'restaurantTable',
             'items.dish.category',
             'items.dish.allergens',
+            'items.materials',
             'waiter',
             'precontoSplits',
             'tableOrderInvoices.customer',
@@ -128,7 +130,37 @@ class SalesController extends BaseController
             ->orderBy('created_at', 'asc')
             ->get();
 
-        return view('backoffice.sales.show', compact('sale', 'logs', 'printLogs', 'cashDrawerLogs'));
+        // Stima costi materie prime per riga e totale (escluse righe cancellate)
+        $items = $sale->items()->withTrashed()->get()->load('materials');
+        $itemCostEstimates = [];
+        $totalEstimatedCost = 0.0;
+        foreach ($items as $item) {
+            if ($item->isSegueItem()) {
+                continue;
+            }
+            $unitCost   = $costEstimator->estimateOrderItemUnitCost($item);
+            $lineCost   = $costEstimator->estimateOrderItemCost($item);
+            $coverage   = $costEstimator->orderItemCostCoverage($item);
+            $itemCostEstimates[$item->id] = [
+                'unit_cost' => $unitCost,
+                'line_cost' => $lineCost,
+                'coverage'  => $coverage,
+            ];
+            if ($item->status !== 'cancelled' && !$item->trashed()) {
+                $totalEstimatedCost += $lineCost;
+            }
+        }
+        $totalEstimatedCost = round($totalEstimatedCost, 2);
+        $effectiveRevenue   = $sale->hasDiscount() ? $sale->getDiscountedTotal() : (float) $sale->total_amount;
+        $estimatedMargin    = round($effectiveRevenue - $totalEstimatedCost, 2);
+        $marginPercent      = $effectiveRevenue > 0 ? round(($estimatedMargin / $effectiveRevenue) * 100, 1) : null;
+        $costPercent        = $effectiveRevenue > 0 ? round(($totalEstimatedCost / $effectiveRevenue) * 100, 1) : null;
+
+        return view('backoffice.sales.show', compact(
+            'sale', 'logs', 'printLogs', 'cashDrawerLogs',
+            'itemCostEstimates', 'totalEstimatedCost',
+            'estimatedMargin', 'marginPercent', 'costPercent'
+        ));
     }
 
     /**
