@@ -508,6 +508,37 @@ class TableOrdersManager {
     }
 
     /**
+     * Bottone "SEGUE" nella barra azioni desktop: aggiunge un separatore
+     * dopo l'ultimo piatto. Se l'ultimo elemento è già un segue, il bottone
+     * è disabilitato (l'eliminazione avviene tramite la X sul separatore).
+     */
+    async addSegueAtEnd() {
+        const items = this.modifySession?.items ?? [];
+        if (items.length === 0) {
+            this.showNotification('Aggiungi un piatto prima di inserire un segue', 'warning');
+            return;
+        }
+        const last = items[items.length - 1];
+        if (last.segue && !last.dish_id) return;
+        await this.addSegueAfter(last.id);
+    }
+
+    /**
+     * Aggiorna lo stato disabled del bottone SEGUE desktop in base
+     * alla presenza di un separatore come ultimo elemento.
+     */
+    _updateAddSegueButton() {
+        const btn = document.getElementById('btnAddSegue');
+        if (!btn) return;
+        const items = this.modifySession?.items ?? [];
+        const last = items[items.length - 1];
+        const disabled = items.length === 0 || !!(last && last.segue && !last.dish_id);
+        btn.disabled = disabled;
+        btn.style.opacity = disabled ? '0.45' : '1';
+        btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    }
+
+    /**
      * Tasto veloce "Segue" (mobile): inserisce o rimuove il separatore
      * in coda all'ordine a seconda dello stato corrente dell'ultimo elemento.
      */
@@ -733,30 +764,30 @@ class TableOrdersManager {
             const _displayName = this.isMobile && _rawName.length > 30 ? _rawName.substring(0, 30) + '…' : _rawName;
             itemsHtml += `
             <div class="receipt-item" onclick="tableOrdersManager._mobileItemTap(${item.id}, event)" data-item-id="${item.id}" data-was-printed="${item.was_printed ? '1' : '0'}" data-is-new="${item._isNew ? '1' : '0'}">
-                <div style="font-size:13px;font-weight:600;line-height:1.3; color:#3d3d3d;">
-                    ${item.quantity} × <span class="receipt-dish-name" title="${_rawName.replace(/"/g, '&quot;')}">${_displayName}</span>
-                    ${item.notes ? `<br /><div class="receipt-item-notes"> ${item.notes}</div>` : ''}
-                    ${item.extras && Object.keys(item.extras).length > 0 ? `
-                        <div class="receipt-item-extras">
-                            ${Object.entries(item.extras).map(([name, price]) =>
+                <div class="receipt-item-body">
+                    <div style="font-size:13px;font-weight:600;line-height:1.3; color:#3d3d3d;">
+                        ${item.quantity} × <span class="receipt-dish-name" title="${_rawName.replace(/"/g, '&quot;')}">${_displayName}</span>
+                        ${item.notes ? `<br /><div class="receipt-item-notes"> ${item.notes}</div>` : ''}
+                        ${item.extras && Object.keys(item.extras).length > 0 ? `
+                            <div class="receipt-item-extras">
+                                ${Object.entries(item.extras).map(([name, price]) =>
                     `<span><i class="fas fa-plus-circle me-1"></i>${name} (+€${parseFloat(price).toFixed(2)})</span>`
                      ).join(' ')}
-                        </div>
-                    ` : ''}
-                    ${item.removals && item.removals.length > 0 ? `
-                        <div class="receipt-item-removals">
-                            ${item.removals.map(removal => `<span><i class="fas fa-minus-circle me-1"></i>${removal}</span>`).join(' ')}
-                        </div>
+                            </div>
                         ` : ''}
-                </div>
-                <div class="receipt-item-actions">
-                    <div style="display:flex;gap:4px;">
+                        ${item.removals && item.removals.length > 0 ? `
+                            <div class="receipt-item-removals">
+                                ${item.removals.map(removal => `<span><i class="fas fa-minus-circle me-1"></i>${removal}</span>`).join(' ')}
+                            </div>
+                            ` : ''}
+                    </div>
+                    <div class="receipt-item-buttons">
                         <button class="btn-quick-add" onclick="tableOrdersManager.openProductModal({id:${item.dish_id}, name:'${(item.dish_name || '').replace(/'/g, "\\'")}', price:${item.unit_price}})" title="Aggiungi ancora"><i class="fas fa-plus"></i></button>
                         <button class="btn-edit-item" onclick="tableOrdersManager.openEditItemModal(${item.id})" title="Modifica piatto"><i class="fas fa-pen"></i></button>
                         <button class="btn-remove-item" onclick="tableOrdersManager.removeItem(${item.id})" title="Rimuovi piatto"><i class="fas fa-trash"></i></button>
                     </div>
-                    <span class="receipt-item-price">€${parseFloat(item.subtotal).toFixed(2)}</span>
                 </div>
+                <span class="receipt-item-price">€${parseFloat(item.subtotal).toFixed(2)}</span>
             </div>`;
         });
 
@@ -882,6 +913,7 @@ class TableOrdersManager {
 
         this._updateBancoCloseButtons();
         this._updateQuickSegueButton();
+        this._updateAddSegueButton();
     }
 
     /**

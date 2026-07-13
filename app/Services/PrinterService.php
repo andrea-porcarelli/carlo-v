@@ -300,13 +300,16 @@ class PrinterService implements PrinterServiceInterface
     {
         // Segue separator item: stampa solo il separatore e ritorna
         if ($item->isSegueItem()) {
+            $printer->feed(2);
             $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
 
-            $printer->setTextSize(2, 1);
+            $printer->setTextSize(2, 2);
             $printer->setEmphasis(true);
             $printer->text("*** SEGUE ***\n");
             $printer->setEmphasis(false);
+            $printer->setTextSize(1, 1);
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            $printer->feed(2);
             return;
         }
 
@@ -318,18 +321,25 @@ class PrinterService implements PrinterServiceInterface
             $printer->text("$quantity $dishName\n");
         } else {
 
-            $printer->setTextSize(2, 1);
+            $printer->feed(2);
+            $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $printer->setTextSize(2, 2);
             $printer->setEmphasis(true);
             $printer->text("*** SEGUE ***\n");
-            $printer->setTextSize(2, 2);
             $printer->setEmphasis(false);
+            $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            $printer->feed(2);
         }
         $printer->setTextSize(1, 1);
         $printer->setEmphasis(false);
 
         // Note
         if (!empty($item->notes)) {
-            $printer->text("  Note: " . $item->notes . "\n");
+            $printer->setTextSize(2, 2);
+            $printer->setEmphasis(true);
+            $printer->text("  >> " . strtoupper($item->notes) . "\n");
+            $printer->setEmphasis(false);
+            $printer->setTextSize(1, 1);
         }
 
         // Aggiunte (extras)
@@ -1721,12 +1731,18 @@ class PrinterService implements PrinterServiceInterface
                     $printer->setTextSize(1, 1);
 
                     if (!empty($item->notes)) {
-                        $printer->text("  Note: " . $item->notes . "\n");
+                        $printer->setEmphasis(true);
+                        $printer->text("  >> " . strtoupper($item->notes) . "\n");
+                        $printer->setEmphasis(false);
                     }
                 } else {
-                    $printer->setTextSize(1, 1);
+                    $printer->feed(1);
+                    $printer->setJustification(EscposPrinter::JUSTIFY_CENTER);
+                    $printer->setEmphasis(true);
                     $printer->text("*** SEGUE ***\n");
-                    $printer->setTextSize(1, 1);
+                    $printer->setEmphasis(false);
+                    $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
+                    $printer->feed(1);
                 }
             }
 

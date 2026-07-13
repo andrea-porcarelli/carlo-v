@@ -730,14 +730,14 @@ body {
 .btn-remove-item, .btn-edit-item, .btn-quick-add {
     border: none;
     color: white;
-    width: 30px;
-    height: 30px;
+    width: 24px;
+    height: 24px;
     border-radius: 25%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
 }
 
 .btn-quick-add { background: #28a745; }
@@ -747,21 +747,35 @@ body {
 .btn-edit-item { background: #17a2b8; }
 .btn-edit-item:hover { background: #138496; }
 
-.receipt-item-actions {
-    position: absolute;
-    right: 8px;
-    top: 6px;
+.receipt-item {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 1px;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #dee2e6;
+    min-height: 0;
 }
 
-.receipt-item {
-    position: relative;
-    display: block;
-    padding-right: 80px;
-    min-height: 62px;
+.receipt-item-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.receipt-item-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.receipt-item-price {
+    font-weight: 700;
+    color: #dc3545;
+    white-space: nowrap;
+    font-size: 0.95rem;
+    line-height: 1.2;
 }
 
 /* Compact action buttons for modify overlay */
@@ -1184,9 +1198,9 @@ body {
     .ds-dishes-grid .menu-item-price { font-size: 11px; }
 
     /* — Righe ordine corrente — */
-    .receipt-item { padding: 4px 8px; padding-right: 70px; }
+    .receipt-item { padding: 4px 8px; }
     .btn-remove-item,
-    .btn-edit-item, .btn-quick-add { width: 26px; height: 26px; font-size: 0.73rem; }
+    .btn-edit-item, .btn-quick-add { width: 22px; height: 22px; font-size: 0.68rem; }
 
     /* — Empty state (meno spazio verticale) — */
     .empty-state { padding: 30px 20px; }

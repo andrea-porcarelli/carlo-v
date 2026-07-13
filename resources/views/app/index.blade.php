@@ -111,6 +111,9 @@
                         <button class="action-btn-v" id="btnMarciaTavolo" style="background:#28a745;">
                             <i class="fas fa-play-circle"></i> MARCIA
                         </button>
+                        <button class="action-btn-v" id="btnAddSegue" style="background:#dc3545;" onclick="tableOrdersManager.addSegueAtEnd()">
+                            <i class="fas fa-forward"></i> SEGUE
+                        </button>
                         <button class="action-btn-v" id="btnInviaOrdine" style="background:#0d6efd; display:none;">
                             <i class="fas fa-paper-plane"></i> INVIA ORDINE
                         </button>
