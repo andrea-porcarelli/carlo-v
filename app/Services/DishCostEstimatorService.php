@@ -6,6 +6,7 @@ use App\Models\OrderItem;
 use App\Models\TableOrder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Stima del costo materie prime per piatti / righe ordine / tavoli.
@@ -24,6 +25,77 @@ class DishCostEstimatorService
     /** @var array<int, float>|null cache in-memory dei costi medi per materiale */
     private ?array $avgCostsCache = null;
 
+    /** @var array<string, bool>|null cache existence delle tabelle di join */
+    private ?array $joinTablesCache = null;
+
+    /**
+     * Verifica quali tabelle di supporto per il calcolo del multiplier sono presenti.
+     * @return array{sip:bool, eil:bool}
+     */
+    private function availableJoinTables(): array
+    {
+        if ($this->joinTablesCache !== null) {
+            return $this->joinTablesCache;
+        }
+        $this->joinTablesCache = [
+            'sip' => Schema::hasTable('supplier_invoice_products') && Schema::hasColumn('supplier_invoice_products', 'quantity_multiplier'),
+            'eil' => Schema::hasTable('external_invoice_lines') && Schema::hasColumn('external_invoice_lines', 'quantity_multiplier'),
+        ];
+        return $this->joinTablesCache;
+    }
+
+    /**
+     * Costruisce l'espressione SQL "prezzo effettivo per unità base".
+     * Usa i join con le tabelle disponibili; senza tabelle di supporto ricade
+     * sul purchase_price grezzo (retrocompatibile).
+     */
+    private function effectivePriceExpression(string $msAlias = 'ms'): string
+    {
+        $available = $this->availableJoinTables();
+        $clauses = [];
+        if ($available['sip']) {
+            $clauses[] = "WHEN sip.quantity_multiplier IS NOT NULL AND sip.quantity_multiplier > 0 THEN {$msAlias}.purchase_price / sip.quantity_multiplier";
+        }
+        if ($available['eil']) {
+            $clauses[] = "WHEN eil.quantity_multiplier IS NOT NULL AND eil.quantity_multiplier > 0 THEN {$msAlias}.purchase_price / eil.quantity_multiplier";
+        }
+        if (empty($clauses)) {
+            return "{$msAlias}.purchase_price";
+        }
+        return 'CASE ' . implode(' ', $clauses) . " ELSE {$msAlias}.purchase_price END";
+    }
+
+    /**
+     * Applica i LEFT JOIN opzionali per le tabelle di supporto al calcolo del multiplier.
+     */
+    private function applyMultiplierJoins($query, string $msAlias = 'ms')
+    {
+        $available = $this->availableJoinTables();
+        if ($available['sip']) {
+            $query->leftJoin('supplier_invoice_products as sip', 'sip.id', '=', "{$msAlias}.supplier_invoice_product_id");
+        }
+        if ($available['eil']) {
+            $query->leftJoin('external_invoice_lines as eil', 'eil.id', '=', "{$msAlias}.external_invoice_line_id");
+        }
+        return $query;
+    }
+
+    /**
+     * Subquery riusabile: material_id → avg_cost per unità base.
+     */
+    private function avgCostSubquery()
+    {
+        $q = DB::table('material_stocks as ms');
+        $this->applyMultiplierJoins($q, 'ms');
+        $eff = $this->effectivePriceExpression('ms');
+        return $q
+            ->select('ms.material_id', DB::raw("SUM(($eff) * ms.stock) / NULLIF(SUM(ms.stock), 0) as avg_cost"))
+            ->whereNotNull('ms.purchase_price')
+            ->where('ms.purchase_price', '>', 0)
+            ->where('ms.stock', '>', 0)
+            ->groupBy('ms.material_id');
+    }
+
     /**
      * Costo medio per unità (base) di ogni materiale.
      *
@@ -41,17 +113,12 @@ class DishCostEstimatorService
             return $this->avgCostsCache;
         }
 
-        $effectivePrice = 'CASE
-            WHEN sip.quantity_multiplier IS NOT NULL AND sip.quantity_multiplier > 0
-                THEN ms.purchase_price / sip.quantity_multiplier
-            WHEN eil.quantity_multiplier IS NOT NULL AND eil.quantity_multiplier > 0
-                THEN ms.purchase_price / eil.quantity_multiplier
-            ELSE ms.purchase_price
-        END';
+        $effectivePrice = $this->effectivePriceExpression('ms');
 
-        $rows = DB::table('material_stocks as ms')
-            ->leftJoin('supplier_invoice_products as sip', 'sip.id', '=', 'ms.supplier_invoice_product_id')
-            ->leftJoin('external_invoice_lines as eil', 'eil.id', '=', 'ms.external_invoice_line_id')
+        $query = DB::table('material_stocks as ms');
+        $this->applyMultiplierJoins($query, 'ms');
+
+        $rows = $query
             ->select('ms.material_id', DB::raw("SUM(($effectivePrice) * ms.stock) / NULLIF(SUM(ms.stock), 0) as avg_cost"))
             ->whereNotNull('ms.purchase_price')
             ->where('ms.purchase_price', '>', 0)
@@ -189,26 +256,7 @@ class DishCostEstimatorService
         $q = DB::table('order_items as oi')
             ->join('order_item_materials as oim', 'oi.id', '=', 'oim.order_item_id')
             ->join('table_orders as too', 'oi.table_order_id', '=', 'too.id')
-            ->joinSub(
-                DB::table('material_stocks as ms')
-                    ->leftJoin('supplier_invoice_products as sip', 'sip.id', '=', 'ms.supplier_invoice_product_id')
-                    ->leftJoin('external_invoice_lines as eil', 'eil.id', '=', 'ms.external_invoice_line_id')
-                    ->select('ms.material_id', DB::raw('SUM((CASE
-                        WHEN sip.quantity_multiplier IS NOT NULL AND sip.quantity_multiplier > 0
-                            THEN ms.purchase_price / sip.quantity_multiplier
-                        WHEN eil.quantity_multiplier IS NOT NULL AND eil.quantity_multiplier > 0
-                            THEN ms.purchase_price / eil.quantity_multiplier
-                        ELSE ms.purchase_price
-                    END) * ms.stock) / NULLIF(SUM(ms.stock), 0) as avg_cost'))
-                    ->whereNotNull('ms.purchase_price')
-                    ->where('ms.purchase_price', '>', 0)
-                    ->where('ms.stock', '>', 0)
-                    ->groupBy('ms.material_id'),
-                'mc',
-                'oim.material_id',
-                '=',
-                'mc.material_id'
-            )
+            ->joinSub($this->avgCostSubquery(), 'mc', 'oim.material_id', '=', 'mc.material_id')
             ->where('too.status', 'paid')
             ->where(fn($q) => $q->where('too.autoconsumo', false)->orWhereNull('too.autoconsumo'))
             ->whereNull('oi.deleted_at');
@@ -248,26 +296,7 @@ class DishCostEstimatorService
         $q = DB::table('order_items as oi')
             ->join('order_item_materials as oim', 'oi.id', '=', 'oim.order_item_id')
             ->join('table_orders as too', 'oi.table_order_id', '=', 'too.id')
-            ->joinSub(
-                DB::table('material_stocks as ms')
-                    ->leftJoin('supplier_invoice_products as sip', 'sip.id', '=', 'ms.supplier_invoice_product_id')
-                    ->leftJoin('external_invoice_lines as eil', 'eil.id', '=', 'ms.external_invoice_line_id')
-                    ->select('ms.material_id', DB::raw('SUM((CASE
-                        WHEN sip.quantity_multiplier IS NOT NULL AND sip.quantity_multiplier > 0
-                            THEN ms.purchase_price / sip.quantity_multiplier
-                        WHEN eil.quantity_multiplier IS NOT NULL AND eil.quantity_multiplier > 0
-                            THEN ms.purchase_price / eil.quantity_multiplier
-                        ELSE ms.purchase_price
-                    END) * ms.stock) / NULLIF(SUM(ms.stock), 0) as avg_cost'))
-                    ->whereNotNull('ms.purchase_price')
-                    ->where('ms.purchase_price', '>', 0)
-                    ->where('ms.stock', '>', 0)
-                    ->groupBy('ms.material_id'),
-                'mc',
-                'oim.material_id',
-                '=',
-                'mc.material_id'
-            )
+            ->joinSub($this->avgCostSubquery(), 'mc', 'oim.material_id', '=', 'mc.material_id')
             ->where('too.status', 'paid')
             ->where(fn($q) => $q->where('too.autoconsumo', false)->orWhereNull('too.autoconsumo'))
             ->whereNull('oi.deleted_at')
