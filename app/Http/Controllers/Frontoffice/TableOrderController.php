@@ -3195,7 +3195,7 @@ class TableOrderController extends Controller
 
                 // Non eliminiamo gli item, solo recalcoliamo il totale
                 $order->refresh();
-                $order->recalculateTotal();
+                $order->updateTotal();
                 $order->refresh();
 
                 // Chiudi l'ordine, settando autoconsumo e liberando il tavolo
