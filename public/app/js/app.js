@@ -436,7 +436,7 @@ $(document).ready(function() {
             { key: null,                 label: 'Scontrino (tot.)',    amount: v.scontrino },
             { key: 'fatture',            label: 'Fatture',             color: '#6f42c1', icon: 'fa-file-invoice' },
             { key: 'autoconsumo',        label: 'Autoconsumo',         color: '#ffc107', icon: 'fa-utensils' },
-            { key: 'chiusure_conto',     label: 'Chiusura conto / Omaggi', color: '#e83e8c', icon: 'fa-gift' },
+            { key: 'chiusure_conto',     label: 'Chiusura conto',      color: '#e83e8c', icon: 'fa-gift' },
             { key: 'vendite_banco',      label: 'Vendite al banco',   color: '#fd7e14', icon: 'fa-store' },
         ];
 

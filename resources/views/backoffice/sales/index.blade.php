@@ -52,7 +52,7 @@
             <div class="panel" style="border-color:#e83e8c;">
                 <div class="panel-body text-center" style="background:#e83e8c; color:#fff; border-radius:4px;">
                     <h4 class="mb-0" id="kpiChiusureConto">€0,00</h4>
-                    <small><i class="fas fa-gift"></i> Chiusura conto / Omaggi</small>
+                    <small><i class="fas fa-gift"></i> Chiusura conto</small>
                 </div>
             </div>
         </div>
