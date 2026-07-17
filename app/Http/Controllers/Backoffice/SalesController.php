@@ -239,10 +239,12 @@ class SalesController extends BaseController
             $unitCost   = $costEstimator->estimateOrderItemUnitCost($item);
             $lineCost   = $costEstimator->estimateOrderItemCost($item);
             $coverage   = $costEstimator->orderItemCostCoverage($item);
+            $breakdown  = $costEstimator->getOrderItemCostBreakdown($item);
             $itemCostEstimates[$item->id] = [
                 'unit_cost' => $unitCost,
                 'line_cost' => $lineCost,
                 'coverage'  => $coverage,
+                'breakdown' => $breakdown,
             ];
             if ($item->status !== 'cancelled' && !$item->trashed()) {
                 $totalEstimatedCost += $lineCost;

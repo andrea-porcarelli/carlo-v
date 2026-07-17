@@ -78,6 +78,55 @@ class DishCostEstimatorService
     }
 
     /**
+     * Breakdown dettagliato del calcolo costo per una riga ordine.
+     * Ritorna l'elenco dei materiali con costo unitario medio, quantità
+     * per porzione, contributo alla riga (unità e totale linea).
+     * Usato per il debug/tooltip in dettaglio vendita.
+     *
+     * @return array{unit_cost:float, line_cost:float, quantity:int, coverage:float, materials:array<int, array{material_id:int, name:string, unit:string, qty_per_portion:float, avg_cost:?float, contribution_unit:float, contribution_line:float, has_cost:bool}>}
+     */
+    public function getOrderItemCostBreakdown(OrderItem $item): array
+    {
+        $item->loadMissing('materials.material');
+
+        $costs = $this->getMaterialAvgCosts();
+        $quantity = (int) $item->quantity;
+        $unitCost = 0.0;
+        $materials = [];
+
+        foreach ($item->materials as $m) {
+            $avgCost   = $costs[$m->material_id] ?? null;
+            $qtyPer    = (float) $m->quantity;
+            $contribUnit = $avgCost !== null ? round($qtyPer * $avgCost, 4) : 0.0;
+            $contribLine = round($contribUnit * $quantity, 4);
+            $materials[] = [
+                'material_id'       => $m->material_id,
+                'name'              => $m->material?->label ?? "Materiale #{$m->material_id}",
+                'unit'              => $m->material?->stock_type ?? '',
+                'qty_per_portion'   => $qtyPer,
+                'avg_cost'          => $avgCost,
+                'contribution_unit' => $contribUnit,
+                'contribution_line' => $contribLine,
+                'has_cost'          => $avgCost !== null,
+            ];
+            if ($avgCost !== null) {
+                $unitCost += $qtyPer * $avgCost;
+            }
+        }
+
+        $total = count($materials);
+        $known = count(array_filter($materials, fn($m) => $m['has_cost']));
+
+        return [
+            'unit_cost' => round($unitCost, 4),
+            'line_cost' => round($unitCost * $quantity, 4),
+            'quantity'  => $quantity,
+            'coverage'  => $total > 0 ? $known / $total : 0.0,
+            'materials' => $materials,
+        ];
+    }
+
+    /**
      * Percentuale di materiali della riga di cui abbiamo un costo (0..1).
      * Usata per segnalare stime parziali/mancanti.
      */

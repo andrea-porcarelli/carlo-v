@@ -538,6 +538,8 @@ window._boSale = {
                                                 <td class="text-right">
                                                     @php
                                                         $costInfo = $itemCostEstimates[$item->id] ?? null;
+                                                        $bd       = $costInfo['breakdown'] ?? null;
+                                                        $hasBd    = $bd && !empty($bd['materials']);
                                                     @endphp
                                                     @if($costInfo && ($costInfo['unit_cost'] > 0 || $costInfo['coverage'] > 0))
                                                         <span style="font-size: 13px; color:#8a6d3b;">
@@ -552,10 +554,32 @@ window._boSale = {
                                                                 </span>
                                                             @endif
                                                         </small>
+                                                        @if($hasBd)
+                                                            <br>
+                                                            <button type="button"
+                                                                    class="btn btn-link btn-xs cost-debug-btn"
+                                                                    data-toggle="collapse"
+                                                                    data-target="#costDebug-{{ $item->id }}"
+                                                                    aria-expanded="false"
+                                                                    style="padding:0; font-size:10px; text-decoration:underline; color:#6c757d;">
+                                                                <i class="fas fa-bug"></i> debug
+                                                            </button>
+                                                        @endif
                                                     @else
                                                         <span class="text-muted" title="Nessun costo materiali disponibile" style="font-size:12px;">
                                                             <i class="fas fa-question-circle"></i> n/d
                                                         </span>
+                                                        @if($hasBd)
+                                                            <br>
+                                                            <button type="button"
+                                                                    class="btn btn-link btn-xs cost-debug-btn"
+                                                                    data-toggle="collapse"
+                                                                    data-target="#costDebug-{{ $item->id }}"
+                                                                    aria-expanded="false"
+                                                                    style="padding:0; font-size:10px; text-decoration:underline; color:#6c757d;">
+                                                                <i class="fas fa-bug"></i> debug
+                                                            </button>
+                                                        @endif
                                                     @endif
                                                 </td>
                                                 <td class="text-right">
@@ -566,6 +590,76 @@ window._boSale = {
                                             @endif
 
                                         </tr>
+                                        @if(isset($item->dish) && !empty($itemCostEstimates[$item->id]['breakdown']['materials'] ?? []))
+                                            @php
+                                                $debugCols = $sale->autoconsumo ? 6 : 5;
+                                                $bd        = $itemCostEstimates[$item->id]['breakdown'];
+                                            @endphp
+                                            <tr class="collapse cost-debug-row" id="costDebug-{{ $item->id }}">
+                                                <td colspan="{{ $debugCols }}" style="background:#fdfdf5; padding:12px 18px; border-top:1px dashed #d0d0b0;">
+                                                    <div style="font-size:11px; color:#6c757d; margin-bottom:6px;">
+                                                        <i class="fas fa-info-circle"></i>
+                                                        Costo unitario = Σ (qty materiale per porzione × costo medio materiale).
+                                                        Costo medio = SUM(purchase_price × stock) / SUM(stock) sui carichi di magazzino con prezzo &gt; 0.
+                                                    </div>
+                                                    <table class="table table-sm mb-0" style="font-size:12px; background:transparent;">
+                                                        <thead>
+                                                            <tr style="background:#f0efdc;">
+                                                                <th style="padding:4px 8px;">Materiale</th>
+                                                                <th class="text-right" style="padding:4px 8px;">Qta / porz.</th>
+                                                                <th class="text-right" style="padding:4px 8px;">Costo medio</th>
+                                                                <th class="text-right" style="padding:4px 8px;">Contributo unit.</th>
+                                                                <th class="text-right" style="padding:4px 8px;">× {{ $bd['quantity'] }} porz.</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach($bd['materials'] as $m)
+                                                                <tr @if(!$m['has_cost']) style="color:#b58a1a;" @endif>
+                                                                    <td style="padding:4px 8px;">
+                                                                        {{ $m['name'] }}
+                                                                        @if(!$m['has_cost'])
+                                                                            <i class="fas fa-exclamation-triangle" title="Nessun carico con prezzo — costo non calcolabile"></i>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="text-right" style="padding:4px 8px;">
+                                                                        {{ rtrim(rtrim(number_format($m['qty_per_portion'], 4, ',', '.'), '0'), ',') }}
+                                                                        <small class="text-muted">{{ $m['unit'] }}</small>
+                                                                    </td>
+                                                                    <td class="text-right" style="padding:4px 8px;">
+                                                                        @if($m['has_cost'])
+                                                                            €{{ number_format($m['avg_cost'], 4, ',', '.') }} / {{ $m['unit'] ?: 'un.' }}
+                                                                        @else
+                                                                            <span class="text-muted">n/d</span>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="text-right" style="padding:4px 8px;">
+                                                                        @if($m['has_cost'])
+                                                                            €{{ number_format($m['contribution_unit'], 4, ',', '.') }}
+                                                                        @else
+                                                                            —
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="text-right" style="padding:4px 8px;">
+                                                                        @if($m['has_cost'])
+                                                                            €{{ number_format($m['contribution_line'], 4, ',', '.') }}
+                                                                        @else
+                                                                            —
+                                                                        @endif
+                                                                    </td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                        <tfoot>
+                                                            <tr style="font-weight:700; background:#f0efdc;">
+                                                                <td colspan="3" class="text-right" style="padding:6px 8px;">Totale</td>
+                                                                <td class="text-right" style="padding:6px 8px;">€{{ number_format($bd['unit_cost'], 4, ',', '.') }}</td>
+                                                                <td class="text-right" style="padding:6px 8px;">€{{ number_format($bd['line_cost'], 4, ',', '.') }}</td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        @endif
                                     @endforeach
                                 </tbody>
                                 <tfoot>
