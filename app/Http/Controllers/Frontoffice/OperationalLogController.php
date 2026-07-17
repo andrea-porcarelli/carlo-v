@@ -43,7 +43,6 @@ class OperationalLogController extends Controller
         $buckets = [
             'contanti'            => 0.0,
             'pos'                 => 0.0,
-            'scontrino'           => 0.0,
             'fatture'             => 0.0,
             'autoconsumo'         => 0.0,
             'chiusure_conto'      => 0.0,
@@ -58,6 +57,9 @@ class OperationalLogController extends Controller
             'chiusure_conto' => [],
             'vendite_banco'  => [],
         ];
+
+        $scontriniCount = 0;
+        $fattureCount   = 0;
 
         foreach ($paid as $order) {
             $amount = (float) $order->total_amount;
@@ -83,13 +85,13 @@ class OperationalLogController extends Controller
             switch ($order->payment_method) {
                 case 'contanti':
                     $buckets['contanti']  += $amount;
-                    $buckets['scontrino'] += $amount;
                     $details['contanti'][] = $entry;
+                    $scontriniCount++;
                     break;
                 case 'pos':
                     $buckets['pos']       += $amount;
-                    $buckets['scontrino'] += $amount;
                     $details['pos'][] = $entry;
+                    $scontriniCount++;
                     break;
                 case 'fattura':
                 case 'fattura_contanti':
@@ -99,6 +101,7 @@ class OperationalLogController extends Controller
                 case 'misto':
                     $buckets['fatture'] += $amount;
                     $details['fatture'][] = $entry;
+                    $fattureCount++;
                     break;
                 case 'chiusura_conto':
                     $buckets['chiusure_conto'] += $amount;
@@ -117,6 +120,8 @@ class OperationalLogController extends Controller
 
         return array_map(fn($v) => round($v, 2), $buckets) + [
             'totale_incassato' => round($totaleIncassato, 2),
+            'scontrini_count'  => $scontriniCount,
+            'fatture_count'    => $fattureCount,
             'dettagli'         => $details,
         ];
     }

@@ -247,12 +247,14 @@ class SalesController extends BaseController
         $buckets = [
             'contanti'       => 0.0,
             'pos'            => 0.0,
-            'scontrino'      => 0.0,
             'fatture'        => 0.0,
             'autoconsumo'    => 0.0,
             'chiusure_conto' => 0.0,
             'vendite_banco'  => 0.0,
         ];
+
+        $scontriniCount = 0;
+        $fattureCount   = 0;
 
         foreach ($paid as $order) {
             $amount  = (float) $order->total_amount;
@@ -270,11 +272,11 @@ class SalesController extends BaseController
             switch ($order->payment_method) {
                 case 'contanti':
                     $buckets['contanti']  += $amount;
-                    $buckets['scontrino'] += $amount;
+                    $scontriniCount++;
                     break;
                 case 'pos':
                     $buckets['pos']       += $amount;
-                    $buckets['scontrino'] += $amount;
+                    $scontriniCount++;
                     break;
                 case 'fattura':
                 case 'fattura_contanti':
@@ -283,6 +285,7 @@ class SalesController extends BaseController
                 case 'assegno':
                 case 'misto':
                     $buckets['fatture'] += $amount;
+                    $fattureCount++;
                     break;
                 case 'chiusura_conto':
                     $buckets['chiusure_conto'] += $amount;
@@ -294,6 +297,8 @@ class SalesController extends BaseController
 
         return response()->json(array_map(fn($v) => round($v, 2), $buckets) + [
             'totale_incassato' => round($totaleIncassato, 2),
+            'scontrini_count'  => $scontriniCount,
+            'fatture_count'    => $fattureCount,
         ]);
     }
 

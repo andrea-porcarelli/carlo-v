@@ -25,22 +25,6 @@
             </div>
         </div>
         <div class="col-lg-2 col-md-4 col-sm-6">
-            <div class="panel panel-default">
-                <div class="panel-body text-center">
-                    <h4 class="mb-0" id="kpiScontrino">€0,00</h4>
-                    <small><i class="fas fa-receipt"></i> Scontrino (tot.)</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-2 col-md-4 col-sm-6">
-            <div class="panel" style="border-color:#6f42c1;">
-                <div class="panel-body text-center" style="background:#6f42c1; color:#fff; border-radius:4px;">
-                    <h4 class="mb-0" id="kpiFatture">€0,00</h4>
-                    <small><i class="fas fa-file-invoice"></i> Fatture</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-2 col-md-4 col-sm-6">
             <div class="panel panel-warning">
                 <div class="panel-body text-center">
                     <h4 class="mb-0" id="kpiAutoconsumo">€0,00</h4>
@@ -61,6 +45,24 @@
                 <div class="panel-body text-center" style="background:#fd7e14; color:#fff; border-radius:4px;">
                     <h4 class="mb-0" id="kpiBanco">€0,00</h4>
                     <small><i class="fas fa-store"></i> Vendite al banco</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="panel" style="border-color:#343a40;">
+                <div class="panel-body text-center" style="background:#343a40; color:#fff; border-radius:4px; padding:14px 10px;">
+                    <div style="display:flex; justify-content:space-around; align-items:center;">
+                        <div>
+                            <h4 class="mb-0" id="kpiScontriniCount" style="font-weight:700;">0</h4>
+                            <small style="font-size:0.75rem;">Scontrini</small>
+                        </div>
+                        <div style="width:1px; height:32px; background:rgba(255,255,255,0.25);"></div>
+                        <div>
+                            <h4 class="mb-0" id="kpiFattureCount" style="font-weight:700;">0</h4>
+                            <small style="font-size:0.75rem;">Fatture</small>
+                        </div>
+                    </div>
+                    <small style="display:block; margin-top:6px; opacity:0.75;"><i class="fas fa-receipt"></i> Fiscale</small>
                 </div>
             </div>
         </div>
@@ -302,11 +304,11 @@
                     success: function(k) {
                         $('#kpiContanti').text(fmtMoney(k.contanti));
                         $('#kpiPos').text(fmtMoney(k.pos));
-                        $('#kpiScontrino').text(fmtMoney(k.scontrino));
-                        $('#kpiFatture').text(fmtMoney(k.fatture));
                         $('#kpiAutoconsumo').text(fmtMoney(k.autoconsumo));
                         $('#kpiChiusureConto').text(fmtMoney(k.chiusure_conto));
                         $('#kpiBanco').text(fmtMoney(k.vendite_banco));
+                        $('#kpiScontriniCount').text(k.scontrini_count || 0);
+                        $('#kpiFattureCount').text(k.fatture_count || 0);
                         $('#kpiTotaleIncassato').text(fmtMoney(k.totale_incassato));
                     }
                 });

@@ -433,8 +433,6 @@ $(document).ready(function() {
         const rowMeta = [
             { key: 'contanti',           label: 'Contanti',            color: '#28a745', icon: 'fa-coins' },
             { key: 'pos',                label: 'POS',                 color: '#17a2b8', icon: 'fa-credit-card' },
-            { key: null,                 label: 'Scontrino (tot.)',    amount: v.scontrino },
-            { key: 'fatture',            label: 'Fatture',             color: '#6f42c1', icon: 'fa-file-invoice' },
             { key: 'autoconsumo',        label: 'Autoconsumo',         color: '#ffc107', icon: 'fa-utensils' },
             { key: 'chiusure_conto',     label: 'Chiusura conto',      color: '#e83e8c', icon: 'fa-gift' },
             { key: 'vendite_banco',      label: 'Vendite al banco',   color: '#fd7e14', icon: 'fa-store' },
@@ -457,6 +455,17 @@ $(document).ready(function() {
             html += row(m.label, amount, m.key);
         });
         html += row('Totale incassato', v.totale_incassato, null, 'total');
+
+        const scontrini = v.scontrini_count || 0;
+        const fatture   = v.fatture_count   || 0;
+        html += `<div class="logop-row logop-fiscale" style="margin-top:10px; padding-top:10px; border-top:1px solid #444;">
+                    <span class="label" style="color:#ffc107;"><i class="fas fa-receipt"></i> Fiscale</span>
+                    <span class="value" style="font-size:0.9rem;">
+                        <span style="color:#adb5bd;">${scontrini}</span> <span style="color:#6c757d; font-size:0.8rem;">scontrini</span>
+                        &nbsp;·&nbsp;
+                        <span style="color:#adb5bd;">${fatture}</span> <span style="color:#6c757d; font-size:0.8rem;">fatture</span>
+                    </span>
+                </div>`;
 
         $('#logOpVenduto').html(html);
         $('#logOpVendutoDetail').hide().empty();
