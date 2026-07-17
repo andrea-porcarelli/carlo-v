@@ -57,7 +57,13 @@ class PrintOrderItemsJob implements ShouldQueue
             $printerService->setOperatorId($this->operatorId);
         }
 
-        $ok = $printerService->printOrderItems($tableOrder, $items, $this->operation);
+        // È il primo invio della comanda se nessun altro item del tavolo è già stato stampato
+        $isFirstSend = !$tableOrder->items()
+            ->whereNotIn('id', $this->itemIds)
+            ->whereNotNull('first_printed_at')
+            ->exists();
+
+        $ok = $printerService->printOrderItems($tableOrder, $items, $this->operation, $isFirstSend);
 
         if ($ok && in_array($this->operation, ['add', 'update'], true)) {
             OrderItem::whereIn('id', $this->itemIds)

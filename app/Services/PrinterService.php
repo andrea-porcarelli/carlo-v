@@ -39,9 +39,10 @@ class PrinterService implements PrinterServiceInterface
      * @param TableOrder $tableOrder L'ordine del tavolo
      * @param Collection|array $items Array di OrderItem da stampare
      * @param string|null $operation Tipo di operazione: 'add', 'update', 'remove'
+     * @param bool $isFirstSend True se è il primo invio della comanda del tavolo
      * @return bool True se la stampa è andata a buon fine, false altrimenti
      */
-    public function printOrderItems(TableOrder $tableOrder, Collection|array $items, ?string $operation = 'add'): bool
+    public function printOrderItems(TableOrder $tableOrder, Collection|array $items, ?string $operation = 'add', bool $isFirstSend = false): bool
     {
         try {
             // Converti in Collection se necessario
@@ -62,7 +63,7 @@ class PrinterService implements PrinterServiceInterface
 
             // Per ogni stampante, stampa gli articoli corrispondenti
             foreach ($itemsByPrinter as $printerData) {
-                $success = $this->printToDevice($tableOrder, $printerData['printer'], $printerData['items'], $operation);
+                $success = $this->printToDevice($tableOrder, $printerData['printer'], $printerData['items'], $operation, $isFirstSend);
                 if (!$success) {
                     $allSuccess = false;
                 }
@@ -87,9 +88,10 @@ class PrinterService implements PrinterServiceInterface
      * @param Printer $printerObj
      * @param array $items
      * @param string|null $operation
+     * @param bool $isFirstSend
      * @return bool
      */
-    protected function printToDevice(TableOrder $tableOrder, Printer $printerObj, array $items, ?string $operation = 'add'): bool
+    protected function printToDevice(TableOrder $tableOrder, Printer $printerObj, array $items, ?string $operation = 'add', bool $isFirstSend = false): bool
     {
         try {
             $printerIp = $printerObj->ip;
@@ -198,8 +200,9 @@ class PrinterService implements PrinterServiceInterface
             $printer->text(str_repeat('-', 42) . "\n");
             $printer->feed(1);
 
-            // Stampa articoli delle altre stampanti in piccolo (non per gli annullamenti/modifiche)
-            if ($operation !== 'remove' && $operation !== 'update') {
+            // Stampa articoli delle altre stampanti in piccolo solo al PRIMO invio della comanda
+            // (non per gli annullamenti/modifiche e non su invii successivi)
+            if ($operation !== 'remove' && $operation !== 'update' && $isFirstSend) {
                 $this->printOtherPrintersItems($printer, $printerObj, $tableOrder);
             }
 

@@ -238,19 +238,15 @@ $(document).ready(function () {
 
     function toggleSections() {
         var role = $('#role').val();
-        if (role === 'admin') {
-            $('#adminSection').slideDown(200);
-            $('#operatorSection').slideUp(200);
-            $('#permissionsPanel').slideUp(200);
-        } else if (role === 'operator') {
-            $('#adminSection').slideUp(200);
-            $('#operatorSection').slideDown(200);
-            $('#permissionsPanel').slideDown(200);
-        } else {
-            $('#adminSection').slideUp(200);
-            $('#operatorSection').slideUp(200);
-            $('#permissionsPanel').slideUp(200);
-        }
+        var adminActive    = role === 'admin';
+        var operatorActive = role === 'operator';
+
+        $('#adminSection')[adminActive ? 'slideDown' : 'slideUp'](200)
+            .find(':input').prop('disabled', !adminActive);
+        $('#operatorSection')[operatorActive ? 'slideDown' : 'slideUp'](200)
+            .find(':input').prop('disabled', !operatorActive);
+        $('#permissionsPanel')[operatorActive ? 'slideDown' : 'slideUp'](200)
+            .find(':input').prop('disabled', !operatorActive);
     }
     toggleSections();
     $('#role').on('change', toggleSections);

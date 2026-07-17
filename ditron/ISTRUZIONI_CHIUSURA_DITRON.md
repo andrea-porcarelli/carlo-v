@@ -30,7 +30,7 @@ Sulla macchina di sviluppo (Linux), dalla root del repo Carlo V:
 
 ```bash
 cd ditron/agent
-docker compose run --rm build
+docker compose run --rm buildc
 ```
 
 A fine build il file aggiornato è in `ditron/agent/artifact/DitronAgent.exe`

@@ -93,7 +93,7 @@ window._boSale = {
                             </tr>
                             @endisset
                             <tr>
-                                <td><strong>Cameriere:</strong></td>
+                                <td><strong>Apertura:</strong></td>
                                 <td>
                                     @if($sale->waiter)
                                         <i class="fas fa-user"></i> {{ $sale->waiter->name }}
@@ -102,6 +102,18 @@ window._boSale = {
                                     @endif
                                 </td>
                             </tr>
+                            @if($sale->closed_at)
+                            <tr>
+                                <td><strong>Chiusura:</strong></td>
+                                <td>
+                                    @if($sale->closeLog && $sale->closeLog->user)
+                                        <i class="fas fa-user-check"></i> {{ $sale->closeLog->user->name }}
+                                    @else
+                                        <em class="text-muted">Non specificato</em>
+                                    @endif
+                                </td>
+                            </tr>
+                            @endif
                             @if($sale->hasDiscount())
                             <tr>
                                 <td><strong>Sconto:</strong></td>

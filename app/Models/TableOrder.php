@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TableOrder extends Model
@@ -105,6 +106,18 @@ class TableOrder extends Model
     public function ditronReceipts(): HasMany
     {
         return $this->hasMany(DitronReceipt::class)->orderBy('id');
+    }
+
+    /**
+     * Ultimo log di chiusura ordine (action=close_order). Serve per risalire
+     * all'operatore che ha effettivamente chiuso il tavolo, distinto dal
+     * cameriere che lo aveva aperto (waiter_id).
+     */
+    public function closeLog(): HasOne
+    {
+        return $this->hasOne(TableOrderLog::class)
+            ->where('action', 'close_order')
+            ->latestOfMany();
     }
 
     /**

@@ -45,7 +45,7 @@ class SalesController extends BaseController
             $filters = $request->get('filters') ?? [];
 
             // Get only paid orders (completed sales)
-            $query = TableOrder::with(['restaurantTable', 'items.dish', 'waiter', 'ditronReceipts'])
+            $query = TableOrder::with(['restaurantTable', 'items.dish', 'waiter', 'ditronReceipts', 'closeLog.user'])
                 ->where('status', 'paid')
                 ->orderBy('updated_at', 'desc');
 
@@ -127,7 +127,10 @@ class SalesController extends BaseController
                     return $badge . $ditronBlock;
                 })
                 ->addColumn('waiter', function ($item) {
-                    return $item->waiter ? $item->waiter->name : '-';
+                    $opener = $item->waiter ? $item->waiter->name : '-';
+                    $closer = $item->closeLog && $item->closeLog->user ? $item->closeLog->user->name : '-';
+                    return '<div><small class="text-muted">Apre:</small> <strong>' . e($opener) . '</strong></div>'
+                        . '<div><small class="text-muted">Chiude:</small> <strong>' . e($closer) . '</strong></div>';
                 })
                 ->addColumn('duration', function ($item) {
                     if ($item->opened_at && $item->closed_at) {
@@ -136,7 +139,7 @@ class SalesController extends BaseController
                     }
                     return '-';
                 })
-                ->rawColumns(['sale_info', 'total', 'payment', 'action'])
+                ->rawColumns(['sale_info', 'total', 'payment', 'waiter', 'action'])
                 ->make(true);
 
         } catch (Exception $e) {
@@ -155,6 +158,7 @@ class SalesController extends BaseController
             'items.dish.allergens',
             'items.materials',
             'waiter',
+            'closeLog.user',
             'precontoSplits',
             'tableOrderInvoices.customer',
             'corrispettivi.precontoSplit',

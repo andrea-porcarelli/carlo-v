@@ -13,6 +13,9 @@
                     <button onclick="openFullscreen()" class="js-fullscreen-btn" style="background:#007bff; border:none; color:white; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer;">
                         <i class="fas fa-expand"></i> SCHERMO
                     </button>
+                    <button id="btnLogOperativo" style="background:#dc3545; border:none; color:white; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer;">
+                        <i class="fas fa-chart-line"></i> LOG
+                    </button>
                     @if($isAdmin)
                     <button id="btnAddTableMobile" style="background:#dc3545; border:none; color:white; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; cursor:pointer;">
                         <i class="fas fa-plus"></i> TAVOLI
@@ -196,6 +199,17 @@
     <x-payment-method-modal />
     <x-autoconsumo-modal />
     <x-invoice-modal />
+    <x-operational-log-modal />
+
+    <style>
+        /* Log operativo su mobile: layout single-column e paddings ridotti */
+        @media (max-width: 767px) {
+            #operationalLogModal > div { width: 100% !important; max-width: 100% !important; max-height: 100vh !important; height: 100vh; border-radius: 0 !important; border-width: 0 !important; }
+            #operationalLogModal #logOpBody { grid-template-columns: 1fr !important; padding: 12px !important; gap: 10px !important; }
+            #operationalLogModal h4 { font-size: 1rem !important; }
+            #operationalLogModal #logOpDate { font-size: 0.8rem !important; padding: 5px 8px !important; }
+        }
+    </style>
 
     <!-- Cash Drawer Overlay -->
     <div id="cashDrawerOverlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.88); align-items:center; justify-content:center; flex-direction:column;">

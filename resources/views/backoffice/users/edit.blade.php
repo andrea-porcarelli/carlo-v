@@ -296,19 +296,20 @@ $(document).ready(function () {
     });
 
     // ── Mostra / nascondi sezioni ─────────────────────────────────────────────
-    $('#role').on('change', function () {
-        var selectedRole = $(this).val();
+    function toggleSections() {
+        var role = $('#role').val();
+        var adminActive    = role === 'admin';
+        var operatorActive = role === 'operator';
 
-        if (selectedRole === 'admin') {
-            $('#adminSection').slideDown(200);
-            $('#operatorSection').slideUp(200);
-            $('#permissionsPanel').slideUp(200);
-        } else if (selectedRole === 'operator') {
-            $('#adminSection').slideUp(200);
-            $('#operatorSection').slideDown(200);
-            $('#permissionsPanel').slideDown(200);
-        }
-    });
+        $('#adminSection')[adminActive ? 'slideDown' : 'slideUp'](200)
+            .find(':input').prop('disabled', !adminActive);
+        $('#operatorSection')[operatorActive ? 'slideDown' : 'slideUp'](200)
+            .find(':input').prop('disabled', !operatorActive);
+        $('#permissionsPanel')[operatorActive ? 'slideDown' : 'slideUp'](200)
+            .find(':input').prop('disabled', !operatorActive);
+    }
+    toggleSections();
+    $('#role').on('change', toggleSections);
 
     // ── Seleziona tutti ───────────────────────────────────────────────────────
     $('#selectAllPerms').on('click', function (e) {

@@ -16,9 +16,10 @@ interface PrinterServiceInterface
      * @param TableOrder $tableOrder L'ordine del tavolo
      * @param Collection|array $items Array di OrderItem da stampare
      * @param string|null $operation Tipo di operazione: 'add', 'update', 'remove'
+     * @param bool $isFirstSend True se è il primo invio della comanda del tavolo
      * @return bool True se la stampa è andata a buon fine, false altrimenti
      */
-    public function printOrderItems(TableOrder $tableOrder, Collection|array $items, ?string $operation = 'add'): bool;
+    public function printOrderItems(TableOrder $tableOrder, Collection|array $items, ?string $operation = 'add', bool $isFirstSend = false): bool;
 
     /**
      * Verifica se una stampante è raggiungibile
