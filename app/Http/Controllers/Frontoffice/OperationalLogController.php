@@ -38,7 +38,7 @@ class OperationalLogController extends Controller
         $paid = TableOrder::where('status', 'paid')
             ->whereDate('closed_at', $date)
             ->with('restaurantTable:id,table_number,is_banco')
-            ->get(['id', 'restaurant_table_id', 'total_amount', 'payment_method', 'autoconsumo', 'closed_at']);
+            ->get(['id', 'restaurant_table_id', 'total_amount', 'discount_type', 'discount_value', 'payment_method', 'autoconsumo', 'closed_at']);
 
         $buckets = [
             'contanti'            => 0.0,
@@ -62,7 +62,7 @@ class OperationalLogController extends Controller
         $fattureCount   = 0;
 
         foreach ($paid as $order) {
-            $amount = (float) $order->total_amount;
+            $amount = $order->hasDiscount() ? $order->getDiscountedTotal() : (float) $order->total_amount;
             $table  = $order->restaurantTable;
             $isBanco = (bool) $table?->is_banco;
             $entry = [
@@ -131,15 +131,16 @@ class OperationalLogController extends Controller
         $openOrders = TableOrder::where('status', 'open')
             ->with(['restaurantTable:id,table_number,is_banco'])
             ->orderBy('opened_at')
-            ->get(['id', 'restaurant_table_id', 'total_amount', 'opened_at']);
+            ->get(['id', 'restaurant_table_id', 'total_amount', 'discount_type', 'discount_value', 'opened_at']);
 
         $list = $openOrders->map(function ($o) {
             $t = $o->restaurantTable;
             $isBanco = (bool) ($t?->is_banco);
+            $amount  = $o->hasDiscount() ? $o->getDiscountedTotal() : (float) $o->total_amount;
             return [
                 'table_number' => $isBanco ? 'BANCO' : ($t?->table_number ?? '-'),
                 'is_banco'     => $isBanco,
-                'amount'       => round((float) $o->total_amount, 2),
+                'amount'       => round($amount, 2),
                 'opened_at'    => optional($o->opened_at)->format('H:i'),
             ];
         })

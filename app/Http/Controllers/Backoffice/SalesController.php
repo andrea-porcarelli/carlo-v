@@ -81,6 +81,11 @@ class SalesController extends BaseController
                     return $item->items->count() . ' prodotti';
                 })
                 ->addColumn('total', function ($item) {
+                    if ($item->hasDiscount()) {
+                        return '<strong>' . Utils::price($item->getDiscountedTotal()) . '</strong>'
+                            . '<br><small class="text-muted"><s>' . Utils::price($item->total_amount) . '</s> '
+                            . '<span style="color:#dc3545;">−' . Utils::price((float) $item->discount_value) . '</span></small>';
+                    }
                     return '<strong>' . Utils::price($item->total_amount) . '</strong>';
                 })
                 ->addColumn('payment', function ($item) use ($paymentLabels) {
@@ -242,7 +247,7 @@ class SalesController extends BaseController
             $query->where('payment_method', $filters['payment_method']);
         }
 
-        $paid = $query->get(['id', 'restaurant_table_id', 'total_amount', 'payment_method', 'autoconsumo', 'closed_at']);
+        $paid = $query->get(['id', 'restaurant_table_id', 'total_amount', 'discount_type', 'discount_value', 'payment_method', 'autoconsumo', 'closed_at']);
 
         $buckets = [
             'contanti'       => 0.0,
@@ -257,7 +262,7 @@ class SalesController extends BaseController
         $fattureCount   = 0;
 
         foreach ($paid as $order) {
-            $amount  = (float) $order->total_amount;
+            $amount  = $order->hasDiscount() ? $order->getDiscountedTotal() : (float) $order->total_amount;
             $isBanco = (bool) $order->restaurantTable?->is_banco;
 
             if ($isBanco) {
