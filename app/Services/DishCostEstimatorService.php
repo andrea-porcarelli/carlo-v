@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\DB;
 /**
  * Stima del costo materie prime per piatti / righe ordine / tavoli.
  *
- * Base di calcolo: costo medio ponderato per materiale (SUM(purchase_price * stock) / SUM(stock))
- * calcolato sui carichi in material_stocks. Il consumo per piatto è preso dallo
- * snapshot `order_item_materials` (quantità in unità base del materiale).
+ * Base di calcolo: media ponderata per unità base del materiale sui carichi in
+ * `material_stocks`. Il `purchase_price` è per unità di fattura, quindi viene
+ * normalizzato dividendo per `quantity_multiplier` della riga fattura d'origine
+ * (supplier_invoice_products o external_invoice_lines) prima della ponderazione
+ * per stock. Il consumo per piatto è preso dallo snapshot `order_item_materials`.
  *
  * Nota: è una **stima** — dipende dalla qualità dei dati di carico (unit_price
  * coerente con l'unità base del materiale).
@@ -24,6 +26,13 @@ class DishCostEstimatorService
 
     /**
      * Costo medio per unità (base) di ogni materiale.
+     *
+     * `material_stocks.purchase_price` è salvato per unità di fattura (es. €/fusto),
+     * mentre `stock` è già in unità base (es. cl). Serve dividere per il
+     * `quantity_multiplier` della riga fattura d'origine per ottenere il prezzo
+     * per unità base. Per i carichi manuali (senza fattura) manteniamo il
+     * purchase_price così com'è.
+     *
      * @return array<int, float> [material_id => avg_cost_per_base_unit]
      */
     public function getMaterialAvgCosts(): array
@@ -32,13 +41,23 @@ class DishCostEstimatorService
             return $this->avgCostsCache;
         }
 
-        $rows = DB::table('material_stocks')
-            ->select('material_id', DB::raw('SUM(purchase_price * stock) / NULLIF(SUM(stock), 0) as avg_cost'))
-            ->whereNotNull('purchase_price')
-            ->where('purchase_price', '>', 0)
-            ->where('stock', '>', 0)
-            ->groupBy('material_id')
-            ->pluck('avg_cost', 'material_id');
+        $effectivePrice = 'CASE
+            WHEN sip.quantity_multiplier IS NOT NULL AND sip.quantity_multiplier > 0
+                THEN ms.purchase_price / sip.quantity_multiplier
+            WHEN eil.quantity_multiplier IS NOT NULL AND eil.quantity_multiplier > 0
+                THEN ms.purchase_price / eil.quantity_multiplier
+            ELSE ms.purchase_price
+        END';
+
+        $rows = DB::table('material_stocks as ms')
+            ->leftJoin('supplier_invoice_products as sip', 'sip.id', '=', 'ms.supplier_invoice_product_id')
+            ->leftJoin('external_invoice_lines as eil', 'eil.id', '=', 'ms.external_invoice_line_id')
+            ->select('ms.material_id', DB::raw("SUM(($effectivePrice) * ms.stock) / NULLIF(SUM(ms.stock), 0) as avg_cost"))
+            ->whereNotNull('ms.purchase_price')
+            ->where('ms.purchase_price', '>', 0)
+            ->where('ms.stock', '>', 0)
+            ->groupBy('ms.material_id')
+            ->pluck('avg_cost', 'ms.material_id');
 
         $this->avgCostsCache = $rows->map(fn($v) => (float) $v)->toArray();
         return $this->avgCostsCache;
@@ -171,12 +190,20 @@ class DishCostEstimatorService
             ->join('order_item_materials as oim', 'oi.id', '=', 'oim.order_item_id')
             ->join('table_orders as too', 'oi.table_order_id', '=', 'too.id')
             ->joinSub(
-                DB::table('material_stocks')
-                    ->select('material_id', DB::raw('SUM(purchase_price * stock) / NULLIF(SUM(stock), 0) as avg_cost'))
-                    ->whereNotNull('purchase_price')
-                    ->where('purchase_price', '>', 0)
-                    ->where('stock', '>', 0)
-                    ->groupBy('material_id'),
+                DB::table('material_stocks as ms')
+                    ->leftJoin('supplier_invoice_products as sip', 'sip.id', '=', 'ms.supplier_invoice_product_id')
+                    ->leftJoin('external_invoice_lines as eil', 'eil.id', '=', 'ms.external_invoice_line_id')
+                    ->select('ms.material_id', DB::raw('SUM((CASE
+                        WHEN sip.quantity_multiplier IS NOT NULL AND sip.quantity_multiplier > 0
+                            THEN ms.purchase_price / sip.quantity_multiplier
+                        WHEN eil.quantity_multiplier IS NOT NULL AND eil.quantity_multiplier > 0
+                            THEN ms.purchase_price / eil.quantity_multiplier
+                        ELSE ms.purchase_price
+                    END) * ms.stock) / NULLIF(SUM(ms.stock), 0) as avg_cost'))
+                    ->whereNotNull('ms.purchase_price')
+                    ->where('ms.purchase_price', '>', 0)
+                    ->where('ms.stock', '>', 0)
+                    ->groupBy('ms.material_id'),
                 'mc',
                 'oim.material_id',
                 '=',
@@ -222,12 +249,20 @@ class DishCostEstimatorService
             ->join('order_item_materials as oim', 'oi.id', '=', 'oim.order_item_id')
             ->join('table_orders as too', 'oi.table_order_id', '=', 'too.id')
             ->joinSub(
-                DB::table('material_stocks')
-                    ->select('material_id', DB::raw('SUM(purchase_price * stock) / NULLIF(SUM(stock), 0) as avg_cost'))
-                    ->whereNotNull('purchase_price')
-                    ->where('purchase_price', '>', 0)
-                    ->where('stock', '>', 0)
-                    ->groupBy('material_id'),
+                DB::table('material_stocks as ms')
+                    ->leftJoin('supplier_invoice_products as sip', 'sip.id', '=', 'ms.supplier_invoice_product_id')
+                    ->leftJoin('external_invoice_lines as eil', 'eil.id', '=', 'ms.external_invoice_line_id')
+                    ->select('ms.material_id', DB::raw('SUM((CASE
+                        WHEN sip.quantity_multiplier IS NOT NULL AND sip.quantity_multiplier > 0
+                            THEN ms.purchase_price / sip.quantity_multiplier
+                        WHEN eil.quantity_multiplier IS NOT NULL AND eil.quantity_multiplier > 0
+                            THEN ms.purchase_price / eil.quantity_multiplier
+                        ELSE ms.purchase_price
+                    END) * ms.stock) / NULLIF(SUM(ms.stock), 0) as avg_cost'))
+                    ->whereNotNull('ms.purchase_price')
+                    ->where('ms.purchase_price', '>', 0)
+                    ->where('ms.stock', '>', 0)
+                    ->groupBy('ms.material_id'),
                 'mc',
                 'oim.material_id',
                 '=',

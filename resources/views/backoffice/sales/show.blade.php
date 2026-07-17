@@ -600,7 +600,8 @@ window._boSale = {
                                                     <div style="font-size:11px; color:#6c757d; margin-bottom:6px;">
                                                         <i class="fas fa-info-circle"></i>
                                                         Costo unitario = Σ (qty materiale per porzione × costo medio materiale).
-                                                        Costo medio = SUM(purchase_price × stock) / SUM(stock) sui carichi di magazzino con prezzo &gt; 0.
+                                                        Costo medio per unità base = media ponderata sui carichi, con purchase_price /
+                                                        quantity_multiplier della riga fattura (fusto/cartone → cl/kg/pz).
                                                     </div>
                                                     <table class="table table-sm mb-0" style="font-size:12px; background:transparent;">
                                                         <thead>
