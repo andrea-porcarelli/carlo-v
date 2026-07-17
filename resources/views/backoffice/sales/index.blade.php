@@ -43,8 +43,16 @@
         <div class="col-lg-2 col-md-4 col-sm-6">
             <div class="panel panel-warning">
                 <div class="panel-body text-center">
-                    <h4 class="mb-0" id="kpiOmaggi">€0,00</h4>
-                    <small><i class="fas fa-gift"></i> Omaggi / Autoconsumo</small>
+                    <h4 class="mb-0" id="kpiAutoconsumo">€0,00</h4>
+                    <small><i class="fas fa-utensils"></i> Autoconsumo</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-6">
+            <div class="panel" style="border-color:#e83e8c;">
+                <div class="panel-body text-center" style="background:#e83e8c; color:#fff; border-radius:4px;">
+                    <h4 class="mb-0" id="kpiChiusureConto">€0,00</h4>
+                    <small><i class="fas fa-gift"></i> Chiusura conto / Omaggi</small>
                 </div>
             </div>
         </div>
@@ -296,7 +304,8 @@
                         $('#kpiPos').text(fmtMoney(k.pos));
                         $('#kpiScontrino').text(fmtMoney(k.scontrino));
                         $('#kpiFatture').text(fmtMoney(k.fatture));
-                        $('#kpiOmaggi').text(fmtMoney(k.omaggi_autoconsumo));
+                        $('#kpiAutoconsumo').text(fmtMoney(k.autoconsumo));
+                        $('#kpiChiusureConto').text(fmtMoney(k.chiusure_conto));
                         $('#kpiBanco').text(fmtMoney(k.vendite_banco));
                         $('#kpiTotaleIncassato').text(fmtMoney(k.totale_incassato));
                     }

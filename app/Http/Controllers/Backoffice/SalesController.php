@@ -245,12 +245,13 @@ class SalesController extends BaseController
         $paid = $query->get(['id', 'restaurant_table_id', 'total_amount', 'payment_method', 'autoconsumo', 'closed_at']);
 
         $buckets = [
-            'contanti'           => 0.0,
-            'pos'                => 0.0,
-            'scontrino'          => 0.0,
-            'fatture'            => 0.0,
-            'omaggi_autoconsumo' => 0.0,
-            'vendite_banco'      => 0.0,
+            'contanti'       => 0.0,
+            'pos'            => 0.0,
+            'scontrino'      => 0.0,
+            'fatture'        => 0.0,
+            'autoconsumo'    => 0.0,
+            'chiusure_conto' => 0.0,
+            'vendite_banco'  => 0.0,
         ];
 
         foreach ($paid as $order) {
@@ -262,7 +263,7 @@ class SalesController extends BaseController
             }
 
             if ($order->autoconsumo) {
-                $buckets['omaggi_autoconsumo'] += $amount;
+                $buckets['autoconsumo'] += $amount;
                 continue;
             }
 
@@ -284,7 +285,7 @@ class SalesController extends BaseController
                     $buckets['fatture'] += $amount;
                     break;
                 case 'chiusura_conto':
-                    $buckets['omaggi_autoconsumo'] += $amount;
+                    $buckets['chiusure_conto'] += $amount;
                     break;
             }
         }
