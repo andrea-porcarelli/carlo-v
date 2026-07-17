@@ -435,7 +435,8 @@ $(document).ready(function() {
             { key: 'pos',                label: 'POS',                 color: '#17a2b8', icon: 'fa-credit-card' },
             { key: null,                 label: 'Scontrino (tot.)',    amount: v.scontrino },
             { key: 'fatture',            label: 'Fatture',             color: '#6f42c1', icon: 'fa-file-invoice' },
-            { key: 'omaggi_autoconsumo', label: 'Omaggi / Autoconsumo', color: '#ffc107', icon: 'fa-gift' },
+            { key: 'autoconsumo',        label: 'Autoconsumo',         color: '#ffc107', icon: 'fa-utensils' },
+            { key: 'chiusure_conto',     label: 'Chiusura conto / Omaggi', color: '#e83e8c', icon: 'fa-gift' },
             { key: 'vendite_banco',      label: 'Vendite al banco',   color: '#fd7e14', icon: 'fa-store' },
         ];
 

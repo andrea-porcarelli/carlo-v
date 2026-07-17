@@ -45,16 +45,18 @@ class OperationalLogController extends Controller
             'pos'                 => 0.0,
             'scontrino'           => 0.0,
             'fatture'             => 0.0,
-            'omaggi_autoconsumo'  => 0.0,
+            'autoconsumo'         => 0.0,
+            'chiusure_conto'      => 0.0,
             'vendite_banco'       => 0.0,
         ];
 
         $details = [
-            'contanti'           => [],
-            'pos'                => [],
-            'fatture'            => [],
-            'omaggi_autoconsumo' => [],
-            'vendite_banco'      => [],
+            'contanti'       => [],
+            'pos'            => [],
+            'fatture'        => [],
+            'autoconsumo'    => [],
+            'chiusure_conto' => [],
+            'vendite_banco'  => [],
         ];
 
         foreach ($paid as $order) {
@@ -73,8 +75,8 @@ class OperationalLogController extends Controller
             }
 
             if ($order->autoconsumo) {
-                $buckets['omaggi_autoconsumo'] += $amount;
-                $details['omaggi_autoconsumo'][] = $entry;
+                $buckets['autoconsumo'] += $amount;
+                $details['autoconsumo'][] = $entry;
                 continue;
             }
 
@@ -99,8 +101,8 @@ class OperationalLogController extends Controller
                     $details['fatture'][] = $entry;
                     break;
                 case 'chiusura_conto':
-                    $buckets['omaggi_autoconsumo'] += $amount;
-                    $details['omaggi_autoconsumo'][] = $entry;
+                    $buckets['chiusure_conto'] += $amount;
+                    $details['chiusure_conto'][] = $entry;
                     break;
             }
         }
