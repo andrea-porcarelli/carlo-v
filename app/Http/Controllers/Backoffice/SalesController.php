@@ -7,6 +7,8 @@ use App\Models\CashDrawerLog;
 use App\Models\PrintLog;
 use App\Models\TableOrder;
 use App\Models\TableOrderInvoice;
+use App\Models\TableOrderLog;
+use App\Models\User;
 use App\Services\DishCostEstimatorService;
 use App\Services\MysondFatturaService;
 use App\Services\TableOrderLoggerService;
@@ -162,6 +164,7 @@ class SalesController extends BaseController
             'items.dish.category',
             'items.dish.allergens',
             'items.materials',
+            'items.autoconsumoUser:id,name',
             'waiter',
             'closeLog.user',
             'precontoSplits',
@@ -171,6 +174,44 @@ class SalesController extends BaseController
             'corrispettivi.emissioneAnnullata',
         ])->withTrashed()
             ->findOrFail($id);
+
+        // Ricostruzione assegnazioni autoconsumo dal log (per autoconsumo parziale
+        // con item spezzati in qty pagata + qty autoconsumata, il flag su OrderItem
+        // non basta: la qty autoconsumata è tracciata solo nel log).
+        $autoconsumoType        = null;
+        $autoconsumoAssignments = collect();
+        $autoconsumoBreakdown   = [];
+        $autoconsumoUserNames   = collect();
+        if ($sale->autoconsumo) {
+            $autoconsumoLog = TableOrderLog::where('table_order_id', $id)
+                ->whereIn('action', ['autoconsumo', 'autoconsumo_partial'])
+                ->latest('id')
+                ->first();
+            if ($autoconsumoLog) {
+                $autoconsumoType = $autoconsumoLog->action;
+                $assignments = $autoconsumoLog->data_after['assignments'] ?? [];
+                $autoconsumoAssignments = collect($assignments)->keyBy('item_id');
+
+                $userIds = array_unique(array_column($assignments, 'user_id'));
+                $userNames = User::whereIn('id', $userIds)->pluck('name', 'id');
+                $autoconsumoUserNames = $userNames;
+                foreach ($assignments as $a) {
+                    $uid = $a['user_id'];
+                    $name = $userNames[$uid] ?? "Utente #{$uid}";
+                    $qty  = $a['actual_quantity'] ?? $a['quantity'] ?? 1;
+                    $itemId = $a['item_id'];
+                    $itemName = optional($sale->items->firstWhere('id', $itemId))->dish?->name ?? "Prodotto #{$itemId}";
+                    $autoconsumoBreakdown[$name][] = ['item' => $itemName, 'qty' => $qty];
+                }
+                // Aggiungi anche gli item con autoconsumo_user_id valorizzato (autoconsumo intero)
+                foreach ($sale->items as $it) {
+                    if ($it->autoconsumo_user_id && !$autoconsumoAssignments->has($it->id)) {
+                        $name = $it->autoconsumoUser?->name ?? "Utente #{$it->autoconsumo_user_id}";
+                        $autoconsumoBreakdown[$name][] = ['item' => $it->dish?->name ?? "Prodotto #{$it->id}", 'qty' => $it->quantity];
+                    }
+                }
+            }
+        }
 
         // Load logs for this sale
         $loggerService = new TableOrderLoggerService();
@@ -216,7 +257,8 @@ class SalesController extends BaseController
         return view('backoffice.sales.show', compact(
             'sale', 'logs', 'printLogs', 'cashDrawerLogs',
             'itemCostEstimates', 'totalEstimatedCost',
-            'estimatedMargin', 'marginPercent', 'costPercent'
+            'estimatedMargin', 'marginPercent', 'costPercent',
+            'autoconsumoType', 'autoconsumoAssignments', 'autoconsumoBreakdown', 'autoconsumoUserNames'
         ));
     }
 

@@ -326,6 +326,47 @@ window._boSale = {
                     </h4>
                 </div>
                 <div class="panel-body">
+                    @if($sale->autoconsumo)
+                        <div class="alert" style="background:#fff3cd; border-left:4px solid #ffc107; padding:12px 15px; margin-bottom:15px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                                <div>
+                                    <strong style="color:#856404;"><i class="fas fa-utensils"></i>
+                                        @if($autoconsumoType === 'autoconsumo_partial')
+                                            Autoconsumo parziale
+                                        @else
+                                            Autoconsumo completo
+                                        @endif
+                                    </strong>
+                                    @if($autoconsumoType === 'autoconsumo')
+                                        <span class="text-muted"> — l'intero ordine è stato marcato come autoconsumo (nessuna assegnazione per operatore)</span>
+                                    @endif
+                                </div>
+                            </div>
+                            @if(!empty($autoconsumoBreakdown))
+                                <hr style="margin:10px 0; border-color:#ffe69c;">
+                                <div style="display:flex; flex-wrap:wrap; gap:12px;">
+                                    @foreach($autoconsumoBreakdown as $userName => $entries)
+                                        @php
+                                            $totalQty = collect($entries)->sum('qty');
+                                        @endphp
+                                        <div style="background:#fff; border:1px solid #ffe69c; border-radius:4px; padding:8px 12px; min-width:180px;">
+                                            <div style="font-weight:700; color:#333; border-bottom:1px solid #eee; padding-bottom:4px; margin-bottom:4px;">
+                                                <i class="fas fa-user"></i> {{ $userName }}
+                                                <span class="badge badge-warning" style="float:right;">{{ $totalQty }} pz</span>
+                                            </div>
+                                            <ul style="list-style:none; padding:0; margin:0; font-size:0.85rem;">
+                                                @foreach($entries as $e)
+                                                    <li style="padding:2px 0;">
+                                                        <span style="color:#6c757d;">{{ $e['qty'] }}×</span> {{ $e['item'] }}
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @endif
                     @if($sale->items()->withTrashed()->get()->count() > 0)
                         <div class="table-responsive">
                             <table class="table table-striped table-bordered">
@@ -450,7 +491,26 @@ window._boSale = {
                                                     @endif
                                                 </td>
                                                 @if($sale->autoconsumo)
-                                                    <td>{{ $item->autoconsumoUser->name ?? 'Sconosciuto' }}</td>
+                                                    <td>
+                                                        @if($item->autoconsumoUser)
+                                                            <i class="fas fa-user text-warning"></i>
+                                                            <strong>{{ $item->autoconsumoUser->name }}</strong>
+                                                            <br><small class="text-muted">tutto ({{ $item->quantity }} pz)</small>
+                                                        @elseif($autoconsumoAssignments->has($item->id))
+                                                            @php
+                                                                $a = $autoconsumoAssignments->get($item->id);
+                                                                $aQty = $a['actual_quantity'] ?? $a['quantity'] ?? 1;
+                                                                $aName = $autoconsumoUserNames[$a['user_id']] ?? "Utente #{$a['user_id']}";
+                                                            @endphp
+                                                            <i class="fas fa-user text-warning"></i>
+                                                            <strong>{{ $aName }}</strong>
+                                                            <br><small class="text-muted">{{ $aQty }} pz autoconsumati</small>
+                                                        @elseif($autoconsumoType === 'autoconsumo')
+                                                            <span class="text-muted"><i class="fas fa-utensils"></i> Autoconsumo completo</span>
+                                                        @else
+                                                            <span class="text-muted">—</span>
+                                                        @endif
+                                                    </td>
                                                 @endif
                                                 <td class="text-right" style="font-weight: bold">
                                                     @php
