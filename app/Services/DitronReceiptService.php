@@ -347,23 +347,41 @@ final class DitronReceiptService implements ReceiptIssuerInterface
         $body = $response->json();
         $isOk = $response->successful() && (bool) ($body['ok'] ?? false);
 
+        // Recovery: WinEcrCom scrive nel .err warning transitori (es. EFPTR_WRONG_STATE=207)
+        // anche quando lo scontrino È stato effettivamente stampato. Se il chiamante ha
+        // registrato un raw_err ma l'agent ha comunque parlato con la cassa, interroghiamo
+        // GETP per vedere se un nuovo fiscal_number è stato emesso: in tal caso promuoviamo
+        // il record a sent con i dati fiscali reali.
+        $recovered = null;
+        if (!$isOk && !empty($body['raw_err'] ?? '')) {
+            $recovered = $this->tryRecoverFromCash($receipt);
+        }
+        $effectiveOk = $isOk || $recovered !== null;
+
         $receipt->update([
-            'status'         => $isOk ? DitronReceipt::STATUS_SENT : DitronReceipt::STATUS_FAILED,
+            'status'         => $effectiveOk ? DitronReceipt::STATUS_SENT : DitronReceipt::STATUS_FAILED,
             'receipt_number' => $body['receipt_number'] ?? null,
-            'fiscal_number'  => $body['fiscal_number'] ?? null,
-            'fiscal_date'    => isset($body['fiscal_date']) ? Carbon::parse($body['fiscal_date'])->toDateString() : null,
-            'z_number'       => $body['z_number'] ?? null,
-            'matricola'      => $body['matricola'] ?? null,
+            'fiscal_number'  => $recovered['fiscal_number'] ?? ($body['fiscal_number'] ?? null),
+            'fiscal_date'    => $this->pickFiscalDate($recovered, $body),
+            'z_number'       => $recovered['z_number'] ?? ($body['z_number'] ?? null),
+            'matricola'      => $recovered['matricola'] ?? ($body['matricola'] ?? null),
             'raw_command'    => $body['raw_command'] ?? null,
             'raw_err'        => $body['raw_err'] ?? null,
             'elapsed_ms'     => $body['elapsed_ms'] ?? null,
-            'last_error'     => $isOk ? null : ($body['error'] ?? ('http_' . $response->status())),
-            'sent_at'        => $isOk ? now() : null,
+            'last_error'     => $effectiveOk ? null : ($body['error'] ?? ('http_' . $response->status())),
+            'sent_at'        => $effectiveOk ? now() : null,
         ]);
 
-        $this->log($isOk ? 'info' : 'warning', $isOk ? 'Ditron emesso' : 'Ditron failed', $receipt->getLogContext() + [
+        $level = $effectiveOk ? 'info' : 'warning';
+        $msg = match (true) {
+            $isOk               => 'Ditron emesso',
+            $recovered !== null => 'Ditron emesso (recovered via GETP)',
+            default             => 'Ditron failed',
+        };
+        $this->log($level, $msg, $receipt->getLogContext() + [
             'status'     => $receipt->status,
             'elapsed_ms' => $receipt->elapsed_ms,
+            'recovered'  => $recovered !== null,
         ]);
     }
 
@@ -572,24 +590,127 @@ final class DitronReceiptService implements ReceiptIssuerInterface
         $body = $response->json();
         $isOk = $response->successful() && (bool) ($body['ok'] ?? false);
 
+        // Stessa logica di recovery via GETP applicata all'emissione: anche il DOCANNULLO
+        // (opcode 124) può ricevere warning WinEcrCom pur avendo stampato correttamente.
+        $recovered = null;
+        if (!$isOk && !empty($body['raw_err'] ?? '')) {
+            $recovered = $this->tryRecoverFromCash($cancel);
+        }
+        $effectiveOk = $isOk || $recovered !== null;
+
         $cancel->update([
-            'status'         => $isOk ? DitronReceipt::STATUS_SENT : DitronReceipt::STATUS_FAILED,
+            'status'         => $effectiveOk ? DitronReceipt::STATUS_SENT : DitronReceipt::STATUS_FAILED,
             'receipt_number' => $body['receipt_number'] ?? null,
-            'fiscal_number'  => $body['fiscal_number'] ?? null,
-            'fiscal_date'    => isset($body['fiscal_date']) ? Carbon::parse($body['fiscal_date'])->toDateString() : null,
-            'z_number'       => $body['z_number'] ?? null,
-            'matricola'      => $body['matricola'] ?? null,
+            'fiscal_number'  => $recovered['fiscal_number'] ?? ($body['fiscal_number'] ?? null),
+            'fiscal_date'    => $this->pickFiscalDate($recovered, $body),
+            'z_number'       => $recovered['z_number'] ?? ($body['z_number'] ?? null),
+            'matricola'      => $recovered['matricola'] ?? ($body['matricola'] ?? null),
             'raw_command'    => $body['raw_command'] ?? null,
             'raw_err'        => $body['raw_err'] ?? null,
             'elapsed_ms'     => $body['elapsed_ms'] ?? null,
-            'last_error'     => $isOk ? null : ($body['error'] ?? ('http_' . $response->status())),
-            'sent_at'        => $isOk ? now() : null,
+            'last_error'     => $effectiveOk ? null : ($body['error'] ?? ('http_' . $response->status())),
+            'sent_at'        => $effectiveOk ? now() : null,
         ]);
 
-        $this->log($isOk ? 'info' : 'warning', $isOk ? 'DOCANNULLO Ditron emesso' : 'DOCANNULLO Ditron failed', $cancel->getLogContext() + [
+        $level = $effectiveOk ? 'info' : 'warning';
+        $msg = match (true) {
+            $isOk               => 'DOCANNULLO Ditron emesso',
+            $recovered !== null => 'DOCANNULLO Ditron emesso (recovered via GETP)',
+            default             => 'DOCANNULLO Ditron failed',
+        };
+        $this->log($level, $msg, $cancel->getLogContext() + [
             'status'     => $cancel->status,
             'elapsed_ms' => $cancel->elapsed_ms,
+            'recovered'  => $recovered !== null,
         ]);
+    }
+
+    /**
+     * Interroga la cassa via GETP (prop 1 matricola, 10 num ultimo scontrino, 12 Z/data)
+     * per verificare se, nonostante l'agent abbia riportato errore, un nuovo documento
+     * fiscale è stato effettivamente emesso. È il fix per i warning transitori di WinEcrCom
+     * (es. EFPTR_WRONG_STATE=207) che appaiono nel .err ma non impediscono la stampa.
+     *
+     * Criterio: il fiscal_number letto dalla cassa deve essere strettamente maggiore
+     * dell'ultimo fiscal_number già registrato in `ditron_receipts` — significa che la
+     * cassa ha emesso qualcosa di nuovo dopo il nostro tentativo. Altrimenti restituisce
+     * null (non promuoviamo a sent).
+     *
+     * @return array{fiscal_number: string, fiscal_date: string, z_number: ?int, matricola: string}|null
+     */
+    private function tryRecoverFromCash(DitronReceipt $receipt): ?array
+    {
+        $lastKnown = (int) DitronReceipt::query()
+            ->where('id', '!=', $receipt->id)
+            ->whereNotNull('fiscal_number')
+            ->max('fiscal_number');
+
+        $props = $this->readProperties([1, 10, 12]);
+        if (!$props['ok']) {
+            return null;
+        }
+
+        $values     = (array) ($props['values'] ?? []);
+        $matricola  = $values[1] ?? null;
+        $fiscalStr  = $values[10] ?? null;
+        $lastZorDt  = $values[12] ?? null;
+
+        if (!$matricola || !$fiscalStr || !ctype_digit((string) $fiscalStr)) {
+            return null;
+        }
+
+        $fiscalNum = (int) $fiscalStr;
+        if ($fiscalNum <= $lastKnown) {
+            return null;
+        }
+
+        $zNumber = null;
+        $fiscalDate = null;
+        if ($lastZorDt !== null && ctype_digit((string) $lastZorDt)) {
+            $zNumber = (int) $lastZorDt;
+            $fiscalDate = now()->toDateString();
+        } elseif (!empty($lastZorDt)) {
+            try {
+                $fiscalDate = Carbon::parse($lastZorDt)->toDateString();
+            } catch (Throwable) {
+                $fiscalDate = now()->toDateString();
+            }
+        } else {
+            $fiscalDate = now()->toDateString();
+        }
+
+        $this->log('warning', 'Ditron recovery via GETP: scontrino emesso nonostante warning del WinEcrCom', $receipt->getLogContext() + [
+            'recovered_fiscal_number'  => $fiscalNum,
+            'recovered_z_number'       => $zNumber,
+            'recovered_matricola'      => $matricola,
+            'last_known_fiscal_number' => $lastKnown,
+        ]);
+
+        return [
+            'fiscal_number' => (string) $fiscalNum,
+            'fiscal_date'   => $fiscalDate,
+            'z_number'      => $zNumber,
+            'matricola'     => (string) $matricola,
+        ];
+    }
+
+    /**
+     * Sceglie la fiscal_date da persistere: preferisce quella del recovery se presente,
+     * altrimenti quella del body dell'agent.
+     */
+    private function pickFiscalDate(?array $recovered, ?array $body): ?string
+    {
+        if (isset($recovered['fiscal_date'])) {
+            return $recovered['fiscal_date'];
+        }
+        if (isset($body['fiscal_date'])) {
+            try {
+                return Carbon::parse($body['fiscal_date'])->toDateString();
+            } catch (Throwable) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private function isEnabled(): bool
