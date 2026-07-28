@@ -3226,9 +3226,10 @@ class TableOrdersManager {
             console.error('Cash drawer cancel error:', e);
         }
 
-        const onComplete = this._cashDrawerOnComplete;
+        // Annullo = nessun completamento: NON invocare onComplete, altrimenti in
+        // executePayment('chiusura_conto'/'contanti') partirebbe il /pay differito
+        // e il tavolo verrebbe chiuso nonostante l'annullo.
         this._hideCashDrawerOverlay();
-        if (onComplete) await onComplete();
     }
 
     _hideCashDrawerOverlay() {

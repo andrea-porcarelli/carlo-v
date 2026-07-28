@@ -199,6 +199,8 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/datatable-tables', [SalesController::class, 'datatable_tables'])->name('datatable.tables');
                 Route::get('/{id}', [SalesController::class, 'show'])->name('show');
                 Route::post('/export', [SalesController::class, 'export'])->name('export');
+                Route::patch('/{id}/payment-method', [SalesController::class, 'updatePaymentMethod'])->name('update-payment-method');
+                Route::post('/{id}/emit-fiscal-receipt', [SalesController::class, 'emitFiscalReceipt'])->name('emit-fiscal-receipt');
             });
 
             Route::group(['prefix' => '/table-order-invoices', 'as' => 'table-order-invoices.'], function() {

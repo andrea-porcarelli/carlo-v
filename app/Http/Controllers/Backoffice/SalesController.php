@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Backoffice;
 
 use App\Facades\Utils;
 use App\Models\CashDrawerLog;
+use App\Models\DitronReceipt;
 use App\Models\PrintLog;
 use App\Models\TableOrder;
 use App\Models\TableOrderInvoice;
 use App\Models\TableOrderLog;
 use App\Models\User;
 use App\Services\DishCostEstimatorService;
+use App\Services\DitronReceiptService;
 use App\Services\MysondFatturaService;
 use App\Services\TableOrderLoggerService;
 use App\Traits\DatatableTrait;
@@ -17,7 +19,9 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use Throwable;
 
 class SalesController extends BaseController
 {
@@ -596,5 +600,143 @@ class SalesController extends BaseController
         } catch (Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Cambia il metodo di pagamento di una vendita già chiusa.
+     * Azione riservata agli admin: aggiorna solo il campo `payment_method` sul
+     * TableOrder, non tocca gli scontrini fiscali già emessi (l'operatore
+     * eventualmente li annulla dal log Ditron e riemette col nuovo metodo).
+     */
+    public function updatePaymentMethod(int $id, Request $request, TableOrderLoggerService $logger): JsonResponse
+    {
+        if (Auth::user()?->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Operazione riservata agli amministratori.'], 403);
+        }
+
+        $validMethods = array_keys(TableOrder::paymentMethodLabels());
+        $data = $request->validate([
+            'payment_method' => ['required', 'string', 'in:' . implode(',', $validMethods)],
+            'reason'         => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $order = TableOrder::withTrashed()->findOrFail($id);
+
+        if ($order->status !== 'paid') {
+            return response()->json(['success' => false, 'message' => 'Il metodo di pagamento può essere modificato solo su vendite chiuse.'], 422);
+        }
+
+        $oldMethod = $order->payment_method;
+        if ($oldMethod === $data['payment_method']) {
+            return response()->json(['success' => false, 'message' => 'Il metodo di pagamento è già impostato su questo valore.'], 422);
+        }
+
+        $order->update(['payment_method' => $data['payment_method']]);
+
+        $labels = TableOrder::paymentMethodLabels();
+        $logger->log(
+            action: 'update_payment_method',
+            entityType: 'table_order',
+            entity: $order,
+            dataBefore: ['payment_method' => $oldMethod],
+            dataAfter:  ['payment_method' => $data['payment_method']],
+            notes: sprintf(
+                'Cambio metodo pagamento post-chiusura: %s → %s%s',
+                $labels[$oldMethod] ?? ($oldMethod ?? '—'),
+                $labels[$data['payment_method']] ?? $data['payment_method'],
+                !empty($data['reason']) ? ' | Motivo: ' . $data['reason'] : ''
+            ),
+            category: TableOrderLog::CATEGORY_ORDER,
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Metodo di pagamento aggiornato con successo.',
+        ]);
+    }
+
+    /**
+     * Emette manualmente uno scontrino fiscale Ditron su una vendita chiusa.
+     * Azione riservata agli admin. Blocca se esiste già una ricevuta attiva
+     * (pending/sending/sent non annullata): in tal caso occorre prima annullarla
+     * col DOCANNULLO dalla schermata di dettaglio ricevuta.
+     */
+    public function emitFiscalReceipt(int $id, Request $request, DitronReceiptService $ditron, TableOrderLoggerService $logger): JsonResponse
+    {
+        if (Auth::user()?->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Operazione riservata agli amministratori.'], 403);
+        }
+
+        $order = TableOrder::withTrashed()->findOrFail($id);
+
+        if ($order->status !== 'paid') {
+            return response()->json(['success' => false, 'message' => 'Lo scontrino fiscale può essere emesso solo su vendite chiuse.'], 422);
+        }
+
+        $paymentMethod = $order->payment_method;
+        if (!in_array($paymentMethod, ['contanti', 'pos'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lo scontrino fiscale è emettibile solo per pagamenti in contanti o POS. Cambia prima il metodo di pagamento.',
+            ], 422);
+        }
+
+        $activeSale = DitronReceipt::where('table_order_id', $order->id)
+            ->where('preconto_split_id', null)
+            ->where('type', DitronReceipt::TYPE_SALE)
+            ->whereIn('status', [
+                DitronReceipt::STATUS_PENDING,
+                DitronReceipt::STATUS_SENDING,
+                DitronReceipt::STATUS_SENT,
+            ])
+            ->whereNull('cancelled_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($activeSale) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Esiste già uno scontrino fiscale attivo (#' . $activeSale->id . ', stato: ' . $activeSale->getStatusLabel() . '). Annullalo prima di emetterne uno nuovo.',
+            ], 409);
+        }
+
+        try {
+            $dto = $ditron->emettiPerOrdine($order, $paymentMethod, Auth::id());
+        } catch (Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Emissione fiscale manuale fallita: ' . $e->getMessage(), [
+                'table_order_id' => $order->id,
+            ]);
+            return response()->json(['success' => false, 'message' => 'Errore durante l\'emissione: ' . $e->getMessage()], 500);
+        }
+
+        if ($dto === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Emissione saltata: provider Ditron non attivo o metodo non ammesso.',
+            ], 422);
+        }
+
+        $emittedReceipt = DitronReceipt::find($dto->id);
+        $logger->log(
+            action: 'emit_fiscal_receipt_manual',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: [
+                'payment_method'    => $paymentMethod,
+                'ditron_receipt_id' => $dto->id,
+                'receipt_status'    => $dto->status,
+                'fiscal_number'     => $emittedReceipt?->fiscal_number,
+            ],
+            notes: 'Emissione manuale scontrino fiscale da backoffice (metodo: ' . $paymentMethod . ')',
+            category: TableOrderLog::CATEGORY_ORDER,
+        );
+
+        $isSent = $dto->status === DitronReceipt::STATUS_SENT;
+        return response()->json([
+            'success' => $isSent,
+            'message' => $isSent
+                ? 'Scontrino fiscale emesso con successo.'
+                : 'Emissione richiesta ma non conclusa (stato: ' . $dto->status . '). Controlla il log Ditron.',
+        ], $isSent ? 200 : 202);
     }
 }

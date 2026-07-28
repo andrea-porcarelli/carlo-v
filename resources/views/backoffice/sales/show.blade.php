@@ -247,6 +247,122 @@ window._boSale = {
                     </table>
                 </div>
             </div>
+            @php
+                $isAdmin = auth()->user()?->role === 'admin';
+                $isPaid  = $sale->status === 'paid';
+                $activeDitronSale = $isPaid
+                    ? ($sale->ditronReceipts ?? collect())
+                        ->where('type', \App\Models\DitronReceipt::TYPE_SALE)
+                        ->whereIn('status', [
+                            \App\Models\DitronReceipt::STATUS_PENDING,
+                            \App\Models\DitronReceipt::STATUS_SENDING,
+                            \App\Models\DitronReceipt::STATUS_SENT,
+                        ])
+                        ->whereNull('preconto_split_id')
+                        ->filter(fn($r) => $r->cancelled_at === null)
+                        ->sortByDesc('id')
+                        ->first()
+                    : null;
+                $canEmitReceipt = $isPaid && in_array($sale->payment_method, ['contanti', 'pos'], true);
+            @endphp
+            @if($isPaid && $isAdmin)
+            <div class="panel panel-danger" style="margin-top: 15px;">
+                <div class="panel-heading">
+                    <h4 class="panel-title">
+                        <i class="fas fa-user-shield"></i> Azioni Amministrative
+                    </h4>
+                </div>
+                <div class="panel-body">
+                    <div class="alert alert-warning" style="padding:8px 12px; margin-bottom:12px; font-size:12px;">
+                        <i class="fa fa-exclamation-triangle"></i>
+                        <strong>Attenzione:</strong> operazioni delicate e <u>irreversibili</u> sulla vendita chiusa.
+                        Il cambio di metodo pagamento non annulla lo scontrino fiscale già emesso;
+                        annullalo prima dal log Ditron se necessario.
+                    </div>
+                    <div class="row" style="margin: -3px;">
+                        <div class="col-xs-12" style="padding: 3px;">
+                            <button type="button" class="btn btn-warning btn-block btn-sm" onclick="toggleModal('modalChangePaymentMethod')">
+                                <i class="fas fa-exchange-alt"></i> Cambia metodo di pagamento
+                            </button>
+                        </div>
+                        <div class="col-xs-12" style="padding: 3px;">
+                            <button type="button"
+                                    class="btn btn-primary btn-block btn-sm"
+                                    id="btnEmitFiscalReceipt"
+                                    @if(!$canEmitReceipt || $activeDitronSale) disabled @endif
+                                    @if($activeDitronSale)
+                                        title="Esiste già uno scontrino fiscale attivo (#{{ $activeDitronSale->id }}). Annullalo prima di emetterne uno nuovo."
+                                    @elseif(!$canEmitReceipt)
+                                        title="Emissione possibile solo per pagamenti in contanti o POS."
+                                    @endif>
+                                <i class="fas fa-print"></i> Emetti scontrino fiscale
+                            </button>
+                            @if($activeDitronSale)
+                                <small class="text-muted" style="display:block; margin-top:4px; font-size:11px;">
+                                    <i class="fa fa-info-circle"></i>
+                                    Scontrino attivo: #{{ $activeDitronSale->id }} — {{ $activeDitronSale->getStatusLabel() }}
+                                </small>
+                            @elseif(!$canEmitReceipt)
+                                <small class="text-muted" style="display:block; margin-top:4px; font-size:11px;">
+                                    <i class="fa fa-info-circle"></i>
+                                    Disponibile solo per metodi <em>Contanti</em> o <em>POS</em>.
+                                </small>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal: Cambio Metodo di Pagamento (admin) -->
+            <div id="modalChangePaymentMethod" class="log-modal" onclick="if(event.target===this)toggleModal('modalChangePaymentMethod')">
+                <div class="log-modal-content" style="max-width:520px;">
+                    <div class="log-modal-header" style="background:#d9534f;">
+                        <h5><i class="fas fa-exchange-alt"></i> Cambia metodo di pagamento</h5>
+                        <button type="button" onclick="toggleModal('modalChangePaymentMethod')" class="log-modal-close">&times;</button>
+                    </div>
+                    <div class="log-modal-body">
+                        <div class="alert alert-danger" style="padding:10px 12px;">
+                            <strong><i class="fa fa-exclamation-triangle"></i> Operazione irreversibile.</strong><br>
+                            Stai modificando il metodo di pagamento di una vendita <u>già chiusa</u>.
+                            Questa azione <strong>non annulla</strong> automaticamente lo scontrino fiscale
+                            eventualmente già emesso: se necessario, procedi prima con l'annullo dal log Ditron.
+                            L'operazione viene tracciata sul log operativo con il tuo utente.
+                        </div>
+                        <form id="formChangePaymentMethod">
+                            <div class="form-group">
+                                <label><strong>Metodo attuale:</strong>
+                                    <span class="label label-default" style="font-size:12px;">
+                                        {{ \App\Models\TableOrder::paymentMethodLabels()[$sale->payment_method] ?? ($sale->payment_method ?? '—') }}
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="selectNewPaymentMethod"><strong>Nuovo metodo di pagamento</strong></label>
+                                <select id="selectNewPaymentMethod" class="form-control" required>
+                                    <option value="">-- Seleziona metodo --</option>
+                                    @foreach(\App\Models\TableOrder::paymentMethodLabels() as $key => $label)
+                                        @if($key !== $sale->payment_method)
+                                            <option value="{{ $key }}">{{ $label }}</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="inputChangePaymentReason">Motivo (opzionale, verrà salvato nel log)</label>
+                                <textarea id="inputChangePaymentReason" class="form-control" rows="2" maxlength="500" placeholder="Es. errata registrazione contanti/POS al momento della chiusura"></textarea>
+                            </div>
+                            <div style="display:flex; gap:10px; margin-top:15px;">
+                                <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalChangePaymentMethod')">Annulla</button>
+                                <button type="submit" class="btn btn-danger" style="flex:2" id="btnConfirmChangePaymentMethod">
+                                    <i class="fa fa-check"></i> Conferma cambio
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             @if($isOpen)
             <div class="panel panel-warning" style="margin-top: 15px;">
                 <div class="panel-heading">
@@ -2546,6 +2662,99 @@ window._boSale = {
                 btn.innerHTML = originalText;
             });
         });
+        @if($sale->status === 'paid' && auth()->user()?->role === 'admin')
+        // --- Admin: cambio metodo di pagamento su vendita chiusa ---
+        (function() {
+            var form = document.getElementById('formChangePaymentMethod');
+            if (!form) return;
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                var select = document.getElementById('selectNewPaymentMethod');
+                var reasonEl = document.getElementById('inputChangePaymentReason');
+                var newMethod = select.value;
+                if (!newMethod) {
+                    alert('Seleziona un metodo di pagamento.');
+                    return;
+                }
+                var currentLabel = select.options[select.selectedIndex].text;
+                if (!confirm('Confermi il cambio metodo di pagamento in "' + currentLabel + '"?\n\nATTENZIONE: operazione IRREVERSIBILE. Lo scontrino fiscale eventualmente già emesso NON viene annullato.')) {
+                    return;
+                }
+                var btn = document.getElementById('btnConfirmChangePaymentMethod');
+                var original = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Aggiornamento…';
+                fetch('/backoffice/restaurant/sales/{{ $sale->id }}/payment-method', {
+                    method: 'PATCH',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        payment_method: newMethod,
+                        reason: reasonEl.value || null
+                    })
+                })
+                .then(function(r) { return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
+                .then(function(res) {
+                    if (res.ok && res.data.success) {
+                        alert(res.data.message || 'Metodo di pagamento aggiornato.');
+                        window.location.reload();
+                    } else {
+                        alert('Errore: ' + (res.data.message || 'operazione fallita'));
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    }
+                })
+                .catch(function() {
+                    alert('Errore di rete.');
+                    btn.disabled = false;
+                    btn.innerHTML = original;
+                });
+            });
+        })();
+
+        // --- Admin: emissione manuale scontrino fiscale ---
+        (function() {
+            var btn = document.getElementById('btnEmitFiscalReceipt');
+            if (!btn) return;
+            btn.addEventListener('click', function() {
+                if (btn.disabled) return;
+                if (!confirm('Confermi l\'emissione dello scontrino fiscale Ditron per questa vendita?\n\nATTENZIONE: azione IRREVERSIBILE. Verrà inviato alla cassa fiscale con il metodo di pagamento attualmente registrato.')) {
+                    return;
+                }
+                var original = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Emissione in corso…';
+                fetch('/backoffice/restaurant/sales/{{ $sale->id }}/emit-fiscal-receipt', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(function(r) { return r.json().then(function(d){ return {ok: r.ok, status: r.status, data: d}; }); })
+                .then(function(res) {
+                    var msg = res.data.message || (res.data.success ? 'Scontrino emesso.' : 'Operazione fallita.');
+                    alert(msg);
+                    if (res.data.success || res.status === 202) {
+                        window.location.reload();
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    }
+                })
+                .catch(function() {
+                    alert('Errore di rete durante l\'emissione.');
+                    btn.disabled = false;
+                    btn.innerHTML = original;
+                });
+            });
+        })();
+        @endif
+
         @if($hasInvoices)
         document.querySelectorAll('.btn-regenerate-invoice').forEach(function(btn) {
             btn.addEventListener('click', function() {
