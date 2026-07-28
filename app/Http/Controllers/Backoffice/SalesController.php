@@ -669,6 +669,10 @@ class SalesController extends BaseController
 
         $order = TableOrder::withTrashed()->findOrFail($id);
 
+        if ($order->trashed()) {
+            return response()->json(['success' => false, 'message' => 'Impossibile emettere scontrino: vendita cancellata.'], 422);
+        }
+
         if ($order->status !== 'paid') {
             return response()->json(['success' => false, 'message' => 'Lo scontrino fiscale può essere emesso solo su vendite chiuse.'], 422);
         }
@@ -700,8 +704,15 @@ class SalesController extends BaseController
             ], 409);
         }
 
+        // Suffix univoco per evitare collision sul UNIQUE `idempotency_key`: la key base
+        // è deterministica (order_id + closed_at) quindi verrebbe rifiutata se una ricevuta
+        // esiste già per lo stesso ordine (es. annullata via DOCANNULLO, o un tentativo
+        // precedente fallito). Usare timestamp con microsecondi per gestire riemissioni
+        // multiple ravvicinate.
+        $keySuffix = 'manual:' . now()->format('YmdHisu');
+
         try {
-            $dto = $ditron->emettiPerOrdine($order, $paymentMethod, Auth::id());
+            $dto = $ditron->emettiPerOrdine($order, $paymentMethod, Auth::id(), $keySuffix);
         } catch (Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Emissione fiscale manuale fallita: ' . $e->getMessage(), [
                 'table_order_id' => $order->id,

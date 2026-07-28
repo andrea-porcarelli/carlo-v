@@ -45,7 +45,7 @@ final class DitronReceiptService implements ReceiptIssuerInterface
         return 'ditron';
     }
 
-    public function emettiPerOrdine(TableOrder $order, string $paymentMethod, ?int $operatorId): ?IssuedReceiptDto
+    public function emettiPerOrdine(TableOrder $order, string $paymentMethod, ?int $operatorId, ?string $keySuffix = null): ?IssuedReceiptDto
     {
         if (!in_array($paymentMethod, self::PAYMENT_METHODS_ALLOWED, true)) {
             $this->log('info', 'Emissione Ditron saltata: metodo non ammesso (solo contanti/pos)', [
@@ -61,13 +61,23 @@ final class DitronReceiptService implements ReceiptIssuerInterface
             return null;
         }
 
+        // La idempotency_key base è deterministica su (order_id, closed_at). Per emissioni
+        // "extra" successive alla prima (es. riemissione manuale dopo DOCANNULLO o dopo un
+        // fallimento) il chiamante deve passare un `keySuffix` univoco, altrimenti l'INSERT
+        // fallirebbe sul vincolo UNIQUE della colonna idempotency_key.
+        $key = $this->idempotencyKeyForOrder($order);
+        if ($keySuffix !== null && $keySuffix !== '') {
+            $key .= ':' . $keySuffix;
+        }
+
         $payload = $this->buildPayloadForOrder($order, $paymentMethod);
+        $payload['idempotency_key'] = $key;
         $importo = $order->hasDiscount() ? (float) $order->getDiscountedTotal() : (float) $order->total_amount;
 
         $receipt = DitronReceipt::create([
             'table_order_id'    => $order->id,
             'preconto_split_id' => null,
-            'idempotency_key'   => $this->idempotencyKeyForOrder($order),
+            'idempotency_key'   => $key,
             'payment_method'    => $paymentMethod,
             'importo_totale'    => $importo,
             'status'            => DitronReceipt::STATUS_PENDING,
