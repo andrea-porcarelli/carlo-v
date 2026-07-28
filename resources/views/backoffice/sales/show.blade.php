@@ -1676,6 +1676,142 @@ window._boSale = {
         </div>
     </div>
 
+    <!-- Ditron Receipts / Logs Section -->
+    @php
+        $ditronReceipts = $sale->ditronReceipts ?? collect();
+        $statusBadgeDitron = [
+            \App\Models\DitronReceipt::STATUS_PENDING => 'default',
+            \App\Models\DitronReceipt::STATUS_SENDING => 'info',
+            \App\Models\DitronReceipt::STATUS_SENT    => 'success',
+            \App\Models\DitronReceipt::STATUS_FAILED  => 'danger',
+        ];
+    @endphp
+    @if($ditronReceipts->isNotEmpty())
+    <div class="row mt-4">
+        <div class="col-xs-12">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h4 class="panel-title" style="margin:0;">
+                        <i class="fa fa-print"></i> Log Ditron (scontrini fiscali)
+                        <span class="label label-default" style="margin-left:8px;">{{ $ditronReceipts->count() }}</span>
+                        @if($ditronReceipts->where('status', \App\Models\DitronReceipt::STATUS_FAILED)->count() > 0)
+                            <span class="label label-danger" style="margin-left:4px;">
+                                {{ $ditronReceipts->where('status', \App\Models\DitronReceipt::STATUS_FAILED)->count() }} falliti
+                            </span>
+                        @endif
+                        @if($ditronReceipts->where('type', \App\Models\DitronReceipt::TYPE_CANCEL)->count() > 0)
+                            <span class="label label-warning" style="margin-left:4px;">
+                                <i class="fa fa-ban"></i>
+                                {{ $ditronReceipts->where('type', \App\Models\DitronReceipt::TYPE_CANCEL)->count() }} annulli
+                            </span>
+                        @endif
+                    </h4>
+                </div>
+                <div class="panel-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-condensed table-hover table-striped">
+                            <thead>
+                                <tr class="active">
+                                    <th>Tipo</th>
+                                    <th>Data</th>
+                                    <th>Preconto</th>
+                                    <th>Pagamento</th>
+                                    <th class="text-right">Totale</th>
+                                    <th>N. Fiscale</th>
+                                    <th>Z / Matricola</th>
+                                    <th>Stato</th>
+                                    <th>Tentativi</th>
+                                    <th>Operatore</th>
+                                    <th>Dettagli</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($ditronReceipts as $dr)
+                                <tr>
+                                    <td>
+                                        @if($dr->isCancel())
+                                            <span class="label label-inverse">Annullo</span>
+                                            @if($dr->cancelsReceipt)
+                                                <small class="text-muted d-block">di #{{ $dr->cancelsReceipt->id }}</small>
+                                            @endif
+                                        @else
+                                            <span class="label label-primary">Vendita</span>
+                                            @if($dr->isCancelled())
+                                                <small class="text-danger d-block">
+                                                    <i class="fa fa-ban"></i> annullata
+                                                    @if($dr->cancelledByReceipt)
+                                                        da #{{ $dr->cancelledByReceipt->id }}
+                                                    @endif
+                                                </small>
+                                            @endif
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <small>{{ ($dr->sent_at ?? $dr->created_at)->format('d/m/Y H:i:s') }}</small>
+                                    </td>
+                                    <td>{{ $dr->precontoSplit?->label ?? '—' }}</td>
+                                    <td>{{ $dr->payment_method }}</td>
+                                    <td class="text-right">€{{ number_format((float)$dr->importo_totale, 2) }}</td>
+                                    <td>
+                                        @if($dr->fiscal_number)
+                                            <code>{{ $dr->fiscal_number }}</code>
+                                            @if($dr->fiscal_date)
+                                                <small class="text-muted d-block">{{ $dr->fiscal_date->format('d/m/Y') }}</small>
+                                            @endif
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($dr->z_number || $dr->matricola)
+                                            @if($dr->z_number)<small>Z: <code>{{ $dr->z_number }}</code></small>@endif
+                                            @if($dr->matricola)<small class="d-block text-muted">{{ $dr->matricola }}</small>@endif
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="label label-{{ $statusBadgeDitron[$dr->status] ?? 'default' }}">
+                                            {{ $dr->getStatusLabel() }}
+                                        </span>
+                                        @if($dr->last_error)
+                                            <i class="fa fa-exclamation-triangle text-danger" title="{{ $dr->last_error }}"></i>
+                                        @endif
+                                    </td>
+                                    <td>{{ $dr->attempts }}/{{ $dr->max_attempts }}</td>
+                                    <td>{{ $dr->operator?->name ?? '—' }}</td>
+                                    <td>
+                                        @if($dr->elapsed_ms)
+                                            <small class="text-muted">{{ $dr->elapsed_ms }} ms</small><br>
+                                        @endif
+                                        @if($dr->isCancelled() && $dr->cancelled_at)
+                                            <small class="text-danger">
+                                                Annullata: {{ $dr->cancelled_at->format('d/m/Y H:i') }}
+                                                @if($dr->cancelledByUser)
+                                                    da {{ $dr->cancelledByUser->name }}
+                                                @endif
+                                            </small>
+                                            @if($dr->cancel_reason)
+                                                <small class="d-block text-muted">{{ $dr->cancel_reason }}</small>
+                                            @endif
+                                        @endif
+                                        @if($dr->last_error)
+                                            <small class="text-danger d-block" style="word-break:break-word;">
+                                                {{ \Illuminate\Support\Str::limit($dr->last_error, 120) }}
+                                            </small>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <!-- Print History Modal -->
     <div id="printHistoryModal" class="log-modal" onclick="if(event.target === this) toggleModal('printHistoryModal')">
         <div class="log-modal-content">

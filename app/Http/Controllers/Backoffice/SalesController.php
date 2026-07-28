@@ -172,6 +172,11 @@ class SalesController extends BaseController
             'corrispettivi.precontoSplit',
             'corrispettivi.operator:id,name',
             'corrispettivi.emissioneAnnullata',
+            'ditronReceipts.operator:id,name',
+            'ditronReceipts.cancelledByUser:id,name',
+            'ditronReceipts.precontoSplit',
+            'ditronReceipts.cancelsReceipt',
+            'ditronReceipts.cancelledByReceipt',
         ])->withTrashed()
             ->findOrFail($id);
 
