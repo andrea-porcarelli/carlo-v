@@ -444,7 +444,7 @@ body {
 /* ===== NOTIFICATION STYLES ===== */
 .notification {
     position: fixed;
-    bottom: 20px;
+    top: 20px;
     left: 20px;
     max-width: 380px;
     background: white;
@@ -467,7 +467,7 @@ body {
 
 .notification.show {
     display: flex;
-    animation: slideInUp 0.3s ease-out;
+    animation: slideInDown 0.3s ease-out;
 }
 
 .notification::before {
@@ -525,9 +525,9 @@ body {
     font-weight: 700;
 }
 
-@keyframes slideInUp {
+@keyframes slideInDown {
     from {
-        transform: translateY(100px);
+        transform: translateY(-100px);
         opacity: 0;
     }
     to {
@@ -539,7 +539,7 @@ body {
 @keyframes fadeOut {
     to {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(-20px);
     }
 }
 

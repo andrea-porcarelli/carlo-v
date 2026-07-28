@@ -1541,7 +1541,7 @@ body.mobile-body #modifyReceiptItems .receipt-item-price {
 
 /* ===== NOTIFICATION (MOBILE) ===== */
 .mobile-body .notification {
-    bottom: 16px;
+    top: 16px;
     left: 12px;
     right: 12px;
     max-width: none;

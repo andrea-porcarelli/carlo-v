@@ -693,10 +693,45 @@ class TableOrdersManager {
         // For banco: toggle close buttons based on whether items exist
         this._updateBancoCloseButtons();
 
+        // Update MARCIA button state based on last_marcia_at
+        this._updateMarciaButtonState();
+
         // Show overlay
         const overlay = document.getElementById('modifyOrderOverlay');
         if (overlay) {
             overlay.style.display = 'block';
+        }
+    }
+
+    /**
+     * Update the "MARCIA" button to reflect whether the marcia was already sent.
+     * When last_marcia_at is set, show timestamp and dim the button so the
+     * operator can see it and avoid re-launching by mistake.
+     */
+    _updateMarciaButtonState() {
+        const btn = document.getElementById('btnMarciaTavolo');
+        if (!btn) return;
+        const lastAt = this.currentTable?.order?.last_marcia_at;
+        btn.replaceChildren();
+        const icon = document.createElement('i');
+        if (lastAt) {
+            const d = new Date(lastAt);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            icon.className = 'fas fa-check-circle';
+            btn.append(icon, ' MARCIA ');
+            const info = document.createElement('small');
+            info.style.opacity = '0.9';
+            info.style.fontWeight = '600';
+            info.textContent = `(inviata ${hh}:${mm})`;
+            btn.appendChild(info);
+            btn.style.background = '#6c757d';
+            btn.title = `Marcia già inviata alle ${hh}:${mm}`;
+        } else {
+            icon.className = 'fas fa-play-circle';
+            btn.append(icon, ' MARCIA');
+            btn.style.background = '#28a745';
+            btn.title = '';
         }
     }
 
@@ -4393,6 +4428,10 @@ class TableOrdersManager {
 
             if (result.success) {
                 this.showNotification('Marcia tavolo inviata con successo', 'success');
+                if (this.currentTable?.order) {
+                    this.currentTable.order.last_marcia_at = new Date().toISOString();
+                    this._updateMarciaButtonState();
+                }
             } else {
                 this.showNotification(result.message || 'Errore nell\'invio della marcia', 'error');
             }

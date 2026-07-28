@@ -23,6 +23,7 @@ use App\Models\InvoiceMysondLog;
 use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Models\TableOrderInvoice;
+use App\Models\TableOrderLog;
 use App\Models\User;
 use App\Interfaces\ReceiptIssuerInterface;
 use App\Services\MysondFatturaService;
@@ -236,6 +237,14 @@ class TableOrderController extends Controller
                 ->values()
                 ->all();
 
+            $lastMarciaAt = null;
+            if ($order) {
+                $lastMarciaAt = TableOrderLog::byTableOrder($order->id)
+                    ->byAction(TableOrderLog::ACTION_PRINT_MARCIA)
+                    ->latest('created_at')
+                    ->value('created_at');
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -249,6 +258,7 @@ class TableOrderController extends Controller
                         'covers' => $order->covers,
                         'autoconsumo' => (bool) $order->autoconsumo,
                         'has_preconto' => $order->preconto_requested_at !== null,
+                        'last_marcia_at' => $lastMarciaAt?->toIso8601String(),
                         'items_subtotal' => $order->getItemsSubtotal(),
                         'cover_charge_per_person' => $order->getCoverChargePerPerson(),
                         'cover_charge_total' => $order->getCoverChargeAmount(),
