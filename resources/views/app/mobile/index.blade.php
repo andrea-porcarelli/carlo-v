@@ -64,7 +64,7 @@
 
                 <!-- ORDINE (55%) -->
                 <div id="mobileOverlayOrderTab" style="flex:55 1 0; min-height:0; display:flex; flex-direction:column; overflow:hidden;">
-                    <div id="marciaBanner" style="display:none; padding:6px 10px; background:#fed7aa; border:2px solid #9a3412; color:#9a3412; border-radius:6px; font-weight:700; text-align:center; font-size:0.75rem; flex-shrink:0; margin-bottom:4px;">
+                    <div id="marciaBanner" style="display:none; padding:3px 8px; background:#fb923c; border:1px solid #7c2d12; color:#7c2d12; border-radius:4px; font-weight:700; text-align:center; font-size:0.68rem; flex-shrink:0; margin-bottom:3px;">
                         <i class="fas fa-check-circle me-1"></i>
                         <span id="marciaBannerText"></span>
                     </div>

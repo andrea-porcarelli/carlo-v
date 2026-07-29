@@ -64,7 +64,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div id="marciaBanner" style="display:none; margin:8px 12px 0; padding:8px 12px; background:#fed7aa; border:2px solid #9a3412; color:#9a3412; border-radius:6px; font-weight:700; text-align:center; font-size:0.9rem; flex-shrink:0;">
+                            <div id="marciaBanner" style="display:none; margin:6px 12px 0; padding:4px 10px; background:#fb923c; border:1px solid #7c2d12; color:#7c2d12; border-radius:4px; font-weight:700; text-align:center; font-size:0.78rem; flex-shrink:0;">
                                 <i class="fas fa-check-circle me-1"></i>
                                 <span id="marciaBannerText"></span>
                             </div>
