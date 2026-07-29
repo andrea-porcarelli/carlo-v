@@ -3367,15 +3367,16 @@ class TableOrdersManager {
             amount,
             this.currentTable.order.id,
             auth.token,
-            // onComplete: chiamato quando il poll del cassetto conferma l'operazione
-            () => {
+            // onComplete: chiamato dal polling quando il cassetto conferma, dal fallback,
+            // oppure direttamente quando l'integrazione cassetto è disabilitata (skipped).
+            // NON viene invocato in caso di annullo utente: il /pay deve stare qui, non in onReady,
+            // altrimenti l'annullo arriva sempre a tavolo già chiuso.
+            async () => {
                 if (this._paymentHandledByFallback) {
                     this._paymentHandledByFallback = false;
+                    this._afterPaymentSuccess();
+                    return;
                 }
-                this._afterPaymentSuccess();
-            },
-            // onReady: chiamato subito dopo l'apertura del cassetto, prima del polling
-            async () => {
                 try {
                     const response = await fetch(`${this.apiBase}/${tableId}/pay`, {
                         method: 'POST',
@@ -3389,17 +3390,17 @@ class TableOrdersManager {
                     const result = await response.json();
                     if (!result.success) {
                         this.showNotification(result.message || 'Errore nell\'incasso', 'error');
-                        return false;
+                        return;
                     }
                     this.showNotification(`Conto registrato: €${parseFloat(result.data.total_paid).toFixed(2)}`);
                     this._notifyCorrispettivoResult(result.data?.corrispettivo);
-                    return true;
+                    this._afterPaymentSuccess();
                 } catch (error) {
                     console.error('Error chiudi conto contanti:', error);
                     this.showNotification('Errore nell\'incasso', 'error');
-                    return false;
                 }
             },
+            null,
             tableId,
             null,
             'chiusura_conto'
