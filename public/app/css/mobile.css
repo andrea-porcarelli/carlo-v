@@ -138,7 +138,7 @@
 
 .mobile-tables-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 10px;
     padding: 15px;
     background: white;
@@ -1551,4 +1551,165 @@ body.mobile-body #modifyReceiptItems .receipt-item-price {
 .preconto-option-label {
     padding: 6px !important;
     transition: none !important;
+}
+
+/* ============================================================
+   LOG OPERATIVO — MOBILE
+   Layout full-viewport, single column, tabelle → liste verticali.
+   Attivato sempre su .mobile-body (la view mobile serve solo a mobile).
+   ============================================================ */
+
+body.mobile-body #operationalLogModal {
+    padding: 0 !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+}
+
+body.mobile-body #operationalLogModal > div {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+}
+
+/* Header: LOG OPERATIVO + data + X su una sola riga */
+body.mobile-body #operationalLogModal > div > div:first-child {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+}
+
+body.mobile-body #operationalLogModal h4 {
+    font-size: 0.9rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+body.mobile-body #operationalLogModal h4 .me-2 { margin-right: 4px !important; }
+
+body.mobile-body #operationalLogModal #logOpDate {
+    font-size: 0.75rem !important;
+    padding: 4px 6px !important;
+    max-width: 130px;
+    flex-shrink: 0;
+}
+
+body.mobile-body #operationalLogModal #closeOperationalLog {
+    flex-shrink: 0;
+    width: 32px !important;
+    height: 32px !important;
+}
+
+/* Body: single column, padding minimo, no overflow orizzontale */
+body.mobile-body #operationalLogModal #logOpBody {
+    grid-template-columns: 1fr !important;
+    padding: 8px !important;
+    gap: 8px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+body.mobile-body #operationalLogModal .logop-card {
+    padding: 10px 12px !important;
+}
+
+body.mobile-body #operationalLogModal .logop-card h6 {
+    font-size: 0.8rem !important;
+    margin-bottom: 8px !important;
+    letter-spacing: 0.3px !important;
+}
+
+/* Righe venduto / da incassare: flex a due colonne con troncamento label */
+body.mobile-body #operationalLogModal .logop-row {
+    padding: 5px 0 !important;
+    font-size: 0.82rem !important;
+    gap: 8px;
+    min-width: 0;
+}
+
+body.mobile-body #operationalLogModal .logop-row .label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 auto;
+}
+
+body.mobile-body #operationalLogModal .logop-row .value {
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+body.mobile-body #operationalLogModal .logop-row.total .label,
+body.mobile-body #operationalLogModal .logop-row.total .value {
+    font-size: 0.9rem !important;
+}
+
+body.mobile-body #operationalLogModal .logop-fiscale .value {
+    font-size: 0.75rem !important;
+}
+
+/* Tabelle articoli cancellati/modificati → lista verticale.
+   Ogni <tr> diventa una "card" con le celle impilate,
+   ogni <td> mostra la label (via data-label) a sx e il valore a dx. */
+
+body.mobile-body #operationalLogModal #logOpCancellati,
+body.mobile-body #operationalLogModal #logOpModificati {
+    max-height: 40vh;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+body.mobile-body #operationalLogModal .logop-table,
+body.mobile-body #operationalLogModal .logop-table tbody,
+body.mobile-body #operationalLogModal .logop-table tr {
+    display: block;
+    width: 100%;
+}
+
+body.mobile-body #operationalLogModal .logop-table thead { display: none; }
+
+body.mobile-body #operationalLogModal .logop-table tr {
+    padding: 8px 6px;
+    margin-bottom: 6px;
+    background: #1f1f1f;
+    border-radius: 6px;
+    border: 1px solid #2a2a2a;
+}
+
+body.mobile-body #operationalLogModal .logop-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 3px 0 !important;
+    border: none !important;
+    font-size: 0.8rem;
+    gap: 10px;
+    white-space: normal !important;
+    text-align: right;
+    word-break: break-word;
+}
+
+body.mobile-body #operationalLogModal .logop-table td::before {
+    content: attr(data-label);
+    color: #888;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    flex: 0 0 auto;
+    text-align: left;
+    font-weight: 600;
+}
+
+/* Celle senza data-label (fallback): nasconde solo la pseudo, mantiene contenuto */
+body.mobile-body #operationalLogModal .logop-table td:not([data-label])::before {
+    content: none;
 }

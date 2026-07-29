@@ -496,9 +496,9 @@ $(document).ready(function() {
             const groupTotal = items.reduce((s, t) => s + (t.amount || 0), 0);
             const tableRows = items.map(t =>
                 `<tr>
-                    <td><strong style="color:#fff;">${escapeHtml(String(t.table_number))}</strong></td>
-                    <td>${t.closed_at || '-'}</td>
-                    <td style="text-align:right; font-weight:600; font-variant-numeric:tabular-nums;">${fmtMoney(t.amount)}</td>
+                    <td data-label="Tavolo"><strong style="color:#fff;">${escapeHtml(String(t.table_number))}</strong></td>
+                    <td data-label="Chiuso">${t.closed_at || '-'}</td>
+                    <td data-label="Importo" style="text-align:right; font-weight:600; font-variant-numeric:tabular-nums;">${fmtMoney(t.amount)}</td>
                 </tr>`
             ).join('');
 
@@ -546,13 +546,13 @@ $(document).ready(function() {
         }
         const rows = list.map(r => `
             <tr>
-                <td>${r.time}</td>
-                <td>${r.table}</td>
-                <td>${escapeHtml(r.dish)}</td>
-                <td>${r.qty}</td>
-                <td>${r.price ? '€' + r.price : '-'}</td>
-                <td>${escapeHtml(r.reason)}</td>
-                <td>${escapeHtml(r.operator)}</td>
+                <td data-label="Ora">${r.time}</td>
+                <td data-label="Tavolo">${r.table}</td>
+                <td data-label="Piatto">${escapeHtml(r.dish)}</td>
+                <td data-label="Qtà">${r.qty}</td>
+                <td data-label="Prezzo">${r.price ? '€' + r.price : '-'}</td>
+                <td data-label="Motivo">${escapeHtml(r.reason)}</td>
+                <td data-label="Operatore">${escapeHtml(r.operator)}</td>
             </tr>`).join('');
         $('#logOpCancellati').html(`
             <table class="logop-table">
@@ -569,13 +569,13 @@ $(document).ready(function() {
         }
         const rows = list.map(r => `
             <tr>
-                <td>${r.time}</td>
-                <td>${r.table}</td>
-                <td>${escapeHtml(r.dish)}</td>
-                <td>${escapeHtml(r.field)}</td>
-                <td style="color:#dc3545;">${escapeHtml(String(r.old))}</td>
-                <td style="color:#28a745;">${escapeHtml(String(r.new))}</td>
-                <td>${escapeHtml(r.operator)}</td>
+                <td data-label="Ora">${r.time}</td>
+                <td data-label="Tavolo">${r.table}</td>
+                <td data-label="Piatto">${escapeHtml(r.dish)}</td>
+                <td data-label="Campo">${escapeHtml(r.field)}</td>
+                <td data-label="Da" style="color:#dc3545;">${escapeHtml(String(r.old))}</td>
+                <td data-label="A" style="color:#28a745;">${escapeHtml(String(r.new))}</td>
+                <td data-label="Operatore">${escapeHtml(r.operator)}</td>
             </tr>`).join('');
         $('#logOpModificati').html(`
             <table class="logop-table">

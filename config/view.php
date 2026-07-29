@@ -34,6 +34,6 @@ return [
     |
     */
 
-    'assets_version' => env('ASSETS_VERSION', '2026071303'),
+    'assets_version' => env('ASSETS_VERSION', '2026072901'),
 
 ];
