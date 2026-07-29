@@ -22,17 +22,9 @@ class OperatorAuthController extends Controller
         ]);
 
         try {
-            // Find user by password - check all operators
-            $users = User::whereIn('role', ['operator', 'admin'])->get();
-            $user = null;
-
-            foreach ($users as $potentialUser) {
-                // For admins: check authentication_pin (stored in plain text)
-                if ($potentialUser->authentication_pin === $validated['password']) {
-                    $user = $potentialUser;
-                    break;
-                }
-            }
+            $user = User::whereIn('role', ['operator', 'admin'])
+                ->where('authentication_pin', $validated['password'])
+                ->first();
 
             if (!$user) {
                 return response()->json([
@@ -41,10 +33,10 @@ class OperatorAuthController extends Controller
                 ], 401);
             }
 
-            // Generate a temporary token valid for current session
+            $this->purgeExpiredOperatorTokens();
+
             $token = base64_encode($user->id . ':' . time() . ':' . bin2hex(random_bytes(16)));
 
-            // Store in session for verification
             session(['operator_token_' . $token => [
                 'user_id' => $user->id,
                 'timestamp' => time(),
@@ -159,16 +151,9 @@ class OperatorAuthController extends Controller
         ]);
 
         try {
-            $users = User::where('role', 'admin')->get();
-            $user = null;
-
-            foreach ($users as $potentialUser) {
-                // Check against authentication_pin (stored in plain text) for admins
-                if ($potentialUser->authentication_pin === $validated['password']) {
-                    $user = $potentialUser;
-                    break;
-                }
-            }
+            $user = User::where('role', 'admin')
+                ->where('authentication_pin', $validated['password'])
+                ->first();
 
             if (!$user) {
                 return response()->json([
@@ -217,6 +202,24 @@ class OperatorAuthController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Rimuove dalla sessione i token operatore scaduti (TTL 1h) per evitare
+     * l'accumulo indefinito che degrada le performance del session store.
+     */
+    private function purgeExpiredOperatorTokens(): void
+    {
+        $now = time();
+        foreach (session()->all() as $key => $value) {
+            if (!is_string($key) || strncmp($key, 'operator_token_', 15) !== 0) {
+                continue;
+            }
+            $timestamp = is_array($value) ? ($value['timestamp'] ?? 0) : 0;
+            if ($now - (int) $timestamp > 3600) {
+                session()->forget($key);
+            }
+        }
     }
 
     /**

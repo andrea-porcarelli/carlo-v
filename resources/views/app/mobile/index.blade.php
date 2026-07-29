@@ -205,9 +205,15 @@
         /* Log operativo su mobile: layout single-column e paddings ridotti */
         @media (max-width: 767px) {
             #operationalLogModal > div { width: 100% !important; max-width: 100% !important; max-height: 100vh !important; height: 100vh; border-radius: 0 !important; border-width: 0 !important; }
-            #operationalLogModal #logOpBody { grid-template-columns: 1fr !important; padding: 12px !important; gap: 10px !important; }
+            #operationalLogModal #logOpBody { grid-template-columns: 1fr !important; padding: 12px !important; gap: 10px !important; overflow-x: hidden !important; }
             #operationalLogModal h4 { font-size: 1rem !important; }
             #operationalLogModal #logOpDate { font-size: 0.8rem !important; padding: 5px 8px !important; }
+            /* Le tabelle a 7 colonne (articoli cancellati/modificati) su mobile scrollano
+               internamente invece di far sforare l'intero modal. */
+            #operationalLogModal #logOpCancellati,
+            #operationalLogModal #logOpModificati { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            #operationalLogModal .logop-table th,
+            #operationalLogModal .logop-table td { white-space: nowrap; }
         }
     </style>
 
