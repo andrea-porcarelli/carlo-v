@@ -351,7 +351,7 @@ class SalesController extends BaseController
             }
         }
 
-        $totaleIncassato = $buckets['contanti'] + $buckets['pos'] + $buckets['fatture'];
+        $totaleIncassato = $buckets['contanti'] + $buckets['pos'] + $buckets['fatture'] + $buckets['chiusure_conto'];
 
         return response()->json(array_map(fn($v) => round($v, 2), $buckets) + [
             'totale_incassato' => round($totaleIncassato, 2),

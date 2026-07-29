@@ -116,7 +116,7 @@ class OperationalLogController extends Controller
         }
         unset($list);
 
-        $totaleIncassato = $buckets['contanti'] + $buckets['pos'] + $buckets['fatture'];
+        $totaleIncassato = $buckets['contanti'] + $buckets['pos'] + $buckets['fatture'] + $buckets['chiusure_conto'];
 
         return array_map(fn($v) => round($v, 2), $buckets) + [
             'totale_incassato' => round($totaleIncassato, 2),
