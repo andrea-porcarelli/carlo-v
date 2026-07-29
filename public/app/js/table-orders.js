@@ -1248,27 +1248,28 @@ class TableOrdersManager {
         if (quantityElement) quantityElement.value = 1;
         if (notesElement) notesElement.value = '';
 
-        // Populate extras and removals
+        // Populate extras and removals — nascondi l'intera sezione se non ci sono opzioni disponibili
+        const extrasSection = this.getElement('extrasSection');
+        const removalsSection = this.getElement('removalsSection');
         const extrasContainer = this.getElement('extrasContainer');
         const removalsContainer = this.getElement('removalsContainer');
 
-        if (extrasContainer) {
-            extrasContainer.innerHTML = this.menuOptions.extras.length
-                ? this.menuOptions.extras.map(e => `
-                    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
-                        <input type="checkbox" class="extra-checkbox" data-name="${e.label}" value="${e.price}" style="accent-color:#dc3545;">
-                        <span>${e.label}</span><span style="color:#dc3545;font-weight:700;">+€${parseFloat(e.price).toFixed(2)}</span>
-                    </label>`).join('')
-                : '<small style="color:#6c757d;">Nessun supplemento disponibile</small>';
+        if (extrasSection) extrasSection.style.display = this.menuOptions.extras.length ? '' : 'none';
+        if (extrasContainer && this.menuOptions.extras.length) {
+            extrasContainer.innerHTML = this.menuOptions.extras.map(e => `
+                <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
+                    <input type="checkbox" class="extra-checkbox" data-name="${e.label}" value="${e.price}" style="accent-color:#dc3545;">
+                    <span>${e.label}</span><span style="color:#dc3545;font-weight:700;">+€${parseFloat(e.price).toFixed(2)}</span>
+                </label>`).join('');
         }
-        if (removalsContainer) {
-            removalsContainer.innerHTML = this.menuOptions.removals.length
-                ? this.menuOptions.removals.map(r => `
-                    <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
-                        <input type="checkbox" class="removal-checkbox" data-name="${r.label}" value="${r.label}" style="accent-color:#dc3545;">
-                        <span>${r.label}</span>
-                    </label>`).join('')
-                : '<small style="color:#6c757d;">Nessuna rimozione disponibile</small>';
+
+        if (removalsSection) removalsSection.style.display = this.menuOptions.removals.length ? '' : 'none';
+        if (removalsContainer && this.menuOptions.removals.length) {
+            removalsContainer.innerHTML = this.menuOptions.removals.map(r => `
+                <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
+                    <input type="checkbox" class="removal-checkbox" data-name="${r.label}" value="${r.label}" style="accent-color:#dc3545;">
+                    <span>${r.label}</span>
+                </label>`).join('');
         }
 
         // Update total
@@ -1322,32 +1323,32 @@ class TableOrdersManager {
         const notesElement = this.getElement('productNotes');
         if (notesElement) notesElement.value = item.notes || '';
 
-        // Extras — pre-check existing
+        // Extras — pre-check existing; nascondi la sezione se nel menu non ci sono supplementi
+        const extrasSection = this.getElement('extrasSection');
         const extrasContainer = this.getElement('extrasContainer');
-        if (extrasContainer) {
-            extrasContainer.innerHTML = this.menuOptions.extras.length
-                ? this.menuOptions.extras.map(e => {
-                    const checked = item.extras && item.extras[e.label] !== undefined ? 'checked' : '';
-                    return `<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
-                        <input type="checkbox" class="extra-checkbox" data-name="${e.label}" value="${e.price}" style="accent-color:#dc3545;" ${checked}>
-                        <span>${e.label}</span><span style="color:#dc3545;font-weight:700;">+€${parseFloat(e.price).toFixed(2)}</span>
-                    </label>`;
-                }).join('')
-                : '<small style="color:#6c757d;">Nessun supplemento disponibile</small>';
+        if (extrasSection) extrasSection.style.display = this.menuOptions.extras.length ? '' : 'none';
+        if (extrasContainer && this.menuOptions.extras.length) {
+            extrasContainer.innerHTML = this.menuOptions.extras.map(e => {
+                const checked = item.extras && item.extras[e.label] !== undefined ? 'checked' : '';
+                return `<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
+                    <input type="checkbox" class="extra-checkbox" data-name="${e.label}" value="${e.price}" style="accent-color:#dc3545;" ${checked}>
+                    <span>${e.label}</span><span style="color:#dc3545;font-weight:700;">+€${parseFloat(e.price).toFixed(2)}</span>
+                </label>`;
+            }).join('');
         }
 
-        // Removals — pre-check existing
+        // Removals — pre-check existing; nascondi la sezione se nel menu non ci sono rimozioni
+        const removalsSection = this.getElement('removalsSection');
         const removalsContainer = this.getElement('removalsContainer');
-        if (removalsContainer) {
-            removalsContainer.innerHTML = this.menuOptions.removals.length
-                ? this.menuOptions.removals.map(r => {
-                    const checked = item.removals && item.removals.includes(r.label) ? 'checked' : '';
-                    return `<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
-                        <input type="checkbox" class="removal-checkbox" data-name="${r.label}" value="${r.label}" style="accent-color:#dc3545;" ${checked}>
-                        <span>${r.label}</span>
-                    </label>`;
-                }).join('')
-                : '<small style="color:#6c757d;">Nessuna rimozione disponibile</small>';
+        if (removalsSection) removalsSection.style.display = this.menuOptions.removals.length ? '' : 'none';
+        if (removalsContainer && this.menuOptions.removals.length) {
+            removalsContainer.innerHTML = this.menuOptions.removals.map(r => {
+                const checked = item.removals && item.removals.includes(r.label) ? 'checked' : '';
+                return `<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:5px 10px;border:1px solid #dee2e6;border-radius:20px;background:#f8f9fa;font-size:0.82rem;color:#000;white-space:nowrap;">
+                    <input type="checkbox" class="removal-checkbox" data-name="${r.label}" value="${r.label}" style="accent-color:#dc3545;" ${checked}>
+                    <span>${r.label}</span>
+                </label>`;
+            }).join('');
         }
 
         // Show "Cambia piatto" button in edit mode (only on desktop overlay)

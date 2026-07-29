@@ -108,7 +108,8 @@
             </div>
 
             <!-- Extras -->
-            <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
+            <div id="{{ $isMobile ? 'extrasSectionMobile' : 'extrasSection' }}"
+                 class="{{ $isMobile ? 'mobile-form-group' : '' }}"
                  style="{{ !$isMobile ? 'margin-bottom: 10px;' : '' }}"
             >
                 <label class="{{ $isMobile ? 'mobile-form-label' : '' }}"
@@ -123,7 +124,8 @@
             </div>
 
             <!-- Removals -->
-            <div class="{{ !$isMobile ? '' : 'mobile-form-group' }}"
+            <div id="{{ $isMobile ? 'removalsSectionMobile' : 'removalsSection' }}"
+                 class="{{ !$isMobile ? '' : 'mobile-form-group' }}"
                  style="{{ !$isMobile ? 'margin-bottom: 10px;' : '' }}"
             >
                 <label class="{{ $isMobile ? 'mobile-form-label' : '' }}"
