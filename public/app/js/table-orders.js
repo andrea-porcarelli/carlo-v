@@ -709,29 +709,21 @@ class TableOrdersManager {
      * operator can see it and avoid re-launching by mistake.
      */
     _updateMarciaButtonState() {
-        const btn = document.getElementById('btnMarciaTavolo');
-        if (!btn) return;
+        const banner = document.getElementById('marciaBanner');
+        const bannerText = document.getElementById('marciaBannerText');
+        if (!banner || !bannerText) return;
         const lastAt = this.currentTable?.order?.last_marcia_at;
-        btn.replaceChildren();
-        const icon = document.createElement('i');
         if (lastAt) {
             const d = new Date(lastAt);
             const hh = String(d.getHours()).padStart(2, '0');
             const mm = String(d.getMinutes()).padStart(2, '0');
-            icon.className = 'fas fa-check-circle';
-            btn.append(icon, ' MARCIA ');
-            const info = document.createElement('small');
-            info.style.opacity = '0.9';
-            info.style.fontWeight = '600';
-            info.textContent = `(inviata ${hh}:${mm})`;
-            btn.appendChild(info);
-            btn.style.background = '#6c757d';
-            btn.title = `Marcia già inviata alle ${hh}:${mm}`;
+            const operator = this.currentTable?.order?.last_marcia_operator;
+            const suffix = operator ? ` da ${operator}` : '';
+            bannerText.textContent = `Marcia inviata alle ${hh}:${mm}${suffix}`;
+            banner.style.display = '';
         } else {
-            icon.className = 'fas fa-play-circle';
-            btn.append(icon, ' MARCIA');
-            btn.style.background = '#28a745';
-            btn.title = '';
+            bannerText.textContent = '';
+            banner.style.display = 'none';
         }
     }
 
@@ -4432,6 +4424,7 @@ class TableOrdersManager {
                 this.showNotification('Marcia tavolo inviata con successo', 'success');
                 if (this.currentTable?.order) {
                     this.currentTable.order.last_marcia_at = new Date().toISOString();
+                    this.currentTable.order.last_marcia_operator = auth.user?.name ?? null;
                     this._updateMarciaButtonState();
                 }
             } else {

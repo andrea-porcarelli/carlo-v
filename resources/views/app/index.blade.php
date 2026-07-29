@@ -64,6 +64,10 @@
                                     </div>
                                 </div>
                             </div>
+                            <div id="marciaBanner" style="display:none; margin:8px 12px 0; padding:8px 12px; background:#fed7aa; border:2px solid #9a3412; color:#9a3412; border-radius:6px; font-weight:700; text-align:center; font-size:0.9rem; flex-shrink:0;">
+                                <i class="fas fa-check-circle me-1"></i>
+                                <span id="marciaBannerText"></span>
+                            </div>
                             <div id="modifyReceiptItems" style="flex:1;min-height:0;overflow-y:auto;padding:12px;">
                                 <div class="empty-state">
                                     <i class="fas fa-shopping-cart"></i>

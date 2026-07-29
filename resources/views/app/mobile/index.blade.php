@@ -64,6 +64,10 @@
 
                 <!-- ORDINE (55%) -->
                 <div id="mobileOverlayOrderTab" style="flex:55 1 0; min-height:0; display:flex; flex-direction:column; overflow:hidden;">
+                    <div id="marciaBanner" style="display:none; padding:6px 10px; background:#fed7aa; border:2px solid #9a3412; color:#9a3412; border-radius:6px; font-weight:700; text-align:center; font-size:0.75rem; flex-shrink:0; margin-bottom:4px;">
+                        <i class="fas fa-check-circle me-1"></i>
+                        <span id="marciaBannerText"></span>
+                    </div>
                     <div style="flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; background:white; border-radius:8px; padding:8px;" id="modifyReceiptItems">
                         <div class="empty-state">
                             <i class="fas fa-shopping-cart"></i>

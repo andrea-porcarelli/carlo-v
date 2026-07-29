@@ -238,11 +238,17 @@ class TableOrderController extends Controller
                 ->all();
 
             $lastMarciaAt = null;
+            $lastMarciaOperator = null;
             if ($order) {
-                $lastMarciaAt = TableOrderLog::byTableOrder($order->id)
+                $lastMarciaLog = TableOrderLog::byTableOrder($order->id)
                     ->byAction(TableOrderLog::ACTION_PRINT_MARCIA)
+                    ->with('user:id,name')
                     ->latest('created_at')
-                    ->value('created_at');
+                    ->first();
+                if ($lastMarciaLog) {
+                    $lastMarciaAt = $lastMarciaLog->created_at;
+                    $lastMarciaOperator = $lastMarciaLog->user?->name;
+                }
             }
 
             return response()->json([
@@ -259,6 +265,7 @@ class TableOrderController extends Controller
                         'autoconsumo' => (bool) $order->autoconsumo,
                         'has_preconto' => $order->preconto_requested_at !== null,
                         'last_marcia_at' => $lastMarciaAt?->toIso8601String(),
+                        'last_marcia_operator' => $lastMarciaOperator,
                         'items_subtotal' => $order->getItemsSubtotal(),
                         'cover_charge_per_person' => $order->getCoverChargePerPerson(),
                         'cover_charge_total' => $order->getCoverChargeAmount(),
