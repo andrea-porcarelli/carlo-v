@@ -5154,6 +5154,9 @@ class TableOrdersManager {
             const extrasTotal = this._itemExtrasTotal(item);
             const unitPrice = parseFloat(item.unit_price || 0) + extrasTotal;
             const subtotal = (0).toFixed(2);
+            const unitPriceBadge = unitPrice > 0
+                ? `<span style="font-size:0.75rem;color:#6c757d;margin-left:6px;">€${unitPrice.toFixed(2)}/cad.</span>`
+                : '';
             const extrasBadge = extrasTotal > 0
                 ? `<span style="font-size:0.72rem;color:#17a2b8;margin-left:4px;">(+€${extrasTotal.toFixed(2)} extra)</span>`
                 : '';
@@ -5161,7 +5164,7 @@ class TableOrdersManager {
                 ? `<span style="font-size:0.72rem;color:#fd7e14;margin-left:4px;">(${item._assigned} già in preconto)</span>`
                 : '';
             return `<div class="preconto-item-row" data-item-id="${item.id}">
-                <span class="preconto-item-name">${name}${extrasBadge}${alreadyBadge}</span>
+                <span class="preconto-item-name">${name}${unitPriceBadge}${extrasBadge}${alreadyBadge}</span>
                 <div style="display: flex; flex-direction: column">
                     <div class="preconto-qty-ctrl">
                         <button type="button" class="pqi-dec" data-item-id="${item.id}">−</button>
