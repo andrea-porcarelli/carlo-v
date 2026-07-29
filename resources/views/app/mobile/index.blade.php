@@ -205,15 +205,21 @@
         /* Log operativo su mobile: layout single-column e paddings ridotti */
         @media (max-width: 767px) {
             #operationalLogModal > div { width: 100% !important; max-width: 100% !important; max-height: 100vh !important; height: 100vh; border-radius: 0 !important; border-width: 0 !important; }
-            #operationalLogModal #logOpBody { grid-template-columns: 1fr !important; padding: 12px !important; gap: 10px !important; overflow-x: hidden !important; }
+            #operationalLogModal #logOpBody { grid-template-columns: 1fr !important; padding: 8px !important; gap: 8px !important; overflow-x: hidden !important; }
             #operationalLogModal h4 { font-size: 1rem !important; }
             #operationalLogModal #logOpDate { font-size: 0.8rem !important; padding: 5px 8px !important; }
+            #operationalLogModal .logop-card { padding: 10px !important; }
+            #operationalLogModal .logop-card h6 { font-size: 0.85rem !important; margin-bottom: 8px !important; letter-spacing: 0.5px !important; }
+            #operationalLogModal .logop-row { padding: 4px 0 !important; font-size: 0.82rem !important; }
+            #operationalLogModal .logop-row.total .label,
+            #operationalLogModal .logop-row.total .value { font-size: 0.9rem !important; }
             /* Le tabelle a 7 colonne (articoli cancellati/modificati) su mobile scrollano
                internamente invece di far sforare l'intero modal. */
             #operationalLogModal #logOpCancellati,
             #operationalLogModal #logOpModificati { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            #operationalLogModal .logop-table { font-size: 0.78rem !important; }
             #operationalLogModal .logop-table th,
-            #operationalLogModal .logop-table td { white-space: nowrap; }
+            #operationalLogModal .logop-table td { white-space: nowrap; padding: 4px 6px !important; }
         }
     </style>
 

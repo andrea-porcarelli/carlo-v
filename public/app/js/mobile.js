@@ -63,7 +63,8 @@ $(document).ready(function() {
         if (e.target.closest('.mobile-modal-body') ||
             e.target.closest('#modifyReceiptItems') ||
             e.target.closest('.dsm-categories-strip') ||
-            e.target.closest('.dsm-dishes-list')) {
+            e.target.closest('.dsm-dishes-list') ||
+            e.target.closest('#operationalLogModal')) {
             return;
         }
         const dy = e.touches[0].clientY - touchStartY;
