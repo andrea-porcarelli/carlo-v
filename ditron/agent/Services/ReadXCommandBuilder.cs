@@ -8,8 +8,11 @@ namespace DitronAgent.Services;
 
 /// <summary>
 /// Costruisce il comando WinEcrCom per una Lettura X giornaliera
-/// (opcode <c>azzgio tipo=1</c>): stampa i totali della giornata in corso
+/// (opcode <c>report num=2 modo=0</c>): stampa i totali della giornata in corso
 /// SENZA azzerare i contatori fiscali. Non ha valore fiscale.
+/// Attenzione: <c>azzgio</c> (opcode 27) è sempre un azzeramento Z, anche con
+/// <c>tipo=1</c> — usare esclusivamente <c>report</c> (opcode 26) con
+/// <c>modo=0</c> per la lettura X.
 /// </summary>
 public sealed class ReadXCommandBuilder : IReadXCommandBuilder
 {
@@ -27,7 +30,7 @@ public sealed class ReadXCommandBuilder : IReadXCommandBuilder
 
         if (_options.Mode == ReceiptMode.Fiscal)
         {
-            sb.AppendLine("azzgio tipo=1");
+            sb.AppendLine("report num=2 modo=0");
             return sb.ToString();
         }
 

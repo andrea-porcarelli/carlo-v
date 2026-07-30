@@ -28,7 +28,7 @@ Carlo V (Laravel)  ──HTTP POST /emit-receipt──▶  DitronAgent  ──fi
   ```json
   { "idempotency_key": "read_x:20260714_183045_abc123" }
   ```
-  In `Fiscal` emette `azzgio tipo=1`; in `NonFiscal` una simulazione `nofis`. Risposta simile a `/close-day`.
+  In `Fiscal` emette `report num=2 modo=0` (opcode 26, modo X = non azzera contatori); in `NonFiscal` una simulazione `nofis`. Risposta simile a `/close-day`. **Nota:** `azzgio` (opcode 27) è sempre una Z fiscale con azzeramento — non usarlo per la lettura X, anche con `tipo=1`.
 - `POST /emit-receipt` — corpo JSON:
   ```json
   {

@@ -38,8 +38,12 @@ class DishCostEstimatorService
             return $this->joinTablesCache;
         }
         $this->joinTablesCache = [
-            'sip' => Schema::hasTable('supplier_invoice_products') && Schema::hasColumn('supplier_invoice_products', 'quantity_multiplier'),
-            'eil' => Schema::hasTable('external_invoice_lines') && Schema::hasColumn('external_invoice_lines', 'quantity_multiplier'),
+            'sip' => Schema::hasColumn('material_stocks', 'supplier_invoice_product_id')
+                && Schema::hasTable('supplier_invoice_products')
+                && Schema::hasColumn('supplier_invoice_products', 'quantity_multiplier'),
+            'eil' => Schema::hasColumn('material_stocks', 'external_invoice_line_id')
+                && Schema::hasTable('external_invoice_lines')
+                && Schema::hasColumn('external_invoice_lines', 'quantity_multiplier'),
         ];
         return $this->joinTablesCache;
     }

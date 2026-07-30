@@ -234,7 +234,7 @@ class SalesController extends BaseController
 
         // Load cash drawer logs for this sale
         $cashDrawerLogs = CashDrawerLog::where('table_order_id', $id)
-            ->orderBy('created_at', 'asc')
+            ->orderBy('created_at', 'desc')
             ->get();
 
         // Stima costi materie prime per riga e totale (escluse righe cancellate)
