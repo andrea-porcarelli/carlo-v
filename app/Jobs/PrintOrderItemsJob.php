@@ -5,11 +5,14 @@ namespace App\Jobs;
 use App\Interfaces\PrinterServiceInterface;
 use App\Models\OrderItem;
 use App\Models\TableOrder;
+use App\Services\OperationalIncidentReporter;
+use App\Support\OperationalErrorCode;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 class PrintOrderItemsJob implements ShouldQueue
 {
@@ -70,5 +73,36 @@ class PrintOrderItemsJob implements ShouldQueue
                 ->whereNull('first_printed_at')
                 ->update(['first_printed_at' => now()]);
         }
+
+        if (!$ok) {
+            app(OperationalIncidentReporter::class)->report(
+                code:       OperationalErrorCode::PRINT_KITCHEN_FAILED,
+                context:    [
+                    'motivo'      => 'stampante non raggiungibile o errore ESC/POS',
+                    'operation'   => $this->operation,
+                    'items_count' => $items->count(),
+                ],
+                tableOrder: $tableOrder,
+                userId:     $this->operatorId,
+                source:     self::class,
+            );
+        }
+    }
+
+    public function failed(Throwable $e): void
+    {
+        $tableOrder = TableOrder::withTrashed()->find($this->tableOrderId);
+
+        app(OperationalIncidentReporter::class)->report(
+            code:            OperationalErrorCode::PRINT_KITCHEN_FAILED,
+            context:         [
+                'motivo'    => $e->getMessage() ?: 'errore imprevisto durante la stampa',
+                'operation' => $this->operation,
+            ],
+            tableOrder:      $tableOrder,
+            userId:          $this->operatorId,
+            source:          self::class,
+            technicalDetail: $e->getMessage(),
+        );
     }
 }

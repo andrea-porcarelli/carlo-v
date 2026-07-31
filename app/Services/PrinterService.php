@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\OperationalException;
 use App\Interfaces\PrinterServiceInterface;
 use App\Models\OrderItem;
 use App\Models\PrecontoSplit;
@@ -9,6 +10,7 @@ use App\Models\Printer;
 use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Models\User;
+use App\Support\OperationalErrorCode;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -473,6 +475,33 @@ class PrinterService implements PrinterServiceInterface
         }
 
         return false;
+    }
+
+    /**
+     * Verifica sincrona di raggiungibilità stampante che throw un
+     * OperationalException col codice adatto al ruolo indicato.
+     *
+     * $role: 'kitchen' | 'bar' | 'receipt' | 'preconto' (fallback → PRINT.KITCHEN.UNREACHABLE).
+     * Usato da chi vuole dare feedback immediato all'operatore prima ancora
+     * di accodare un Job di stampa.
+     */
+    public function assertPrinterReachable(Printer $printer, string $role = 'kitchen'): void
+    {
+        if ($this->isPrinterReachable($printer->ip)) {
+            return;
+        }
+
+        $code = match ($role) {
+            'bar'                  => OperationalErrorCode::PRINT_BAR_UNREACHABLE,
+            'receipt', 'preconto'  => OperationalErrorCode::PRINT_RECEIPT_UNREACHABLE,
+            default                => OperationalErrorCode::PRINT_KITCHEN_UNREACHABLE,
+        };
+
+        throw new OperationalException($code, [
+            'printer_id' => $printer->id,
+            'printer'    => $printer->label,
+            'ip'         => $printer->ip,
+        ]);
     }
 
     /**
@@ -1814,7 +1843,16 @@ class PrinterService implements PrinterServiceInterface
                     'response'   => $data,
                 ]);
                 return [
-                    'response' => false,
+                    'response'   => false,
+                    'error_code' => OperationalErrorCode::CASHDRAWER_VNE_REJECTED->value,
+                    'error'      => [
+                        'code'    => OperationalErrorCode::CASHDRAWER_VNE_REJECTED,
+                        'context' => [
+                            'motivo'   => $data['message'] ?? 'risposta negativa dal dispositivo',
+                            'response' => $data,
+                            'ip'       => $ip,
+                        ],
+                    ],
                 ];
             }
 
@@ -1827,8 +1865,22 @@ class PrinterService implements PrinterServiceInterface
                 'printer_ip' => $ip ?? 'N/D',
                 'error'      => $e->getMessage(),
             ]);
+            $isTimeout = str_contains(strtolower($e->getMessage()), 'timeout')
+                || $e instanceof \Illuminate\Http\Client\ConnectionException;
+            $code = $isTimeout
+                ? OperationalErrorCode::CASHDRAWER_VNE_TIMEOUT
+                : OperationalErrorCode::CASHDRAWER_VNE_UNREACHABLE;
+
             return [
-                'response' => false,
+                'response'   => false,
+                'error_code' => $code->value,
+                'error'      => [
+                    'code'    => $code,
+                    'context' => [
+                        'motivo' => $e->getMessage(),
+                        'ip'     => $ip,
+                    ],
+                ],
             ];
         }
     }

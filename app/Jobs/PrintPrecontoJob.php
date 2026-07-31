@@ -5,12 +5,15 @@ namespace App\Jobs;
 use App\Interfaces\PrinterServiceInterface;
 use App\Models\PrecontoSplit;
 use App\Models\TableOrder;
+use App\Services\OperationalIncidentReporter;
+use App\Support\OperationalErrorCode;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class PrintPrecontoJob implements ShouldQueue
 {
@@ -74,5 +77,35 @@ class PrintPrecontoJob implements ShouldQueue
             );
             Log::info('PrintPrecontoJob: printPreconto esito', ['table_order_id' => $tableOrder->id, 'ok' => $ok]);
         }
+
+        if (!$ok) {
+            app(OperationalIncidentReporter::class)->report(
+                code:       OperationalErrorCode::PRINT_PRECONTO_FAILED,
+                context:    [
+                    'motivo'   => 'stampante cassa non raggiungibile o errore ESC/POS',
+                    'split_id' => $this->splitId,
+                ],
+                tableOrder: $tableOrder,
+                userId:     $this->operatorId,
+                source:     self::class,
+            );
+        }
+    }
+
+    public function failed(Throwable $e): void
+    {
+        $tableOrder = TableOrder::find($this->tableOrderId);
+
+        app(OperationalIncidentReporter::class)->report(
+            code:            OperationalErrorCode::PRINT_PRECONTO_FAILED,
+            context:         [
+                'motivo'   => $e->getMessage() ?: 'errore imprevisto',
+                'split_id' => $this->splitId,
+            ],
+            tableOrder:      $tableOrder,
+            userId:          $this->operatorId,
+            source:          self::class,
+            technicalDetail: $e->getMessage(),
+        );
     }
 }

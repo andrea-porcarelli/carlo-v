@@ -27,10 +27,12 @@ use App\Models\TableOrderLog;
 use App\Models\User;
 use App\Interfaces\ReceiptIssuerInterface;
 use App\Services\MysondFatturaService;
+use App\Services\OperationalIncidentReporter;
 use App\Support\IssuedReceiptDto;
 use App\Services\RevolutPaymentCloser;
 use App\Services\RevolutTerminalService;
 use App\Services\TableOrderLoggerService;
+use App\Support\OperationalErrorCode;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -2285,10 +2287,28 @@ class TableOrderController extends Controller
                 ->update(['cash_drawer_operation_id' => $opened['operation_id']]);
         }
 
+        if (!$opened['response'] && isset($opened['error'])) {
+            $order = $table_order_id ? TableOrder::find($table_order_id) : null;
+            $incident = app(OperationalIncidentReporter::class)->report(
+                code:       $opened['error']['code'],
+                context:    $opened['error']['context'] ?? [],
+                tableOrder: $order,
+                userId:     $operatorId,
+                source:     'TableOrderController@openCashDrawer',
+            );
+            return response()->json([
+                'success'         => false,
+                'error_code'      => $incident->code,
+                'operator_message'=> $incident->operator_message,
+                'incident_id'     => $incident->id,
+                'message'         => $incident->operator_message,
+            ], 503);
+        }
+
         return response()->json([
             'success'      => $opened['response'],
             'operation_id' => $opened['operation_id'] ?? null,
-            'message'      => $opened['response'] ? 'Pagamento avviato' : 'Impossibile avviare il pagamento',
+            'message'      => 'Pagamento avviato',
         ]);
     }
 

@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Software Gestionale per Ristorazione — Proposta Commerciale</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #0F172A;
+    font-size: 11pt;
+    line-height: 1.5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  :root {
+    --navy-900: #0B1F4D;
+    --navy-800: #142B5E;
+    --navy-700: #1E3A8A;
+    --blue-600: #2563EB;
+    --blue-500: #3B82F6;
+    --blue-50:  #EFF6FF;
+    --blue-100: #DBEAFE;
+    --gold:     #D4A437;
+    --gold-light:#FCD34D;
+    --gold-soft:#FBF3DE;
+    --emerald:  #047857;
+    --emerald-soft:#D1FAE5;
+    --rose:     #BE123C;
+    --rose-soft:#FFE4E6;
+    --slate-900:#0F172A;
+    --slate-700:#334155;
+    --slate-600:#475569;
+    --slate-500:#64748B;
+    --slate-400:#94A3B8;
+    --slate-300:#CBD5E1;
+    --slate-200:#E2E8F0;
+    --slate-100:#F1F5F9;
+    --slate-50: #F8FAFC;
+    --white:    #FFFFFF;
+  }
+
+  @page { size: A4; margin: 0; }
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding: 18mm 16mm 16mm 16mm;
+    page-break-after: always;
+    position: relative;
+    background: #FFFFFF;
+    overflow: hidden;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ---------- Footer ---------- */
+  .page-footer {
+    position: absolute;
+    left: 16mm;
+    right: 16mm;
+    bottom: 8mm;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 8.5pt;
+    color: var(--slate-400);
+    letter-spacing: 0.02em;
+  }
+  .page-footer .brand-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  /* =====================================================
+     COVER PAGE
+     ===================================================== */
+  .cover {
+    padding: 0;
+    color: var(--white);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(59,130,246,0.55), transparent 60%),
+      radial-gradient(900px 700px at -10% 110%, rgba(212,164,55,0.22), transparent 55%),
+      linear-gradient(150deg, #0B1F4D 0%, #142B5E 45%, #1E3A8A 100%);
+  }
+  .cover-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    padding: 26mm 20mm 20mm 20mm;
+    display: flex;
+    flex-direction: column;
+  }
+  .cover-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 9pt;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: #BFDBFE;
+  }
+  .cover-eyebrow .bar {
+    display: inline-block;
+    width: 32px;
+    height: 2px;
+    background: var(--gold);
+  }
+  .cover-title {
+    margin: 22px 0 18px 0;
+    font-size: 52pt;
+    line-height: 1.02;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--white);
+  }
+  .cover-title .accent { color: var(--gold-light); }
+  .cover-sub {
+    font-size: 14pt;
+    line-height: 1.45;
+    font-weight: 400;
+    color: #CBD5E1;
+    max-width: 155mm;
+  }
+  .cover-rule {
+    margin: 32px 0 26px 0;
+    width: 64px;
+    height: 3px;
+    background: var(--gold);
+    border-radius: 2px;
+  }
+  .cover-modules {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    max-width: 170mm;
+  }
+  .cover-module-chip {
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(191,219,254,0.25);
+    color: #E0E7FF;
+  }
+  .cover-module-chip .n {
+    font-size: 8pt;
+    font-weight: 600;
+    letter-spacing: 0.20em;
+    color: var(--gold-light);
+    text-transform: uppercase;
+  }
+  .cover-module-chip .t {
+    margin-top: 6px;
+    font-size: 13pt;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: -0.01em;
+  }
+  .cover-stats {
+    margin-top: auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(191,219,254,0.2);
+  }
+  .cover-stat .n {
+    font-size: 26pt;
+    font-weight: 800;
+    color: var(--gold-light);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .cover-stat .l {
+    margin-top: 8px;
+    font-size: 9pt;
+    color: #CBD5E1;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 500;
+  }
+  .cover-footer {
+    margin-top: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    color: #94A3B8;
+    font-size: 9pt;
+  }
+  .cover-footer .doc {
+    color: #E0E7FF;
+    font-weight: 600;
+    font-size: 10pt;
+    letter-spacing: 0.05em;
+  }
+  .cover-mark {
+    position: absolute;
+    top: 26mm;
+    right: 20mm;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #E0E7FF;
+    font-size: 10pt;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .cover-mark .diamond {
+    width: 14px;
+    height: 14px;
+    background: var(--gold-light);
+    transform: rotate(45deg);
+    box-shadow: 0 4px 12px rgba(252,211,77,0.35);
+  }
+
+  /* =====================================================
+     STANDARD CONTENT PAGE
+     ===================================================== */
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--slate-200);
+  }
+  .page-header .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 9pt;
+    font-weight: 700;
+    color: var(--navy-900);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .page-header .brand-diamond {
+    width: 10px;
+    height: 10px;
+    background: var(--gold);
+    transform: rotate(45deg);
+  }
+  .page-header .kicker {
+    font-size: 8.5pt;
+    color: var(--slate-500);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* ---------- Module page ---------- */
+  .module-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    background: var(--blue-50);
+    border: 1px solid var(--blue-100);
+    color: var(--navy-700);
+    border-radius: 999px;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .module-badge .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--navy-700);
+    color: var(--gold-light);
+    font-size: 10pt;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+  h1.module-title {
+    margin: 14px 0 6px 0;
+    font-size: 34pt;
+    font-weight: 800;
+    color: var(--navy-900);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+  h1.module-title .name {
+    color: var(--gold);
+  }
+  .module-sub {
+    font-size: 12pt;
+    color: var(--slate-600);
+    max-width: 165mm;
+    margin-bottom: 22px;
+    line-height: 1.5;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 62mm;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .features {
+    background: var(--slate-50);
+    border: 1px solid var(--slate-200);
+    border-radius: 14px;
+    padding: 18px 20px 20px 20px;
+  }
+  .features h3 {
+    margin: 0 0 12px 0;
+    font-size: 10pt;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--slate-500);
+    font-weight: 700;
+  }
+  .features ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .features li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 7px 0;
+    font-size: 10.5pt;
+    color: var(--slate-900);
+    line-height: 1.45;
+    border-bottom: 1px dashed var(--slate-200);
+  }
+  .features li:last-child { border-bottom: none; }
+  .features li .check {
+    flex-shrink: 0;
+    margin-top: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--emerald-soft);
+    color: var(--emerald);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9pt;
+    font-weight: 800;
+  }
+  .features li b {
+    color: var(--navy-800);
+    font-weight: 700;
+  }
+
+  .features.inherited {
+    background: linear-gradient(180deg, #FEF9E7 0%, #FBF3DE 100%);
+    border-color: #F0DBA1;
+  }
+  .features.inherited h3 { color: #8A6A15; }
+  .features.inherited li .check {
+    background: #FBF3DE;
+    color: #8A6A15;
+    border: 1px solid #E5C46A;
+  }
+
+  /* ---------- Price card ---------- */
+  .price-card {
+    background: linear-gradient(160deg, #0B1F4D 0%, #142B5E 55%, #1E3A8A 100%);
+    color: #FFFFFF;
+    border-radius: 16px;
+    padding: 22px 20px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(11,31,77,0.18);
+  }
+  .price-card::before {
+    content: "";
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 140px;
+    height: 140px;
+    background: radial-gradient(circle, rgba(252,211,77,0.20), transparent 65%);
+    border-radius: 50%;
+  }
+  .price-card .label {
+    font-size: 8.5pt;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+    font-weight: 700;
+  }
+  .price-card .initial {
+    margin-top: 14px;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .price-card .initial .amt {
+    font-size: 30pt;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #FFFFFF;
+  }
+  .price-card .initial .cur {
+    font-size: 16pt;
+    font-weight: 700;
+    color: var(--gold-light);
+  }
+  .price-card .initial .tag {
+    margin-left: 6px;
+    font-size: 8.5pt;
+    color: #CBD5E1;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .price-card .divider {
+    margin: 14px 0;
+    height: 1px;
+    background: rgba(191,219,254,0.20);
+  }
+  .price-card .monthly {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .price-card .monthly .amt {
+    font-size: 26pt;
+    font-weight: 800;
+    color: #FFFFFF;
+    letter-spacing: -0.02em;
+  }
+  .price-card .monthly .cur {
+    font-size: 14pt;
+    font-weight: 700;
+    color: var(--gold-light);
+  }
+  .price-card .monthly .per {
+    font-size: 10pt;
+    color: #CBD5E1;
+    font-weight: 500;
+    margin-left: 2px;
+  }
+  .price-card .terms {
+    margin-top: 14px;
+    font-size: 8.5pt;
+    color: #BFDBFE;
+    line-height: 1.5;
+  }
+  .price-card .terms .row {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    padding: 3px 0;
+  }
+  .price-card .terms .row .k {
+    color: var(--gold-light);
+    font-weight: 700;
+    font-size: 9pt;
+  }
+
+  /* ---------- Requirements block ---------- */
+  .requires {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: #FFF7ED;
+    border-left: 3px solid #F59E0B;
+    border-radius: 6px;
+    font-size: 9.5pt;
+    color: #7C2D12;
+  }
+  .requires b { color: #78350F; }
+
+  /* =====================================================
+     COMPARISON PAGE
+     ===================================================== */
+  h1.page-title {
+    font-size: 24pt;
+    font-weight: 800;
+    color: var(--navy-900);
+    letter-spacing: -0.02em;
+    margin: 0 0 4px 0;
+  }
+  .page-lead {
+    font-size: 10.5pt;
+    color: var(--slate-600);
+    max-width: 170mm;
+    margin-bottom: 14px;
+  }
+
+  .cmp-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 9.5pt;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 18px rgba(15,23,42,0.06);
+  }
+  .cmp-table th, .cmp-table td {
+    padding: 7px 12px;
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--slate-200);
+  }
+  .cmp-table thead th {
+    background: var(--navy-900);
+    color: #FFFFFF;
+    font-size: 9pt;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+    border-bottom: none;
+  }
+  .cmp-table thead th.mod-1 { background: var(--navy-800); }
+  .cmp-table thead th.mod-2 { background: var(--navy-700); }
+  .cmp-table thead th.mod-3 {
+    background: linear-gradient(135deg, #B8860B, var(--gold));
+    color: #FFFFFF;
+  }
+  .cmp-table tbody tr:nth-child(even) { background: var(--slate-50); }
+  .cmp-table tbody tr:hover { background: var(--blue-50); }
+  .cmp-table .feat {
+    color: var(--slate-900);
+    font-weight: 600;
+    width: 42%;
+  }
+  .cmp-table .mark {
+    text-align: center;
+    font-size: 13pt;
+    font-weight: 800;
+  }
+  .cmp-table .mark.yes { color: var(--emerald); }
+  .cmp-table .mark.no  { color: var(--slate-300); }
+  .cmp-table tfoot td {
+    background: var(--slate-100);
+    font-weight: 700;
+    font-size: 10.5pt;
+    color: var(--navy-900);
+    padding: 9px 12px;
+  }
+  .cmp-table tfoot .price-row td { padding-top: 5px; padding-bottom: 5px; }
+  .cmp-table tfoot .price-init { color: var(--navy-700); font-size: 11.5pt; }
+  .cmp-table tfoot .price-mon  { color: var(--gold); font-size: 12pt; }
+
+  .conditions {
+    margin-top: 14px;
+    background: var(--slate-50);
+    border: 1px solid var(--slate-200);
+    border-radius: 12px;
+    padding: 12px 18px 14px 18px;
+  }
+  .conditions h3 {
+    margin: 0 0 6px 0;
+    font-size: 9.5pt;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--navy-800);
+    font-weight: 700;
+  }
+  .conditions ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 9.5pt;
+    color: var(--slate-700);
+    line-height: 1.45;
+  }
+  .conditions li { padding: 2px 0; }
+  .conditions li b { color: var(--navy-900); }
+
+  .final-cta {
+    margin-top: 12px;
+    background: linear-gradient(120deg, #0B1F4D 0%, #1E3A8A 100%);
+    color: #FFFFFF;
+    border-radius: 12px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+  }
+  .final-cta .t {
+    font-size: 11pt;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .final-cta .s {
+    font-size: 9pt;
+    color: #BFDBFE;
+    margin-top: 3px;
+  }
+  .final-cta .cta-mark {
+    padding: 7px 13px;
+    background: var(--gold-light);
+    color: #422006;
+    font-weight: 800;
+    font-size: 9pt;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     PAGE 1 - COVER
+     ============================================================ -->
+<section class="page cover">
+  <div class="cover-inner">
+    <div class="cover-mark">
+      <span class="diamond"></span>
+      <span>Proposta Commerciale</span>
+    </div>
+
+    <div class="cover-eyebrow">
+      <span class="bar"></span>
+      <span>Software gestionale per la ristorazione</span>
+    </div>
+
+    <h1 class="cover-title">
+      Tre moduli.<br>
+      Un'unica <span class="accent">piattaforma.</span>
+    </h1>
+
+    <p class="cover-sub">
+      Una soluzione modulare pensata per crescere insieme al tuo ristorante:
+      dalla gestione delle comande e della fatturazione elettronica fino al controllo
+      completo di contabilità, magazzino e food cost.
+    </p>
+
+    <div class="cover-rule"></div>
+
+    <div class="cover-modules">
+      <div class="cover-module-chip">
+        <div class="n">Modulo 01</div>
+        <div class="t">Essential</div>
+      </div>
+      <div class="cover-module-chip">
+        <div class="n">Modulo 02</div>
+        <div class="t">Business</div>
+      </div>
+      <div class="cover-module-chip">
+        <div class="n">Modulo 03</div>
+        <div class="t">Premium</div>
+      </div>
+    </div>
+
+    <div class="cover-stats">
+      <div class="cover-stat">
+        <div class="n">3</div>
+        <div class="l">Livelli di offerta</div>
+      </div>
+      <div class="cover-stat">
+        <div class="n">24</div>
+        <div class="l">Mesi di canone minimo</div>
+      </div>
+      <div class="cover-stat">
+        <div class="n">100%</div>
+        <div class="l">Assistenza e aggiornamenti inclusi</div>
+      </div>
+    </div>
+
+    <div class="cover-footer">
+      <div>
+        <div class="doc">Offerta commerciale</div>
+        <div style="margin-top:4px;">Documento riservato — valido 30 giorni</div>
+      </div>
+      <div style="text-align:right;">
+        <div>Rif. Offerta</div>
+        <div style="color:#E0E7FF; font-weight:600; margin-top:4px;">2026 / MOD-3T</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 2 - MODULO 1 ESSENTIAL
+     ============================================================ -->
+<section class="page">
+  <header class="page-header">
+    <div class="brand">
+      <span class="brand-diamond"></span>
+      Software Gestionale Ristorazione
+    </div>
+    <div class="kicker">Modulo 01 · Essential</div>
+  </header>
+
+  <div class="module-badge">
+    <span class="num">1</span>
+    <span>Modulo Essential</span>
+  </div>
+
+  <h1 class="module-title">Comande <span class="name">& Fatturazione</span></h1>
+  <p class="module-sub">
+    Il cuore operativo del ristorante: gestione dei tavoli, presa delle comande,
+    stampe di cucina e bar, incassi e fatturazione elettronica. Tutto ciò che serve
+    per aprire, gestire e chiudere il servizio ogni giorno.
+  </p>
+
+  <div class="content-grid">
+    <div class="features">
+      <h3>Cosa comprende</h3>
+      <ul>
+        <li><span class="check">✓</span><span><b>Gestione tavoli e sala</b> con planimetria dinamica, apertura conto e coperti.</span></li>
+        <li><span class="check">✓</span><span><b>Presa comande da tablet o PC</b> con stampa automatica in cucina e al bar.</span></li>
+        <li><span class="check">✓</span><span><b>Varianti piatto</b> (extra / senza / segue) e note libere per ogni portata.</span></li>
+        <li><span class="check">✓</span><span><b>Modalità Banco</b> per vendite al banco, asporto e ordini rapidi.</span></li>
+        <li><span class="check">✓</span><span><b>Split del conto</b> per persone o per importi con emissione documenti separati.</span></li>
+        <li><span class="check">✓</span><span><b>Chiusura conto multi-tender</b>: contanti, POS, bonifico, buoni pasto.</span></li>
+        <li><span class="check">✓</span><span><b>Scontrino fiscale</b> con integrazione al Registratore Telematico.</span></li>
+        <li><span class="check">✓</span><span><b>Fattura elettronica</b> con invio automatico allo SDI.</span></li>
+        <li><span class="check">✓</span><span><b>Operatori con PIN</b> e permessi granulari per ogni azione.</span></li>
+        <li><span class="check">✓</span><span><b>Log operativo</b> completo di ogni operazione e chiusura giornaliera.</span></li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="price-card">
+        <div class="label">Investimento</div>
+        <div class="initial">
+          <span class="amt">650</span><span class="cur">€</span>
+          <span class="tag">Una tantum</span>
+        </div>
+        <div class="divider"></div>
+        <div class="monthly">
+          <span class="amt">120</span><span class="cur">€</span>
+          <span class="per">/ mese</span>
+        </div>
+        <div class="terms">
+          <div class="row"><span class="k">▸</span><span>Durata minima <b style="color:#fff">24 mesi</b></span></div>
+          <div class="row"><span class="k">▸</span><span>Assistenza e aggiornamenti <b style="color:#fff">inclusi</b></span></div>
+          <div class="row"><span class="k">▸</span><span>Prezzi IVA esclusa</span></div>
+        </div>
+      </div>
+
+      <div class="requires">
+        <b>Requisito:</b> per l'emissione automatica della fattura elettronica
+        è necessaria l'integrazione con il portale <b>MySond</b>.
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Offerta commerciale · Modulo Essential</div>
+    <div>Pagina 2 di 5</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 3 - MODULO 2 BUSINESS
+     ============================================================ -->
+<section class="page">
+  <header class="page-header">
+    <div class="brand">
+      <span class="brand-diamond"></span>
+      Software Gestionale Ristorazione
+    </div>
+    <div class="kicker">Modulo 02 · Business</div>
+  </header>
+
+  <div class="module-badge">
+    <span class="num">2</span>
+    <span>Modulo Business</span>
+  </div>
+
+  <h1 class="module-title">Contabilità <span class="name">integrata</span></h1>
+  <p class="module-sub">
+    Tutte le funzionalità del Modulo Essential, arricchite dagli strumenti di
+    contabilità: gestione delle fatture in ingresso e in uscita, anagrafiche
+    centralizzate di clienti e fornitori, scadenzario incassi e pagamenti.
+  </p>
+
+  <div class="content-grid">
+    <div>
+      <div class="features inherited" style="margin-bottom:14px;">
+        <h3>Include tutto il Modulo Essential</h3>
+        <ul>
+          <li><span class="check">✓</span><span>Comande, tavoli, stampe di cucina e bar.</span></li>
+          <li><span class="check">✓</span><span>Scontrino fiscale e fatturazione elettronica.</span></li>
+          <li><span class="check">✓</span><span>Cassa automatica, split conto, operatori con PIN.</span></li>
+        </ul>
+      </div>
+
+      <div class="features">
+        <h3>In più, con il modulo Business</h3>
+        <ul>
+          <li><span class="check">✓</span><span><b>Fatture di vendita</b>: emissione, gestione clienti e scadenzario incassi.</span></li>
+          <li><span class="check">✓</span><span><b>Fatture di acquisto</b>: registrazione, gestione fornitori e pagamenti.</span></li>
+          <li><span class="check">✓</span><span><b>Anagrafiche</b> clienti e fornitori centralizzate.</span></li>
+          <li><span class="check">✓</span><span><b>Integrazione Cassa automatica contanti VNE</b> con gestione resto e riconciliazione.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <div class="price-card">
+        <div class="label">Investimento</div>
+        <div class="initial">
+          <span class="amt">850</span><span class="cur">€</span>
+          <span class="tag">Una tantum</span>
+        </div>
+        <div class="divider"></div>
+        <div class="monthly">
+          <span class="amt">160</span><span class="cur">€</span>
+          <span class="per">/ mese</span>
+        </div>
+        <div class="terms">
+          <div class="row"><span class="k">▸</span><span>Durata minima <b style="color:#fff">24 mesi</b></span></div>
+          <div class="row"><span class="k">▸</span><span>Assistenza e aggiornamenti <b style="color:#fff">inclusi</b></span></div>
+          <div class="row"><span class="k">▸</span><span>Prezzi IVA esclusa</span></div>
+        </div>
+      </div>
+
+      <div class="requires">
+        <b>Ideale per:</b> ristoranti che vogliono centralizzare la gestione
+        contabile e ridurre il lavoro manuale di scarico documenti al commercialista.
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Offerta commerciale · Modulo Business</div>
+    <div>Pagina 3 di 5</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 4 - MODULO 3 PREMIUM
+     ============================================================ -->
+<section class="page">
+  <header class="page-header">
+    <div class="brand">
+      <span class="brand-diamond"></span>
+      Software Gestionale Ristorazione
+    </div>
+    <div class="kicker">Modulo 03 · Premium</div>
+  </header>
+
+  <div class="module-badge" style="background: #FEF3C7; border-color:#FDE68A; color:#78350F;">
+    <span class="num" style="background:#B8860B; color:#FFF7ED;">3</span>
+    <span>Modulo Premium</span>
+  </div>
+
+  <h1 class="module-title">Food Cost <span class="name">& Magazzino</span></h1>
+  <p class="module-sub">
+    La soluzione completa: tutte le funzionalità dei Moduli Essential e Business,
+    più il controllo totale su magazzino, ricette e marginalità reale di ogni
+    piatto. Lo strumento per prendere decisioni basate sui numeri.
+  </p>
+
+  <div class="content-grid">
+    <div>
+      <div class="features inherited" style="margin-bottom:14px;">
+        <h3>Include tutto Essential + Business</h3>
+        <ul>
+          <li><span class="check">✓</span><span>Comande, scontrino fiscale, fatturazione elettronica.</span></li>
+          <li><span class="check">✓</span><span>Fatture di vendita e acquisto, anagrafiche clienti e fornitori.</span></li>
+          <li><span class="check">✓</span><span>Scadenzario incassi e pagamenti.</span></li>
+        </ul>
+      </div>
+
+      <div class="features">
+        <h3>In più, con il modulo Premium</h3>
+        <ul>
+          <li><span class="check">✓</span><span><b>Magazzino</b>: anagrafica articoli, giacenze in tempo reale, unità di misura multiple.</span></li>
+          <li><span class="check">✓</span><span><b>Movimenti di carico e scarico</b> manuali o da bolla fornitore.</span></li>
+          <li><span class="check">✓</span><span><b>Ricette e distinte base</b> per ogni piatto con ingredienti e dosaggi.</span></li>
+          <li><span class="check">✓</span><span><b>Scarico automatico</b> del magazzino alla chiusura di ogni comanda.</span></li>
+          <li><span class="check">✓</span><span><b>Food Cost per piatto</b>: costo materia prima vs prezzo di vendita.</span></li>
+          <li><span class="check">✓</span><span><b>Analisi marginalità</b> per piatto, categoria e periodo.</span></li>
+          <li><span class="check">✓</span><span><b>Alert scorta minima</b> e suggerimento di riordino.</span></li>
+          <li><span class="check">✓</span><span><b>Inventari periodici</b> assistiti con confronto tra rilevato e teorico.</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <div class="price-card">
+        <div class="label">Investimento</div>
+        <div class="initial">
+          <span class="amt">1.200</span><span class="cur">€</span>
+          <span class="tag">Una tantum</span>
+        </div>
+        <div class="divider"></div>
+        <div class="monthly">
+          <span class="amt">200</span><span class="cur">€</span>
+          <span class="per">/ mese</span>
+        </div>
+        <div class="terms">
+          <div class="row"><span class="k">▸</span><span>Durata minima <b style="color:#fff">24 mesi</b></span></div>
+          <div class="row"><span class="k">▸</span><span>Assistenza e aggiornamenti <b style="color:#fff">inclusi</b></span></div>
+          <div class="row"><span class="k">▸</span><span>Prezzi IVA esclusa</span></div>
+        </div>
+      </div>
+
+      <div class="requires" style="background:#FEF3C7; border-left-color:#B8860B; color:#78350F;">
+        <b>Consigliato per:</b> attività strutturate che vogliono conoscere
+        con precisione il margine reale di ogni piatto e mantenere sotto
+        controllo scorte e sprechi.
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Offerta commerciale · Modulo Premium</div>
+    <div>Pagina 4 di 5</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PAGE 5 - CONFRONTO E CONDIZIONI
+     ============================================================ -->
+<section class="page">
+  <header class="page-header">
+    <div class="brand">
+      <span class="brand-diamond"></span>
+      Software Gestionale Ristorazione
+    </div>
+    <div class="kicker">Riepilogo · Confronto moduli</div>
+  </header>
+
+  <h1 class="page-title">Confronto rapido dei tre moduli</h1>
+  <p class="page-lead">
+    Una sintesi immediata delle differenze tra le tre configurazioni, con il
+    quadro completo dell'investimento richiesto per ciascuna soluzione.
+  </p>
+
+  <table class="cmp-table">
+    <thead>
+      <tr>
+        <th>Funzionalità</th>
+        <th class="mod-1" style="text-align:center;">Essential</th>
+        <th class="mod-2" style="text-align:center;">Business</th>
+        <th class="mod-3" style="text-align:center;">Premium</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="feat">Gestione tavoli, comande, stampe cucina/bar</td>
+        <td class="mark yes">✓</td><td class="mark yes">✓</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Split conto e modalità Banco</td>
+        <td class="mark yes">✓</td><td class="mark yes">✓</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Scontrino fiscale (Registratore Telematico)</td>
+        <td class="mark yes">✓</td><td class="mark yes">✓</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Fatturazione elettronica (via MySond)</td>
+        <td class="mark yes">✓</td><td class="mark yes">✓</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Integrazione Cassa automatica contanti VNE</td>
+        <td class="mark no">—</td><td class="mark yes">✓</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Fatture di vendita, clienti e scadenzario incassi</td>
+        <td class="mark no">—</td><td class="mark yes">✓</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Fatture di acquisto, fornitori e pagamenti</td>
+        <td class="mark no">—</td><td class="mark yes">✓</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Anagrafiche clienti e fornitori centralizzate</td>
+        <td class="mark no">—</td><td class="mark yes">✓</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Magazzino, movimenti e giacenze</td>
+        <td class="mark no">—</td><td class="mark no">—</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Ricette, food cost e marginalità</td>
+        <td class="mark no">—</td><td class="mark no">—</td><td class="mark yes">✓</td>
+      </tr>
+      <tr>
+        <td class="feat">Inventari e alert scorta minima</td>
+        <td class="mark no">—</td><td class="mark no">—</td><td class="mark yes">✓</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr class="price-row">
+        <td>Attivazione (una tantum)</td>
+        <td class="mark price-init">650 €</td>
+        <td class="mark price-init">850 €</td>
+        <td class="mark price-init">1.200 €</td>
+      </tr>
+      <tr class="price-row">
+        <td>Canone mensile</td>
+        <td class="mark price-mon">120 €</td>
+        <td class="mark price-mon">160 €</td>
+        <td class="mark price-mon">200 €</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="conditions">
+    <h3>Condizioni economiche</h3>
+    <ul>
+      <li><b>Durata minima del canone:</b> 24 mesi dalla data di attivazione.</li>
+      <li><b>Il canone mensile include:</b> assistenza tecnica, aggiornamenti software e nuove funzionalità rilasciate.</li>
+      <li><b>Prezzi IVA esclusa.</b> Fatturazione mensile posticipata del canone.</li>
+      <li><b>Installazione, formazione operativa e configurazione hardware</b> (registratore di cassa, stampanti, cassa automatica, POS) sono quotate separatamente in base alla configurazione richiesta.</li>
+      <li><b>Passaggio tra moduli:</b> è sempre possibile passare a un modulo superiore in qualsiasi momento, con adeguamento del canone dal mese successivo.</li>
+    </ul>
+  </div>
+
+  <div class="final-cta">
+    <div>
+      <div class="t">Vuoi vedere il software in azione?</div>
+      <div class="s">Prenota una demo gratuita e personalizzata sulla tua realtà.</div>
+    </div>
+    <div class="cta-mark">Contattaci</div>
+  </div>
+
+  <div class="page-footer">
+    <div><span class="brand-dot"></span> Offerta commerciale · Confronto e condizioni</div>
+    <div>Pagina 5 di 5</div>
+  </div>
+</section>
+
+</body>
+</html>

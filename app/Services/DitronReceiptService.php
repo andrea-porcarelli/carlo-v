@@ -10,6 +10,7 @@ use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Models\User;
 use App\Support\IssuedReceiptDto;
+use App\Support\OperationalErrorCode;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
@@ -321,6 +322,7 @@ final class DitronReceiptService implements ReceiptIssuerInterface
                 'last_error' => 'ditron_agent_url non configurato',
                 'attempts'   => $receipt->attempts + 1,
             ]);
+            $this->reportIncident($receipt, OperationalErrorCode::DITRON_AGENT_DOWN);
             return;
         }
 
@@ -345,12 +347,14 @@ final class DitronReceiptService implements ReceiptIssuerInterface
                 'status'     => DitronReceipt::STATUS_FAILED,
                 'last_error' => 'connect_error: ' . Str::limit($e->getMessage(), 250),
             ]);
+            $this->reportIncident($receipt, OperationalErrorCode::DITRON_AGENT_DOWN);
             return;
         } catch (Throwable $e) {
             $receipt->update([
                 'status'     => DitronReceipt::STATUS_FAILED,
                 'last_error' => 'unexpected_error: ' . Str::limit($e->getMessage(), 250),
             ]);
+            $this->reportIncident($receipt, OperationalErrorCode::DITRON_RECEIPT_FAILED);
             return;
         }
 
@@ -393,6 +397,74 @@ final class DitronReceiptService implements ReceiptIssuerInterface
             'elapsed_ms' => $receipt->elapsed_ms,
             'recovered'  => $recovered !== null,
         ]);
+
+        if (!$effectiveOk) {
+            $this->reportIncident(
+                $receipt,
+                $this->classifyDitronError($receipt->last_error, $receipt->raw_err),
+            );
+        }
+    }
+
+    /**
+     * Mappa il testo di errore (last_error + raw_err) al codice operativo giusto.
+     * Restituisce sempre un OperationalErrorCode; il default è DITRON_RECEIPT_FAILED.
+     */
+    private function classifyDitronError(?string $lastError, ?string $rawErr): OperationalErrorCode
+    {
+        $haystack = strtolower(($lastError ?? '') . ' ' . ($rawErr ?? ''));
+
+        if (str_contains($haystack, 'paper')
+            || str_contains($haystack, 'carta')
+            || str_contains($haystack, 'no_paper')) {
+            return OperationalErrorCode::DITRON_CASSA_PAPER;
+        }
+
+        if (str_contains($haystack, 'busy')
+            || str_contains($haystack, 'occupata')
+            || str_contains($haystack, 'in_use')) {
+            return OperationalErrorCode::DITRON_CASSA_BUSY;
+        }
+
+        if (str_contains($haystack, 'connect_error')
+            || str_contains($haystack, 'agent')
+            || str_contains($haystack, 'http_5')) {
+            return OperationalErrorCode::DITRON_AGENT_DOWN;
+        }
+
+        if (str_contains($haystack, 'tender')) {
+            return OperationalErrorCode::DITRON_TENDER_INVALID;
+        }
+
+        return OperationalErrorCode::DITRON_RECEIPT_FAILED;
+    }
+
+    /**
+     * Registra l'incidente sul reporter operativo (persistenza + Telegram).
+     * Best-effort: eventuali errori del reporter non bloccano l'emissione.
+     */
+    private function reportIncident(DitronReceipt $receipt, OperationalErrorCode $code): void
+    {
+        try {
+            app(OperationalIncidentReporter::class)->report(
+                code:            $code,
+                context:         [
+                    'motivo'            => Str::limit((string) $receipt->last_error, 200),
+                    'ditron_receipt_id' => $receipt->id,
+                    'attempts'          => $receipt->attempts,
+                    'payment_method'    => $receipt->payment_method,
+                ],
+                tableOrder:      $receipt->tableOrder,
+                userId:          $receipt->operator_id,
+                source:          static::class,
+                technicalDetail: $receipt->last_error,
+            );
+        } catch (Throwable $e) {
+            $this->log('warning', 'operational_incident_report_failed', [
+                'ditron_receipt_id' => $receipt->id,
+                'error'             => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

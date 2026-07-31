@@ -48,6 +48,7 @@ class TableOrdersManager {
         this.loadTables();
         this.startTimerUpdates();
         this.loadMenuOptions();
+        this._startOperationalIncidentPolling();
     }
 
     async loadMenuOptions() {
@@ -156,6 +157,92 @@ class TableOrdersManager {
                 }, 3500);
             }
         }
+    }
+
+    /**
+     * Mostra una notifica per un errore operativo (stampa/cassa/Ditron).
+     * Nota: la notifica è persistente e riporta anche il codice errore per
+     * l'assistenza tecnica; se presente incidentId, marca l'incidente come
+     * letto quando l'operatore chiude la notifica.
+     */
+    showOperationalError(errorCode, operatorMessage, incidentId = null) {
+        const text = errorCode
+            ? `${operatorMessage} [${errorCode}]`
+            : operatorMessage;
+        this.showNotification(text, 'error', true);
+
+        if (incidentId) {
+            const notification = this.getElement('notification');
+            const notificationClose = document.getElementById('notificationClose');
+            if (notification && notificationClose) {
+                const originalHandler = notification.onclick;
+                notification.onclick = (e) => {
+                    if (e.target !== notificationClose) return;
+                    this._acknowledgeIncident(incidentId);
+                    if (originalHandler) originalHandler(e);
+                    else this._hideNotification();
+                };
+            }
+        }
+    }
+
+    /**
+     * Se la response JSON di un'API riporta {error_code, operator_message},
+     * mostra la notifica dedicata e ritorna true. Altrimenti false, così
+     * il chiamante può gestire il fallback (es. showNotification generico).
+     */
+    handleOperationalErrorResponse(data) {
+        if (data && data.error_code && data.operator_message) {
+            this.showOperationalError(data.error_code, data.operator_message, data.incident_id ?? null);
+            return true;
+        }
+        return false;
+    }
+
+    async _acknowledgeIncident(incidentId) {
+        const token = window.operatorAuthManager?.getCurrentToken?.();
+        if (!token) return;
+        try {
+            await fetch(`/api/operational-incidents/${incidentId}/ack`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'X-Operator-Token': token,
+                },
+            });
+        } catch (e) { /* silenzioso: retry al polling successivo */ }
+    }
+
+    /**
+     * Avvia polling degli incidenti operativi non letti. Il feed cattura i
+     * fallimenti dei Job async di stampa (dietro le quinte) che l'operatore
+     * non vedrebbe altrimenti.
+     */
+    _startOperationalIncidentPolling() {
+        if (this._incidentsPollInterval) return;
+        this._lastSeenIncidentId = 0;
+        const tick = () => this._fetchOperationalIncidents();
+        this._incidentsPollInterval = setInterval(tick, 15000);
+        // Prima poll immediata (best-effort — richiede token)
+        setTimeout(tick, 2000);
+    }
+
+    async _fetchOperationalIncidents() {
+        const token = window.operatorAuthManager?.getCurrentToken?.();
+        if (!token) return;
+        try {
+            const resp = await fetch(`/api/operational-incidents/unread?since=${this._lastSeenIncidentId || 0}`, {
+                headers: { 'X-Operator-Token': token },
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data.success || !Array.isArray(data.incidents) || data.incidents.length === 0) return;
+            // Mostra solo l'incidente più recente per non sovrapporre notifiche
+            const latest = data.incidents[0];
+            this._lastSeenIncidentId = latest.id;
+            this.showOperationalError(latest.code, latest.operator_message, latest.id);
+        } catch (e) { /* silenzioso */ }
     }
 
     /**
@@ -3197,6 +3284,7 @@ class TableOrdersManager {
         try {
             if (!data.success) {
                 console.error('Cash drawer open failed:', data);
+                this.handleOperationalErrorResponse(data);
                 await this._executeCashDrawerFallback();
                 return;
             }

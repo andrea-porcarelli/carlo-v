@@ -30,6 +30,7 @@ use App\Http\Controllers\Backoffice\UploadController;
 use App\Http\Controllers\Backoffice\UserController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Frontoffice\AppController;
+use App\Http\Controllers\Frontoffice\OperationalIncidentController;
 use App\Http\Controllers\Frontoffice\OperatorAuthController;
 use App\Http\Controllers\Frontoffice\TableOrderController;
 use Illuminate\Support\Facades\Route;
@@ -59,6 +60,10 @@ Route::post('/api/admin/verify-pin', [OperatorAuthController::class, 'adminVerif
 
 // Operational log (admin-gated, PIN re-verified server-side)
 Route::get('/api/operational-log', [\App\Http\Controllers\Frontoffice\OperationalLogController::class, 'index'])->name('api.operationalLog');
+
+// Operational incidents feed (polled by frontoffice for print/cash/Ditron failures)
+Route::get('/api/operational-incidents/unread', [OperationalIncidentController::class, 'unread'])->name('api.operationalIncidents.unread');
+Route::post('/api/operational-incidents/{incident}/ack', [OperationalIncidentController::class, 'acknowledge'])->name('api.operationalIncidents.ack');
 
 // Operator token for already-authenticated backoffice admin
 Route::get('/api/admin/operator-token', [OperatorAuthController::class, 'getAdminToken'])->middleware('auth')->name('api.admin.operatorToken');
@@ -317,6 +322,13 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/export', [TableOrderLogController::class, 'export'])->name('export');
             Route::get('/activity-summary', [TableOrderLogController::class, 'activitySummary'])->name('activity-summary');
             Route::get('/category-stats', [TableOrderLogController::class, 'categoryStats'])->name('category-stats');
+        });
+
+        // Operational incidents — admin dashboard
+        Route::prefix('/operational-incidents')->name('backoffice.operational-incidents.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Backoffice\OperationalIncidentController::class, 'index'])->name('index');
+            Route::post('/{incident}/ack', [\App\Http\Controllers\Backoffice\OperationalIncidentController::class, 'acknowledge'])->name('ack');
+            Route::post('/{incident}/resolve', [\App\Http\Controllers\Backoffice\OperationalIncidentController::class, 'resolve'])->name('resolve');
         });
 
         // Corrispettivi elettronici — azioni manuali da backoffice
