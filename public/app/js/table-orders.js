@@ -333,15 +333,15 @@ class TableOrdersManager {
 
     async _acknowledgeIncident(incidentId) {
         const token = window.operatorAuthManager?.getCurrentToken?.();
-        if (!token) return;
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+        };
+        if (token) headers['X-Operator-Token'] = token;
         try {
             await fetch(`/api/operational-incidents/${incidentId}/ack`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    'X-Operator-Token': token,
-                },
+                headers,
             });
         } catch (e) { /* silenzioso: retry al polling successivo */ }
     }
@@ -361,20 +361,26 @@ class TableOrdersManager {
     }
 
     async _fetchOperationalIncidents() {
-        const token = window.operatorAuthManager?.getCurrentToken?.();
-        if (!token) return;
         try {
-            const resp = await fetch(`/api/operational-incidents/unread?since=${this._lastSeenIncidentId || 0}`, {
-                headers: { 'X-Operator-Token': token },
-            });
-            if (!resp.ok) return;
+            const token = window.operatorAuthManager?.getCurrentToken?.();
+            const headers = { 'Accept': 'application/json' };
+            if (token) headers['X-Operator-Token'] = token;
+
+            const resp = await fetch(`/api/operational-incidents/unread?since=${this._lastSeenIncidentId || 0}`, { headers });
+            if (!resp.ok) {
+                console.warn('[OpIncidents] polling HTTP', resp.status);
+                return;
+            }
             const data = await resp.json();
             if (!data.success || !Array.isArray(data.incidents) || data.incidents.length === 0) return;
+            console.info('[OpIncidents] nuovi incidenti:', data.incidents.length);
             // data.incidents è ordinato desc per id: mostro tutti i nuovi (max 3 per non invadere lo schermo)
             const toShow = data.incidents.slice(0, 3).reverse();
             this._lastSeenIncidentId = data.incidents[0].id;
             for (const inc of toShow) this.showOperationalError(inc);
-        } catch (e) { /* silenzioso */ }
+        } catch (e) {
+            console.warn('[OpIncidents] polling error:', e);
+        }
     }
 
     /**

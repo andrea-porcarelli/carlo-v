@@ -34,14 +34,14 @@ class OperationalIncidentController extends Controller
     /**
      * Feed incidenti non ancora acknowledged. Il frontend può passare
      * ?since=<id> per ottenere solo quelli nuovi rispetto all'ultimo visto.
+     *
+     * Non richiede token PIN: la sola visualizzazione degli incident non è
+     * un'azione operativa. La protezione è delegata al BasicAuth del
+     * frontoffice (già in atto sulla pagina che carica table-orders.js).
+     * L'acknowledge invece richiede il token per attribuire chi ha letto.
      */
     public function unread(Request $request): JsonResponse
     {
-        $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
-        if (!$operatorId) {
-            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
-        }
-
         $since = (int) $request->query('since', 0);
 
         $incidents = OperationalIncident::unacknowledged()
@@ -70,14 +70,13 @@ class OperationalIncidentController extends Controller
     }
 
     /**
-     * Segna un incidente come letto dall'operatore corrente.
+     * Segna un incidente come letto. Se è presente un token operatore valido,
+     * viene registrato chi ha letto (acknowledged_by); altrimenti l'ack è
+     * anonimo — accettabile perché la pagina è già dietro BasicAuth.
      */
     public function acknowledge(Request $request, OperationalIncident $incident): JsonResponse
     {
         $operatorId = $this->verifyOperatorToken($request->header('X-Operator-Token'));
-        if (!$operatorId) {
-            return response()->json(['success' => false, 'message' => 'Token operatore non valido'], 401);
-        }
 
         if ($incident->acknowledged_at === null) {
             $incident->forceFill([
