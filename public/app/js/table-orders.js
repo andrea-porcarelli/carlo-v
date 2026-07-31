@@ -942,7 +942,7 @@ class TableOrdersManager {
 
         totalElement.textContent = `€${finalTotal.toFixed(2)}`;
 
-        this._updateBancoCloseButtons();
+        this._updateBancoCloseButtons(finalTotal);
         this._updateQuickSegueButton();
         this._updateAddSegueButton();
     }
@@ -951,11 +951,14 @@ class TableOrdersManager {
      * Show/hide close buttons for banco based on whether items exist.
      * Empty banco → show close buttons. Banco with items → hide them.
      */
-    _updateBancoCloseButtons() {
+    _updateBancoCloseButtons(finalTotal = null) {
         const isBanco = !!this.currentTable?.table?.is_banco;
         const closeBtn = document.getElementById('closeModifyBtn');
         const closeNoPrintBtn = document.getElementById('closeModifyNoPrintBtn');
         const chiudiTavoloBtn = document.getElementById('btnChiudiTavolo');
+        const btnPreconto = document.getElementById('btnPreconto');
+        const btnIncassa = document.getElementById('btnModifyPayBill');
+        const btnChiudiConto = document.getElementById('btnModifyFreeTable');
 
         const hasItems = (this.modifySession.items || []).some(i => !(i.segue && !i.dish_id));
 
@@ -963,8 +966,27 @@ class TableOrdersManager {
             if (closeBtn) closeBtn.style.display = hasItems ? 'none' : '';
             if (closeNoPrintBtn) closeNoPrintBtn.style.display = hasItems ? 'none' : '';
             if (chiudiTavoloBtn) chiudiTavoloBtn.style.display = 'none';
-        } else {
-            if (chiudiTavoloBtn) chiudiTavoloBtn.style.display = hasItems ? 'none' : '';
+            return;
+        }
+
+        // Determina il totale corrente. Se il chiamante lo passa (updateModifyReceiptItems
+        // ha già calcolato items + coperti - sconti autorizzati) usalo, altrimenti derivalo
+        // dall'ordine (fallback per la prima apertura dell'overlay).
+        let currentTotal = finalTotal;
+        if (currentTotal === null || currentTotal === undefined) {
+            const order = this.currentTable?.order;
+            currentTotal = parseFloat(order?.discounted_total ?? order?.total_amount ?? 0) || 0;
+        }
+        const isZero = !isFinite(currentTotal) || currentTotal < 0.005;
+
+        // Totale > 0 → azioni di pagamento visibili, "Chiudi tavolo" nascosto.
+        // Totale = 0 → azioni di pagamento nascoste, "Chiudi tavolo" visibile in blu.
+        if (btnPreconto) btnPreconto.style.display = isZero ? 'none' : '';
+        if (btnIncassa) btnIncassa.style.display = isZero ? 'none' : '';
+        if (btnChiudiConto) btnChiudiConto.style.display = isZero ? 'none' : '';
+        if (chiudiTavoloBtn) {
+            chiudiTavoloBtn.style.display = isZero ? '' : 'none';
+            chiudiTavoloBtn.style.background = '#0d6efd';
         }
     }
 
@@ -3356,6 +3378,33 @@ class TableOrdersManager {
 
         const amount = parseFloat(this.currentTable.order.discounted_total ?? this.currentTable.order.total_amount ?? 0);
         const tableId = this.currentTable.table.id;
+
+        // Tavolo a €0: nessuna richiesta alla cassa contanti, chiudi direttamente con log.
+        if (!isFinite(amount) || amount < 0.005) {
+            try {
+                const response = await fetch(`${this.apiBase}/${tableId}/pay`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'X-Operator-Token': auth.token,
+                    },
+                    body: JSON.stringify({ payment_method: 'chiusura_conto' }),
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    this.showNotification(result.message || 'Errore nella chiusura del tavolo', 'error');
+                    return;
+                }
+                this.showNotification('Tavolo chiuso a €0');
+                this._afterPaymentSuccess();
+            } catch (error) {
+                console.error('Error chiudi conto a zero:', error);
+                this.showNotification('Errore nella chiusura del tavolo', 'error');
+            }
+            return;
+        }
+
         await this.startCashDrawerFlow(
             amount,
             this.currentTable.order.id,

@@ -273,11 +273,13 @@ window._boSale = {
                     </h4>
                 </div>
                 <div class="panel-body">
-                    <div class="alert alert-warning" style="padding:8px 12px; margin-bottom:12px; font-size:12px;">
-                        <i class="fa fa-exclamation-triangle"></i>
-                        <strong>Attenzione:</strong> operazioni delicate e <u>irreversibili</u> sulla vendita chiusa.
-                        Il cambio di metodo pagamento non annulla lo scontrino fiscale già emesso;
-                        annullalo prima dal log Ditron se necessario.
+                    <div class="alert alert-warning" style="padding:8px 12px; margin-bottom:12px; font-size:12px; align-items:flex-start;">
+                        <i class="fa fa-exclamation-triangle" style="margin-top:2px;"></i>
+                        <div style="flex:1;">
+                            <strong>Attenzione:</strong> operazioni delicate e <u>irreversibili</u> sulla vendita chiusa.
+                            Il cambio di metodo pagamento non annulla lo scontrino fiscale già emesso;
+                            annullalo prima dal log Ditron se necessario.
+                        </div>
                     </div>
                     <div class="row" style="margin: -3px;">
                         <div class="col-xs-12" style="padding: 3px;">
