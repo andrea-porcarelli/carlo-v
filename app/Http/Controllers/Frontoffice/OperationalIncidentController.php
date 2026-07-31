@@ -55,6 +55,8 @@ class OperationalIncidentController extends Controller
                 'severity'         => $i->severity,
                 'category'         => $i->category,
                 'operator_message' => $i->operator_message,
+                'technical_detail' => $i->technical_detail,
+                'context'          => $i->context,
                 'table_order_id'   => $i->table_order_id,
                 'source'           => $i->source,
                 'created_at'       => $i->created_at?->toIso8601String(),

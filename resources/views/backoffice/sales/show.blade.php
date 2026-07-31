@@ -323,7 +323,7 @@ window._boSale = {
                         <button type="button" onclick="toggleModal('modalChangePaymentMethod')" class="log-modal-close">&times;</button>
                     </div>
                     <div class="log-modal-body">
-                        <div class="alert alert-danger" style="padding:10px 12px;">
+                        <div class="alert alert-danger" style="display:block; padding:10px 12px;">
                             <strong><i class="fa fa-exclamation-triangle"></i> Operazione irreversibile.</strong><br>
                             Stai modificando il metodo di pagamento di una vendita <u>già chiusa</u>.
                             Questa azione <strong>non annulla</strong> automaticamente lo scontrino fiscale
@@ -2286,7 +2286,7 @@ window._boSale = {
                 <button type="button" onclick="toggleModal('modalChiudiTavolo')" class="log-modal-close">&times;</button>
             </div>
             <div class="log-modal-body">
-                <div class="alert alert-danger">
+                <div class="alert alert-danger" style="display:block;">
                     <strong><i class="fas fa-exclamation-triangle"></i> Attenzione!</strong><br>
                     Questa operazione <strong>elimina tutti i piatti</strong> e chiude il tavolo <strong>senza incassare</strong>.<br>
                     L'azione non può essere annullata.

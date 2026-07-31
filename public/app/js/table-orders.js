@@ -160,40 +160,172 @@ class TableOrdersManager {
     }
 
     /**
-     * Mostra una notifica per un errore operativo (stampa/cassa/Ditron).
-     * Nota: la notifica è persistente e riporta anche il codice errore per
-     * l'assistenza tecnica; se presente incidentId, marca l'incidente come
-     * letto quando l'operatore chiude la notifica.
+     * Mostra una card di errore operativo (stampa/cassa/Ditron) con dettagli
+     * tecnici visibili (stampante, IP, motivo) e chiusura manuale esplicita.
+     * incident = { id, code, severity, operator_message, technical_detail, context, source, created_at }
+     * La card è costruita con DOM API (createElement + textContent) per evitare
+     * qualsiasi rischio XSS su dati che arrivano dal backend.
      */
-    showOperationalError(errorCode, operatorMessage, incidentId = null) {
-        const text = errorCode
-            ? `${operatorMessage} [${errorCode}]`
-            : operatorMessage;
-        this.showNotification(text, 'error', true);
+    showOperationalError(incident) {
+        this._ensureOpIncidentCardStyles();
 
-        if (incidentId) {
-            const notification = this.getElement('notification');
-            const notificationClose = document.getElementById('notificationClose');
-            if (notification && notificationClose) {
-                const originalHandler = notification.onclick;
-                notification.onclick = (e) => {
-                    if (e.target !== notificationClose) return;
-                    this._acknowledgeIncident(incidentId);
-                    if (originalHandler) originalHandler(e);
-                    else this._hideNotification();
-                };
+        let container = document.getElementById('operationalIncidentContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'operationalIncidentContainer';
+            document.body.appendChild(container);
+        }
+
+        // Evita di duplicare la stessa card se l'incidente è già visibile
+        if (incident.id && container.querySelector(`[data-incident-id="${incident.id}"]`)) return;
+
+        const el = (tag, className, text) => {
+            const n = document.createElement(tag);
+            if (className) n.className = className;
+            if (text !== undefined && text !== null) n.textContent = String(text);
+            return n;
+        };
+
+        const card = el('div', `op-incident-card op-incident-${incident.severity || 'error'}`);
+        if (incident.id) card.dataset.incidentId = String(incident.id);
+
+        const head = el('div', 'op-incident-head');
+        const title = el('div', 'op-incident-title');
+        title.appendChild(el('span', 'op-incident-icon', '⚠'));
+        title.appendChild(el('span', 'op-incident-code', incident.code || 'ERRORE'));
+        head.appendChild(title);
+        const closeBtn = el('button', 'op-incident-close', '✕');
+        closeBtn.type = 'button';
+        closeBtn.setAttribute('aria-label', 'Chiudi');
+        head.appendChild(closeBtn);
+        card.appendChild(head);
+
+        card.appendChild(el('div', 'op-incident-message', incident.operator_message || 'Errore operativo'));
+
+        const details = this._buildIncidentDetailsNode(incident);
+        if (details) card.appendChild(details);
+
+        const footer = el('div', 'op-incident-footer');
+        footer.appendChild(el('span', 'op-incident-time',
+            incident.created_at ? this._formatIncidentTime(incident.created_at) : ''));
+        const ackBtn = el('button', 'op-incident-ack-btn', 'Ho preso nota');
+        ackBtn.type = 'button';
+        footer.appendChild(ackBtn);
+        card.appendChild(footer);
+
+        const dismiss = () => {
+            if (incident.id) this._acknowledgeIncident(incident.id);
+            card.classList.add('op-incident-out');
+            setTimeout(() => card.remove(), 200);
+        };
+        closeBtn.addEventListener('click', dismiss);
+        ackBtn.addEventListener('click', dismiss);
+
+        container.appendChild(card);
+    }
+
+    _buildIncidentDetailsNode(incident) {
+        const ctx = incident.context || {};
+        const labels = {
+            printer:      'Stampante',
+            printer_id:   'Printer ID',
+            ip:           'IP',
+            motivo:       'Motivo',
+            operation:    'Operazione',
+            items_count:  'Articoli',
+            split_id:     'Split preconto',
+            old_dish_name:'Piatto sostituito',
+            item_id:      'Item ID',
+            ditron_receipt_id: 'Scontrino Ditron',
+            payment_method:    'Metodo pagamento',
+            attempts:     'Tentativi',
+        };
+
+        const pairs = [];
+        for (const key of Object.keys(labels)) {
+            if (ctx[key] !== undefined && ctx[key] !== null && ctx[key] !== '') {
+                pairs.push([labels[key], String(ctx[key])]);
             }
         }
+        if (incident.source) pairs.push(['Origine', String(incident.source)]);
+        if (incident.technical_detail && !ctx.motivo) pairs.push(['Dettaglio', String(incident.technical_detail)]);
+
+        if (pairs.length === 0) return null;
+
+        const wrap = document.createElement('div');
+        wrap.className = 'op-incident-details';
+        for (const [k, v] of pairs) {
+            const row = document.createElement('div');
+            row.className = 'op-incident-row';
+            const keySpan = document.createElement('span');
+            keySpan.className = 'op-incident-key';
+            keySpan.textContent = `${k}:`;
+            const valSpan = document.createElement('span');
+            valSpan.className = 'op-incident-val';
+            valSpan.textContent = v;
+            row.appendChild(keySpan);
+            row.appendChild(document.createTextNode(' '));
+            row.appendChild(valSpan);
+            wrap.appendChild(row);
+        }
+        return wrap;
+    }
+
+    _formatIncidentTime(iso) {
+        try {
+            const d = new Date(iso);
+            return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        } catch (e) { return ''; }
+    }
+
+    _ensureOpIncidentCardStyles() {
+        if (document.getElementById('opIncidentCardStyles')) return;
+        const style = document.createElement('style');
+        style.id = 'opIncidentCardStyles';
+        style.textContent = `
+            #operationalIncidentContainer { position: fixed; top: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 12px; max-width: 460px; }
+            .op-incident-card { background: #fff; border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,0.22); border-left: 6px solid #dc3545; padding: 14px 16px; font-family: inherit; animation: opIncidentIn 0.25s ease-out; }
+            .op-incident-card.op-incident-out { animation: opIncidentOut 0.2s ease-in forwards; }
+            .op-incident-critical { border-left-color: #b00020; background: #fff5f6; }
+            .op-incident-error { border-left-color: #dc3545; background: #fff5f6; }
+            .op-incident-warn { border-left-color: #ffc107; background: #fffaf0; }
+            .op-incident-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+            .op-incident-title { display: flex; align-items: center; gap: 8px; }
+            .op-incident-icon { font-size: 1.2rem; color: #dc3545; }
+            .op-incident-code { font-family: monospace; font-size: 0.75rem; background: #f2f2f2; padding: 2px 8px; border-radius: 4px; color: #444; }
+            .op-incident-close { background: transparent; border: 0; font-size: 1.1rem; color: #666; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+            .op-incident-close:hover { background: rgba(0,0,0,0.06); color: #000; }
+            .op-incident-message { font-weight: 600; font-size: 0.98rem; color: #212529; margin-bottom: 8px; line-height: 1.4; }
+            .op-incident-details { font-size: 0.85rem; color: #495057; background: rgba(0,0,0,0.03); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
+            .op-incident-row { padding: 2px 0; }
+            .op-incident-key { font-weight: 600; color: #6c757d; margin-right: 4px; }
+            .op-incident-val { font-family: monospace; word-break: break-all; }
+            .op-incident-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+            .op-incident-time { font-size: 0.75rem; color: #6c757d; }
+            .op-incident-ack-btn { background: #dc3545; color: #fff; border: 0; padding: 6px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+            .op-incident-ack-btn:hover { background: #c82333; }
+            @keyframes opIncidentIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+            @keyframes opIncidentOut { to { transform: translateX(20px); opacity: 0; } }
+        `;
+        document.head.appendChild(style);
     }
 
     /**
      * Se la response JSON di un'API riporta {error_code, operator_message},
-     * mostra la notifica dedicata e ritorna true. Altrimenti false, così
-     * il chiamante può gestire il fallback (es. showNotification generico).
+     * mostra la card dettagliata e ritorna true.
      */
     handleOperationalErrorResponse(data) {
         if (data && data.error_code && data.operator_message) {
-            this.showOperationalError(data.error_code, data.operator_message, data.incident_id ?? null);
+            this.showOperationalError({
+                id:               data.incident_id ?? null,
+                code:             data.error_code,
+                severity:         data.severity || 'error',
+                operator_message: data.operator_message,
+                technical_detail: data.technical_detail || null,
+                context:          data.context || null,
+                source:           data.source || null,
+                created_at:       new Date().toISOString(),
+            });
             return true;
         }
         return false;
@@ -238,10 +370,10 @@ class TableOrdersManager {
             if (!resp.ok) return;
             const data = await resp.json();
             if (!data.success || !Array.isArray(data.incidents) || data.incidents.length === 0) return;
-            // Mostra solo l'incidente più recente per non sovrapporre notifiche
-            const latest = data.incidents[0];
-            this._lastSeenIncidentId = latest.id;
-            this.showOperationalError(latest.code, latest.operator_message, latest.id);
+            // data.incidents è ordinato desc per id: mostro tutti i nuovi (max 3 per non invadere lo schermo)
+            const toShow = data.incidents.slice(0, 3).reverse();
+            this._lastSeenIncidentId = data.incidents[0].id;
+            for (const inc of toShow) this.showOperationalError(inc);
         } catch (e) { /* silenzioso */ }
     }
 
