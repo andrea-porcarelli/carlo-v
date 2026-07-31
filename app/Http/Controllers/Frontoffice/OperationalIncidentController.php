@@ -45,22 +45,34 @@ class OperationalIncidentController extends Controller
         $since = (int) $request->query('since', 0);
 
         $incidents = OperationalIncident::unacknowledged()
+            ->with('tableOrder.restaurantTable')
             ->when($since > 0, fn ($q) => $q->where('id', '>', $since))
             ->orderByDesc('id')
             ->limit(50)
             ->get()
-            ->map(fn (OperationalIncident $i) => [
-                'id'               => $i->id,
-                'code'             => $i->code,
-                'severity'         => $i->severity,
-                'category'         => $i->category,
-                'operator_message' => $i->operator_message,
-                'technical_detail' => $i->technical_detail,
-                'context'          => $i->context,
-                'table_order_id'   => $i->table_order_id,
-                'source'           => $i->source,
-                'created_at'       => $i->created_at?->toIso8601String(),
-            ]);
+            ->map(function (OperationalIncident $i) {
+                $tableRef = null;
+                if ($i->table_order_id) {
+                    $table = $i->tableOrder?->restaurantTable;
+                    $tableRef = $table?->is_banco
+                        ? 'Banco'
+                        : ($table?->table_number ? "Tavolo {$table->table_number}" : "Ordine #{$i->table_order_id}");
+                }
+
+                return [
+                    'id'               => $i->id,
+                    'code'             => $i->code,
+                    'severity'         => $i->severity,
+                    'category'         => $i->category,
+                    'operator_message' => $i->operator_message,
+                    'technical_detail' => $i->technical_detail,
+                    'context'          => $i->context,
+                    'table_order_id'   => $i->table_order_id,
+                    'table_ref'        => $tableRef,
+                    'source'           => $i->source,
+                    'created_at'       => $i->created_at?->toIso8601String(),
+                ];
+            });
 
         return response()->json([
             'success'   => true,

@@ -242,6 +242,7 @@ class TableOrdersManager {
         };
 
         const pairs = [];
+        if (incident.table_ref) pairs.push(['Tavolo', String(incident.table_ref)]);
         for (const key of Object.keys(labels)) {
             if (ctx[key] !== undefined && ctx[key] !== null && ctx[key] !== '') {
                 pairs.push([labels[key], String(ctx[key])]);
