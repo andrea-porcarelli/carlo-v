@@ -67,7 +67,13 @@
                     {{-- Nome ingrediente --}}
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            {{ $material['label'] }}
+                            <a href="{{ route('restaurant.materials.show', $materialId) }}"
+                               target="_blank"
+                               title="Apri scheda ingrediente in una nuova scheda"
+                               style="color: inherit; text-decoration: none;">
+                                {{ $material['label'] }}
+                                <i class="fa fa-external-link" style="font-size: 10px; color: #1c84c6; margin-left: 4px; opacity: 0.75;"></i>
+                            </a>
                         </div>
                         <div style="font-size: 11px; color: #999; margin-top: 1px;">
                             base:&nbsp;<strong>{{ $material['stock_type'] }}</strong>
