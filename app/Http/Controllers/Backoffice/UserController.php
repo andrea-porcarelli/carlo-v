@@ -9,7 +9,6 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -153,13 +152,14 @@ class UserController extends BaseController
                 $validated = $request->validate([
                     'name' => 'required|string|max:255',
                     'role' => 'required|in:admin,operator',
-                    'password' => 'required|digits_between:1,5',
+                    'authentication_pin' => 'required|digits_between:1,5|unique:users,authentication_pin',
                     'permissions' => 'nullable|array',
                     'permissions.*' => 'string|in:' . implode(',', array_keys(User::availablePermissions())),
                 ], [
                     'name.required' => 'Il nome è obbligatorio',
-                    'password.required' => 'La password (PIN) è obbligatoria',
-                    'password.digits_between' => 'La password deve essere numerica, da 1 a 5 cifre',
+                    'authentication_pin.required' => 'Il PIN di autenticazione è obbligatorio',
+                    'authentication_pin.digits_between' => 'Il PIN deve essere numerico, da 1 a 5 cifre',
+                    'authentication_pin.unique' => 'Questo PIN è già assegnato a un altro utente',
                     'role.required' => 'Il ruolo è obbligatorio',
                     'role.in' => 'Ruolo non valido',
                 ]);
@@ -169,7 +169,7 @@ class UserController extends BaseController
                 $user = User::create([
                     'name' => $validated['name'],
                     'role' => 'operator',
-                    'password' => Hash::make($validated['password']),
+                    'authentication_pin' => $validated['authentication_pin'],
                     'permissions' => $validated['permissions'] ?? [],
                 ]);
             }
@@ -250,13 +250,11 @@ class UserController extends BaseController
                 $validated = $request->validate([
                     'name' => 'required|string|max:255',
                     'role' => 'required|in:admin,operator',
-                    'password' => 'nullable|digits_between:1,5',
                     'permissions' => 'nullable|array',
                     'permissions.*' => 'string|in:' . implode(',', array_keys(User::availablePermissions())),
                     'authentication_pin' => ['nullable', 'digits_between:1,5', Rule::unique('users')->ignore($user->id)],
                 ], [
                     'name.required' => 'Il nome è obbligatorio',
-                    'password.digits_between' => 'La password deve essere numerica, da 1 a 5 cifre',
                     'role.required' => 'Il ruolo è obbligatorio',
                     'role.in' => 'Ruolo non valido',
                     'authentication_pin.digits_between' => 'Il PIN deve essere numerico, da 1 a 5 cifre',
@@ -290,6 +288,34 @@ class UserController extends BaseController
             Log::error('Error updating user: ' . $e->getMessage());
             return $this->error(['message' => 'Errore nell\'aggiornamento dell\'utente']);
         }
+    }
+
+    /**
+     * Check if an authentication PIN is already in use.
+     * Optional ignore_id excludes a specific user (used in edit form).
+     */
+    public function checkPin(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'pin' => 'required|digits_between:1,5',
+            'ignore_id' => 'nullable|integer',
+        ]);
+
+        $query = User::where('authentication_pin', $validated['pin']);
+        if (!empty($validated['ignore_id'])) {
+            $query->where('id', '!=', $validated['ignore_id']);
+        }
+
+        $existing = $query->first(['id', 'name', 'role']);
+
+        return response()->json([
+            'available' => $existing === null,
+            'user' => $existing ? [
+                'id' => $existing->id,
+                'name' => $existing->name,
+                'role' => $existing->role,
+            ] : null,
+        ]);
     }
 
     /**

@@ -116,13 +116,18 @@ $permissionMeta = [
                             @include('backoffice.components.form.input', [
                                 'label'       => 'PIN di Autenticazione',
                                 'name'        => 'authentication_pin',
+                                'id_input'    => 'authentication_pin_admin',
                                 'col'         => 6,
                                 'type'        => 'text',
                                 'inputmode'   => 'numeric',
                                 'value'       => $_user->authentication_pin,
                                 'placeholder' => 'Es: 12345',
                                 'pattern'     => '[0-9]{1,5}',
+                                'class'       => 'js-pin-check',
                             ])
+                            <div class="col-lg-12">
+                                <div class="pin-feedback" data-for="authentication_pin_admin" style="margin-top:6px; font-size:13px;"></div>
+                            </div>
                         </div>
 
                         <div class="row m-t-md">
@@ -173,13 +178,18 @@ $permissionMeta = [
                             @include('backoffice.components.form.input', [
                                 'label'       => 'PIN di Autenticazione',
                                 'name'        => 'authentication_pin',
+                                'id_input'    => 'authentication_pin_operator',
                                 'col'         => 6,
                                 'type'        => 'text',
                                 'inputmode'   => 'numeric',
                                 'value'       => $_user->authentication_pin,
                                 'placeholder' => 'Es: 12345',
                                 'pattern'     => '[0-9]{1,5}',
+                                'class'       => 'js-pin-check',
                             ])
+                            <div class="col-lg-12">
+                                <div class="pin-feedback" data-for="authentication_pin_operator" style="margin-top:6px; font-size:13px;"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -349,10 +359,82 @@ $(document).ready(function () {
         }
     });
 
+    // ── Verifica in tempo reale univocità PIN ────────────────────────────────
+    const CURRENT_USER_ID = {{ $_user->id }};
+    const pinCheckTimers = {};
+    const pinAvailability = {};
+
+    function renderPinFeedback(inputId, state, message) {
+        const $fb = $('.pin-feedback[data-for="' + inputId + '"]');
+        const $input = $('#' + inputId);
+        $fb.removeClass('text-success text-danger text-muted');
+        $input.css('border-color', '');
+        if (state === 'ok') {
+            $fb.addClass('text-success').html('<i class="fas fa-check-circle"></i> ' + message);
+            $input.css('border-color', '#1ab394');
+        } else if (state === 'ko') {
+            $fb.addClass('text-danger').html('<i class="fas fa-exclamation-triangle"></i> ' + message);
+            $input.css('border-color', '#ed5565');
+        } else if (state === 'checking') {
+            $fb.addClass('text-muted').html('<i class="fas fa-spinner fa-spin"></i> ' + message);
+        } else {
+            $fb.empty();
+        }
+    }
+
+    $('.js-pin-check').on('input', function () {
+        const $input = $(this);
+        const inputId = $input.attr('id');
+        const pin = ($input.val() || '').trim();
+
+        clearTimeout(pinCheckTimers[inputId]);
+        pinAvailability[inputId] = null;
+
+        if (!pin) {
+            renderPinFeedback(inputId, null, '');
+            return;
+        }
+        if (!/^[0-9]{1,5}$/.test(pin)) {
+            renderPinFeedback(inputId, 'ko', 'Il PIN deve essere numerico, da 1 a 5 cifre');
+            pinAvailability[inputId] = false;
+            return;
+        }
+
+        renderPinFeedback(inputId, 'checking', 'Verifica PIN...');
+
+        pinCheckTimers[inputId] = setTimeout(function () {
+            $.get('{{ route('users.check-pin') }}', { pin: pin, ignore_id: CURRENT_USER_ID })
+                .done(function (res) {
+                    if (res.available) {
+                        renderPinFeedback(inputId, 'ok', 'PIN disponibile');
+                        pinAvailability[inputId] = true;
+                    } else {
+                        const owner = res.user ? (' (già assegnato a: ' + res.user.name + ')') : '';
+                        renderPinFeedback(inputId, 'ko', 'Questo PIN è già usato da un altro operatore' + owner);
+                        pinAvailability[inputId] = false;
+                    }
+                })
+                .fail(function () {
+                    renderPinFeedback(inputId, null, '');
+                    pinAvailability[inputId] = null;
+                });
+        }, 350);
+    });
+
     // ── Submit ────────────────────────────────────────────────────────────────
     $('#userForm').on('submit', function (e) {
         e.preventDefault();
         const form   = $(this);
+
+        // Blocca il submit se il PIN attivo è occupato
+        const role = $('#role').val();
+        const activePinId = role === 'admin' ? 'authentication_pin_admin' : 'authentication_pin_operator';
+        if (pinAvailability[activePinId] === false) {
+            alert('Il PIN inserito è già usato da un altro operatore. Scegline uno diverso.');
+            $('#' + activePinId).focus();
+            return;
+        }
+
         const submit = form.find('button[type="submit"]');
         submit.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Salvataggio...');
 

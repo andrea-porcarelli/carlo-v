@@ -151,6 +151,7 @@ Route::group(['prefix' => '/backoffice'], function() {
             Route::get('/', [UserController::class, 'index'])->name('index');
             Route::get('/datatable', [UserController::class, 'datatable'])->name('datatable');
             Route::get('/create', [UserController::class, 'create'])->name('create');
+            Route::get('/check-pin', [UserController::class, 'checkPin'])->name('check-pin');
             Route::post('/', [UserController::class, 'store'])->name('store');
             Route::get('/{id}', [UserController::class, 'show'])->name('show');
             Route::put('/{id}', [UserController::class, 'edit'])->name('edit');
