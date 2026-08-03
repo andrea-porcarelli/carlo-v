@@ -96,7 +96,7 @@ class SupplierController extends BaseController
                 ];
             })
                 ->filter()
-                ->sortBy(fn($r) => $r['material']->label)
+                ->sortByDesc(fn($r) => $r['material']->label)
                 ->values();
 
             return view('backoffice.suppliers.product-comparison', compact('rows'));

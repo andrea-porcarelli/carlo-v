@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Backoffice;
 
 use App\Facades\Utils;
 use App\Interfaces\MaterialInterface;
+use App\Models\MappingProduct;
 use App\Models\Material;
 use App\Models\MaterialStock;
 use App\Models\Printer;
+use App\Models\SupplierInvoiceProduct;
 use App\Services\StockService;
 use App\Traits\DatatableTrait;
 use Exception;
@@ -113,7 +115,36 @@ class MaterialController extends BaseController
                 $stockService = app(StockService::class);
                 $stockSummary = $stockService->calculateStock($object);
                 $movements = $stockService->getMovements($object->id);
-                return view('backoffice.' . $this->name . '.edit', compact('object', 'stock_types', 'stockSummary', 'movements'));
+
+                $productNames = MappingProduct::where('material_id', $object->id)
+                    ->whereNotNull('material_id')
+                    ->pluck('product_name');
+
+                $purchases = SupplierInvoiceProduct::whereIn('product_name', $productNames)
+                    ->whereHas('invoice', fn($q) => $q->whereNull('ignored_at'))
+                    ->with(['invoice.supplier'])
+                    ->get()
+                    ->map(function ($p) {
+                        $p->price_per_unit = ($p->quantity_multiplier > 0)
+                            ? round($p->price / $p->quantity_multiplier, 4)
+                            : null;
+                        return $p;
+                    })
+                    ->sortByDesc(fn($p) => $p->invoice->invoice_date)
+                    ->values();
+
+                $minPrice = $purchases
+                    ->where('ignore_mapping', 0)
+                    ->where('quantity_multiplier', '>', 0)
+                    ->pluck('price_per_unit')
+                    ->min() ?? 0;
+
+                $materials = Material::orderBy('label')->get(['id', 'label']);
+
+                return view('backoffice.' . $this->name . '.edit', compact(
+                    'object', 'stock_types', 'stockSummary', 'movements',
+                    'purchases', 'minPrice', 'materials'
+                ));
             }
             throw new Exception('Element not found');
         }
