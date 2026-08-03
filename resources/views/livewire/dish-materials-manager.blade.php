@@ -72,7 +72,7 @@
                                title="Apri scheda ingrediente in una nuova scheda"
                                style="color: inherit; text-decoration: none;">
                                 {{ $material['label'] }}
-                                <i class="fa fa-external-link" style="font-size: 10px; color: #1c84c6; margin-left: 4px; opacity: 0.75;"></i>
+                                <i class="fas fa-external-link-alt" style="font-size: 10px; color: #1c84c6; margin-left: 4px; opacity: 0.75;"></i>
                             </a>
                         </div>
                         <div style="font-size: 11px; color: #999; margin-top: 1px;">
