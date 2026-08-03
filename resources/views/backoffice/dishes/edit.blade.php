@@ -60,6 +60,9 @@
                     </div>
                 </div>
             </div>
+
+            @livewire('dish-cost-breakdown', ['dishId' => $object->id])
+
             <div class="panel panel-default">
                 <div class="panel-body">
                     <div class="row">

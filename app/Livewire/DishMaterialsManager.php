@@ -41,6 +41,31 @@ class DishMaterialsManager extends Component
     }
 
     /**
+     * Snapshot della ricetta corrente in unità base, consumato dal componente
+     * DishCostBreakdown per aggiornare la stima costo in tempo reale.
+     * @return array<int, array{material_id:int, quantity_base:float}>
+     */
+    protected function currentRecipeSnapshot(): array
+    {
+        $out = [];
+        foreach ($this->selectedMaterials as $m) {
+            $qty       = (float) ($m['quantity'] ?? 0);
+            $unitType  = $m['unit_type'] ?? $m['stock_type'];
+            $baseQty   = $qty > 0 ? UnitConverter::toBase($qty, $unitType) : 0.0;
+            $out[] = [
+                'material_id'   => (int) $m['id'],
+                'quantity_base' => $baseQty,
+            ];
+        }
+        return $out;
+    }
+
+    protected function dispatchRecipeUpdated(): void
+    {
+        $this->dispatch('dish-materials-updated', items: $this->currentRecipeSnapshot());
+    }
+
+    /**
      * Converte un valore in unità base nella rappresentazione più leggibile.
      * Es. 0.025 kg → ['quantity' => 25, 'unit' => 'g']
      *     1.5 kg  → ['quantity' => 1.5, 'unit' => 'kg']
@@ -97,12 +122,14 @@ class DishMaterialsManager extends Component
 
             $this->search = '';
             $this->searchResults = [];
+            $this->dispatchRecipeUpdated();
         }
     }
 
     public function removeMaterial($materialId)
     {
         unset($this->selectedMaterials[$materialId]);
+        $this->dispatchRecipeUpdated();
     }
 
     public function getStockTypeLabel($stockType)
@@ -124,6 +151,7 @@ class DishMaterialsManager extends Component
     public function updatedSelectedMaterials()
     {
         // Forza il re-render del componente per aggiornare il campo hidden
+        $this->dispatchRecipeUpdated();
     }
 
     public function getMaterialsData()

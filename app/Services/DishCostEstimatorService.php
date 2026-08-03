@@ -291,6 +291,65 @@ class DishCostEstimatorService
     }
 
     /**
+     * Breakdown del costo per una ricetta arbitraria (elenco material_id + quantità in unità base).
+     * Usato dalla scheda piatto per stimare il food cost in tempo reale sulla ricetta corrente,
+     * senza dover salvare o consultare gli ordini.
+     *
+     * @param array<int, array{material_id:int, quantity_base:float}> $items
+     * @return array{
+     *   total_cost: float,
+     *   coverage: float,
+     *   materials: array<int, array{material_id:int, name:string, unit:string, qty_base:float, avg_cost:?float, contribution:float, has_cost:bool}>
+     * }
+     */
+    public function getRecipeCostBreakdown(array $items): array
+    {
+        $costs = $this->getMaterialAvgCosts();
+
+        $ids = array_values(array_unique(array_filter(array_map(
+            fn($it) => (int) ($it['material_id'] ?? 0),
+            $items
+        ))));
+        $materialsMeta = $ids
+            ? \App\Models\Material::whereIn('id', $ids)->get(['id', 'label', 'stock_type'])->keyBy('id')
+            : collect();
+
+        $total = 0.0;
+        $materials = [];
+        foreach ($items as $it) {
+            $mid = (int) ($it['material_id'] ?? 0);
+            $qty = (float) ($it['quantity_base'] ?? 0);
+            if ($mid <= 0) {
+                continue;
+            }
+            $meta      = $materialsMeta->get($mid);
+            $avg       = $costs[$mid] ?? null;
+            $contrib   = $avg !== null ? round($qty * $avg, 4) : 0.0;
+            $materials[] = [
+                'material_id'   => $mid,
+                'name'          => $meta?->label ?? "Materiale #{$mid}",
+                'unit'          => $meta?->stock_type ?? '',
+                'qty_base'      => $qty,
+                'avg_cost'      => $avg !== null ? (float) $avg : null,
+                'contribution'  => $contrib,
+                'has_cost'      => $avg !== null,
+            ];
+            if ($avg !== null) {
+                $total += $qty * $avg;
+            }
+        }
+
+        $count = count($materials);
+        $known = count(array_filter($materials, fn($m) => $m['has_cost']));
+
+        return [
+            'total_cost' => round($total, 4),
+            'coverage'   => $count > 0 ? $known / $count : 0.0,
+            'materials'  => $materials,
+        ];
+    }
+
+    /**
      * Costo stimato aggregato per dish_id (tutti gli ordini pagati, autoconsumo escluso).
      * @param array<int>|null $dishIds se null restituisce tutti
      * @return array<int, float> [dish_id => total_cost]
