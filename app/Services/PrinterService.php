@@ -143,7 +143,9 @@ class PrinterService implements PrinterServiceInterface
             $printer->setEmphasis(false);
             $printer->setJustification(EscposPrinter::JUSTIFY_LEFT);
             $operatorName = 'N/D';
-            if (count($items) > 0 && isset($items[0]->addedBy)) {
+            if ($this->currentOperatorId) {
+                $operatorName = User::find($this->currentOperatorId)?->name ?? 'N/D';
+            } elseif (count($items) > 0 && isset($items[0]->addedBy)) {
                 $operatorName = $items[0]->addedBy->name ?? 'N/D';
             }
 
@@ -214,7 +216,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setEmphasis(true);
                 $printer->setTextSize(2, 2);
                 $printer->setReverseColors(true);
-                $printer->text(str_pad('*** STORNO ***', 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->text(str_pad('*** STORNO ***', 18, ' ', STR_PAD_BOTH) . "\n");
                 $printer->setReverseColors(false);
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
@@ -2031,7 +2033,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setEmphasis(true);
                 $printer->setTextSize(2, 2);
                 $printer->setReverseColors(true);
-                $printer->text(str_pad('*** STORNO ***', 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->text(str_pad('*** STORNO ***', 18, ' ', STR_PAD_BOTH) . "\n");
                 $printer->setReverseColors(false);
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
@@ -2054,7 +2056,7 @@ class PrinterService implements PrinterServiceInterface
                 $printer->setTextSize(2, 2);
                 $printer->setReverseColors(true);
                 $label = '*** AGGIUNTA ***';
-                $printer->text(str_pad($label, 24, ' ', STR_PAD_BOTH) . "\n");
+                $printer->text(str_pad($label, 20, ' ', STR_PAD_BOTH) . "\n");
                 $printer->setReverseColors(false);
                 $printer->setTextSize(1, 1);
                 $printer->setEmphasis(false);
