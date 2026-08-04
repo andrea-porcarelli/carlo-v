@@ -1414,7 +1414,10 @@ input, textarea, select {
     flex-shrink: 0;
     width: 100%;
     padding: 2px 4px;
-    border: 1px solid #dee2e6;
+    /* Bordo sottile con lato sinistro evidenziato del colore categoria */
+    border-style: solid;
+    border-width: 1px 1px 1px 4px;
+    border-color: #dee2e6;
     border-radius: 4px;
     background: white;
     color: #495057;
@@ -1427,9 +1430,18 @@ input, textarea, select {
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.1;
-    min-height: 24px;
+    min-height: 22px;
     transition: all 0.15s;
     box-sizing: border-box;
+}
+
+/* Categoria attiva: nessun fill colorato — solo grigio chiaro + testo scuro
+   più marcato. Il bordo colorato (impostato inline) rende chiara la categoria. */
+.dsm-cat-btn.active {
+    background: #e9ecef;
+    color: #000;
+    font-weight: 800;
+    border-left-width: 6px;
 }
 
 .dsm-cat-btn.active {
@@ -1471,12 +1483,12 @@ input, textarea, select {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
     transition: background 0.1s;
-    gap: 6px;
-    min-height: 30px;
+    gap: 5px;
+    min-height: 24px;
 }
 
 .dsm-dish-row:active {
@@ -1484,19 +1496,22 @@ input, textarea, select {
 }
 
 .dsm-dish-name {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     font-weight: 600;
     color: #212529;
     flex: 1;
     text-transform: uppercase;
-    line-height: 1.15;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Tasto "+" a destra della riga: aggiunge subito il piatto senza aprire il modal */
 .dsm-dish-add-quick {
     flex: 0 0 auto;
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     background: #28a745;
     color: #fff;

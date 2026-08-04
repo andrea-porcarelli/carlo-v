@@ -52,7 +52,10 @@ class DishSelectorMobile extends Component
             $query->where('label', 'like', '%' . $this->search . '%');
         }
 
-        $this->dishes = $query->orderBy('label')->get();
+        // Ordina per il nome mostrato: print_label se presente, altrimenti label
+        $this->dishes = $query
+            ->orderByRaw('LOWER(COALESCE(NULLIF(print_label, ""), label)) ASC')
+            ->get();
     }
 
     public function render()

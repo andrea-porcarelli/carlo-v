@@ -6,9 +6,7 @@
             <button class="dsm-cat-btn {{ $selectedCategory == $category->id ? 'active' : '' }}"
                     wire:click="selectCategory({{ $category->id }})"
                     @if($category->color)
-                        style="{{ $selectedCategory == $category->id
-                            ? 'background:' . $category->color . '; border-color:' . $category->color . ';'
-                            : 'border-color:' . $category->color . '; color:' . $category->color . ';' }}"
+                        style="border-color: {{ $category->color }};"
                     @endif>
                 {{ strtoupper($category->label) }}
             </button>
