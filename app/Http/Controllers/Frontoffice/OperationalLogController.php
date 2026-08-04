@@ -24,19 +24,29 @@ class OperationalLogController extends Controller
             ? Carbon::parse($request->input('date'))->toDateString()
             : Carbon::today()->toDateString();
 
+        [$start, $end] = $this->operationalWindow($date);
+
         return response()->json([
             'date'        => $date,
-            'venduto'     => $this->venduto($date),
+            'venduto'     => $this->venduto($start, $end),
             'daIncassare' => $this->daIncassare(),
-            'cancellati'  => $this->cancellati($date),
-            'modificati'  => $this->modificati($date),
+            'cancellati'  => $this->cancellati($start, $end),
+            'modificati'  => $this->modificati($start, $end),
         ]);
     }
 
-    private function venduto(string $date): array
+    // Giornata operativa: 05:50 del giorno indicato → 05:50 del giorno successivo
+    private function operationalWindow(string $date): array
+    {
+        $start = Carbon::parse($date)->setTime(5, 50, 0);
+        $end   = (clone $start)->addDay();
+        return [$start, $end];
+    }
+
+    private function venduto(Carbon $start, Carbon $end): array
     {
         $paid = TableOrder::where('status', 'paid')
-            ->whereDate('closed_at', $date)
+            ->whereBetween('closed_at', [$start, $end])
             ->with('restaurantTable:id,table_number,is_banco')
             ->get(['id', 'restaurant_table_id', 'total_amount', 'discount_type', 'discount_value', 'payment_method', 'autoconsumo', 'closed_at']);
 
@@ -153,10 +163,10 @@ class OperationalLogController extends Controller
         ];
     }
 
-    private function cancellati(string $date): array
+    private function cancellati(Carbon $start, Carbon $end): array
     {
         return TableOrderLog::where('action', TableOrderLog::ACTION_REMOVE_ITEM)
-            ->whereDate('created_at', $date)
+            ->whereBetween('created_at', [$start, $end])
             ->with(['user:id,name', 'tableOrder.restaurantTable:id,table_number'])
             ->orderByDesc('created_at')
             ->get()
@@ -176,7 +186,7 @@ class OperationalLogController extends Controller
             ->toArray();
     }
 
-    private function modificati(string $date): array
+    private function modificati(Carbon $start, Carbon $end): array
     {
         $actions = [
             'update_item_price',
@@ -189,7 +199,7 @@ class OperationalLogController extends Controller
 
         $rows = [];
         TableOrderLog::whereIn('action', $actions)
-            ->whereDate('created_at', $date)
+            ->whereBetween('created_at', [$start, $end])
             ->with(['user:id,name', 'tableOrder.restaurantTable:id,table_number'])
             ->orderByDesc('created_at')
             ->get()

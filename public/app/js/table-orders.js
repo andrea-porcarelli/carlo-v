@@ -18,6 +18,7 @@ class TableOrdersManager {
             items: [],
             pendingAdd: [],
             pendingRemove: [],
+            pendingPartialRemove: {},
             pendingUpdate: {},
             pendingDishChange: [],
             itemCounter: -1,
@@ -617,6 +618,7 @@ class TableOrdersManager {
             : [];
         this.modifySession.pendingAdd = [];
         this.modifySession.pendingRemove = [];
+        this.modifySession.pendingPartialRemove = {};
         this.modifySession.pendingUpdate = {};
         this.modifySession.pendingDishChange = [];
         this.modifySession.itemCounter = -1;
@@ -2124,10 +2126,23 @@ class TableOrdersManager {
     }
 
     /**
-     * Remove item from order
+     * Remove item from order.
+     * If item.quantity > 1, first asks how many units to remove; a partial
+     * reduction triggers a STORNO print for the delta at the department printer.
      */
     async removeItem(itemId) {
         if (this.modifySession.active) {
+            const sessionItem = this.modifySession.items.find(i => i.id === itemId);
+            if (!sessionItem) return;
+
+            let qtyToRemove = sessionItem.quantity;
+            if (sessionItem.quantity > 1) {
+                qtyToRemove = await this._showRemoveQuantityModal(sessionItem.quantity, sessionItem.dish_name);
+                if (!qtyToRemove) return; // user cancelled
+            }
+
+            const isPartial = qtyToRemove < sessionItem.quantity;
+
             const reason = await this._showRemoveReasonModal();
             if (!reason) return; // user cancelled
 
@@ -2139,13 +2154,43 @@ class TableOrdersManager {
                 return;
             }
 
-            const item = this.modifySession.items.find(i => i.id === itemId);
-            if (!item) return;
+            if (isPartial) {
+                const newQty = sessionItem.quantity - qtyToRemove;
+                sessionItem.quantity = newQty;
+                sessionItem.subtotal = parseFloat(
+                    ((parseFloat(sessionItem.unit_price) + this._itemExtrasTotal(sessionItem)) * newQty).toFixed(2)
+                );
 
-            if (item._isNew) {
+                if (sessionItem._isNew) {
+                    // New item never submitted: just shrink the pendingAdd entry
+                    const paIdx = this.modifySession.pendingAdd.findIndex(i => i._localId === itemId);
+                    if (paIdx >= 0) this.modifySession.pendingAdd[paIdx].quantity = newQty;
+                } else {
+                    // Persisted item: schedule a modifyItem call at submit so STORNO prints with reason
+                    this.modifySession.pendingPartialRemove[itemId] = {
+                        new_quantity: newQty,
+                        reason,
+                        authToken: auth.token,
+                    };
+                    // Any pending qty update on the same item is superseded by this partial removal
+                    if (this.modifySession.pendingUpdate[itemId]) {
+                        delete this.modifySession.pendingUpdate[itemId].quantity;
+                        if (Object.keys(this.modifySession.pendingUpdate[itemId]).length === 0) {
+                            delete this.modifySession.pendingUpdate[itemId];
+                        }
+                    }
+                }
+                this.updateModifyReceiptItems();
+                return;
+            }
+
+            // Full removal
+            if (sessionItem._isNew) {
                 this.modifySession.items = this.modifySession.items.filter(i => i.id !== itemId);
                 this.modifySession.pendingAdd = this.modifySession.pendingAdd.filter(i => i._localId !== itemId);
             } else {
+                // Se c'era una rimozione parziale pendente, va sostituita dalla rimozione totale
+                delete this.modifySession.pendingPartialRemove[itemId];
                 this.modifySession.pendingRemove.push({ id: itemId, reason, authToken: auth.token });
                 this.modifySession.items = this.modifySession.items.filter(i => i.id !== itemId);
             }
@@ -2154,7 +2199,25 @@ class TableOrdersManager {
             return;
         }
 
-        if (!confirm('Vuoi rimuovere questo prodotto?')) return;
+        // ── Direct (non-session) path ────────────────────────────────────────
+        const dbItem = this.currentTable?.order?.items?.find(i => i.id === itemId);
+        const currentQty = dbItem ? parseInt(dbItem.quantity) : 1;
+
+        let qtyToRemove = currentQty;
+        if (currentQty > 1) {
+            qtyToRemove = await this._showRemoveQuantityModal(currentQty, dbItem?.dish_name);
+            if (!qtyToRemove) return;
+        }
+        const isPartial = qtyToRemove < currentQty;
+
+        // Motivo: obbligatorio per rimozione parziale (backend lo richiede per items già stampati)
+        let reason = null;
+        if (isPartial) {
+            reason = await this._showRemoveReasonModal();
+            if (!reason) return;
+        } else if (!confirm('Vuoi rimuovere questo prodotto?')) {
+            return;
+        }
 
         let auth;
         try {
@@ -2166,18 +2229,36 @@ class TableOrdersManager {
         }
 
         try {
-            const response = await fetch(`${this.apiBase}/items/${itemId}`, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    'X-Operator-Token': auth.token
-                }
-            });
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+            let response;
+            if (isPartial) {
+                response = await fetch(`${this.apiBase}/items/${itemId}/modify`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Operator-Token': auth.token,
+                    },
+                    body: JSON.stringify({
+                        new_quantity: currentQty - qtyToRemove,
+                        new_unit_price: parseFloat(dbItem.unit_price),
+                        reason,
+                    }),
+                });
+            } else {
+                response = await fetch(`${this.apiBase}/items/${itemId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Operator-Token': auth.token,
+                    },
+                });
+            }
 
             const result = await response.json();
 
             if (result.success) {
-                this.showNotification('Prodotto rimosso');
+                this.showNotification(isPartial ? `Rimosse ${qtyToRemove} unità` : 'Prodotto rimosso');
                 await this.selectTable(this.currentTable.table.id);
                 await this.loadTables();
                 const modifyOverlay = document.getElementById('modifyOrderOverlay');
@@ -2191,6 +2272,56 @@ class TableOrdersManager {
             console.error('Error removing item:', error);
             this.showNotification('Errore nella rimozione', 'error');
         }
+    }
+
+    /**
+     * Show modal to choose how many units to remove (1..maxQty).
+     * Returns the chosen integer, or null if cancelled.
+     */
+    _showRemoveQuantityModal(maxQty, dishName = '') {
+        return new Promise(resolve => {
+            const modal = document.getElementById('removeQuantityModal');
+            if (!modal) { resolve(maxQty); return; }
+
+            const nameEl  = document.getElementById('removeQuantityDishName');
+            const availEl = document.getElementById('removeQuantityAvailable');
+            const btnCont = document.getElementById('removeQuantityButtons');
+            const allBtn  = document.getElementById('removeQuantityAll');
+            const cancelBtn = document.getElementById('cancelRemoveQuantity');
+
+            if (nameEl)  nameEl.textContent = dishName || '';
+            if (availEl) availEl.textContent = maxQty;
+            if (btnCont) {
+                while (btnCont.firstChild) btnCont.removeChild(btnCont.firstChild);
+                for (let i = 1; i < maxQty; i++) {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'remove-quantity-btn';
+                    b.dataset.qty = i;
+                    b.textContent = i;
+                    b.style.cssText = 'padding:14px 8px; background:#f8f9fa; border:2px solid #dee2e6; border-radius:6px; cursor:pointer; font-weight:700; font-size:1.1rem;';
+                    btnCont.appendChild(b);
+                }
+            }
+
+            modal.style.display = 'flex';
+
+            const cleanup = (value) => {
+                modal.style.display = 'none';
+                if (btnCont) btnCont.querySelectorAll('.remove-quantity-btn').forEach(b => b.replaceWith(b.cloneNode(true)));
+                if (allBtn)    allBtn.replaceWith(allBtn.cloneNode(true));
+                if (cancelBtn) cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                resolve(value);
+            };
+
+            if (btnCont) {
+                btnCont.querySelectorAll('.remove-quantity-btn').forEach(b => {
+                    b.addEventListener('click', () => cleanup(parseInt(b.dataset.qty)));
+                });
+            }
+            if (allBtn)    allBtn.addEventListener('click', () => cleanup(maxQty));
+            if (cancelBtn) cancelBtn.addEventListener('click', () => cleanup(null));
+        });
     }
 
     /**
@@ -2311,6 +2442,11 @@ class TableOrdersManager {
         } else {
             if (!this.modifySession.pendingUpdate[itemId]) this.modifySession.pendingUpdate[itemId] = {};
             this.modifySession.pendingUpdate[itemId].quantity = item.quantity;
+            // Un eventuale partial removal precedente è ora obsoleto: lo scarto per evitare
+            // che il batch submit invii due chiamate contrastanti sullo stesso item.
+            if (this.modifySession.pendingPartialRemove && this.modifySession.pendingPartialRemove[itemId]) {
+                delete this.modifySession.pendingPartialRemove[itemId];
+            }
         }
     }
 
@@ -4768,6 +4904,7 @@ class TableOrdersManager {
         const hasChanges =
             this.modifySession.pendingAdd.length > 0 ||
             this.modifySession.pendingRemove.length > 0 ||
+            Object.keys(this.modifySession.pendingPartialRemove || {}).length > 0 ||
             Object.keys(this.modifySession.pendingUpdate).length > 0 ||
             (this.modifySession.pendingDishChange || []).length > 0;
 
@@ -4822,6 +4959,7 @@ class TableOrdersManager {
         const hasChanges =
             this.modifySession.pendingAdd.length > 0 ||
             this.modifySession.pendingRemove.length > 0 ||
+            Object.keys(this.modifySession.pendingPartialRemove || {}).length > 0 ||
             Object.keys(this.modifySession.pendingUpdate).length > 0 ||
             (this.modifySession.pendingDishChange || []).length > 0;
 
@@ -4988,6 +5126,31 @@ class TableOrdersManager {
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
                 throw new Error(err.message || `Errore nella rimozione (${resp.status})`);
+            }
+        }
+
+        // 1b. Partial removals (quantity decrement with STORNO print of the delta)
+        for (const [itemIdStr, partial] of Object.entries(this.modifySession.pendingPartialRemove || {})) {
+            const itemId = parseInt(itemIdStr);
+            // Prezzo unitario originale dall'ordine (necessario dal payload modifyItem)
+            const origItem = this.currentTable?.order?.items?.find(i => i.id === itemId);
+            const unitPrice = origItem ? parseFloat(origItem.unit_price) : null;
+            const resp = await fetch(`${this.apiBase}/items/${itemId}/modify`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Operator-Token': partial.authToken ?? token,
+                },
+                body: JSON.stringify({
+                    new_quantity: partial.new_quantity,
+                    new_unit_price: unitPrice,
+                    reason: partial.reason,
+                }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || `Errore nella rimozione parziale (${resp.status})`);
             }
         }
 

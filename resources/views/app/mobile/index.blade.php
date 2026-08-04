@@ -138,6 +138,24 @@
         </div>
     </div>
 
+    <!-- Remove Quantity Modal (shown when item.quantity > 1) -->
+    <div id="removeQuantityModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:3000; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:8px; padding:22px; max-width:380px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+            <h4 style="margin:0 0 6px 0; font-weight:700; text-transform:uppercase; text-align:center; color:#000;">
+                <i class="fas fa-trash-alt me-2" style="color:#dc3545;"></i>Quantità da rimuovere
+            </h4>
+            <p style="margin:0 0 14px 0; text-align:center; color:#6c757d; font-size:0.85rem;">
+                <span id="removeQuantityDishName" style="font-weight:600; color:#212529;"></span>
+                — presenti <strong id="removeQuantityAvailable">0</strong>
+            </p>
+            <div id="removeQuantityButtons" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(60px, 1fr)); gap:8px; margin-bottom:10px;"></div>
+            <button id="removeQuantityAll" class="remove-quantity-all-btn" style="width:100%; padding:11px; background:#dc3545; color:white; border:none; border-radius:6px; font-weight:700; text-transform:uppercase; cursor:pointer; margin-bottom:8px; font-size:0.9rem;">
+                <i class="fas fa-trash me-1"></i> Rimuovi tutti
+            </button>
+            <button id="cancelRemoveQuantity" style="width:100%; padding:11px; background:#6c757d; border:none; color:white; font-weight:600; text-transform:uppercase; border-radius:6px; cursor:pointer;">ANNULLA</button>
+        </div>
+    </div>
+
     <!-- Remove Reason Modal -->
     <div id="removeReasonModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:3000; align-items:center; justify-content:center;">
         <div style="background:white; border-radius:8px; padding:24px; max-width:380px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
