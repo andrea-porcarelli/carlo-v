@@ -92,6 +92,15 @@
                 </div>
             </div>
 
+            @if($isMobile)
+            <!-- Toggle: apre/chiude Note+Supplementi+Rimozioni (solo mobile) -->
+            <button type="button" id="productExtrasToggle" class="product-extras-toggle" aria-expanded="false">
+                <span><i class="fas fa-sliders-h me-1"></i> Note, supplementi e rimozioni</span>
+                <i class="fas fa-chevron-down chev"></i>
+            </button>
+            @endif
+
+            <div id="productExtrasCollapse" class="product-extras-collapse {{ $isMobile ? 'collapsed' : '' }}">
             <!-- Notes -->
             <div class="{{ $isMobile ? 'mobile-form-group' : '' }}"
                  style="{{ !$isMobile ? 'margin-bottom: 10px;' : '' }}"
@@ -138,6 +147,7 @@
                     <!-- Removals will be dynamically loaded -->
                 </div>
             </div>
+            </div><!-- /#productExtrasCollapse -->
 
             <!-- Total (Mobile) -->
             @if($isMobile)

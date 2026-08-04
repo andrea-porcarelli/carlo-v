@@ -33,12 +33,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 15px;
+    padding: 7px 9px;
     border-bottom: 1px solid #333;
 }
 
 .mobile-logo {
-    font-size: 18px;
+    font-size: 12px;
     font-weight: 700;
     text-transform: uppercase;
     display: flex;
@@ -46,7 +46,7 @@
 }
 
 .mobile-logo i {
-    margin-right: 8px;
+    margin-right: 5px;
     color: #dc3545;
 }
 
@@ -111,8 +111,8 @@
 /* ===== MOBILE PAGES ===== */
 .mobile-page {
     display: none;
-    padding: 15px;
-    padding-top: 85px;
+    padding: 9px;
+    padding-top: 55px;
 }
 
 .mobile-page.active {
@@ -120,29 +120,29 @@
 }
 
 .mobile-section-title {
-    font-size: 16px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     color: #000;
-    margin-bottom: 15px;
-    padding: 10px 15px;
+    margin-bottom: 8px;
+    padding: 6px 10px;
     background: white;
-    border-radius: 8px;
+    border-radius: 6px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 /* ===== DINING AREA (MOBILE) ===== */
 .mobile-dining-area {
-    padding-bottom: 20px;
+    padding-bottom: 12px;
 }
 
 .mobile-tables-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    padding: 15px;
+    gap: 6px;
+    padding: 8px;
     background: white;
-    border-radius: 8px;
+    border-radius: 6px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
@@ -429,8 +429,8 @@
 .mobile-modal-header {
     background: #000;
     color: white;
-    padding: 20px;
-    border-radius: 20px 20px 0 0;
+    padding: 10px 14px;
+    border-radius: 14px 14px 0 0;
     position: relative;
 }
 
@@ -439,26 +439,26 @@
 }
 
 .table-number-large {
-    font-size: 48px;
+    font-size: 30px;
     font-weight: 700;
     color: #dc3545;
     line-height: 1;
 }
 
 .table-number-medium {
-    font-size: 28px;
+    font-size: 20px;
     font-weight: 700;
     color: #dc3545;
     line-height: 1;
 }
 
 .mobile-modal-header-compact {
-    padding: 12px 20px;
+    padding: 8px 14px;
 }
 
 .mobile-modal-header-compact .table-status-text {
-    margin-top: 2px;
-    font-size: 11px;
+    margin-top: 1px;
+    font-size: 10px;
 }
 
 /* ===== ADD PRODUCT BAR ===== */
@@ -563,22 +563,22 @@
 
 .product-price {
     color: #dc3545;
-    font-size: 24px;
+    font-size: 15px;
     font-weight: 700;
-    margin-top: 8px;
+    margin-top: 4px;
 }
 
 .mobile-close-btn {
     position: absolute;
-    top: 15px;
-    right: 15px;
-    width: 36px;
-    height: 36px;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     background: #dc3545;
     color: white;
     border: none;
-    font-size: 20px;
+    font-size: 14px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -594,12 +594,12 @@
 .mobile-modal-body {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
+    padding: 12px;
     -webkit-overflow-scrolling: touch;
 }
 
 .mobile-modal-footer {
-    padding: 15px 20px;
+    padding: 9px 12px;
     border-top: 1px solid #dee2e6;
     background: #f8f9fa;
 }
@@ -608,17 +608,17 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px 0;
+    padding: 9px 0;
 }
 
 .mobile-total-label {
-    font-size: 18px;
+    font-size: 12px;
     font-weight: 700;
     color: #000;
 }
 
 .mobile-total-amount {
-    font-size: 28px;
+    font-size: 18px;
     font-weight: 700;
     color: #dc3545;
 }
@@ -626,14 +626,14 @@
 .mobile-footer-actions {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
 }
 
 .mobile-modal-total {
     background: #f8f9fa;
-    padding: 15px;
-    border-radius: 8px;
-    margin-top: 20px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-top: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -641,33 +641,33 @@
 
 /* ===== FORM ELEMENTS (MOBILE) ===== */
 .mobile-form-group {
-    margin-bottom: 25px;
+    margin-bottom: 12px;
 }
 
 .mobile-form-label {
     display: block;
-    font-size: 14px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     color: #000;
-    margin-bottom: 12px;
+    margin-bottom: 5px;
 }
 
 .mobile-quantity-control {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
     justify-content: center;
 }
 
 .mobile-qty-btn {
-    width: 50px;
-    height: 50px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     background: #dc3545;
     color: white;
     border: none;
-    font-size: 24px;
+    font-size: 17px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s;
@@ -679,22 +679,22 @@
 }
 
 .mobile-qty-input {
-    width: 80px;
-    height: 50px;
+    width: 54px;
+    height: 34px;
     text-align: center;
     border: 2px solid #dee2e6;
-    border-radius: 8px;
-    font-size: 20px;
+    border-radius: 6px;
+    font-size: 15px;
     font-weight: 700;
 }
 
 .mobile-textarea {
     width: 100%;
-    min-height: 100px;
-    padding: 12px;
+    min-height: 55px;
+    padding: 7px;
     border: 2px solid #dee2e6;
-    border-radius: 8px;
-    font-size: 14px;
+    border-radius: 6px;
+    font-size: 13px;
     font-family: inherit;
     resize: vertical;
 }
@@ -702,25 +702,25 @@
 .mobile-checkbox-group {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 5px;
 }
 
 .mobile-checkbox-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px;
+    padding: 7px 10px;
     background: #f8f9fa;
     border: 2px solid #dee2e6;
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
 }
 
 .mobile-checkbox-item input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    margin-right: 10px;
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
     cursor: pointer;
 }
 
@@ -731,7 +731,7 @@
 .price-tag {
     color: #dc3545;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 /* ===== RECEIPT ITEMS (MOBILE) ===== */
@@ -1388,17 +1388,20 @@ input, textarea, select {
 }
 
 /* ===== DISH SELECTOR MOBILE (dsm-*) ===== */
+/* Barra verticale categorie: colonna stretta a sinistra della lista piatti.
+   Scroll verticale se le categorie superano l'altezza disponibile. */
 .dsm-categories-strip {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 7px;
-    padding: 10px 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    gap: 3px;
+    padding: 4px 3px;
     background: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
-    flex-shrink: 0;
+    border-right: 1px solid #dee2e6;
+    flex: 0 0 68px;
+    width: 68px;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
 }
@@ -1409,18 +1412,24 @@ input, textarea, select {
 
 .dsm-cat-btn {
     flex-shrink: 0;
-    padding: 7px 14px;
-    border: 2px solid #dee2e6;
-    border-radius: 20px;
+    width: 100%;
+    padding: 2px 4px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
     background: white;
     color: #495057;
-    font-size: 0.72rem;
+    font-size: 0.55rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.2px;
     cursor: pointer;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.1;
+    min-height: 24px;
     transition: all 0.15s;
+    box-sizing: border-box;
 }
 
 .dsm-cat-btn.active {
@@ -1462,11 +1471,12 @@ input, textarea, select {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 2px 8px;
     border-bottom: 1px solid #f0f0f0;
     cursor: pointer;
     transition: background 0.1s;
-    gap: 10px;
+    gap: 6px;
+    min-height: 30px;
 }
 
 .dsm-dish-row:active {
@@ -1474,11 +1484,35 @@ input, textarea, select {
 }
 
 .dsm-dish-name {
-    font-size: 0.92rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: #212529;
     flex: 1;
     text-transform: uppercase;
+    line-height: 1.15;
+}
+
+/* Tasto "+" a destra della riga: aggiunge subito il piatto senza aprire il modal */
+.dsm-dish-add-quick {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #28a745;
+    color: #fff;
+    border: none;
+    font-size: 9px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(40,167,69,0.35);
+    padding: 0;
+}
+.dsm-dish-add-quick:active {
+    transform: scale(0.9);
+    background: #218838;
 }
 
 /* Maiuscolo solo sul nome piatto nelle voci ordine mobile (non su note/extras/rimozioni) */
@@ -1498,24 +1532,58 @@ body.mobile-body #modifyReceiptItems .receipt-item:active {
     background: rgba(13, 110, 253, 0.06);
 }
 
-/* In mobile il SEGUE si gestisce dal tasto in basso: nascondiamo separatori e placeholder inline */
-body.mobile-body #modifyReceiptItems .segue-separator,
+/* In mobile il tasto SEGUE in basso rimane la via primaria per inserirlo,
+   quindi nascondiamo il "+ segue" inline tra i piatti. Il separatore reale
+   (★ SEGUE ★) resta visibile ma reso più compatto. */
 body.mobile-body #modifyReceiptItems .segue-placeholder {
     display: none !important;
+}
+body.mobile-body #modifyReceiptItems .segue-separator {
+    margin: 1px 0 !important;
+    gap: 4px !important;
+}
+body.mobile-body #modifyReceiptItems .segue-separator > div {
+    height: 1px !important;
+}
+body.mobile-body #modifyReceiptItems .segue-separator > span {
+    font-size: 0.65rem !important;
+    letter-spacing: 0.5px !important;
+    font-weight: 700 !important;
+}
+body.mobile-body #modifyReceiptItems .segue-separator > button {
+    font-size: 0.7rem !important;
 }
 
 /* Voci ordine mobile: più compatte e prezzo discreto */
 body.mobile-body #modifyReceiptItems .receipt-item {
-    padding: 3px 6px;
+    padding: 2px 4px;
+    gap: 6px;
 }
 body.mobile-body #modifyReceiptItems .receipt-item-price {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 500;
     color: #6c757d;
 }
+body.mobile-body #modifyReceiptItems .receipt-item-body > div {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+}
+body.mobile-body #modifyReceiptItems .receipt-item-notes,
+body.mobile-body #modifyReceiptItems .receipt-item-extras,
+body.mobile-body #modifyReceiptItems .receipt-item-removals {
+    font-size: 10px !important;
+    margin-top: 1px !important;
+}
+body.mobile-body #modifyReceiptItems .receipt-item-cover {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+}
+body.mobile-body #modifyReceiptItems .receipt-item-cover strong {
+    font-size: 11px !important;
+}
 
 .dsm-dish-price {
-    font-size: 0.92rem;
+    font-size: 0.78rem;
     font-weight: 700;
     color: #dc3545;
     white-space: nowrap;
@@ -1551,6 +1619,48 @@ body.mobile-body #modifyReceiptItems .receipt-item-price {
 .preconto-option-label {
     padding: 6px !important;
     transition: none !important;
+}
+
+/* ============================================================
+   PRODUCT MODAL — Note/Supplementi/Rimozioni collassabili
+   Su mobile la sezione è chiusa di default; si apre col toggle.
+   ============================================================ */
+.product-extras-toggle {
+    display: none; /* visibile solo su .mobile-body via override */
+    width: 100%;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    color: #495057;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.product-extras-toggle .chev {
+    transition: transform 0.2s;
+    font-size: 10px;
+}
+.product-extras-toggle.open .chev {
+    transform: rotate(180deg);
+}
+.product-extras-collapse {
+    display: block;
+}
+body.mobile-body .product-extras-collapse.collapsed {
+    display: none;
+}
+/* Sul desktop il toggle non serve, la sezione è sempre aperta */
+body:not(.mobile-body) .product-extras-toggle {
+    display: none !important;
 }
 
 /* ============================================================

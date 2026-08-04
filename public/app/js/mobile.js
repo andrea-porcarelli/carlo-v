@@ -87,6 +87,28 @@ $(document).ready(function() {
         hapticFeedback([50]);
     });
 
+    // Tasto "+" nella lista piatti mobile: aggiunta immediata senza modal.
+    // Usiamo capture per intercettare il click prima che risalga a .menu-item
+    // (che aprirebbe il product modal).
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.dsm-dish-add-quick');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        const row = btn.closest('.dsm-dish-row');
+        if (!row) return;
+        const dish = {
+            id: row.dataset.dishId,
+            name: row.dataset.item,
+            price: parseFloat(row.dataset.price),
+        };
+        if (typeof tableOrdersManager !== 'undefined' && tableOrdersManager.quickAddDishToSession) {
+            tableOrdersManager.quickAddDishToSession(dish);
+            hapticFeedback([30]);
+        }
+    }, true);
+
     // ===== WELCOME MESSAGE =====
 
     setTimeout(() => {
@@ -95,6 +117,62 @@ $(document).ready(function() {
         }
     }, 500);
 });
+
+// ===== PRODUCT MODAL: toggle "Note, supplementi e rimozioni" (mobile) =====
+
+(function() {
+    const toggleId = 'productExtrasToggle';
+    const collapseId = 'productExtrasCollapse';
+    const modalId   = 'productModalMobile';
+
+    function setCollapsed(collapsed) {
+        const wrap = document.getElementById(collapseId);
+        const btn  = document.getElementById(toggleId);
+        if (!wrap || !btn) return;
+        wrap.classList.toggle('collapsed', collapsed);
+        btn.classList.toggle('open', !collapsed);
+        btn.setAttribute('aria-expanded', String(!collapsed));
+    }
+
+    function hasExistingCustomizations() {
+        const notes = document.getElementById('productNotesMobile');
+        if (notes && notes.value && notes.value.trim() !== '') return true;
+        const wrap = document.getElementById(collapseId);
+        if (!wrap) return false;
+        return !!wrap.querySelector('input[type="checkbox"]:checked');
+    }
+
+    // Toggle handler
+    document.addEventListener('click', function(ev) {
+        const btn = ev.target.closest('#' + toggleId);
+        if (!btn) return;
+        const wrap = document.getElementById(collapseId);
+        if (!wrap) return;
+        const isCollapsed = wrap.classList.contains('collapsed');
+        setCollapsed(!isCollapsed);
+    });
+
+    // Osserva l'apertura del modal mobile: se già ci sono note/extras/removals
+    // valorizzati (caso "modifica voce"), apri l'accordion; altrimenti chiudi.
+    function observeModal() {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        const obs = new MutationObserver(() => {
+            const isOpen = modal.style.display && modal.style.display !== 'none';
+            if (!isOpen) return;
+            // Piccolo delay: il JS del manager popola gli input in modo sincrono
+            // ma i checkbox extras/removals vengono generati con innerHTML — attendiamo un tick.
+            setTimeout(() => setCollapsed(!hasExistingCustomizations()), 0);
+        });
+        obs.observe(modal, { attributes: true, attributeFilter: ['style'] });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', observeModal);
+    } else {
+        observeModal();
+    }
+})();
 
 // ===== TAB SWITCHING IN OVERLAY =====
 

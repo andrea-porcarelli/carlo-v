@@ -869,26 +869,17 @@ class TableOrdersManager {
     }
 
     /**
-     * Open modify overlay with menu and order details
+     * Update the covers header (icon + count/label) in the modify overlay
+     * from currentTable.order.
      */
-    openModifyOverlay() {
-        if (!this.currentTable) return;
-
-        // Update table number
-        const modifyTableNumber = document.getElementById('modifyTableNumber');
-        const modifySelectedTableNumber = document.getElementById('modifySelectedTableNumber');
-        if (modifyTableNumber) modifyTableNumber.textContent = this.currentTable.table.table_number;
-        if (modifySelectedTableNumber) modifySelectedTableNumber.textContent = this.currentTable.table.table_number;
-
-        // Update covers info
-        const order = this.currentTable.order;
+    _updateModifyCoversHeader() {
+        const order = this.currentTable?.order;
         const modifyCoversInfo = document.getElementById('modifyCoversInfo');
         const modifyCoversCount = document.getElementById('modifyCoversCount');
         const modifyCoversIcon = document.getElementById('modifyCoversIcon');
         const modifyCoversLabel = document.getElementById('modifyCoversLabel');
         if (order && modifyCoversInfo && modifyCoversCount) {
             if (order.covers === 0) {
-                // Drinks mode
                 if (modifyCoversIcon) modifyCoversIcon.className = 'fas fa-glass-cheers';
                 modifyCoversCount.textContent = 'Consumo Bevande';
                 if (modifyCoversLabel) modifyCoversLabel.textContent = '';
@@ -904,6 +895,22 @@ class TableOrdersManager {
         } else if (modifyCoversInfo) {
             modifyCoversInfo.style.display = 'none';
         }
+    }
+
+    /**
+     * Open modify overlay with menu and order details
+     */
+    openModifyOverlay() {
+        if (!this.currentTable) return;
+
+        // Update table number
+        const modifyTableNumber = document.getElementById('modifyTableNumber');
+        const modifySelectedTableNumber = document.getElementById('modifySelectedTableNumber');
+        if (modifyTableNumber) modifyTableNumber.textContent = this.currentTable.table.table_number;
+        if (modifySelectedTableNumber) modifySelectedTableNumber.textContent = this.currentTable.table.table_number;
+
+        // Update covers info
+        this._updateModifyCoversHeader();
 
         // Update receipt items in modify overlay
         this.updateModifyReceiptItems();
@@ -1062,22 +1069,14 @@ class TableOrdersManager {
                 : `${order.covers} x €${coverPerPerson.toFixed(2)} = <strong>€${coverChargeTotal.toFixed(2)}</strong>`;
             itemsHtml += `
                 <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #17a2b8; padding-left: 15px">
-                    <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
+                    <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
                         <strong><i class="fas fa-utensils me-2"></i>Coperto</strong>
                         <span>
                             <span id="coversDisplay" style="cursor:pointer;" onclick="tableOrdersManager.editCovers()" title="Modifica coperti / valore">
                                 ${coverLabel}
                                 <i class="fas fa-pencil-alt" style="font-size:0.7rem;color:#6c757d;margin-left:4px;"></i>
                             </span>
-                            <span id="coversEdit" style="display:none;">
-                                <button onclick="tableOrdersManager.changeCovers(-1)" style="background:#dc3545;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">−</button>
-                                <span id="coversEditValue" style="display:inline-block;min-width:30px;text-align:center;font-weight:700;">${order.covers}</span>
-                                <button onclick="tableOrdersManager.changeCovers(1)" style="background:#28a745;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">+</button>
-                                <span style="margin-left:8px;color:#6c757d;font-size:0.8rem;">x €</span>
-                                <input id="coverChargeEditValue" type="number" step="0.10" min="0" value="${coverPerPerson.toFixed(2)}" style="width:70px;padding:2px 4px;border:1px solid #ced4da;border-radius:3px;font-size:0.85rem;text-align:right;" title="Valore coperto per persona">
-                                <button onclick="tableOrdersManager.saveCovers()" style="background:#17a2b8;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;margin-left:4px;font-size:0.8rem;"><i class="fas fa-check"></i> Salva</button>
-                                <button onclick="tableOrdersManager.cancelEditCovers()" style="background:#6c757d;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-times"></i></button>
-                            </span>
+                            ${this._renderCoversEditPanel(order.covers, coverPerPerson)}
                         </span>
                     </div>
                 </div>
@@ -1085,21 +1084,13 @@ class TableOrdersManager {
         } else if (order && order.covers === 0) {
             itemsHtml += `
                 <div class="receipt-item receipt-item-cover" style="background: #f8f9fa; border-left: 3px solid #ffc107;">
-                    <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;">
+                    <div class="receipt-item-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
                         <strong><i class="fas fa-glass-cheers me-2"></i>Consumo Bevande (no coperto)</strong>
                         <span>
                             <span id="coversDisplay" style="cursor:pointer;" onclick="tableOrdersManager.editCovers()" title="Modifica coperti / valore">
                                 <i class="fas fa-pencil-alt" style="font-size:0.7rem;color:#6c757d;"></i>
                             </span>
-                            <span id="coversEdit" style="display:none;">
-                                <button onclick="tableOrdersManager.changeCovers(-1)" style="background:#dc3545;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">−</button>
-                                <span id="coversEditValue" style="display:inline-block;min-width:30px;text-align:center;font-weight:700;">0</span>
-                                <button onclick="tableOrdersManager.changeCovers(1)" style="background:#28a745;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:700;">+</button>
-                                <span style="margin-left:8px;color:#6c757d;font-size:0.8rem;">x €</span>
-                                <input id="coverChargeEditValue" type="number" step="0.10" min="0" value="${coverPerPerson.toFixed(2)}" style="width:70px;padding:2px 4px;border:1px solid #ced4da;border-radius:3px;font-size:0.85rem;text-align:right;" title="Valore coperto per persona">
-                                <button onclick="tableOrdersManager.saveCovers()" style="background:#17a2b8;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;margin-left:4px;font-size:0.8rem;"><i class="fas fa-check"></i> Salva</button>
-                                <button onclick="tableOrdersManager.cancelEditCovers()" style="background:#6c757d;border:none;color:white;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:0.8rem;"><i class="fas fa-times"></i></button>
-                            </span>
+                            ${this._renderCoversEditPanel(0, coverPerPerson)}
                         </span>
                     </div>
                 </div>
@@ -2041,6 +2032,51 @@ class TableOrdersManager {
     }
 
     /**
+     * Aggiunta veloce (mobile): inserisce il piatto in sessione senza aprire il modal.
+     * Quantità 1, prezzo default, nessuna nota/supplemento/rimozione.
+     */
+    quickAddDishToSession(dish) {
+        if (!this.currentTable) return;
+        if (!(this.modifySession.permissions ?? []).includes('take_orders')) {
+            this.showNotification('Non hai il permesso di prendere comande', 'error');
+            return;
+        }
+        if (!dish || dish.id == null) return;
+
+        const unitPrice = parseFloat(dish.price) || 0;
+        const quantity = 1;
+        const subtotal = parseFloat((unitPrice * quantity).toFixed(2));
+        const localId = this.modifySession.itemCounter--;
+
+        this.modifySession.items.push({
+            id: localId,
+            dish_id: dish.id,
+            dish_name: dish.name,
+            quantity,
+            unit_price: unitPrice,
+            subtotal,
+            notes: null,
+            extras: {},
+            removals: [],
+            segue: false,
+            _isNew: true,
+        });
+        this.modifySession.pendingAdd.push({
+            _localId: localId,
+            dish_id: dish.id,
+            quantity,
+            notes: null,
+            segue: false,
+            custom_price: null,
+            extras: null,
+            removals: null,
+        });
+
+        this.updateModifyReceiptItems();
+        this.showNotification(`${dish.name} aggiunto`);
+    }
+
+    /**
      * Add product to table (legacy — kept for non-session contexts)
      */
     async addProductToTable() {
@@ -2617,6 +2653,49 @@ class TableOrdersManager {
     }
 
     /**
+     * Change per-person cover charge in edit mode (default step 0.50 €)
+     */
+    changeCoverCharge(delta) {
+        const el = document.getElementById('coverChargeEditValue');
+        if (!el) return;
+        let current = parseFloat(el.value);
+        if (!Number.isFinite(current)) current = 0;
+        current = Math.max(0, current + delta);
+        el.value = current.toFixed(2);
+    }
+
+    /**
+     * Render the inline covers edit panel (steppers per persone e valore,
+     * pulsanti Salva/Annulla). Usato in due punti del receipt (coperto attivo
+     * e modalità Consumo Bevande).
+     */
+    _renderCoversEditPanel(coversValue, coverPerPerson) {
+        const compact = !!this.isMobile;
+        const sz = compact ? 24 : 26;
+        const font = compact ? '0.8rem' : '0.9rem';
+        const btn = `width:${sz}px;height:${sz}px;border:none;color:white;border-radius:4px;cursor:pointer;font-weight:700;font-size:${font};line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;`;
+        const val = `min-width:${compact ? 20 : 24}px;text-align:center;font-weight:700;font-size:${font};color:#212529;padding:0 2px;`;
+        const inputW = compact ? 42 : 50;
+        const sep = `width:1px;height:${sz - 6}px;background:#dee2e6;margin:0 4px;flex-shrink:0;`;
+        return `
+            <span id="coversEdit" style="display:none;">
+                <span style="display:inline-flex;align-items:center;gap:3px;padding:3px 5px;background:#fff;border:1px solid #ced4da;border-radius:5px;box-shadow:0 1px 2px rgba(0,0,0,0.06);vertical-align:middle;">
+                    <button onclick="tableOrdersManager.changeCovers(-1)" style="${btn}background:#dc3545;" title="− coperto">−</button>
+                    <span id="coversEditValue" style="${val}">${coversValue}</span>
+                    <button onclick="tableOrdersManager.changeCovers(1)" style="${btn}background:#28a745;" title="+ coperto">+</button>
+                    <span style="${sep}"></span>
+                    <button onclick="tableOrdersManager.changeCoverCharge(-0.5)" style="${btn}background:#dc3545;" title="− 0,50 €">−</button>
+                    <input id="coverChargeEditValue" type="number" step="0.50" min="0" value="${coverPerPerson.toFixed(2)}" style="width:${inputW}px;padding:0;border:none;outline:none;background:transparent;font-size:${font};text-align:center;font-weight:700;color:#212529;" title="Valore coperto per persona €">
+                    <button onclick="tableOrdersManager.changeCoverCharge(0.5)" style="${btn}background:#28a745;" title="+ 0,50 €">+</button>
+                    <span style="${sep}"></span>
+                    <button onclick="tableOrdersManager.saveCovers()" style="${btn}background:#17a2b8;" title="Salva"><i class="fas fa-check"></i></button>
+                    <button onclick="tableOrdersManager.cancelEditCovers()" style="${btn}background:#6c757d;" title="Annulla"><i class="fas fa-times"></i></button>
+                </span>
+            </span>
+        `;
+    }
+
+    /**
      * Save new covers value
      */
     async saveCovers() {
@@ -2663,12 +2742,21 @@ class TableOrdersManager {
 
             if (result.success) {
                 this.showNotification('Coperti aggiornati');
-                await this.selectTable(this.currentTable.table.id);
-                await this.loadTables();
-                const modifyOverlay = document.getElementById('modifyOrderOverlay');
-                if (modifyOverlay && modifyOverlay.style.display === 'block') {
-                    this.updateModifyReceiptItems();
+
+                // Aggiorna l'ordine in place con la risposta backend: NON ricaricare
+                // via selectTable (chiederebbe un secondo PIN e resetterebbe pendingAdd,
+                // perdendo i piatti aggiunti nella sessione di modifica in corso).
+                const order = this.currentTable?.order;
+                if (order && result.data) {
+                    order.covers = result.data.covers;
+                    order.cover_charge_per_person = result.data.cover_charge_per_person;
+                    order.cover_charge_total = result.data.cover_charge_total;
+                    order.total_amount = result.data.total_amount;
+                    order.has_cover_charge = result.data.covers > 0;
                 }
+
+                this._updateModifyCoversHeader();
+                this.updateModifyReceiptItems();
             } else {
                 this.showNotification(result.message || 'Errore nell\'aggiornamento dei coperti', 'error');
             }
