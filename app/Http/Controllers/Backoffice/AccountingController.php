@@ -14,8 +14,11 @@ use App\Services\SdiStatusNotifier;
 use App\Traits\DatatableTrait;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
@@ -756,5 +759,25 @@ class AccountingController extends BaseController
         } catch (Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Invalida la cache dei crediti MySond e forza un nuovo prelievo. Solo admin.
+     */
+    public function refreshMysondCrediti(MysondFatturaService $mysond): RedirectResponse
+    {
+        $user = Auth::user();
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Solo un amministratore può aggiornare i crediti MySond.');
+        }
+
+        Cache::forget(MysondFatturaService::CREDITI_CACHE_KEY);
+        $info = $mysond->getCreditiInfo();
+
+        if (!empty($info['error'])) {
+            return back()->with('error', 'Aggiornamento crediti MySond fallito: ' . $info['error']);
+        }
+
+        return back()->with('success', "Crediti MySond aggiornati: {$info['crediti']} residui.");
     }
 }

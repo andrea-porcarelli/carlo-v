@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Facades\Utils;
 use SoapClient;
 use Exception;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class MysondFatturaService
@@ -251,11 +252,48 @@ class MysondFatturaService
         );
         try {
             $response = $this->client->getAzienda($ddc);
-            print("<pre>".print_r($response,true)."</pre>");
-            return $response->return ?? [];
+            return $response->return ?? null;
         } catch (Exception $e) {
-            $this->logDebug("getFeInviate", $ddc, null, $e);
+            $this->logDebug("getDatiAzienda", $ddc, null, $e);
             throw $e;
+        }
+    }
+
+    public const CREDITI_CACHE_KEY = 'mysond.crediti_info';
+    public const CREDITI_CACHE_TTL = 21600; // 6 ore
+
+    /**
+     * Ritorna crediti/saldo MySond con caching a 6 ore.
+     * In caso di errore ritorna array con `error` valorizzato e cache breve (5 min)
+     * per evitare di martellare MySond se è down.
+     * Formato: ['crediti' => int|null, 'saldo' => float|null, 'checked_at' => ISO string, 'error' => string|null]
+     */
+    public function getCreditiInfo(): array
+    {
+        $cached = Cache::get(self::CREDITI_CACHE_KEY);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        try {
+            $dati = $this->getDatiAzienda();
+            $info = [
+                'crediti'    => isset($dati->crediti) ? (int) $dati->crediti : null,
+                'saldo'      => isset($dati->saldo) ? (float) $dati->saldo : null,
+                'checked_at' => now()->toIso8601String(),
+                'error'      => null,
+            ];
+            Cache::put(self::CREDITI_CACHE_KEY, $info, self::CREDITI_CACHE_TTL);
+            return $info;
+        } catch (Exception $e) {
+            $info = [
+                'crediti'    => null,
+                'saldo'      => null,
+                'checked_at' => now()->toIso8601String(),
+                'error'      => $e->getMessage(),
+            ];
+            Cache::put(self::CREDITI_CACHE_KEY, $info, 300);
+            return $info;
         }
     }
 

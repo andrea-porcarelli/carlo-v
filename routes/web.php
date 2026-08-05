@@ -296,6 +296,7 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/{invoice}/mysond-inspect', [AccountingController::class, 'inspectMysond'])->name('mysond-inspect');
                 Route::post('/{invoice}/mysond-adopt', [AccountingController::class, 'adoptMysondOutcome'])->name('mysond-adopt');
             });
+            Route::post('/mysond/refresh-crediti', [AccountingController::class, 'refreshMysondCrediti'])->name('mysond.refresh-crediti');
             Route::group(['prefix' => '/customers', 'as' => 'customers.'], function() {
                 Route::get('/', [AccountingController::class, 'customers'])->name('index');
                 Route::get('/datatable', [AccountingController::class, 'customersDatatable'])->name('datatable');
