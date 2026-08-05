@@ -500,7 +500,9 @@
             <div class="qiw-card-body">
 
                 @if($this->isEditMode() && !$result)
-                    @php($editingInvoiceName = \App\Models\TableOrderInvoice::find($invoiceId)->invoice_name ?? '—')
+                    @php
+                        $editingInvoiceName = \App\Models\TableOrderInvoice::find($invoiceId)->invoice_name ?? '—';
+                    @endphp
                     <div class="alert alert-warning" style="font-size:13px;">
                         <div><i class="fa fa-pencil"></i> <strong>Modifica di una fattura in errore</strong></div>
                         <div style="margin-top:4px;">
