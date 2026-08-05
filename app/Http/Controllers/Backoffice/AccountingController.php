@@ -97,6 +97,217 @@ class AccountingController extends BaseController
         return view('backoffice.accounting.invoices.edit', compact('invoice'));
     }
 
+    /**
+     * Rende il wizard in modalità Nota di Credito (TD04). La sorgente può essere:
+     *  - `invoice`   → fattura interna esistente (query ?id=X): pre-compila cliente
+     *                  e righe copiandoli dalla fattura padre.
+     *  - `mirrored`  → fattura esterna (mirrored da MySond, ?id=X): scarica l'XML
+     *                  lazy per estrarre le righe; fallback riga singola col totale.
+     *  - `blank`     → nessuna sorgente: nota credito senza DatiFattureCollegate.
+     *
+     * Il POST è gestito dallo stesso `submit()` del wizard: la persistenza dei
+     * campi document_type / parent_invoice_id / parent_external_ref avviene lì.
+     */
+    public function createCreditNote(Request $request): View
+    {
+        $source = $request->query('source', 'blank');
+        $id     = $request->query('id');
+
+        $documentType      = TableOrderInvoice::DOCUMENT_TYPE_CREDIT_NOTE;
+        $parentInvoiceId   = null;
+        $parentExternalRef = null;
+        $parentSummary     = null;
+        $prefillCustomer   = null;
+        $prefillLines      = null;
+
+        if ($source === 'invoice' && $id) {
+            $parent = TableOrderInvoice::with('customer')->findOrFail((int) $id);
+            $parentInvoiceId = $parent->id;
+            $parentSummary   = sprintf(
+                'Fattura %s del %s%s',
+                $parent->invoice_code,
+                optional($parent->created_at)->format('d/m/Y') ?? '—',
+                $parent->customer ? ' — ' . $parent->customer->full_name : ''
+            );
+
+            if ($parent->customer) {
+                $prefillCustomer = ['id' => $parent->customer->id];
+            }
+
+            // Copia le righe della fattura padre così l'operatore può eliminarne
+            // alcune (nota credito parziale) o modificarle. Se la padre non ha
+            // righe strutturate (fatture legacy da table order), lasciamo vuoto
+            // e sarà l'utente a inserirle.
+            if (is_array($parent->lines) && count($parent->lines) > 0) {
+                $prefillLines = $parent->lines;
+            }
+        } elseif ($source === 'mirrored' && $id) {
+            $mirrored = MirroredInvoice::findOrFail((int) $id);
+
+            // Tentativo di scaricare l'XML lazy se non ancora presente, per
+            // estrarre righe e anagrafica cliente. Fail-soft: se il download
+            // fallisce ripieghiamo su una riga forfait col totale mirroraro.
+            if (empty($mirrored->xml_content)) {
+                try {
+                    $service = app(MysondFatturaService::class);
+                    $year    = $mirrored->mysond_date
+                        ? (int) $mirrored->mysond_date->format('Y')
+                        : (int) now()->format('Y');
+                    $records = $service->listInviateByFileName($mirrored->file_name, $year);
+                    foreach ($records as $rec) {
+                        if (!empty($rec->xmlContent ?? null) || !empty($rec->xml ?? null)) {
+                            $mirrored->update([
+                                'xml_content'    => (string) ($rec->xmlContent ?? $rec->xml),
+                                'xml_fetched_at' => now(),
+                            ]);
+                            break;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('mirrored xml lazy download failed', [
+                        'mirrored_id' => $mirrored->id,
+                        'error'       => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $parentExternalRef = [
+                'code'                => $mirrored->mysond_code,
+                'date'                => $mirrored->mysond_date?->format('Y-m-d'),
+                'total'               => $mirrored->mysond_total,
+                'mirrored_invoice_id' => $mirrored->id,
+            ];
+            $parentSummary = sprintf(
+                'Fattura esterna %s del %s%s',
+                $mirrored->mysond_code ?? '—',
+                $mirrored->mysond_date?->format('d/m/Y') ?? '—',
+                $mirrored->customer_name ? ' — ' . $mirrored->customer_name : ''
+            );
+
+            $prefillLines = $this->extractLinesFromMirroredXml($mirrored);
+        } elseif ($source !== 'blank') {
+            abort(422, 'Sorgente non valida.');
+        }
+
+        return view('backoffice.accounting.invoices.credit-note-create', compact(
+            'documentType', 'parentInvoiceId', 'parentExternalRef', 'parentSummary',
+            'prefillCustomer', 'prefillLines'
+        ));
+    }
+
+    /**
+     * Endpoint AJAX per la modal di selezione fattura sorgente della nota di
+     * credito: restituisce fatture interne + fatture esterne (mirrored) in un
+     * elenco unificato, filtrate per numero/cliente/data. Limitato a 30 record
+     * per tipo per non far esplodere la modal.
+     */
+    public function creditNoteSourceSuggestions(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+
+        $internalQ = TableOrderInvoice::with('customer')
+            ->where('document_type', TableOrderInvoice::DOCUMENT_TYPE_INVOICE)
+            ->orderByDesc('created_at')
+            ->limit(30);
+
+        if ($q !== '') {
+            $like = "%{$q}%";
+            $internalQ->where(function ($sub) use ($like) {
+                $sub->where('invoice_code', 'like', $like)
+                    ->orWhere('invoice_name', 'like', $like)
+                    ->orWhereHas('customer', fn ($c) => $c->where('full_name', 'like', $like));
+            });
+        }
+
+        $internal = $internalQ->get()->map(fn (TableOrderInvoice $i) => [
+            'source'        => 'invoice',
+            'id'            => $i->id,
+            'code'          => $i->invoice_code,
+            'date'          => optional($i->created_at)->format('Y-m-d'),
+            'date_display'  => optional($i->created_at)->format('d/m/Y'),
+            'customer_name' => optional($i->customer)->full_name,
+            'total'         => (float) $i->amount,
+        ]);
+
+        $externalQ = MirroredInvoice::whereNull('local_invoice_id')
+            ->orderByDesc('mysond_date')
+            ->limit(30);
+
+        if ($q !== '') {
+            $like = "%{$q}%";
+            $externalQ->where(function ($sub) use ($like) {
+                $sub->where('mysond_code', 'like', $like)
+                    ->orWhere('customer_name', 'like', $like);
+            });
+        }
+
+        $external = $externalQ->get()->map(fn (MirroredInvoice $m) => [
+            'source'        => 'mirrored',
+            'id'            => $m->id,
+            'code'          => $m->mysond_code,
+            'date'          => optional($m->mysond_date)->format('Y-m-d'),
+            'date_display'  => optional($m->mysond_date)->format('d/m/Y'),
+            'customer_name' => $m->customer_name,
+            'total'         => $m->mysond_total !== null ? (float) $m->mysond_total : null,
+        ]);
+
+        return response()->json([
+            'internal' => $internal->values()->all(),
+            'external' => $external->values()->all(),
+        ]);
+    }
+
+    /**
+     * Estrae righe fattura dal XML mirrored per pre-compilare il wizard nota
+     * credito. In caso di XML assente o parsing fallito: riga unica "Storno
+     * fattura {code}" col totale come fallback ragionevole.
+     *
+     * @return array<int, array{label: string, quantity: float, unit_price: float, vat_rate?: float, dish_id: null}>
+     */
+    private function extractLinesFromMirroredXml(MirroredInvoice $mirrored): array
+    {
+        $fallback = [[
+            'label'      => 'Storno fattura ' . ($mirrored->mysond_code ?? $mirrored->file_name),
+            'quantity'   => 1.0,
+            'unit_price' => $mirrored->mysond_total !== null ? (float) $mirrored->mysond_total : 0.0,
+            'dish_id'    => null,
+        ]];
+
+        if (empty($mirrored->xml_content)) {
+            return $fallback;
+        }
+
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($mirrored->xml_content);
+        if ($xml === false) {
+            return $fallback;
+        }
+
+        $body = $xml->FatturaElettronicaBody ?? null;
+        if (!$body) {
+            return $fallback;
+        }
+
+        $rows = [];
+        foreach ($body->DatiBeniServizi->DettaglioLinee ?? [] as $linea) {
+            $qty       = (float) ($linea->Quantita ?? 1);
+            $unitNet   = (float) ($linea->PrezzoUnitario ?? 0);
+            $vat       = (float) ($linea->AliquotaIVA ?? 0);
+            // Il wizard lavora in LORDO (unit_price include IVA), quindi
+            // ricostruiamo il lordo dal netto XML.
+            $unitGross = round($unitNet * (1 + $vat / 100), 2);
+            $rows[] = [
+                'label'      => (string) ($linea->Descrizione ?? ''),
+                'quantity'   => $qty > 0 ? $qty : 1.0,
+                'unit_price' => $unitGross,
+                'vat_rate'   => $vat,
+                'dish_id'    => null,
+            ];
+        }
+
+        return count($rows) > 0 ? $rows : $fallback;
+    }
+
     public function datatable(Request $request): JsonResponse
     {
         try {
@@ -126,8 +337,11 @@ class AccountingController extends BaseController
                     // Sovrascrive il default ordering di yajra che applica i parametri DataTables.
                 })
                 ->addColumn('code', function ($item) {
-                    $name = $item->invoice_name ? ' <small class="text-muted">(' . $item->invoice_name . ')</small>' : '';
-                    return '<strong>' . e($item->invoice_code) . '</strong>' . $name;
+                    $name  = $item->invoice_name ? ' <small class="text-muted">(' . $item->invoice_name . ')</small>' : '';
+                    $type  = $item->document_type === TableOrderInvoice::DOCUMENT_TYPE_CREDIT_NOTE
+                        ? ' <span class="label label-warning" title="Nota di credito">NC</span>'
+                        : '';
+                    return '<strong>' . e($item->invoice_code) . '</strong>' . $name . $type;
                 })
                 ->addColumn('customer_name', function ($item) {
                     return $item->customer->full_name ?? '—';
@@ -184,9 +398,18 @@ class AccountingController extends BaseController
                     }
                     $inspectBtn = '';
                     if (!empty($item->invoice_name)) {
-                        $inspectBtn = '<button class="btn btn-xs btn-info btn-inspect-mysond" data-id="' . $item->id . '" title="Ispeziona storico invii su MySond"><i class="fa fa-search"></i></button>';
+                        $inspectBtn = '<button class="btn btn-xs btn-info btn-inspect-mysond" data-id="' . $item->id . '" title="Ispeziona storico invii su MySond"><i class="fa fa-search"></i></button> ';
                     }
-                    return $xmlBtn . $logBtn . $editBtn . $resendBtn . $sdiBtn . $inspectBtn;
+                    // Nota di credito: solo da fatture TD01 (evita nota credito
+                    // di una nota credito) e solo se la fattura è stata generata
+                    // (ha invoice_code). Modifica testuale/errore ancora ammessa
+                    // — la NC riferisce il numero anche se lo stato SDI è pending.
+                    $creditNoteBtn = '';
+                    if ($item->document_type === TableOrderInvoice::DOCUMENT_TYPE_INVOICE && !empty($item->invoice_code)) {
+                        $url = route('accounting.credit-notes.create', ['source' => 'invoice', 'id' => $item->id]);
+                        $creditNoteBtn = '<a href="' . $url . '" class="btn btn-xs btn-warning" title="Emetti nota di credito da questa fattura"><i class="fa fa-file-invoice"></i></a>';
+                    }
+                    return $xmlBtn . $logBtn . $editBtn . $resendBtn . $sdiBtn . $inspectBtn . $creditNoteBtn;
                 })
                 ->addColumn('sdi_status_label_fmt', function ($item) {
                     if ($item->sdi_status === null) {

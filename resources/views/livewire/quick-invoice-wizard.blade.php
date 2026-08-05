@@ -31,6 +31,20 @@
 
 <div class="quick-invoice-wizard">
 
+    @if($this->isCreditNote())
+        <div class="alert alert-warning" style="display:flex; align-items:center; gap:12px;">
+            <i class="fa fa-file-invoice fa-2x" style="opacity:.75;"></i>
+            <div style="flex:1;">
+                <strong>Nota di credito (TD04)</strong>
+                @if($parentSummary)
+                    <div class="text-muted" style="margin-top:2px;">Storna: {{ $parentSummary }}</div>
+                @else
+                    <div class="text-muted" style="margin-top:2px;">Emissione senza riferimento a una fattura specifica (SDI ammette anche note credito standalone).</div>
+                @endif
+            </div>
+        </div>
+    @endif
+
     {{-- ────────── Stepper ────────── --}}
     <div class="qiw-stepper">
         @foreach (['Cliente', 'Righe fattura', 'Riepilogo & invio'] as $idx => $label)

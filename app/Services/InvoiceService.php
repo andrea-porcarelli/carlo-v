@@ -14,6 +14,7 @@ use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaBody\DatiBeniS
 use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaBody\DatiBeniServizi\DettaglioLinee;
 use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaBody\DatiBeniServizi\Linea;
 use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaBody\DatiGenerali;
+use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaBody\DatiGenerali\DatiDocumentoCorrelato;
 use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaBody\DatiGenerali\ScontoMaggiorazione;
 use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaBody\DatiPagamento;
 use Deved\FatturaElettronica\FatturaElettronica\FatturaElettronicaHeader\Common\DatiAnagrafici;
@@ -63,13 +64,31 @@ class InvoiceService
 
         $fatturaElettronicaFactory->setCessionarioCommittente($anagraficaCessionario, $sedeCessionario, $user->codice_destinatario, $user->pec_destinatario, $user->user_type === 'public_company');
 
+        $tipoDocumento = $invoice->document_type === TableOrderInvoice::DOCUMENT_TYPE_CREDIT_NOTE
+            ? TipoDocumento::NotaDiCredito
+            : TipoDocumento::Fattura;
+
         $datiGenerali = new DatiGenerali(
-            TipoDocumento::Fattura,
+            $tipoDocumento,
             substr($invoice->created_at, 0, 10),
             $invoice->invoice_code,
             $invoice->amount,
         );
 
+        // Per TD04: DatiFattureCollegate obbligatorio quando la nota di credito
+        // riferisce una fattura precedente (interna o esterna). SDI accetta anche
+        // note credito standalone (senza riferimento), quindi non forziamo la
+        // presenza — la valorizziamo solo se abbiamo i dati.
+        if ($invoice->isCreditNote()) {
+            [$refId, $refDate] = self::resolveParentReference($invoice);
+            if ($refId !== null) {
+                $datiGenerali->setDatiDocumentoCorrelato(new DatiDocumentoCorrelato(
+                    DatiDocumentoCorrelato::FattureCollegate,
+                    $refId,
+                    $refDate,
+                ));
+            }
+        }
 
         if ($invoice->discount > 0) {
             $ScontoMaggiorazione = new ScontoMaggiorazione(ScontoMaggiorazione::SCONTO, null, $invoice->discount);
@@ -127,6 +146,37 @@ class InvoiceService
             ];
         }
 
+    }
+
+    /**
+     * Risolve id documento e data per DatiFattureCollegate a partire dalla
+     * fattura padre (interna) o dal ref esterno JSON. Restituisce [null, null]
+     * se non è disponibile alcun riferimento.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private static function resolveParentReference(TableOrderInvoice $invoice): array
+    {
+        if ($invoice->parent_invoice_id !== null) {
+            $parent = $invoice->parentInvoice()->first();
+            if ($parent !== null) {
+                return [
+                    $parent->invoice_code,
+                    substr((string) $parent->created_at, 0, 10),
+                ];
+            }
+        }
+
+        $ref = $invoice->parent_external_ref;
+        if (is_array($ref) && !empty($ref['code'])) {
+            $date = $ref['date'] ?? null;
+            if ($date !== null) {
+                $date = substr((string) $date, 0, 10);
+            }
+            return [(string) $ref['code'], $date];
+        }
+
+        return [null, null];
     }
 
     private static function resolveModalitaPagamento(?string $paymentMethod, bool $isPublicCompany): string

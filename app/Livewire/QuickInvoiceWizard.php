@@ -22,6 +22,17 @@ class QuickInvoiceWizard extends Component
     public ?int $invoiceId = null;
     public string $invoiceCode = '';
 
+    // ── Nota di credito (TD04) ─────────────────────────────────────────────
+    // documentType = TD01 (Fattura, default) | TD04 (Nota di credito).
+    // parentInvoiceId → fattura interna di riferimento (nullable).
+    // parentExternalRef → riferimento a fattura esterna (mirrored o manuale):
+    //   array {code, date, total?, mirrored_invoice_id?}. Nullable.
+    // parentSummary → stringa human-readable per il banner in UI (nullable).
+    public string $documentType = TableOrderInvoice::DOCUMENT_TYPE_INVOICE;
+    public ?int $parentInvoiceId = null;
+    public ?array $parentExternalRef = null;
+    public ?string $parentSummary = null;
+
     // ── Step 1 – Customer ──────────────────────────────────────────────────
     public string $customerSearch = '';
     public array $customerSearchResults = [];
@@ -54,18 +65,58 @@ class QuickInvoiceWizard extends Component
     public ?array $result = null;
     public bool $submitting = false;
 
-    public function mount(?int $invoiceId = null): void
-    {
+    public function mount(
+        ?int $invoiceId = null,
+        ?string $documentType = null,
+        ?int $parentInvoiceId = null,
+        ?array $parentExternalRef = null,
+        ?string $parentSummary = null,
+        ?array $prefillCustomer = null,
+        ?array $prefillLines = null,
+    ): void {
         $this->vatRate = (float) Setting::get('invoice_vat_rate', 10);
 
         if ($invoiceId !== null) {
             $this->loadInvoiceForEdit($invoiceId);
+            return;
+        }
+
+        if ($documentType !== null) {
+            $this->documentType = $documentType;
+        }
+        $this->parentInvoiceId   = $parentInvoiceId;
+        $this->parentExternalRef = $parentExternalRef;
+        $this->parentSummary     = $parentSummary;
+
+        if (is_array($prefillCustomer) && !empty($prefillCustomer['id'])) {
+            $this->selectCustomer((int) $prefillCustomer['id']);
+        }
+
+        if (is_array($prefillLines) && count($prefillLines) > 0) {
+            $this->lines = array_map(fn ($l) => [
+                'label'      => (string) ($l['label'] ?? ''),
+                'quantity'   => (float) ($l['quantity'] ?? 1),
+                'unit_price' => (float) ($l['unit_price'] ?? 0),
+                'dish_id'    => isset($l['dish_id']) ? (int) $l['dish_id'] : null,
+            ], $prefillLines);
+
+            // Se la sorgente ha vat_rate esplicito e coerente su tutte le righe,
+            // adottalo. Altrimenti manteniamo il default da Setting.
+            $vatRates = collect($prefillLines)->pluck('vat_rate')->filter(fn ($v) => $v !== null)->unique();
+            if ($vatRates->count() === 1) {
+                $this->vatRate = (float) $vatRates->first();
+            }
         }
     }
 
     public function isEditMode(): bool
     {
         return $this->invoiceId !== null;
+    }
+
+    public function isCreditNote(): bool
+    {
+        return $this->documentType === TableOrderInvoice::DOCUMENT_TYPE_CREDIT_NOTE;
     }
 
     private function loadInvoiceForEdit(int $invoiceId): void
@@ -625,17 +676,20 @@ class QuickInvoiceWizard extends Component
                     $invoiceName = TableOrderInvoice::toAlphanumeric($counter);
 
                     $invoice = TableOrderInvoice::create([
-                        'table_order_id'  => null,
-                        'customer_id'     => $customer->id,
-                        'invoice_code'    => $invoiceCode,
-                        'invoice_name'    => $invoiceName,
-                        'amount'          => $this->totalAmount,
-                        'discount'        => (float) $this->discount,
-                        'tax'             => $this->tax,
-                        'description'     => $this->description !== '' ? $this->description : null,
-                        'lines'           => $persistedLines,
-                        'payment_method'  => $this->paymentMethod,
-                        'status'          => 'pending',
+                        'table_order_id'      => null,
+                        'customer_id'         => $customer->id,
+                        'invoice_code'        => $invoiceCode,
+                        'invoice_name'        => $invoiceName,
+                        'document_type'       => $this->documentType,
+                        'parent_invoice_id'   => $this->parentInvoiceId,
+                        'parent_external_ref' => $this->parentExternalRef,
+                        'amount'              => $this->totalAmount,
+                        'discount'            => (float) $this->discount,
+                        'tax'                 => $this->tax,
+                        'description'         => $this->description !== '' ? $this->description : null,
+                        'lines'               => $persistedLines,
+                        'payment_method'      => $this->paymentMethod,
+                        'status'              => 'pending',
                     ]);
                 }
 

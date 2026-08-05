@@ -13,6 +13,13 @@ class TableOrderInvoice extends Model
 {
     const START_SERIES = 'A0000';
 
+    /**
+     * Codici TipoDocumento SDI usati dal sistema. Manteniamo il codice grezzo
+     * su DB per allinearci al mapping XML e semplificare filtri/query.
+     */
+    public const DOCUMENT_TYPE_INVOICE     = 'TD01';
+    public const DOCUMENT_TYPE_CREDIT_NOTE = 'TD04';
+
     public static function toAlphanumeric(int $increment): string
     {
         $baseDec = (int) base_convert(self::START_SERIES, 36, 10);
@@ -27,6 +34,9 @@ class TableOrderInvoice extends Model
         'invoice_code',
         'progressivo_invio',
         'invoice_name',
+        'document_type',
+        'parent_invoice_id',
+        'parent_external_ref',
         'amount',
         'discount',
         'tax',
@@ -45,13 +55,14 @@ class TableOrderInvoice extends Model
     ];
 
     protected $casts = [
-        'amount'         => 'decimal:2',
-        'discount'       => 'decimal:2',
-        'tax'            => 'decimal:2',
-        'lines'          => 'array',
-        'sent_at'        => 'datetime',
-        'sdi_checked_at' => 'datetime',
-        'sdi_status'     => 'integer',
+        'amount'              => 'decimal:2',
+        'discount'            => 'decimal:2',
+        'tax'                 => 'decimal:2',
+        'lines'               => 'array',
+        'parent_external_ref' => 'array',
+        'sent_at'             => 'datetime',
+        'sdi_checked_at'      => 'datetime',
+        'sdi_status'          => 'integer',
     ];
 
     /**
@@ -112,6 +123,21 @@ class TableOrderInvoice extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * Fattura di riferimento (interna) per una nota di credito TD04.
+     * Null se la nota credito riferisce una fattura esterna: in quel caso
+     * i dati sono su parent_external_ref (JSON: {code, date, total, mirrored_invoice_id?}).
+     */
+    public function parentInvoice(): BelongsTo
+    {
+        return $this->belongsTo(TableOrderInvoice::class, 'parent_invoice_id');
+    }
+
+    public function isCreditNote(): bool
+    {
+        return $this->document_type === self::DOCUMENT_TYPE_CREDIT_NOTE;
     }
 
     public function mysondLogs(): HasMany

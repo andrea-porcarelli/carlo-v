@@ -14,6 +14,17 @@
         </div>
     @endif
 
+    <div class="row" style="margin-bottom:12px;">
+        <div class="col-lg-12">
+            <a href="{{ route('accounting.invoices.create') }}" class="btn btn-primary">
+                <i class="fa fa-plus"></i> Nuova fattura
+            </a>
+            <button type="button" class="btn btn-warning" id="btn-open-credit-note">
+                <i class="fa fa-file-invoice"></i> Nuova nota di credito
+            </button>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col-lg-12">
             <div class="panel panel-default">
@@ -186,6 +197,38 @@
             </div>
         </div>
     @endif
+
+    <div class="modal fade" id="credit-note-source-modal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document" style="max-width: 900px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Chiudi"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title"><i class="fa fa-file-invoice"></i> Nuova nota di credito — seleziona fattura</h4>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">
+                        Scegli la fattura da stornare fra quelle interne (emesse da Carlo V) o esterne (viste su MySond ed emesse altrove).
+                        Oppure emetti una nota credito <em>senza riferimento</em> (SDI la accetta ma senza <code>DatiFattureCollegate</code>).
+                    </p>
+
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="credit-note-source-search" placeholder="Cerca per numero fattura o cliente...">
+                    </div>
+
+                    <div id="credit-note-source-loading" class="text-center" style="padding:30px;">
+                        <i class="fa fa-spinner fa-spin fa-2x"></i>
+                    </div>
+                    <div id="credit-note-source-content" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <a href="{{ route('accounting.credit-notes.create', ['source' => 'blank']) }}" class="btn btn-default pull-left">
+                        <i class="fa fa-file"></i> Senza fattura di riferimento
+                    </a>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Annulla</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="modal fade" id="mysond-logs-modal" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-lg" role="document" style="max-width: 1100px;">
@@ -499,6 +542,80 @@
 
             function escapeAttr(str) {
                 return escapeHtml(str).replace(/'/g, '&#039;');
+            }
+
+            // ── Modal selezione fattura per emissione Nota di Credito ─────────
+            const creditNoteBaseUrl = '{{ route('accounting.credit-notes.create') }}';
+            let creditNoteSearchTimer = null;
+
+            $('#btn-open-credit-note').on('click', function () {
+                $('#credit-note-source-search').val('');
+                $('#credit-note-source-content').empty().hide();
+                $('#credit-note-source-loading').show();
+                $('#credit-note-source-modal').modal('show');
+                loadCreditNoteSources('');
+            });
+
+            $('#credit-note-source-search').on('input', function () {
+                const q = $(this).val();
+                clearTimeout(creditNoteSearchTimer);
+                creditNoteSearchTimer = setTimeout(() => loadCreditNoteSources(q), 250);
+            });
+
+            function loadCreditNoteSources(q) {
+                $('#credit-note-source-loading').show();
+                $('#credit-note-source-content').hide();
+                $.ajax({
+                    url: '{{ route('accounting.invoices.source-suggestions') }}',
+                    method: 'GET',
+                    data: { q: q },
+                    success: function (data) {
+                        renderCreditNoteSources(data);
+                    },
+                    error: function (xhr) {
+                        $('#credit-note-source-loading').hide();
+                        $('#credit-note-source-content').show().html(
+                            '<div class="alert alert-danger">Errore caricamento: ' + (xhr.status || 'sconosciuto') + '</div>'
+                        );
+                    }
+                });
+            }
+
+            function renderCreditNoteSources(data) {
+                const internal = data.internal || [];
+                const external = data.external || [];
+
+                let html = '';
+
+                function renderGroup(title, list, sourceKey, emptyMsg) {
+                    html += '<h5 style="margin-top:16px;">' + escapeHtml(title) + ' <small class="text-muted">(' + list.length + ')</small></h5>';
+                    if (list.length === 0) {
+                        html += '<div class="text-muted" style="padding:8px 0;">' + escapeHtml(emptyMsg) + '</div>';
+                        return;
+                    }
+                    html += '<table class="table table-striped table-bordered table-hover" style="margin-bottom:0;">'
+                          + '<thead><tr><th>Numero</th><th>Data</th><th>Cliente</th><th class="text-end">Importo</th><th></th></tr></thead><tbody>';
+                    list.forEach(function (row) {
+                        const total = (row.total !== null && row.total !== undefined)
+                            ? Number(row.total).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'
+                            : '—';
+                        const url = creditNoteBaseUrl + '?source=' + encodeURIComponent(sourceKey) + '&id=' + encodeURIComponent(row.id);
+                        html += '<tr>'
+                             + '<td><strong>' + escapeHtml(row.code || '—') + '</strong></td>'
+                             + '<td>' + escapeHtml(row.date_display || '—') + '</td>'
+                             + '<td>' + escapeHtml(row.customer_name || '—') + '</td>'
+                             + '<td class="text-end">' + total + '</td>'
+                             + '<td class="text-end"><a href="' + url + '" class="btn btn-xs btn-warning">Storna <i class="fa fa-arrow-right"></i></a></td>'
+                             + '</tr>';
+                    });
+                    html += '</tbody></table>';
+                }
+
+                renderGroup('Fatture interne (Carlo V)', internal, 'invoice', 'Nessuna fattura interna trovata.');
+                renderGroup('Fatture esterne (MySond)', external, 'mirrored', 'Nessuna fattura esterna trovata.');
+
+                $('#credit-note-source-loading').hide();
+                $('#credit-note-source-content').show().html(html);
             }
 
             $(document).on('click', '.btn-refresh-sdi', function () {
