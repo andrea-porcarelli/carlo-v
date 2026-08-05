@@ -118,7 +118,16 @@ class MysondInvoiceMirror
             // Riconcilia lo stato SDI sulla TableOrderInvoice locale, se esiste:
             // mantiene allineato anche il vecchio modello senza dover chiamare
             // mysond:refresh-sdi separatamente.
-            if ($localInvoice && $stato !== null && (int) $localInvoice->sdi_status !== $stato) {
+            //
+            // Eccezione: se lo stato locale è già terminale positivo (Consegnata / Accettata),
+            // non lo degradiamo. In caso di doppio importFeAttivo sullo stesso file
+            // (primo consegnato, secondo scartato come duplicato) MySond restituisce
+            // l'esito del secondo tentativo: sovrascrivere annullerebbe l'esito buono
+            // riconosciuto in precedenza (anche via adozione manuale).
+            $isTerminalPositive = $localInvoice
+                && in_array((int) $localInvoice->sdi_status, TableOrderInvoice::SDI_TERMINAL_POSITIVE, true);
+
+            if ($localInvoice && $stato !== null && (int) $localInvoice->sdi_status !== $stato && !$isTerminalPositive) {
                 $localInvoice->update([
                     'sdi_status'       => $stato,
                     'sdi_status_label' => TableOrderInvoice::sdiStatusLabel($stato),

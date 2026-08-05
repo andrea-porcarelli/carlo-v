@@ -486,11 +486,14 @@
             <div class="qiw-card-body">
 
                 @if($this->isEditMode() && !$result)
+                    @php($editingInvoiceName = \App\Models\TableOrderInvoice::find($invoiceId)->invoice_name ?? '—')
                     <div class="alert alert-warning" style="font-size:13px;">
-                        <i class="fa fa-pencil"></i>
-                        Stai modificando una fattura precedentemente <strong>scartata</strong> o in errore.
-                        Verrà rigenerato l'XML e re-inviata a MySond con lo stesso codice file SDI
-                        (<strong>{{ \App\Models\TableOrderInvoice::find($invoiceId)->invoice_name ?? '—' }}</strong>).
+                        <div><i class="fa fa-pencil"></i> <strong>Modifica di una fattura in errore</strong></div>
+                        <div style="margin-top:4px;">
+                            La fattura è stata precedentemente scartata da SDI o l'invio a MySond è andato in errore.
+                            Al salvataggio verrà rigenerato l'XML e ri-trasmesso mantenendo lo stesso codice file SDI
+                            (<code>{{ $editingInvoiceName }}</code>).
+                        </div>
                     </div>
                     <div class="form-group" style="max-width:320px;">
                         <label for="invoiceCode"><strong>Numero fattura</strong></label>

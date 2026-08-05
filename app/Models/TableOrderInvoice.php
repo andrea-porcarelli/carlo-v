@@ -83,6 +83,14 @@ class TableOrderInvoice extends Model
     public const SDI_REJECTED_CODES = [1, 6, 8, 10];
 
     /**
+     * Stati SDI terminali positivi: Consegnata / Accettata. Una volta raggiunti
+     * non si torna indietro — usati per proteggere i record dal downgrade
+     * automatico durante il sync MySond (es. doppio importFeAttivo dove il
+     * primo è stato consegnato e il secondo scartato come duplicato).
+     */
+    public const SDI_TERMINAL_POSITIVE = [7, 9];
+
+    /**
      * Una fattura è modificabile se è stata scartata da SDI o se la generazione
      * XML / invio MySond locale è andato in errore: in entrambi i casi va
      * rettificata e rinviata.

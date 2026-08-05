@@ -414,6 +414,39 @@ class AccountingController extends BaseController
         $previousStatus = $invoice->sdi_status;
         $statusChanged  = $code !== null && $previousStatus !== $code;
 
+        // Non degradare da terminale positivo (Consegnata/Accettata) a scartata:
+        // getNotifica restituisce l'ultima notifica per fileName e in caso di
+        // doppio importFeAttivo darebbe l'esito del duplicato scartato.
+        $isTerminalPositive = in_array((int) $previousStatus, TableOrderInvoice::SDI_TERMINAL_POSITIVE, true);
+        $skipDowngrade      = $isTerminalPositive && $code !== null && !in_array($code, TableOrderInvoice::SDI_TERMINAL_POSITIVE, true);
+
+        if ($skipDowngrade) {
+            InvoiceMysondLog::create([
+                'table_order_invoice_id' => $invoice->id,
+                'operation'              => 'getNotifica',
+                'outcome'                => InvoiceMysondLog::OUTCOME_ERROR,
+                'esito'                  => $code,
+                'codice'                 => $tipo ? (string) $tipo : null,
+                'descrizione'            => sprintf(
+                    'Downgrade ignorato: locale già %s (%d), MySond ha risposto %s (%d). Usare "Ispeziona su MySond" per vedere lo storico.',
+                    TableOrderInvoice::sdiStatusLabel($previousStatus) ?? '',
+                    $previousStatus,
+                    $label ?? '',
+                    $code
+                ),
+                'request_xml'            => $requestXml,
+                'response_xml'           => $responseXml,
+                'duration_ms'            => $durationMs,
+            ]);
+            return $this->success([
+                'message' => 'Nessun aggiornamento: la fattura è già in stato terminale ('
+                    . (TableOrderInvoice::sdiStatusLabel($previousStatus) ?? 'Consegnata')
+                    . '). L\'ultima notifica MySond (' . ($label ?? 'sconosciuta') . ') non retrograda lo stato locale.',
+                'status'  => $previousStatus,
+                'label'   => TableOrderInvoice::sdiStatusLabel($previousStatus),
+            ]);
+        }
+
         $invoice->update([
             'sdi_status'       => $code,
             'sdi_status_label' => $label,

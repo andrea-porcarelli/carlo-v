@@ -54,7 +54,12 @@ class InvoiceService
         $cessionarioVat = VatHelper::sanitize($user->vat_number);
         $anagraficaCessionario = new DatiAnagrafici($user->fiscal_code, $user->full_name, 'IT', $cessionarioVat);
 
-        $sedeCessionario = new Sede('IT', $user->address, $user->zip_code, $user->city, $user->province);
+        // SDI richiede la sigla provincia in maiuscolo (validazione XSD tracciato
+        // fatturaPA: fallisce con "the value 'pa' of element 'provincia' is not valid").
+        // Normalizziamo qui per proteggere l'XML anche se il record cliente in DB
+        // avesse valori non normalizzati (dati storici pre-mutator).
+        $cessionarioProvince = $user->province !== null ? strtoupper(trim((string) $user->province)) : $user->province;
+        $sedeCessionario = new Sede('IT', $user->address, $user->zip_code, $user->city, $cessionarioProvince);
 
         $fatturaElettronicaFactory->setCessionarioCommittente($anagraficaCessionario, $sedeCessionario, $user->codice_destinatario, $user->pec_destinatario, $user->user_type === 'public_company');
 

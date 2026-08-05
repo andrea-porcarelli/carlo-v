@@ -698,9 +698,13 @@
     margin: 4px 0;
 }
 .alert {
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    /* NB: display:flex qui è deleterio con i messaggi che contengono
+       inline markup (<strong>, <code>, <span>): ogni text node tra i tag
+       diventa un flex item separato e le stringhe si spezzano visivamente.
+       Manteniamo il comportamento block di Bootstrap. */
+}
+.alert > i:first-child {
+    margin-right: 6px;
 }
 .panel-heading {
     position: relative;

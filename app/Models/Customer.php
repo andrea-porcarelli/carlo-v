@@ -24,4 +24,26 @@ class Customer extends Model
     {
         return $this->hasMany(TableOrderInvoice::class);
     }
+
+    /**
+     * SDI richiede la sigla provincia in maiuscolo (2 lettere ISTAT).
+     * Normalizziamo alla scrittura così l'XML FatturaPA non viene mai scartato
+     * per <Provincia>xx</Provincia>.
+     */
+    public function setProvinceAttribute($value): void
+    {
+        $this->attributes['province'] = $value !== null && $value !== ''
+            ? strtoupper(trim((string) $value))
+            : null;
+    }
+
+    /**
+     * Codice destinatario SDI: convenzione uppercase per gli alfanumerici.
+     */
+    public function setCodiceDestinatarioAttribute($value): void
+    {
+        $this->attributes['codice_destinatario'] = $value !== null && $value !== ''
+            ? strtoupper(trim((string) $value))
+            : null;
+    }
 }
