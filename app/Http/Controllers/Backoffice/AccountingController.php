@@ -177,9 +177,13 @@ class AccountingController extends BaseController
                     }
                     $sdiBtn = '';
                     if ($item->status === 'sent' && !empty($item->invoice_name)) {
-                        $sdiBtn = '<button class="btn btn-xs btn-primary btn-refresh-sdi" data-id="' . $item->id . '" title="Aggiorna esito SDI"><i class="fa fa-sync"></i></button>';
+                        $sdiBtn = '<button class="btn btn-xs btn-primary btn-refresh-sdi" data-id="' . $item->id . '" title="Aggiorna esito SDI (ultima notifica)"><i class="fa fa-sync"></i></button> ';
                     }
-                    return $xmlBtn . $logBtn . $editBtn . $resendBtn . $sdiBtn;
+                    $inspectBtn = '';
+                    if (!empty($item->invoice_name)) {
+                        $inspectBtn = '<button class="btn btn-xs btn-info btn-inspect-mysond" data-id="' . $item->id . '" title="Ispeziona storico invii su MySond"><i class="fa fa-search"></i></button>';
+                    }
+                    return $xmlBtn . $logBtn . $editBtn . $resendBtn . $sdiBtn . $inspectBtn;
                 })
                 ->addColumn('sdi_status_label_fmt', function ($item) {
                     if ($item->sdi_status === null) {
@@ -444,6 +448,131 @@ class AccountingController extends BaseController
             'message' => 'Esito SDI aggiornato: ' . ($label ?? 'sconosciuto'),
             'status'  => $code,
             'label'   => $label,
+        ]);
+    }
+
+    /**
+     * Ispeziona su MySond tutti i record docFeLink che matchano il fileName
+     * della fattura. Serve quando importFeAttivo è stato eseguito più volte
+     * sullo stesso file (consegnato la prima volta, scartato la seconda come
+     * duplicato): getNotifica restituisce solo l'ultimo esito, questo metodo
+     * mostra la storia completa e permette di adottare l'esito buono.
+     */
+    public function inspectMysond(TableOrderInvoice $invoice): JsonResponse
+    {
+        if (empty($invoice->invoice_name)) {
+            return $this->error(['message' => 'invoice_name mancante — impossibile interrogare MySond.']);
+        }
+
+        $vatDigits = \App\Helpers\VatHelper::sanitize(\App\Facades\Utils::setting('company_vat_number'));
+        $fileName  = 'IT' . $vatDigits . '_' . $invoice->invoice_name;
+
+        $year = $invoice->created_at ? (int) $invoice->created_at->format('Y') : (int) now()->format('Y');
+
+        $service = app(MysondFatturaService::class);
+
+        try {
+            $records = $service->listInviateByFileName($fileName, $year);
+        } catch (\Throwable $e) {
+            Log::error('inspectMysond error', ['invoice_id' => $invoice->id, 'error' => $e->getMessage()]);
+            return $this->error(['message' => 'Errore interrogazione MySond: ' . $e->getMessage()]);
+        }
+
+        $rows = array_map(function ($item) {
+            $stato = isset($item->stato) && is_numeric($item->stato) ? (int) $item->stato : null;
+            $raw   = json_decode(json_encode($item), true) ?: [];
+            return [
+                'code'          => isset($item->code) ? (string) $item->code : null,
+                'doc_name'      => (string) ($item->docName ?? $item->fileName ?? ''),
+                'stato'         => $stato,
+                'stato_label'   => $stato !== null ? TableOrderInvoice::sdiStatusLabel($stato) : null,
+                'is_success'    => $stato !== null && in_array($stato, [7, 9], true),
+                'is_rejected'   => $stato !== null && in_array($stato, TableOrderInvoice::SDI_REJECTED_CODES, true),
+                'date'          => $raw['date'] ?? ($raw['dateLong'] ?? null),
+                'total'         => $raw['importoTotale'] ?? ($raw['totale'] ?? ($raw['importo'] ?? null)),
+                'descrizione'   => $raw['descrizione'] ?? ($raw['messaggio'] ?? null),
+                'raw'           => $raw,
+            ];
+        }, $records);
+
+        return response()->json([
+            'invoice' => [
+                'id'           => $invoice->id,
+                'invoice_code' => $invoice->invoice_code,
+                'invoice_name' => $invoice->invoice_name,
+                'status'       => $invoice->status,
+                'sdi_status'   => $invoice->sdi_status,
+                'sdi_status_label' => $invoice->sdi_status_label,
+            ],
+            'file_name' => $fileName,
+            'records'   => $rows,
+            'has_success' => collect($rows)->contains('is_success', true),
+        ]);
+    }
+
+    /**
+     * Adotta come esito ufficiale uno dei record trovati su MySond.
+     * Consentito solo se lo stato scelto è di successo (Consegnata/Accettata):
+     * imposta status='sent', allinea sdi_status e sdi_status_label, e registra
+     * l'operazione in invoice_mysond_logs per audit.
+     */
+    public function adoptMysondOutcome(Request $request, TableOrderInvoice $invoice): JsonResponse
+    {
+        $data = $request->validate([
+            'stato'       => 'required|integer',
+            'codice'      => 'nullable|string|max:100',
+            'descrizione' => 'nullable|string|max:1000',
+        ]);
+
+        $stato = (int) $data['stato'];
+        if (!in_array($stato, [7, 9], true)) {
+            return $this->error(['message' => 'Adozione consentita solo per esiti di successo (Consegnata / Accettata).']);
+        }
+
+        $label       = TableOrderInvoice::sdiStatusLabel($stato);
+        $descrizione = $data['descrizione'] ?? $label;
+        $codice      = $data['codice'] ?? null;
+
+        $previousStatus = $invoice->status;
+        $previousSdi    = $invoice->sdi_status;
+
+        $invoice->update([
+            'status'           => 'sent',
+            'sent_at'          => $invoice->sent_at ?: now(),
+            'sdi_status'       => $stato,
+            'sdi_status_label' => $label,
+            'sdi_checked_at'   => now(),
+            'sdi_response'     => json_encode([
+                'adopted'     => true,
+                'stato'       => $stato,
+                'descrizione' => $descrizione,
+                'codice'      => $codice,
+                'previous'    => [
+                    'status'     => $previousStatus,
+                    'sdi_status' => $previousSdi,
+                ],
+                'adopted_by'  => auth()->user()?->email,
+                'at'          => now()->toIso8601String(),
+            ]),
+        ]);
+
+        InvoiceMysondLog::create([
+            'table_order_invoice_id' => $invoice->id,
+            'operation'              => 'adoptFromMysond',
+            'outcome'                => InvoiceMysondLog::OUTCOME_SUCCESS,
+            'esito'                  => $stato,
+            'codice'                 => $codice,
+            'descrizione'            => sprintf(
+                'Adottato esito %s da MySond (era status=%s, sdi_status=%s). Utente: %s',
+                $label ?? ('Stato ' . $stato),
+                $previousStatus ?? '—',
+                $previousSdi ?? '—',
+                auth()->user()?->email ?? 'admin'
+            ),
+        ]);
+
+        return $this->success([
+            'message' => 'Esito adottato: ' . ($label ?? ('Stato ' . $stato)),
         ]);
     }
 

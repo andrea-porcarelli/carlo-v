@@ -293,6 +293,8 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::get('/{invoice}/logs', [AccountingController::class, 'logs'])->name('logs');
                 Route::post('/{invoice}/resend', [AccountingController::class, 'resend'])->name('resend');
                 Route::post('/{invoice}/refresh-sdi', [AccountingController::class, 'refreshSdi'])->name('refresh-sdi');
+                Route::get('/{invoice}/mysond-inspect', [AccountingController::class, 'inspectMysond'])->name('mysond-inspect');
+                Route::post('/{invoice}/mysond-adopt', [AccountingController::class, 'adoptMysondOutcome'])->name('mysond-adopt');
             });
             Route::group(['prefix' => '/customers', 'as' => 'customers.'], function() {
                 Route::get('/', [AccountingController::class, 'customers'])->name('index');

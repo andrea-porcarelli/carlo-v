@@ -2,6 +2,8 @@
 
 namespace App\Livewire;
 
+use App\Helpers\ItalianFiscalHelper;
+use App\Helpers\VatHelper;
 use App\Models\Customer;
 use App\Models\Dish;
 use App\Models\InvoiceMysondLog;
@@ -301,20 +303,71 @@ class QuickInvoiceWizard extends Component
         $this->goToStep($this->step - 1);
     }
 
+    // ────────────────────── Normalizzazione live campi ────────────────────
+    // Le sigle provincia sui documenti fiscali sono sempre in maiuscolo (SDI
+    // richiede 2 lettere maiuscole). Normalizziamo mentre l'operatore scrive.
+    public function updatedProvince(): void
+    {
+        $this->province = strtoupper(trim($this->province));
+    }
+
+    public function updatedFiscalCode(): void
+    {
+        $this->fiscalCode = strtoupper(trim($this->fiscalCode));
+    }
+
+    public function updatedCodiceDestinatario(): void
+    {
+        $this->codiceDestinatario = strtoupper(trim($this->codiceDestinatario));
+    }
+
+    public function updatedVatNumber(): void
+    {
+        // Rimuoviamo prefisso "IT" e caratteri non numerici per uniformare la
+        // digitazione (SDI vuole solo le 11 cifre in IdCodice).
+        $this->vatNumber = VatHelper::sanitize($this->vatNumber);
+    }
+
+    public function updatedUserType(): void
+    {
+        // Cambio di tipo soggetto → azzeriamo il codice destinatario se non è
+        // coerente con la nuova casistica, così l'operatore vede subito quale
+        // valore inserire (0000000 privato/azienda, IPA 6 char per PA).
+        $len = strlen($this->codiceDestinatario);
+        if ($this->userType === 'public_company' && $len !== 6) {
+            $this->codiceDestinatario = '';
+        }
+        if ($this->userType !== 'public_company' && $len !== 0 && $len !== 7) {
+            $this->codiceDestinatario = '';
+        }
+    }
+
+    /**
+     * Applica le regole standard italiane per la Fattura Elettronica (SDI):
+     *   • Privato    → nome+cognome, codice fiscale (16 alfanumerici), indirizzo completo
+     *   • Azienda    → ragione sociale, P.IVA (11 cifre), sede completa,
+     *                  codice destinatario (7 char) OPPURE PEC
+     *   • Pubblica A. → ragione sociale, P.IVA, sede completa,
+     *                  codice destinatario IPA (6 char) obbligatorio
+     * Provincia: sempre 2 lettere maiuscole appartenenti alle sigle ISTAT (+"EE"
+     * per estero); CAP: 5 cifre.
+     */
     private function validateCustomerStep(): void
     {
         $this->validate([
             'userType'  => 'required|in:private,company,public_company',
             'fullName'  => 'required|string|max:255',
-            'fiscalCode'=> 'nullable|string|max:50',
-            'vatNumber' => 'nullable|string|max:50',
+            'fiscalCode'=> 'nullable|string|max:16',
+            'vatNumber' => 'nullable|string|max:11',
             'address'   => 'nullable|string|max:255',
             'zipCode'   => 'nullable|string|max:10',
             'city'      => 'nullable|string|max:100',
-            'province'  => 'nullable|string|max:5',
+            'province'  => 'nullable|string|size:2',
             'codiceDestinatario' => 'nullable|string|max:7',
             'pecDestinatario'    => 'nullable|email|max:255',
-        ], [], [
+        ], [
+            'province.size' => 'La provincia deve essere di 2 lettere (sigla, es. CA, MI, RM).',
+        ], [
             'userType'  => 'tipo soggetto',
             'fullName'  => 'ragione sociale / nome',
             'fiscalCode'=> 'codice fiscale',
@@ -324,12 +377,107 @@ class QuickInvoiceWizard extends Component
             'pecDestinatario'    => 'PEC destinatario',
         ]);
 
-        // SDI requires at least one identifier
+        $errors = [];
+
+        // Provincia: se valorizzata, deve essere una sigla italiana valida.
+        if ($this->province !== '' && !ItalianFiscalHelper::isValidProvince($this->province)) {
+            $errors['province'] = 'Sigla provincia non valida. Usare una sigla ISTAT di 2 lettere (es. CA, MI, RM; "EE" per estero).';
+        }
+
+        // CAP: se valorizzato, deve essere 5 cifre.
+        if ($this->zipCode !== '' && !ItalianFiscalHelper::isValidCap($this->zipCode)) {
+            $errors['zipCode'] = 'Il CAP deve essere composto da 5 cifre.';
+        }
+
+        // Almeno un identificativo (CF o P.IVA) è sempre richiesto.
         if ($this->fiscalCode === '' && $this->vatNumber === '') {
-            $this->addError('fiscalCode', 'Indicare codice fiscale o partita IVA.');
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'fiscalCode' => 'Indicare codice fiscale o partita IVA.',
-            ]);
+            $errors['fiscalCode'] = 'Indicare codice fiscale o partita IVA.';
+        }
+
+        // P.IVA: 11 cifre con checksum corretto quando valorizzata.
+        if ($this->vatNumber !== '' && !ItalianFiscalHelper::isValidVatNumber($this->vatNumber)) {
+            $errors['vatNumber'] = 'Partita IVA non valida (devono essere 11 cifre con checksum corretto).';
+        }
+
+        // PEC: campo aggiuntivo di validazione (Laravel valida già il formato email).
+        // In caso di privato / azienda con codice destinatario "0000000", SDI
+        // richiede la PEC per il recapito.
+
+        // Regole per tipo soggetto ---------------------------------------------
+        if ($this->userType === 'private') {
+            // Privato → CF alfanumerico 16 caratteri (persona fisica)
+            if ($this->fiscalCode !== '' && !ItalianFiscalHelper::isValidPersonalFiscalCode($this->fiscalCode)) {
+                $errors['fiscalCode'] = 'Codice fiscale non valido: attesi 16 caratteri alfanumerici (persona fisica).';
+            }
+            // Sede completa consigliata: SDI accetta anche senza indirizzo per
+            // privati, ma il rifiuto è frequente. Segnaliamo come warning solo
+            // nella view.
+            if ($this->codiceDestinatario !== '' && strlen($this->codiceDestinatario) !== 7) {
+                $errors['codiceDestinatario'] = 'Codice destinatario privato: 7 caratteri (usare "0000000" se non fornito).';
+            }
+        }
+
+        if ($this->userType === 'company') {
+            // Azienda → P.IVA obbligatoria
+            if ($this->vatNumber === '') {
+                $errors['vatNumber'] = 'La partita IVA è obbligatoria per le aziende.';
+            }
+            // Se anche il CF è compilato per una società, deve essere numerico
+            // di 11 cifre (persona giuridica) oppure 16 caratteri (ditta indiv.).
+            if ($this->fiscalCode !== ''
+                && !ItalianFiscalHelper::isValidLegalFiscalCode($this->fiscalCode)
+                && !ItalianFiscalHelper::isValidPersonalFiscalCode($this->fiscalCode)
+            ) {
+                $errors['fiscalCode'] = 'Codice fiscale non valido: attesi 11 cifre (società) o 16 caratteri (ditta individuale).';
+            }
+            // Sede legale completa: SDI la richiede per le persone giuridiche.
+            $sedeFields = [
+                'address'  => ['label' => 'Indirizzo sede', 'article' => 'o'],
+                'zipCode'  => ['label' => 'CAP',            'article' => 'o'],
+                'city'     => ['label' => 'Comune',         'article' => 'o'],
+                'province' => ['label' => 'Provincia',      'article' => 'a'],
+            ];
+            foreach ($sedeFields as $field => $meta) {
+                if ($this->{$field} === '') {
+                    $errors[$field] = $meta['label'] . ' obbligatori' . $meta['article'] . " per l'anagrafica azienda.";
+                }
+            }
+            // Codice destinatario: 7 caratteri; "0000000" ammesso ma solo se
+            // viene fornita la PEC per il recapito.
+            if ($this->codiceDestinatario === '') {
+                $errors['codiceDestinatario'] = 'Codice destinatario obbligatorio (7 caratteri). Usare "0000000" se il cliente non lo fornisce, indicando anche la PEC.';
+            } elseif (strlen($this->codiceDestinatario) !== 7) {
+                $errors['codiceDestinatario'] = 'Codice destinatario azienda: esattamente 7 caratteri alfanumerici.';
+            } elseif ($this->codiceDestinatario === '0000000' && $this->pecDestinatario === '') {
+                $errors['pecDestinatario'] = 'Con codice destinatario "0000000" è necessario indicare la PEC del cliente per il recapito SDI.';
+            }
+        }
+
+        if ($this->userType === 'public_company') {
+            // PA → codice IPA di 6 caratteri
+            if ($this->vatNumber === '') {
+                $errors['vatNumber'] = 'La partita IVA è obbligatoria per la Pubblica Amministrazione.';
+            }
+            if ($this->codiceDestinatario === '') {
+                $errors['codiceDestinatario'] = 'Il codice IPA (6 caratteri) è obbligatorio per la Pubblica Amministrazione.';
+            } elseif (strlen($this->codiceDestinatario) !== 6) {
+                $errors['codiceDestinatario'] = 'Il codice IPA della Pubblica Amministrazione è di esattamente 6 caratteri.';
+            }
+            $sedeFieldsPA = [
+                'address'  => ['label' => 'Indirizzo sede', 'article' => 'o'],
+                'zipCode'  => ['label' => 'CAP',            'article' => 'o'],
+                'city'     => ['label' => 'Comune',         'article' => 'o'],
+                'province' => ['label' => 'Provincia',      'article' => 'a'],
+            ];
+            foreach ($sedeFieldsPA as $field => $meta) {
+                if ($this->{$field} === '') {
+                    $errors[$field] = $meta['label'] . ' obbligatori' . $meta['article'] . " per l'anagrafica PA.";
+                }
+            }
+        }
+
+        if (!empty($errors)) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
         }
     }
 

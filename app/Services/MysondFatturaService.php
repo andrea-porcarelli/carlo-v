@@ -565,6 +565,38 @@ class MysondFatturaService
     }
 
     /**
+     * Recupera tutti i record docFeLink su MySond che matchano il fileName
+     * (senza .xml). MySond può contenere più record con lo stesso docName se
+     * lo stesso file è stato inviato più volte via importFeAttivo: getNotifica
+     * ne restituisce solo l'ultimo, questo metodo li restituisce tutti così
+     * l'utente può vedere se un tentativo precedente era stato consegnato.
+     *
+     * @return array<int, \stdClass> record grezzi come restituiti dal WS
+     */
+    public function listInviateByFileName(string $fileName, ?int $year = null): array
+    {
+        $target = preg_replace('/\.xml$/i', '', $fileName);
+        $items  = $this->getFeInviateLink($year);
+        if (empty($items)) {
+            return [];
+        }
+
+        $matches = [];
+        foreach ($items as $item) {
+            $docName = (string) ($item->docName ?? $item->fileName ?? '');
+            if ($docName === '') {
+                continue;
+            }
+            $docName = preg_replace('/\.xml$/i', '', $docName);
+            if (strcasecmp($docName, $target) === 0) {
+                $matches[] = $item;
+            }
+        }
+
+        return $matches;
+    }
+
+    /**
      * Elenco fatture in stato di scarto/rifiuto per l'anno indicato. Usata dal
      * PreEmissionGuard per bloccare l'emissione finché ogni scartata non è
      * stata riconosciuta dall'admin.

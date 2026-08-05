@@ -210,6 +210,34 @@
         </div>
     </div>
 
+    <div class="modal fade" id="mysond-inspect-modal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document" style="max-width: 1000px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Chiudi"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title">Ispezione MySond — <span class="mysond-inspect-invoice"></span></h4>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mysond-inspect-intro" style="margin-bottom:12px;">
+                        Elenco di tutti i record trovati su MySond per il fileName della fattura.
+                        Se un tentativo precedente è stato consegnato, puoi adottarne l'esito per sbloccare la fattura locale.
+                    </p>
+                    <div><small class="text-muted">FileName: <code class="mysond-inspect-filename"></code></small></div>
+                    <div class="mysond-inspect-loading text-center" style="padding:30px;">
+                        <i class="fa fa-spinner fa-spin fa-2x"></i>
+                    </div>
+                    <div class="mysond-inspect-empty" style="display:none; padding:20px; text-align:center;">
+                        Nessun record trovato su MySond per questo fileName.
+                    </div>
+                    <div class="mysond-inspect-content" style="margin-top:12px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Chiudi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <style>
         .mysond-log-entry { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 12px; }
         .mysond-log-entry .log-header { padding: 8px 12px; background: #f6f6f6; border-bottom: 1px solid #ddd; cursor: pointer; }
@@ -353,6 +381,125 @@
                     }
                 });
             });
+
+            $(document).on('click', '.btn-inspect-mysond', function () {
+                const id = $(this).data('id');
+                const $modal = $('#mysond-inspect-modal');
+                $modal.data('invoice-id', id);
+                $modal.find('.mysond-inspect-invoice').text('#' + id);
+                $modal.find('.mysond-inspect-filename').text('');
+                $modal.find('.mysond-inspect-content').empty();
+                $modal.find('.mysond-inspect-empty').hide();
+                $modal.find('.mysond-inspect-loading').show();
+                $modal.modal('show');
+
+                $.ajax({
+                    url: '/backoffice/accounting/invoices/' + id + '/mysond-inspect',
+                    method: 'GET',
+                    success: function (data) {
+                        $modal.find('.mysond-inspect-loading').hide();
+                        const code = (data.invoice && (data.invoice.invoice_code || data.invoice.invoice_name)) || ('#' + id);
+                        $modal.find('.mysond-inspect-invoice').text(code);
+                        $modal.find('.mysond-inspect-filename').text(data.file_name || '');
+
+                        if (!data.records || data.records.length === 0) {
+                            $modal.find('.mysond-inspect-empty').show();
+                            return;
+                        }
+
+                        let html = '<table class="table table-striped table-bordered" style="margin-top:8px;">'
+                                 + '<thead><tr>'
+                                 + '<th>#</th><th>Numero</th><th>Data</th><th>Importo</th>'
+                                 + '<th>Stato SDI</th><th>Descrizione</th><th class="text-center">Azione</th>'
+                                 + '</tr></thead><tbody>';
+
+                        data.records.forEach(function (r, idx) {
+                            const stato = r.stato !== null && r.stato !== undefined ? r.stato : '—';
+                            const cls = r.is_success ? 'label-success' : (r.is_rejected ? 'label-danger' : 'label-default');
+                            const label = escapeHtml(r.stato_label || ('Stato ' + stato));
+                            const dateTxt = r.date ? escapeHtml(String(r.date)) : '—';
+                            const totalTxt = (r.total !== null && r.total !== undefined)
+                                ? Number(r.total).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'
+                                : '—';
+                            const descTxt = r.descrizione ? '<small class="text-muted">' + escapeHtml(r.descrizione) + '</small>' : '—';
+                            let actionCell = '—';
+                            if (r.is_success) {
+                                const payload = {
+                                    stato: r.stato,
+                                    codice: r.code || '',
+                                    descrizione: r.descrizione || '',
+                                };
+                                actionCell = '<button class="btn btn-xs btn-success btn-adopt-mysond" data-payload=\''
+                                    + escapeAttr(JSON.stringify(payload))
+                                    + '\'><i class="fa fa-check"></i> Adotta esito</button>';
+                            }
+
+                            html += '<tr>'
+                                 + '<td>' + (idx + 1) + '</td>'
+                                 + '<td><code>' + escapeHtml(r.code || '—') + '</code></td>'
+                                 + '<td>' + dateTxt + '</td>'
+                                 + '<td class="text-end">' + totalTxt + '</td>'
+                                 + '<td><span class="label ' + cls + '">' + label + '</span></td>'
+                                 + '<td>' + descTxt + '</td>'
+                                 + '<td class="text-center">' + actionCell + '</td>'
+                                 + '</tr>';
+                        });
+
+                        html += '</tbody></table>';
+
+                        if (data.has_success) {
+                            html += '<div class="alert alert-info" style="margin-top:8px;">'
+                                 +  '<i class="fa fa-info-circle"></i> È presente almeno un record consegnato/accettato: '
+                                 +  'puoi adottarne l\'esito per riallineare lo stato della fattura locale.'
+                                 +  '</div>';
+                        } else {
+                            html += '<div class="alert alert-warning" style="margin-top:8px;">'
+                                 +  '<i class="fa fa-exclamation-triangle"></i> Nessun record con esito Consegnata/Accettata: '
+                                 +  'nulla da adottare.'
+                                 +  '</div>';
+                        }
+
+                        $modal.find('.mysond-inspect-content').html(html);
+                    },
+                    error: function (xhr) {
+                        $modal.find('.mysond-inspect-loading').hide();
+                        const r = (xhr.responseJSON || {});
+                        $modal.find('.mysond-inspect-content').html(
+                            '<div class="alert alert-danger">' + escapeHtml(r.message || ('Errore ' + xhr.status)) + '</div>'
+                        );
+                    }
+                });
+            });
+
+            $(document).on('click', '.btn-adopt-mysond', function () {
+                const $btn = $(this);
+                const payload = JSON.parse($btn.attr('data-payload') || '{}');
+                const invoiceId = $('#mysond-inspect-modal').data('invoice-id');
+                if (!confirm('Adottare come esito ufficiale la notifica selezionata? Lo stato della fattura verrà impostato a "Inviata" con esito SDI ' + (payload.stato || '') + '.')) {
+                    return;
+                }
+                $btn.prop('disabled', true).find('i').removeClass('fa-check').addClass('fa-spinner fa-spin');
+                $.ajax({
+                    url: '/backoffice/accounting/invoices/' + invoiceId + '/mysond-adopt',
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    data: payload,
+                    success: function (data) {
+                        toastr.success(data.message || 'Esito adottato.', 'Operazione effettuata');
+                        $('#mysond-inspect-modal').modal('hide');
+                        $('.datatable_table').DataTable().ajax.reload(null, false);
+                    },
+                    error: function (xhr) {
+                        const r = xhr.responseJSON || {};
+                        toastr.error(r.message || ('Errore ' + xhr.status), 'Errore');
+                        $btn.prop('disabled', false).find('i').removeClass('fa-spinner fa-spin').addClass('fa-check');
+                    }
+                });
+            });
+
+            function escapeAttr(str) {
+                return escapeHtml(str).replace(/'/g, '&#039;');
+            }
 
             $(document).on('click', '.btn-refresh-sdi', function () {
                 const id  = $(this).data('id');

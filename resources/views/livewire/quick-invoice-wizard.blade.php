@@ -6,6 +6,27 @@
         'public_company' => 'Pubblica Amministrazione',
     ];
     $changed = $this->changedCustomerFields ?? [];
+    $provinces = \App\Helpers\ItalianFiscalHelper::PROVINCES;
+    // Requisiti standard per l'emissione della Fattura Elettronica (SDI):
+    // servono per guidare l'operatore mostrando in ogni step cosa è obbligatorio.
+    $requirementsByType = [
+        'private' => [
+            'title'    => 'Privato (persona fisica)',
+            'required' => 'Nome e cognome, Codice Fiscale (16 caratteri).',
+            'notes'    => 'Codice destinatario suggerito: "0000000". Se il privato ha una PEC, indicarla per il recapito SDI.',
+        ],
+        'company' => [
+            'title'    => 'Azienda / professionista (persona giuridica)',
+            'required' => 'Ragione sociale, P.IVA (11 cifre), indirizzo sede completo (via, CAP, comune, provincia), Codice destinatario (7 caratteri) OPPURE PEC.',
+            'notes'    => 'Se il cliente non ha SdI/PEC di recapito, inserire "0000000" come codice destinatario e obbligatoriamente la sua PEC.',
+        ],
+        'public_company' => [
+            'title'    => 'Pubblica Amministrazione',
+            'required' => 'Ragione sociale, P.IVA, indirizzo completo, Codice IPA (6 caratteri) obbligatorio.',
+            'notes'    => 'Il codice IPA è recuperabile su indicepa.gov.it. La PA riceve solo tramite codice IPA, non via PEC.',
+        ],
+    ];
+    $req = $requirementsByType[$userType] ?? $requirementsByType['private'];
 @endphp
 
 <div class="quick-invoice-wizard">
@@ -113,21 +134,51 @@
                     </div>
                 </div>
 
+                {{-- Guida contestuale: cosa richiede SDI per questo tipo soggetto --}}
+                <div class="qiw-guide">
+                    <div class="qiw-guide-title">
+                        <i class="fa fa-info-circle"></i> {{ $req['title'] }} — requisiti per la Fattura Elettronica
+                    </div>
+                    <div class="qiw-guide-body">
+                        <div><strong>Obbligatori:</strong> {{ $req['required'] }}</div>
+                        <div class="text-muted"><em>{{ $req['notes'] }}</em></div>
+                    </div>
+                </div>
+
                 <div class="row">
                     <div class="col-md-6 form-group {{ $changed['fiscal_code'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             Codice fiscale
+                            @if($userType === 'private') * @endif
                             @if($changed['fiscal_code'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
-                        <input type="text" class="form-control" wire:model="fiscalCode" maxlength="50">
-                        @error('fiscalCode') <small class="text-danger">{{ $message }}</small> @enderror
+                        <input type="text" class="form-control"
+                               wire:model.live.debounce.500ms="fiscalCode"
+                               maxlength="16"
+                               placeholder="{{ $userType === 'private' ? '16 caratteri, es. RSSMRA85M01H501U' : '11 cifre (=P.IVA) oppure 16 caratteri (ditta individuale)' }}"
+                               style="text-transform:uppercase;">
+                        <small class="text-muted">
+                            @if($userType === 'private')
+                                Persona fisica: 16 caratteri alfanumerici.
+                            @else
+                                Persona giuridica: coincide di norma con la P.IVA (11 cifre).
+                            @endif
+                        </small>
+                        @error('fiscalCode') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                     <div class="col-md-6 form-group {{ $changed['vat_number'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             Partita IVA
+                            @if($userType !== 'private') * @endif
                             @if($changed['vat_number'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
-                        <input type="text" class="form-control" wire:model="vatNumber" maxlength="50">
+                        <input type="text" class="form-control"
+                               wire:model.live.debounce.500ms="vatNumber"
+                               maxlength="11"
+                               inputmode="numeric"
+                               placeholder="11 cifre (senza prefisso IT)">
+                        <small class="text-muted">Solo cifre; l'eventuale prefisso "IT" viene rimosso in automatico.</small>
+                        @error('vatNumber') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                 </div>
 
@@ -135,33 +186,52 @@
                     <div class="col-md-8 form-group {{ $changed['address'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             Indirizzo
+                            @if($userType !== 'private') * @endif
                             @if($changed['address'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
-                        <input type="text" class="form-control" wire:model="address">
+                        <input type="text" class="form-control" wire:model="address" placeholder="Via / Piazza e numero civico">
+                        @error('address') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                     <div class="col-md-4 form-group {{ $changed['zip_code'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             CAP
+                            @if($userType !== 'private') * @endif
                             @if($changed['zip_code'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
-                        <input type="text" class="form-control" wire:model="zipCode" maxlength="10">
+                        <input type="text" class="form-control" wire:model="zipCode" maxlength="5" inputmode="numeric" placeholder="5 cifre">
+                        @error('zipCode') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                 </div>
 
                 <div class="row">
                     <div class="col-md-8 form-group {{ $changed['city'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
-                            Città
+                            Comune
+                            @if($userType !== 'private') * @endif
                             @if($changed['city'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
                         <input type="text" class="form-control" wire:model="city">
+                        @error('city') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                     <div class="col-md-4 form-group {{ $changed['province'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
-                            Provincia
+                            Provincia (sigla)
+                            @if($userType !== 'private') * @endif
                             @if($changed['province'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
-                        <input type="text" class="form-control" wire:model="province" maxlength="5" style="text-transform:uppercase;">
+                        <input type="text" class="form-control"
+                               wire:model.live.debounce.500ms="province"
+                               maxlength="2"
+                               list="qiw-province-list"
+                               placeholder="es. CA"
+                               style="text-transform:uppercase;">
+                        <datalist id="qiw-province-list">
+                            @foreach($provinces as $p)
+                                <option value="{{ $p }}"></option>
+                            @endforeach
+                        </datalist>
+                        <small class="text-muted">2 lettere (sigla ISTAT). Usare "EE" per soggetti esteri.</small>
+                        @error('province') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                 </div>
 
@@ -169,17 +239,49 @@
                     <div class="col-md-4 form-group {{ $changed['codice_destinatario'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             Codice destinatario SDI
+                            @if($userType !== 'private') * @endif
                             @if($changed['codice_destinatario'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
-                        <input type="text" class="form-control" wire:model="codiceDestinatario" maxlength="7" placeholder="es. 0000000">
+                        <div class="input-group">
+                            <input type="text" class="form-control"
+                                   wire:model.live.debounce.500ms="codiceDestinatario"
+                                   maxlength="{{ $userType === 'public_company' ? 6 : 7 }}"
+                                   placeholder="{{ $userType === 'public_company' ? '6 caratteri (IPA)' : '7 caratteri (o 0000000)' }}"
+                                   style="text-transform:uppercase;">
+                            @if($userType !== 'public_company')
+                                <span class="input-group-btn">
+                                    <button type="button" class="btn btn-default"
+                                            wire:click="$set('codiceDestinatario', '0000000')"
+                                            title="Imposta 0000000 (default per privati e clienti senza SdI)">
+                                        0000000
+                                    </button>
+                                </span>
+                            @endif
+                        </div>
+                        <small class="text-muted">
+                            @if($userType === 'public_company')
+                                Codice IPA a 6 caratteri (recuperabile su indicepa.gov.it).
+                            @else
+                                7 caratteri alfanumerici. Usare "0000000" se il cliente non ha SdI/PEC di recapito — in tal caso è richiesta la PEC.
+                            @endif
+                        </small>
+                        @error('codiceDestinatario') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                     <div class="col-md-8 form-group {{ $changed['pec_destinatario'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             PEC destinatario
+                            @if($userType === 'company' && $codiceDestinatario === '0000000') * @endif
                             @if($changed['pec_destinatario'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
-                        <input type="email" class="form-control" wire:model="pecDestinatario">
-                        @error('pecDestinatario') <small class="text-danger">{{ $message }}</small> @enderror
+                        <input type="email" class="form-control" wire:model="pecDestinatario" placeholder="esempio@pec.it">
+                        <small class="text-muted">
+                            @if($userType === 'public_company')
+                                Non richiesta: la PA riceve solo tramite codice IPA.
+                            @else
+                                Obbligatoria se il codice destinatario è "0000000".
+                            @endif
+                        </small>
+                        @error('pecDestinatario') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                 </div>
 
@@ -568,6 +670,15 @@
         font-size: 10px; background: #ec971f; color: #fff; padding: 1px 6px;
         border-radius: 8px; margin-left: 6px; vertical-align: middle;
     }
+
+    /* Guida contestuale requisiti SDI */
+    .qiw-guide {
+        background: #eef7ff; border-left: 4px solid #1c84c6;
+        padding: 10px 14px; margin: 12px 0 18px; border-radius: 3px;
+        font-size: 13px;
+    }
+    .qiw-guide-title { font-weight: 600; color: #1c84c6; margin-bottom: 4px; }
+    .qiw-guide-body > div { margin: 2px 0; }
 
     /* Lines table */
     .qiw-lines-table th { font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .3px; color: #676a6c; }
