@@ -991,10 +991,13 @@ class AccountingController extends BaseController
             return datatables()->of($elements)
                 ->addColumn('type_label', function ($item) {
                     return match ($item->user_type) {
-                        'private'        => '<span class="label label-default">Privato</span>',
-                        'company'        => '<span class="label label-info">Azienda</span>',
-                        'public_company' => '<span class="label label-primary">PA</span>',
-                        default          => '—',
+                        'private'           => '<span class="label label-default">Privato</span>',
+                        'company'           => '<span class="label label-info">Azienda</span>',
+                        'sole_trader'       => '<span class="label label-info">Ditta ind./Libero prof.</span>',
+                        'non_profit_entity' => '<span class="label label-warning">Ente Non Comm.</span>',
+                        'public_company'    => '<span class="label label-primary">PA</span>',
+                        'foreign'           => '<span class="label label-danger">Estero</span>',
+                        default             => '—',
                     };
                 })
                 ->addColumn('identifier', function ($item) {

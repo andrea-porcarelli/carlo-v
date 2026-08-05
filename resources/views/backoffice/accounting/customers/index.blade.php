@@ -23,7 +23,10 @@
                                 <option value="">Tutti</option>
                                 <option value="private">Privato</option>
                                 <option value="company">Azienda</option>
+                                <option value="sole_trader">Ditta individuale / Libero prof.</option>
+                                <option value="non_profit_entity">Ente Non Commerciale</option>
                                 <option value="public_company">PA</option>
+                                <option value="foreign">Soggetto Estero</option>
                             </select>
                         </div>
                         <div class="col-xs-12 col-sm-3 m-t-sm" style="display:flex; align-items:flex-end;">

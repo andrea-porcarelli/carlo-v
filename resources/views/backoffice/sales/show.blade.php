@@ -1033,7 +1033,14 @@ window._boSale = {
                                                 @if($customer->address)
                                                     <br><small class="text-muted">{{ $customer->address }}, {{ $customer->zip_code }} {{ $customer->city }} ({{ $customer->province }})</small>
                                                 @endif
-                                                @php $typeLabels = ['private' => 'Privato', 'company' => 'Azienda', 'public_company' => 'PA']; @endphp
+                                                @php $typeLabels = [
+                                                    'private' => 'Privato',
+                                                    'company' => 'Azienda',
+                                                    'sole_trader' => 'Ditta ind./Libero prof.',
+                                                    'non_profit_entity' => 'Ente Non Commerciale',
+                                                    'public_company' => 'PA',
+                                                    'foreign' => 'Estero',
+                                                ]; @endphp
                                                 <br><span class="label label-default" style="font-size:.75em;">{{ $typeLabels[$customer->user_type] ?? $customer->user_type }}</span>
                                             @elseif($inv->description)
                                                 <em class="text-muted">{{ $inv->description }}</em>

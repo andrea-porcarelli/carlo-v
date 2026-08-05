@@ -82,4 +82,15 @@ class ItalianFiscalHelper
     {
         return (bool) preg_match('/^[0-9]{5}$/', trim($cap));
     }
+
+    /**
+     * CF di ente non commerciale / condominio: 11 cifre numeriche (con checksum
+     * P.IVA) OPPURE 16 caratteri alfanumerici (retaggio storico per enti che
+     * hanno ricevuto un CF prima della normalizzazione a 11 cifre).
+     */
+    public static function isValidEntityFiscalCode(string $code): bool
+    {
+        $code = strtoupper(trim($code));
+        return self::isValidVatNumber($code) || self::isValidPersonalFiscalCode($code);
+    }
 }

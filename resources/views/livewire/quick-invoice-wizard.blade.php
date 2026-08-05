@@ -1,12 +1,37 @@
 @php
     $isLocked = $step === 3 && $result;
     $userTypes = [
-        'private'        => 'Privato',
-        'company'        => 'Azienda',
-        'public_company' => 'Pubblica Amministrazione',
+        'private'           => 'Privato',
+        'company'           => 'Azienda',
+        'sole_trader'       => 'Ditta individuale / Libero professionista',
+        'non_profit_entity' => 'Ente Non Commerciale',
+        'public_company'    => 'Pubblica Amministrazione',
+        'foreign'           => 'Soggetto Estero (non residente)',
     ];
     $changed = $this->changedCustomerFields ?? [];
     $provinces = \App\Helpers\ItalianFiscalHelper::PROVINCES;
+    // Codici ISO 3166-1 alpha-2 più frequenti — completo su https://it.wikipedia.org/wiki/ISO_3166-1_alpha-2.
+    // La select mostra le nazioni comuni; l'operatore può digitare qualunque codice a 2 lettere.
+    $commonCountries = [
+        'IT' => 'Italia',
+        'FR' => 'Francia',        'DE' => 'Germania',       'ES' => 'Spagna',
+        'PT' => 'Portogallo',     'AT' => 'Austria',        'CH' => 'Svizzera',
+        'GB' => 'Regno Unito',    'IE' => 'Irlanda',        'NL' => 'Paesi Bassi',
+        'BE' => 'Belgio',         'LU' => 'Lussemburgo',    'DK' => 'Danimarca',
+        'SE' => 'Svezia',         'NO' => 'Norvegia',       'FI' => 'Finlandia',
+        'PL' => 'Polonia',        'CZ' => 'Rep. Ceca',      'SK' => 'Slovacchia',
+        'HU' => 'Ungheria',       'RO' => 'Romania',        'BG' => 'Bulgaria',
+        'GR' => 'Grecia',         'HR' => 'Croazia',        'SI' => 'Slovenia',
+        'MT' => 'Malta',          'CY' => 'Cipro',          'EE' => 'Estonia',
+        'LV' => 'Lettonia',       'LT' => 'Lituania',
+        'US' => 'Stati Uniti',    'CA' => 'Canada',         'MX' => 'Messico',
+        'BR' => 'Brasile',        'AR' => 'Argentina',
+        'CN' => 'Cina',           'JP' => 'Giappone',       'KR' => 'Corea del Sud',
+        'IN' => 'India',          'AU' => 'Australia',      'NZ' => 'Nuova Zelanda',
+        'RU' => 'Russia',         'TR' => 'Turchia',        'IL' => 'Israele',
+        'AE' => 'Emirati Arabi',  'SA' => 'Arabia Saudita', 'EG' => 'Egitto',
+        'MA' => 'Marocco',        'TN' => 'Tunisia',        'ZA' => 'Sudafrica',
+    ];
     // Requisiti standard per l'emissione della Fattura Elettronica (SDI):
     // servono per guidare l'operatore mostrando in ogni step cosa è obbligatorio.
     $requirementsByType = [
@@ -20,13 +45,37 @@
             'required' => 'Ragione sociale, P.IVA (11 cifre), indirizzo sede completo (via, CAP, comune, provincia), Codice destinatario (7 caratteri) OPPURE PEC.',
             'notes'    => 'Se il cliente non ha SdI/PEC di recapito, inserire "0000000" come codice destinatario e obbligatoriamente la sua PEC.',
         ],
+        'sole_trader' => [
+            'title'    => 'Ditta individuale / Libero professionista',
+            'required' => 'Nome e cognome (non ragione sociale), Codice Fiscale personale (16 caratteri) E P.IVA (11 cifre), indirizzo sede attività, Codice destinatario (7 caratteri) OPPURE PEC.',
+            'notes'    => 'La persona fisica titolare di P.IVA va identificata con nome+cognome, CF personale e P.IVA insieme.',
+        ],
+        'non_profit_entity' => [
+            'title'    => 'Ente Non Commerciale (associazione, ETS, fondazione, ONLUS)',
+            'required' => 'Ragione sociale, Codice Fiscale (11 cifre numeriche oppure 16 alfanumerici), indirizzo sede completo, Codice destinatario (7 caratteri) OPPURE PEC. P.IVA solo se l\'ente svolge attività commerciale.',
+            'notes'    => 'Il CF numerico è la forma standard per gli enti. Il vecchio CF alfanumerico è ancora ammesso per enti storici.',
+        ],
         'public_company' => [
             'title'    => 'Pubblica Amministrazione',
             'required' => 'Ragione sociale, P.IVA, indirizzo completo, Codice IPA (6 caratteri) obbligatorio.',
             'notes'    => 'Il codice IPA è recuperabile su indicepa.gov.it. La PA riceve solo tramite codice IPA, non via PEC.',
         ],
+        'foreign' => [
+            'title'    => 'Soggetto Estero (non residente)',
+            'required' => 'Ragione sociale o nome, Nazione (codice ISO ≠ IT), indirizzo e città. Codice destinatario "XXXXXXX".',
+            'notes'    => 'Per soggetti esteri SDI accetta CF/P.IVA nel formato estero (in <IdCodice>) e "XXXXXXX" come codice destinatario. Provincia impostata a "EE".',
+        ],
     ];
     $req = $requirementsByType[$userType] ?? $requirementsByType['private'];
+
+    // Etichette dinamiche per il campo full_name in base al tipo.
+    $fullNameLabel = in_array($userType, ['private', 'sole_trader'], true)
+        ? 'Nome e cognome'
+        : 'Ragione sociale';
+    // Le persone giuridiche (azienda, PA, ente) richiedono sede completa;
+    // ditta individuale idem (sede attività); privati sono ammessi anche senza.
+    $requiresFullAddress = in_array($userType, ['company', 'public_company', 'non_profit_entity', 'sole_trader'], true)
+        || ($userType === 'foreign'); // per estero indirizzo+città sono obbligatori ma non CAP/provincia italiana
 @endphp
 
 <div class="quick-invoice-wizard">
@@ -138,13 +187,39 @@
                     </div>
                     <div class="col-md-8 form-group {{ $changed['full_name'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
-                            {{ $userType === 'private' ? 'Nome e cognome' : 'Ragione sociale' }} *
+                            {{ $fullNameLabel }} *
                             @if($changed['full_name'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
                         <input type="text" class="form-control" wire:model="fullName">
                         @error('fullName') <small class="text-danger">{{ $message }}</small> @enderror
                     </div>
                 </div>
+
+                {{-- Nazione: visibile solo per Soggetto Estero. Per gli altri tipi
+                     è fissa a "IT" (gestita da updatedUserType server-side). --}}
+                @if($userType === 'foreign')
+                    <div class="row">
+                        <div class="col-md-6 form-group {{ $changed['country'] ?? false ? 'qiw-changed' : '' }}">
+                            <label>
+                                Nazione *
+                                @if($changed['country'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
+                            </label>
+                            <input type="text" class="form-control"
+                                   wire:model.live.debounce.500ms="country"
+                                   maxlength="2"
+                                   list="qiw-country-list"
+                                   placeholder="Codice ISO 2 lettere (es. FR, DE, US)"
+                                   style="text-transform:uppercase;">
+                            <datalist id="qiw-country-list">
+                                @foreach($commonCountries as $iso => $name)
+                                    <option value="{{ $iso }}">{{ $name }}</option>
+                                @endforeach
+                            </datalist>
+                            <small class="text-muted">Codice ISO 3166-1 alpha-2. Digita per cercare o inserisci direttamente il codice.</small>
+                            @error('country') <small class="text-danger d-block">{{ $message }}</small> @enderror
+                        </div>
+                    </div>
+                @endif
 
                 {{-- Guida contestuale: cosa richiede SDI per questo tipo soggetto --}}
                 <div class="qiw-guide">
@@ -157,48 +232,76 @@
                     </div>
                 </div>
 
+                @php
+                    // Obbligatorietà CF/P.IVA per tipo (asterisco nell'etichetta)
+                    $cfRequired = in_array($userType, ['private', 'sole_trader', 'non_profit_entity'], true);
+                    $pivaRequired = in_array($userType, ['company', 'public_company', 'sole_trader'], true);
+                    // Placeholder + hint per CF
+                    $cfPlaceholder = match ($userType) {
+                        'private', 'sole_trader' => '16 caratteri, es. RSSMRA85M01H501U',
+                        'non_profit_entity'      => '11 cifre (es. 80012345678) oppure 16 caratteri',
+                        'foreign'                => 'Identificativo fiscale estero (opzionale)',
+                        default                  => '11 cifre (=P.IVA) oppure 16 caratteri (ditta individuale)',
+                    };
+                    $cfHint = match ($userType) {
+                        'private'           => 'Persona fisica: 16 caratteri alfanumerici.',
+                        'sole_trader'       => 'CF personale del titolare della P.IVA: 16 caratteri alfanumerici.',
+                        'non_profit_entity' => 'Ente: 11 cifre con checksum (formato P.IVA) oppure 16 alfanumerici (retaggio storico).',
+                        'foreign'           => 'Per soggetti esteri il CF/P.IVA italiano non si applica.',
+                        default             => 'Persona giuridica: coincide di norma con la P.IVA (11 cifre).',
+                    };
+                @endphp
                 <div class="row">
                     <div class="col-md-6 form-group {{ $changed['fiscal_code'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             Codice fiscale
-                            @if($userType === 'private') * @endif
+                            @if($cfRequired) * @endif
                             @if($changed['fiscal_code'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
                         <input type="text" class="form-control"
                                wire:model.live.debounce.500ms="fiscalCode"
                                maxlength="16"
-                               placeholder="{{ $userType === 'private' ? '16 caratteri, es. RSSMRA85M01H501U' : '11 cifre (=P.IVA) oppure 16 caratteri (ditta individuale)' }}"
+                               placeholder="{{ $cfPlaceholder }}"
                                style="text-transform:uppercase;">
-                        <small class="text-muted">
-                            @if($userType === 'private')
-                                Persona fisica: 16 caratteri alfanumerici.
-                            @else
-                                Persona giuridica: coincide di norma con la P.IVA (11 cifre).
-                            @endif
-                        </small>
+                        <small class="text-muted">{{ $cfHint }}</small>
                         @error('fiscalCode') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                     <div class="col-md-6 form-group {{ $changed['vat_number'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             Partita IVA
-                            @if($userType !== 'private') * @endif
+                            @if($pivaRequired) * @endif
                             @if($changed['vat_number'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
                         <input type="text" class="form-control"
                                wire:model.live.debounce.500ms="vatNumber"
-                               maxlength="11"
-                               inputmode="numeric"
-                               placeholder="11 cifre (senza prefisso IT)">
-                        <small class="text-muted">Solo cifre; l'eventuale prefisso "IT" viene rimosso in automatico.</small>
+                               maxlength="{{ $userType === 'foreign' ? 20 : 11 }}"
+                               inputmode="{{ $userType === 'foreign' ? 'text' : 'numeric' }}"
+                               placeholder="{{ $userType === 'foreign' ? 'Codice IVA estero (opzionale)' : '11 cifre (senza prefisso IT)' }}">
+                        <small class="text-muted">
+                            @if($userType === 'foreign')
+                                Codice IVA estero (opzionale). Nessun controllo checksum italiano.
+                            @else
+                                Solo cifre; l'eventuale prefisso "IT" viene rimosso in automatico.
+                            @endif
+                        </small>
                         @error('vatNumber') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                 </div>
 
+                @php
+                    // Per il soggetto estero: indirizzo+comune obbligatori,
+                    // ma CAP/provincia italiane non applicabili (CAP libero,
+                    // provincia fissata a "EE" dal server).
+                    $addressRequired = in_array($userType, ['company', 'public_company', 'non_profit_entity', 'sole_trader', 'foreign'], true);
+                    $cityRequired    = $addressRequired;
+                    $zipRequired     = in_array($userType, ['company', 'public_company', 'non_profit_entity', 'sole_trader'], true);
+                    $provinceRequired = $zipRequired;
+                @endphp
                 <div class="row">
                     <div class="col-md-8 form-group {{ $changed['address'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             Indirizzo
-                            @if($userType !== 'private') * @endif
+                            @if($addressRequired) * @endif
                             @if($changed['address'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
                         <input type="text" class="form-control" wire:model="address" placeholder="Via / Piazza e numero civico">
@@ -206,11 +309,14 @@
                     </div>
                     <div class="col-md-4 form-group {{ $changed['zip_code'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
-                            CAP
-                            @if($userType !== 'private') * @endif
+                            {{ $userType === 'foreign' ? 'CAP / ZIP' : 'CAP' }}
+                            @if($zipRequired) * @endif
                             @if($changed['zip_code'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
-                        <input type="text" class="form-control" wire:model="zipCode" maxlength="5" inputmode="numeric" placeholder="5 cifre">
+                        <input type="text" class="form-control" wire:model="zipCode"
+                               maxlength="{{ $userType === 'foreign' ? 10 : 5 }}"
+                               inputmode="{{ $userType === 'foreign' ? 'text' : 'numeric' }}"
+                               placeholder="{{ $userType === 'foreign' ? 'Formato locale' : '5 cifre' }}">
                         @error('zipCode') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                 </div>
@@ -218,8 +324,8 @@
                 <div class="row">
                     <div class="col-md-8 form-group {{ $changed['city'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
-                            Comune
-                            @if($userType !== 'private') * @endif
+                            {{ $userType === 'foreign' ? 'Città' : 'Comune' }}
+                            @if($cityRequired) * @endif
                             @if($changed['city'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
                         <input type="text" class="form-control" wire:model="city">
@@ -228,39 +334,60 @@
                     <div class="col-md-4 form-group {{ $changed['province'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             Provincia (sigla)
-                            @if($userType !== 'private') * @endif
+                            @if($provinceRequired) * @endif
                             @if($changed['province'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
                         <input type="text" class="form-control"
                                wire:model.live.debounce.500ms="province"
                                maxlength="2"
                                list="qiw-province-list"
-                               placeholder="es. CA"
+                               placeholder="{{ $userType === 'foreign' ? 'EE' : 'es. CA' }}"
+                               @if($userType === 'foreign') readonly @endif
                                style="text-transform:uppercase;">
                         <datalist id="qiw-province-list">
                             @foreach($provinces as $p)
                                 <option value="{{ $p }}"></option>
                             @endforeach
                         </datalist>
-                        <small class="text-muted">2 lettere (sigla ISTAT). Usare "EE" per soggetti esteri.</small>
+                        <small class="text-muted">
+                            @if($userType === 'foreign')
+                                Fissata a "EE" (convenzione SDI per soggetti esteri).
+                            @else
+                                2 lettere (sigla ISTAT). Usare "EE" per soggetti esteri.
+                            @endif
+                        </small>
                         @error('province') <small class="text-danger d-block">{{ $message }}</small> @enderror
                     </div>
                 </div>
 
+                @php
+                    $codDestRequired = $userType !== 'private';
+                    $codDestMax = $userType === 'public_company' ? 6 : 7;
+                    $codDestPlaceholder = match ($userType) {
+                        'public_company' => '6 caratteri (IPA)',
+                        'foreign'        => 'XXXXXXX (convenzione esteri)',
+                        default          => '7 caratteri (o 0000000)',
+                    };
+                    // Il quick-set 0000000 non ha senso per PA né per estero.
+                    $showZeroPreset = !in_array($userType, ['public_company', 'foreign'], true);
+                    // La PEC è obbligatoria per company/sole_trader/non_profit con "0000000".
+                    $pecRequiredForZero = in_array($userType, ['company', 'sole_trader', 'non_profit_entity'], true)
+                        && $codiceDestinatario === '0000000';
+                @endphp
                 <div class="row">
                     <div class="col-md-4 form-group {{ $changed['codice_destinatario'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             Codice destinatario SDI
-                            @if($userType !== 'private') * @endif
+                            @if($codDestRequired) * @endif
                             @if($changed['codice_destinatario'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
                         <div class="input-group">
                             <input type="text" class="form-control"
                                    wire:model.live.debounce.500ms="codiceDestinatario"
-                                   maxlength="{{ $userType === 'public_company' ? 6 : 7 }}"
-                                   placeholder="{{ $userType === 'public_company' ? '6 caratteri (IPA)' : '7 caratteri (o 0000000)' }}"
+                                   maxlength="{{ $codDestMax }}"
+                                   placeholder="{{ $codDestPlaceholder }}"
                                    style="text-transform:uppercase;">
-                            @if($userType !== 'public_company')
+                            @if($showZeroPreset)
                                 <span class="input-group-btn">
                                     <button type="button" class="btn btn-default"
                                             wire:click="$set('codiceDestinatario', '0000000')"
@@ -268,11 +395,21 @@
                                         0000000
                                     </button>
                                 </span>
+                            @elseif($userType === 'foreign')
+                                <span class="input-group-btn">
+                                    <button type="button" class="btn btn-default"
+                                            wire:click="$set('codiceDestinatario', 'XXXXXXX')"
+                                            title="Imposta XXXXXXX (convenzione SDI per soggetti esteri)">
+                                        XXXXXXX
+                                    </button>
+                                </span>
                             @endif
                         </div>
                         <small class="text-muted">
                             @if($userType === 'public_company')
                                 Codice IPA a 6 caratteri (recuperabile su indicepa.gov.it).
+                            @elseif($userType === 'foreign')
+                                Per soggetti esteri SDI accetta la convenzione "XXXXXXX".
                             @else
                                 7 caratteri alfanumerici. Usare "0000000" se il cliente non ha SdI/PEC di recapito — in tal caso è richiesta la PEC.
                             @endif
@@ -282,13 +419,15 @@
                     <div class="col-md-8 form-group {{ $changed['pec_destinatario'] ?? false ? 'qiw-changed' : '' }}">
                         <label>
                             PEC destinatario
-                            @if($userType === 'company' && $codiceDestinatario === '0000000') * @endif
+                            @if($pecRequiredForZero) * @endif
                             @if($changed['pec_destinatario'] ?? false) <span class="qiw-changed-tag">modificato</span> @endif
                         </label>
                         <input type="email" class="form-control" wire:model="pecDestinatario" placeholder="esempio@pec.it">
                         <small class="text-muted">
                             @if($userType === 'public_company')
                                 Non richiesta: la PA riceve solo tramite codice IPA.
+                            @elseif($userType === 'foreign')
+                                Non richiesta per soggetti esteri.
                             @else
                                 Obbligatoria se il codice destinatario è "0000000".
                             @endif
@@ -556,7 +695,10 @@
                 <h4 style="margin-top:0;"><i class="fa fa-user"></i> Cliente</h4>
                 <div class="qiw-summary-grid">
                     <div><span>Tipo</span><strong>{{ $userTypes[$userType] ?? $userType }}</strong></div>
-                    <div><span>{{ $userType === 'private' ? 'Nome e cognome' : 'Ragione sociale' }}</span><strong>{{ $fullName }}</strong></div>
+                    <div><span>{{ $fullNameLabel }}</span><strong>{{ $fullName }}</strong></div>
+                    @if($userType === 'foreign')
+                        <div><span>Nazione</span><strong>{{ $commonCountries[$country] ?? $country }}</strong></div>
+                    @endif
                     @if($fiscalCode)<div><span>Codice fiscale</span><strong>{{ $fiscalCode }}</strong></div>@endif
                     @if($vatNumber)<div><span>Partita IVA</span><strong>{{ $vatNumber }}</strong></div>@endif
                     @if($address)<div><span>Indirizzo</span><strong>{{ $address }}</strong></div>@endif

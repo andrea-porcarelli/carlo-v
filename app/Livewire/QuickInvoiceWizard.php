@@ -40,6 +40,7 @@ class QuickInvoiceWizard extends Component
     public ?array $storedCustomerSnapshot = null; // original DB values for diff display
 
     public string $userType = 'private';
+    public string $country = 'IT';
     public string $fullName = '';
     public string $fiscalCode = '';
     public string $vatNumber = '';
@@ -179,12 +180,13 @@ class QuickInvoiceWizard extends Component
 
         $this->selectedCustomerId   = $customer->id;
         $this->storedCustomerSnapshot = $customer->only([
-            'user_type', 'full_name', 'fiscal_code', 'vat_number',
+            'user_type', 'country', 'full_name', 'fiscal_code', 'vat_number',
             'address', 'zip_code', 'city', 'province',
             'codice_destinatario', 'pec_destinatario',
         ]);
 
         $this->userType            = $customer->user_type ?? 'private';
+        $this->country             = (string) ($customer->country ?? 'IT');
         $this->fullName            = (string) ($customer->full_name ?? '');
         $this->fiscalCode          = (string) ($customer->fiscal_code ?? '');
         $this->vatNumber           = (string) ($customer->vat_number ?? '');
@@ -204,6 +206,7 @@ class QuickInvoiceWizard extends Component
         $this->selectedCustomerId = null;
         $this->storedCustomerSnapshot = null;
         $this->userType = 'private';
+        $this->country  = 'IT';
         $this->fullName = '';
         $this->fiscalCode = '';
         $this->vatNumber = '';
@@ -224,6 +227,7 @@ class QuickInvoiceWizard extends Component
 
         $current = [
             'user_type'           => $this->userType,
+            'country'             => $this->country,
             'full_name'           => $this->fullName,
             'fiscal_code'         => $this->fiscalCode,
             'vat_number'          => $this->vatNumber,
@@ -383,7 +387,8 @@ class QuickInvoiceWizard extends Component
     {
         // Cambio di tipo soggetto → azzeriamo il codice destinatario se non è
         // coerente con la nuova casistica, così l'operatore vede subito quale
-        // valore inserire (0000000 privato/azienda, IPA 6 char per PA).
+        // valore inserire (0000000 privato/azienda, IPA 6 char per PA,
+        // XXXXXXX per soggetto estero).
         $len = strlen($this->codiceDestinatario);
         if ($this->userType === 'public_company' && $len !== 6) {
             $this->codiceDestinatario = '';
@@ -391,6 +396,27 @@ class QuickInvoiceWizard extends Component
         if ($this->userType !== 'public_company' && $len !== 0 && $len !== 7) {
             $this->codiceDestinatario = '';
         }
+
+        // Nazione + provincia devono riflettere il nuovo tipo:
+        //  - foreign → forza country vuoto perché operatore scelga la nazione,
+        //    e imposta provincia "EE" (convenzione SDI per esteri).
+        //  - torna a tipo italiano → riporta country a "IT" e sblocca provincia.
+        if ($this->userType === 'foreign') {
+            if ($this->country === 'IT') {
+                $this->country = '';
+            }
+            $this->province = 'EE';
+        } else {
+            $this->country = 'IT';
+            if ($this->province === 'EE') {
+                $this->province = '';
+            }
+        }
+    }
+
+    public function updatedCountry(): void
+    {
+        $this->country = strtoupper(trim($this->country));
     }
 
     /**
@@ -406,10 +432,11 @@ class QuickInvoiceWizard extends Component
     private function validateCustomerStep(): void
     {
         $this->validate([
-            'userType'  => 'required|in:private,company,public_company',
+            'userType'  => 'required|in:private,company,public_company,non_profit_entity,sole_trader,foreign',
+            'country'   => 'required|string|size:2',
             'fullName'  => 'required|string|max:255',
             'fiscalCode'=> 'nullable|string|max:16',
-            'vatNumber' => 'nullable|string|max:11',
+            'vatNumber' => 'nullable|string|max:20',
             'address'   => 'nullable|string|max:255',
             'zipCode'   => 'nullable|string|max:10',
             'city'      => 'nullable|string|max:100',
@@ -418,8 +445,10 @@ class QuickInvoiceWizard extends Component
             'pecDestinatario'    => 'nullable|email|max:255',
         ], [
             'province.size' => 'La provincia deve essere di 2 lettere (sigla, es. CA, MI, RM).',
+            'country.size'  => 'La nazione deve essere il codice ISO a 2 lettere (es. IT, FR, DE).',
         ], [
             'userType'  => 'tipo soggetto',
+            'country'   => 'nazione',
             'fullName'  => 'ragione sociale / nome',
             'fiscalCode'=> 'codice fiscale',
             'vatNumber' => 'partita IVA',
@@ -430,23 +459,38 @@ class QuickInvoiceWizard extends Component
 
         $errors = [];
 
-        // Provincia: se valorizzata, deve essere una sigla italiana valida.
+        $isForeign = $this->userType === 'foreign';
+
+        // Nazione: soggetti italiani = IT; soggetti esteri = qualunque ISO ≠ IT.
+        if (!$isForeign && strtoupper($this->country) !== 'IT') {
+            $errors['country'] = 'Per soggetti italiani la nazione deve essere "IT". Se il cliente è estero, seleziona "Soggetto Estero" come tipo.';
+        }
+        if ($isForeign && strtoupper($this->country) === 'IT') {
+            $errors['country'] = 'Per un Soggetto Estero la nazione deve essere diversa da "IT".';
+        }
+
+        // Provincia: per soggetti italiani deve essere una sigla ISTAT valida
+        // (o "EE" se per qualche motivo si tratta di sede estera con anagrafica
+        // italiana). Per soggetti esteri accettiamo "EE" convenzionale.
         if ($this->province !== '' && !ItalianFiscalHelper::isValidProvince($this->province)) {
             $errors['province'] = 'Sigla provincia non valida. Usare una sigla ISTAT di 2 lettere (es. CA, MI, RM; "EE" per estero).';
         }
 
-        // CAP: se valorizzato, deve essere 5 cifre.
-        if ($this->zipCode !== '' && !ItalianFiscalHelper::isValidCap($this->zipCode)) {
+        // CAP: per soggetti italiani deve essere 5 cifre; per esteri accettiamo
+        // formati stranieri (Regno Unito, Canada, ...), max 10 caratteri.
+        if (!$isForeign && $this->zipCode !== '' && !ItalianFiscalHelper::isValidCap($this->zipCode)) {
             $errors['zipCode'] = 'Il CAP deve essere composto da 5 cifre.';
         }
 
-        // Almeno un identificativo (CF o P.IVA) è sempre richiesto.
-        if ($this->fiscalCode === '' && $this->vatNumber === '') {
+        // Almeno un identificativo (CF o P.IVA) è sempre richiesto tranne per
+        // il soggetto estero, dove la P.IVA italiana non è applicabile e il CF
+        // può essere un identificativo fiscale estero non standard.
+        if (!$isForeign && $this->fiscalCode === '' && $this->vatNumber === '') {
             $errors['fiscalCode'] = 'Indicare codice fiscale o partita IVA.';
         }
 
-        // P.IVA: 11 cifre con checksum corretto quando valorizzata.
-        if ($this->vatNumber !== '' && !ItalianFiscalHelper::isValidVatNumber($this->vatNumber)) {
+        // P.IVA italiana: validazione checksum solo per soggetti italiani.
+        if (!$isForeign && $this->vatNumber !== '' && !ItalianFiscalHelper::isValidVatNumber($this->vatNumber)) {
             $errors['vatNumber'] = 'Partita IVA non valida (devono essere 11 cifre con checksum corretto).';
         }
 
@@ -524,6 +568,84 @@ class QuickInvoiceWizard extends Component
                 if ($this->{$field} === '') {
                     $errors[$field] = $meta['label'] . ' obbligatori' . $meta['article'] . " per l'anagrafica PA.";
                 }
+            }
+        }
+
+        if ($this->userType === 'non_profit_entity') {
+            // Ente non commerciale (associazioni, ETS, fondazioni, ONLUS):
+            // Codice fiscale obbligatorio; ammesso 11 cifre O 16 alfanumerici
+            // (retaggio storico). P.IVA opzionale (solo se ente commerciale).
+            if ($this->fiscalCode === '') {
+                $errors['fiscalCode'] = 'Il codice fiscale è obbligatorio per gli enti non commerciali.';
+            } elseif (!ItalianFiscalHelper::isValidEntityFiscalCode($this->fiscalCode)) {
+                $errors['fiscalCode'] = 'Codice fiscale non valido: attesi 11 cifre (con checksum) oppure 16 caratteri alfanumerici.';
+            }
+            $sedeFieldsEnte = [
+                'address'  => ['label' => 'Indirizzo sede', 'article' => 'o'],
+                'zipCode'  => ['label' => 'CAP',            'article' => 'o'],
+                'city'     => ['label' => 'Comune',         'article' => 'o'],
+                'province' => ['label' => 'Provincia',      'article' => 'a'],
+            ];
+            foreach ($sedeFieldsEnte as $field => $meta) {
+                if ($this->{$field} === '') {
+                    $errors[$field] = $meta['label'] . ' obbligatori' . $meta['article'] . " per l'anagrafica ente.";
+                }
+            }
+            if ($this->codiceDestinatario === '') {
+                $errors['codiceDestinatario'] = 'Codice destinatario obbligatorio (7 caratteri). Usare "0000000" se l\'ente non lo fornisce, indicando anche la PEC.';
+            } elseif (strlen($this->codiceDestinatario) !== 7) {
+                $errors['codiceDestinatario'] = 'Codice destinatario ente: esattamente 7 caratteri alfanumerici.';
+            } elseif ($this->codiceDestinatario === '0000000' && $this->pecDestinatario === '') {
+                $errors['pecDestinatario'] = 'Con codice destinatario "0000000" è necessario indicare la PEC dell\'ente per il recapito SDI.';
+            }
+        }
+
+        if ($this->userType === 'sole_trader') {
+            // Ditta individuale / libero professionista: persona fisica con
+            // P.IVA. Servono CF personale (16 caratteri) E P.IVA (11 cifre).
+            if ($this->fiscalCode === '') {
+                $errors['fiscalCode'] = 'Il codice fiscale personale è obbligatorio per ditte individuali e liberi professionisti.';
+            } elseif (!ItalianFiscalHelper::isValidPersonalFiscalCode($this->fiscalCode)) {
+                $errors['fiscalCode'] = 'Codice fiscale non valido: attesi 16 caratteri alfanumerici (persona fisica).';
+            }
+            if ($this->vatNumber === '') {
+                $errors['vatNumber'] = 'La partita IVA è obbligatoria per ditte individuali e liberi professionisti.';
+            }
+            $sedeFieldsSole = [
+                'address'  => ['label' => 'Indirizzo sede attività', 'article' => 'o'],
+                'zipCode'  => ['label' => 'CAP',                     'article' => 'o'],
+                'city'     => ['label' => 'Comune',                  'article' => 'o'],
+                'province' => ['label' => 'Provincia',               'article' => 'a'],
+            ];
+            foreach ($sedeFieldsSole as $field => $meta) {
+                if ($this->{$field} === '') {
+                    $errors[$field] = $meta['label'] . ' obbligatori' . $meta['article'] . " per l'anagrafica ditta individuale.";
+                }
+            }
+            if ($this->codiceDestinatario === '') {
+                $errors['codiceDestinatario'] = 'Codice destinatario obbligatorio (7 caratteri). Usare "0000000" se non fornito, indicando anche la PEC.';
+            } elseif (strlen($this->codiceDestinatario) !== 7) {
+                $errors['codiceDestinatario'] = 'Codice destinatario: esattamente 7 caratteri alfanumerici.';
+            } elseif ($this->codiceDestinatario === '0000000' && $this->pecDestinatario === '') {
+                $errors['pecDestinatario'] = 'Con codice destinatario "0000000" è necessario indicare la PEC per il recapito SDI.';
+            }
+        }
+
+        if ($this->userType === 'foreign') {
+            // Soggetto estero (non residente): SDI accetta CF/P.IVA non italiani
+            // in <IdCodice>; convenzionalmente <CodiceDestinatario>=XXXXXXX.
+            // Sede: indirizzo + città obbligatori; provincia forzata a "EE";
+            // CAP libero per adattarsi ai formati esteri.
+            if ($this->codiceDestinatario === '') {
+                $errors['codiceDestinatario'] = 'Per il Soggetto Estero il codice destinatario è convenzionalmente "XXXXXXX".';
+            } elseif (strlen($this->codiceDestinatario) !== 7) {
+                $errors['codiceDestinatario'] = 'Codice destinatario estero: 7 caratteri (usare "XXXXXXX").';
+            }
+            if ($this->address === '') {
+                $errors['address'] = 'Indirizzo sede obbligatorio per l\'anagrafica estera.';
+            }
+            if ($this->city === '') {
+                $errors['city'] = 'Comune / città obbligatori per l\'anagrafica estera.';
             }
         }
 
@@ -786,6 +908,7 @@ class QuickInvoiceWizard extends Component
     {
         return [
             'user_type'           => $this->userType,
+            'country'             => $this->country !== '' ? strtoupper($this->country) : 'IT',
             'full_name'           => $this->fullName,
             'fiscal_code'         => $this->fiscalCode !== '' ? $this->fiscalCode : null,
             'vat_number'          => $this->vatNumber !== '' ? $this->vatNumber : null,
@@ -802,7 +925,7 @@ class QuickInvoiceWizard extends Component
     {
         $this->reset([
             'step', 'customerSearch', 'customerSearchResults', 'selectedCustomerId',
-            'storedCustomerSnapshot', 'userType', 'fullName', 'fiscalCode', 'vatNumber',
+            'storedCustomerSnapshot', 'userType', 'country', 'fullName', 'fiscalCode', 'vatNumber',
             'address', 'zipCode', 'city', 'province', 'codiceDestinatario',
             'pecDestinatario', 'persistCustomerChanges',
             'dishSearch', 'dishSearchResults', 'lines',
