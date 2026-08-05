@@ -299,8 +299,10 @@ Route::group(['prefix' => '/backoffice'], function() {
             });
             Route::post('/mysond/refresh-crediti', [AccountingController::class, 'refreshMysondCrediti'])->name('mysond.refresh-crediti');
 
-            // Emissione Nota di Credito (TD04): riusa il wizard emissione fattura.
+            // Note di Credito (TD04): pagina dedicata + emissione via wizard.
             Route::group(['prefix' => '/credit-notes', 'as' => 'credit-notes.'], function() {
+                Route::get('/', [AccountingController::class, 'creditNotes'])->name('index');
+                Route::get('/datatable', [AccountingController::class, 'creditNotesDatatable'])->name('datatable');
                 Route::get('/create', [AccountingController::class, 'createCreditNote'])->name('create');
             });
             Route::group(['prefix' => '/customers', 'as' => 'customers.'], function() {

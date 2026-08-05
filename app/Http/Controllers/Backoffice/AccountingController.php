@@ -56,6 +56,27 @@ class AccountingController extends BaseController
         ));
     }
 
+    /**
+     * Lista Note di Credito emesse (TD04). Stessa logica pagina Fatture: sync
+     * mirror MySond in ingresso, filtro clienti/scartate, ma senza il pannello
+     * "Fatture esterne" (le note credito esterne non sono ancora tracciate
+     * come categoria a sé — MySond le include indifferentemente in getFeInviateLink).
+     */
+    public function creditNotes(MysondInvoiceMirror $mirror): View
+    {
+        $mirror->sync();
+
+        $customers = Customer::orderBy('full_name')->get(['id', 'full_name'])->map(function ($c) {
+            return ['id' => $c->id, 'label' => $c->full_name];
+        })->toArray();
+
+        $pendingAcks = MirroredInvoice::pendingAck()
+            ->orderBy('first_synced_at')
+            ->get();
+
+        return view('backoffice.accounting.credit-notes.index', compact('customers', 'pendingAcks'));
+    }
+
     public function ackMirroredRejection(Request $request, MirroredInvoice $mirrored)
     {
         abort_unless($mirrored->isRejected(), 422, 'Fattura non in stato di scarto.');
@@ -310,10 +331,28 @@ class AccountingController extends BaseController
 
     public function datatable(Request $request): JsonResponse
     {
+        return $this->buildInvoicesDatatable($request, TableOrderInvoice::DOCUMENT_TYPE_INVOICE);
+    }
+
+    public function creditNotesDatatable(Request $request): JsonResponse
+    {
+        return $this->buildInvoicesDatatable($request, TableOrderInvoice::DOCUMENT_TYPE_CREDIT_NOTE);
+    }
+
+    /**
+     * Datatable condivisa fra Fatture (TD01) e Note di Credito (TD04). Il tipo
+     * documento viene filtrato server-side, così le due pagine mostrano insiemi
+     * disgiunti senza dover far leva sul filtro utente. Le azioni per riga
+     * variano leggermente: dalla lista fatture si può emettere una nota credito,
+     * dalla lista note credito no (evita nota credito di una nota credito).
+     */
+    private function buildInvoicesDatatable(Request $request, string $documentType): JsonResponse
+    {
         try {
             $filters = $request->get('filters') ?? [];
 
             $query = TableOrderInvoice::with(['customer', 'tableOrder'])
+                ->where('document_type', $documentType)
                 ->orderByDesc('created_at')
                 ->orderByDesc('id');
 

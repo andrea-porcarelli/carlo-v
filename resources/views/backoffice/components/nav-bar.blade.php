@@ -28,6 +28,11 @@
                                 <i class="fas fa-file-invoice"></i> Fatture
                             </a>
                         </li>
+                        <li class="{{ (Request::is('backoffice/accounting/credit-notes*')) ? 'active' : '' }}">
+                            <a href="{{ route('accounting.credit-notes.index') }}">
+                                <i class="fas fa-file-invoice-dollar"></i> Note di credito
+                            </a>
+                        </li>
                         <li class="{{ (Request::is('backoffice/accounting/customers*')) ? 'active' : '' }}">
                             <a href="{{ route('accounting.customers.index') }}">
                                 <i class="fas fa-user-tie"></i> Clienti
