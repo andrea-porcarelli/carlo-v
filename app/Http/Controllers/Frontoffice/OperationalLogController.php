@@ -47,7 +47,7 @@ class OperationalLogController extends Controller
     {
         $paid = TableOrder::where('status', 'paid')
             ->whereBetween('closed_at', [$start, $end])
-            ->with('restaurantTable:id,table_number,is_banco')
+            ->with(['restaurantTable:id,table_number,is_banco', 'precontoSplits'])
             ->get(['id', 'restaurant_table_id', 'total_amount', 'discount_type', 'discount_value', 'payment_method', 'autoconsumo', 'closed_at']);
 
         $buckets = [
@@ -72,51 +72,103 @@ class OperationalLogController extends Controller
         $fattureCount   = 0;
 
         foreach ($paid as $order) {
-            $amount = $order->hasDiscount() ? $order->getDiscountedTotal() : (float) $order->total_amount;
-            $table  = $order->restaurantTable;
-            $isBanco = (bool) $table?->is_banco;
-            $entry = [
-                'table_number' => $isBanco ? 'BANCO' : ($table?->table_number ?? '-'),
-                'amount'       => round($amount, 2),
-                'closed_at'    => $order->closed_at?->format('H:i'),
-            ];
+            $effectiveTotal = $order->hasDiscount() ? $order->getDiscountedTotal() : (float) $order->total_amount;
+            $table          = $order->restaurantTable;
+            $isBanco        = (bool) $table?->is_banco;
+            $tableLabel     = $isBanco ? 'BANCO' : ($table?->table_number ?? '-');
+            $orderTime      = $order->closed_at?->format('H:i');
 
-            if ($isBanco) {
-                $buckets['vendite_banco'] += $amount;
-                $details['vendite_banco'][] = $entry;
-            }
-
+            // Autoconsumo: il totale intero va in autoconsumo (in questo flusso non
+            // usiamo split multi-metodo).
             if ($order->autoconsumo) {
-                $buckets['autoconsumo'] += $amount;
+                $entry = [
+                    'table_number' => $tableLabel,
+                    'amount'       => round($effectiveTotal, 2),
+                    'closed_at'    => $orderTime,
+                ];
+                $buckets['autoconsumo'] += $effectiveTotal;
                 $details['autoconsumo'][] = $entry;
+                if ($isBanco) {
+                    $buckets['vendite_banco'] += $effectiveTotal;
+                    $details['vendite_banco'][] = $entry;
+                }
                 continue;
             }
 
-            switch ($order->payment_method) {
-                case 'contanti':
-                    $buckets['contanti']  += $amount;
-                    $details['contanti'][] = $entry;
-                    $scontriniCount++;
-                    break;
-                case 'pos':
-                    $buckets['pos']       += $amount;
-                    $details['pos'][] = $entry;
-                    $scontriniCount++;
-                    break;
-                case 'fattura':
-                case 'fattura_contanti':
-                case 'fattura_pos':
-                case 'bonifico':
-                case 'assegno':
-                case 'misto':
-                    $buckets['fatture'] += $amount;
-                    $details['fatture'][] = $entry;
-                    $fattureCount++;
-                    break;
-                case 'chiusura_conto':
-                    $buckets['chiusure_conto'] += $amount;
-                    $details['chiusure_conto'][] = $entry;
-                    break;
+            // Costruzione della lista dei pagamenti da imputare ai bucket.
+            // Se il tavolo è stato incassato via split preconto con metodi diversi,
+            // ogni split va contato col proprio payment_method; l'eventuale residuo
+            // (delta fra total effettivo e somma degli split) viene attribuito al
+            // payment_method del tavolo (chiusura diretta del residuo).
+            $paidSplits = $order->precontoSplits->where('status', 'paid');
+            $payments   = [];
+
+            if ($paidSplits->isNotEmpty()) {
+                $sumSplits = 0.0;
+                foreach ($paidSplits as $split) {
+                    $splitAmount = (float) $split->total;
+                    $sumSplits  += $splitAmount;
+                    $payments[]  = [
+                        'amount' => $splitAmount,
+                        'method' => $split->payment_method,
+                        'time'   => optional($split->paid_at)->format('H:i') ?? $orderTime,
+                    ];
+                }
+                $residual = round($effectiveTotal - $sumSplits, 2);
+                if ($residual > 0.01) {
+                    $payments[] = [
+                        'amount' => $residual,
+                        'method' => $order->payment_method,
+                        'time'   => $orderTime,
+                    ];
+                }
+            } else {
+                $payments[] = [
+                    'amount' => $effectiveTotal,
+                    'method' => $order->payment_method,
+                    'time'   => $orderTime,
+                ];
+            }
+
+            foreach ($payments as $p) {
+                $amount = $p['amount'];
+                $entry  = [
+                    'table_number' => $tableLabel,
+                    'amount'       => round($amount, 2),
+                    'closed_at'    => $p['time'],
+                ];
+
+                if ($isBanco) {
+                    $buckets['vendite_banco'] += $amount;
+                    $details['vendite_banco'][] = $entry;
+                }
+
+                switch ($p['method']) {
+                    case 'contanti':
+                        $buckets['contanti']  += $amount;
+                        $details['contanti'][] = $entry;
+                        $scontriniCount++;
+                        break;
+                    case 'pos':
+                        $buckets['pos']       += $amount;
+                        $details['pos'][] = $entry;
+                        $scontriniCount++;
+                        break;
+                    case 'fattura':
+                    case 'fattura_contanti':
+                    case 'fattura_pos':
+                    case 'bonifico':
+                    case 'assegno':
+                    case 'misto':
+                        $buckets['fatture'] += $amount;
+                        $details['fatture'][] = $entry;
+                        $fattureCount++;
+                        break;
+                    case 'chiusura_conto':
+                        $buckets['chiusure_conto'] += $amount;
+                        $details['chiusure_conto'][] = $entry;
+                        break;
+                }
             }
         }
 
