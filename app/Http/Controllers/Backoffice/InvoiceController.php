@@ -136,11 +136,13 @@ class InvoiceController extends BaseController
             }
 
             $elements = $this->interface->filters($filters)
-                ->orderByDesc('created_at');
+                ->orderByDesc('invoice_date')
+                ->orderByDesc('id');
 
             $dt = datatables()->of($elements);
 
             return $this->editColumns($dt, $this->name, $operations)
+                ->orderColumn('invoice_date', 'invoice_date $1')
                 ->addColumn('supplier_name', function ($item) {
                    return $item->supplier->extended_name;
                 })

@@ -27,21 +27,21 @@
                                     <thead>
                                     <tr>
                                         <th class="all no-sort"></th>
-                                        <th class="all">Fornitore</th>
-                                        <th class="all">N* fattura </th>
-                                        <th class="all">Importo </th>
+                                        <th class="all no-sort">Fornitore</th>
+                                        <th class="all no-sort">N* fattura </th>
+                                        <th class="all no-sort">Importo </th>
                                         <th class="all">Data </th>
-                                        <th class="all">Stato mappatura</th>
+                                        <th class="all no-sort">Stato mappatura</th>
                                     </tr>
                                     </thead>
                                     <tfoot>
                                     <tr>
                                         <th class="all no-sort"></th>
-                                        <th class="all">Fornitore</th>
-                                        <th class="all">N* fattura </th>
-                                        <th class="all">Importo </th>
+                                        <th class="all no-sort">Fornitore</th>
+                                        <th class="all no-sort">N* fattura </th>
+                                        <th class="all no-sort">Importo </th>
                                         <th class="all">Data </th>
-                                        <th class="all">Da mappare</th>
+                                        <th class="all no-sort">Da mappare</th>
                                     </tr>
                                     </tfoot>
                                 </table>
@@ -92,9 +92,10 @@
                         {data: 'supplier_name', orderable: false},
                         {data: 'invoice_number', orderable: false},
                         {data: 'amount', orderable: false},
-                        {data: 'invoice_date', orderable: false},
+                        {data: 'invoice_date'},
                         {data: 'mapping', class: 'text-center', orderable: false},
                     ],
+                    order: [[4, 'desc']],
                     dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'mapping', 'ignored'],
                     serverSide: true,
                 }]);

@@ -371,11 +371,10 @@ class AccountingController extends BaseController
             }
 
             return datatables()->eloquent($query)
-                ->orderColumn('code', 'invoice_code $1')
-                ->orderColumn('customer_name', '(SELECT full_name FROM customers WHERE customers.id = table_order_invoices.customer_id) $1')
-                ->orderColumn('amount_fmt', 'amount $1')
-                ->orderColumn('status_badge', 'status $1')
-                ->orderColumn('sdi_status_label_fmt', 'sdi_status $1')
+                ->order(function () {
+                    // Ordinamento forzato a livello di query: created_at DESC.
+                    // Sovrascrive il default ordering di yajra che applica i parametri DataTables.
+                })
                 ->addColumn('code', function ($item) {
                     $name  = $item->invoice_name ? ' <small class="text-muted">(' . $item->invoice_name . ')</small>' : '';
                     $type  = $item->document_type === TableOrderInvoice::DOCUMENT_TYPE_CREDIT_NOTE
