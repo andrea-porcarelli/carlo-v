@@ -135,9 +135,7 @@ class InvoiceController extends BaseController
                 $operations[] = 'import-stock';
             }
 
-            $elements = $this->interface->filters($filters)
-                ->orderByDesc('invoice_date')
-                ->orderByDesc('id');
+            $elements = $this->interface->filters($filters);
 
             $dt = datatables()->of($elements);
 
