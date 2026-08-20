@@ -51,10 +51,10 @@ class MaterialController extends BaseController
                 ->addColumn('stock', function ($item) use ($stockService) {
                     $stockSummary = $stockService->calculateStock($item);
                     $current = (float) $stockSummary['current'];
-                    $threshold = $item->alert_threshold !== null ? (float) $item->alert_threshold : null;
-                    $isLow = $threshold !== null && $current <= $threshold;
                     $html = '<strong>' . $current . '</strong> ' . $item->stock_type;
-                    if ($isLow) {
+                    if (!$item->track_stock) {
+                        $html .= ' <span class="label label-default" title="Giacenza non tracciata: escluso dagli avvisi Telegram"><i class="fa fa-bell-slash"></i> Non tracciato</span>';
+                    } elseif ($stockSummary['is_low']) {
                         $html .= ' <span class="label label-danger" title="Giacenza sotto soglia"><i class="fa fa-exclamation-triangle"></i> Sotto soglia</span>';
                     }
                     return $html;
@@ -96,8 +96,9 @@ class MaterialController extends BaseController
                         }
                     },
                 ],
-                'stock'      => 'required|numeric|min:0',
-                'stock_type' => ['required', \Illuminate\Validation\Rule::in(array_keys(Material::stock_types()))],
+                'stock'       => 'required|numeric|min:0',
+                'stock_type'  => ['required', \Illuminate\Validation\Rule::in(array_keys(Material::stock_types()))],
+                'track_stock' => 'nullable|boolean',
             ]);
             $store = $request->all();
             $item = $this->interface->store($store);
@@ -157,9 +158,10 @@ class MaterialController extends BaseController
     public function edit(int $id, Request $request) : JsonResponse {
         try {
             $request->validate([
-                'label'      => 'required',
-                'stock'      => 'required|numeric|min:0',
-                'stock_type' => ['required', \Illuminate\Validation\Rule::in(array_keys(Material::stock_types()))],
+                'label'       => 'required',
+                'stock'       => 'required|numeric|min:0',
+                'stock_type'  => ['required', \Illuminate\Validation\Rule::in(array_keys(Material::stock_types()))],
+                'track_stock' => 'nullable|boolean',
             ]);
             $item = $this->interface->find($id);
             if ($item->id) {

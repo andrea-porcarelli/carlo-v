@@ -21,6 +21,17 @@
                             @include('backoffice.components.form.select',['form' => 'update-or-create-element', 'name' => 'stock_type', 'label' => 'Unità di misura *', 'col' => 2, 'options' => $stock_types])
                             @include('backoffice.components.form.input',['form' => 'update-or-create-element', 'name' => 'alert_threshold', 'label' => 'Soglia minima giacenza *', 'col' => 2])
 
+                            <div class="col-xs-12 col-sm-3 m-t-sm">
+                                <label>Traccia giacenza</label><br />
+                                @include('backoffice.components.form.switch', [
+                                    'field' => true,
+                                    'name'  => 'track_stock',
+                                    'value' => 1,
+                                ])
+                                <small class="text-muted d-block">
+                                    Se disattivato, questo ingrediente viene escluso dagli avvisi di scorta bassa e dalla notifica Telegram.
+                                </small>
+                            </div>
                         </div>
                         <div class="row">
                             <div class="col-xs-12 col-sm-2 text-center m-t-sm">

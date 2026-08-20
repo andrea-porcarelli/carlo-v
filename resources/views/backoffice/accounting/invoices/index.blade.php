@@ -66,13 +66,13 @@
                                     <thead>
                                     <tr>
                                         <th class="all no-sort">Azioni</th>
-                                        <th class="all no-sort">Codice</th>
-                                        <th class="all no-sort">Cliente</th>
-                                        <th class="all no-sort">Importo</th>
-                                        <th class="all no-sort">Stato</th>
-                                        <th class="all no-sort">Esito SDI</th>
+                                        <th class="all">Codice</th>
+                                        <th class="all">Cliente</th>
+                                        <th class="all">Importo</th>
+                                        <th class="all">Stato</th>
+                                        <th class="all">Esito SDI</th>
                                         <th class="all">Creata</th>
-                                        <th class="all no-sort">Inviata</th>
+                                        <th class="all">Inviata</th>
                                         <th class="all no-sort">Risposta MySond</th>
                                     </tr>
                                     </thead>
@@ -299,13 +299,13 @@
                     url: '{{ route('accounting.invoices.datatable') }}',
                     columns: [
                         {data: 'action', orderable: false, searchable: false, width: '110px'},
-                        {data: 'code', orderable: false},
-                        {data: 'customer_name', orderable: false},
-                        {data: 'amount_fmt', class: 'text-end', orderable: false},
-                        {data: 'status_badge', class: 'text-center', orderable: false},
-                        {data: 'sdi_status_label_fmt', class: 'text-center', orderable: false},
+                        {data: 'code'},
+                        {data: 'customer_name'},
+                        {data: 'amount_fmt', class: 'text-end'},
+                        {data: 'status_badge', class: 'text-center'},
+                        {data: 'sdi_status_label_fmt', class: 'text-center'},
                         {data: 'created_at'},
-                        {data: 'sent_at', orderable: false},
+                        {data: 'sent_at'},
                         {data: 'mysond_desc', orderable: false},
                     ],
                     order: [[6, 'desc']],

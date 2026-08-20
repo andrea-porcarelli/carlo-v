@@ -19,6 +19,11 @@ class Material extends Model
         'stock',
         'stock_type',
         'alert_threshold',
+        'track_stock',
+    ];
+
+    protected $casts = [
+        'track_stock' => 'boolean',
     ];
 
     public function stocks() : HasMany {
@@ -49,6 +54,9 @@ class Material extends Model
 
     public function isLowStock(float $currentStock): bool
     {
+        if (!$this->track_stock) {
+            return false;
+        }
         return $this->alert_threshold !== null && $currentStock <= $this->alert_threshold;
     }
 }

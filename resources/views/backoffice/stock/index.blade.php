@@ -135,7 +135,11 @@
                                                        style="width: 100px; display: inline-block;">
                                             </td>
                                             <td class="text-center">
-                                                @if($stock['material']->alert_threshold === null)
+                                                @if(!$stock['material']->track_stock)
+                                                    <span class="label label-default" title="Giacenza non tracciata: escluso dagli avvisi Telegram">
+                                                        <i class="fa fa-bell-slash"></i> Non tracciato
+                                                    </span>
+                                                @elseif($stock['material']->alert_threshold === null)
                                                     <span class="label label-default">N/D</span>
                                                 @elseif($stock['is_low'])
                                                     <span class="label label-danger blink-animation">

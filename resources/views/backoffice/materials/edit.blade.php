@@ -22,6 +22,17 @@
                             @include('backoffice.components.form.select',['form' => 'update-or-create-element', 'name' => 'stock_type', 'label' => 'Unità di misura *', 'col' => 2, 'options' => $stock_types])
                             @include('backoffice.components.form.input',['form' => 'update-or-create-element', 'name' => 'alert_threshold', 'label' => 'Soglia minima giacenza *', 'col' => 2])
 
+                            <div class="col-xs-12 col-sm-3 m-t-sm">
+                                <label>Traccia giacenza</label><br />
+                                @include('backoffice.components.form.switch', [
+                                    'field' => true,
+                                    'name'  => 'track_stock',
+                                    'value' => $object->track_stock,
+                                ])
+                                <small class="text-muted d-block">
+                                    Se disattivato, questo ingrediente viene escluso dagli avvisi di scorta bassa e dalla notifica Telegram.
+                                </small>
+                            </div>
                         </div>
                         <div class="row">
                             <div class="col-xs-12 col-sm-2 text-center m-t-sm">
@@ -68,7 +79,9 @@
                             <div class="panel panel-{{ $stockSummary['is_low'] ? 'danger' : 'default' }}">
                                 <div class="panel-body text-center">
                                     <div class="h3" style="margin:0">
-                                        @if($stockSummary['is_low'])
+                                        @if(!$object->track_stock)
+                                            <span class="text-muted"><i class="fa fa-bell-slash"></i> Non tracciato</span>
+                                        @elseif($stockSummary['is_low'])
                                             <span class="text-danger"><i class="fa fa-exclamation-triangle"></i> BASSO</span>
                                         @else
                                             <span class="text-success"><i class="fa fa-check"></i> OK</span>
