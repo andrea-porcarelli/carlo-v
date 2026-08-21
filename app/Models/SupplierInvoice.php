@@ -11,6 +11,9 @@ class SupplierInvoice extends LogsModel
 {
     use LogsActivity;
 
+    public const DOCUMENT_TYPE_INVOICE     = 'TD01';
+    public const DOCUMENT_TYPE_CREDIT_NOTE = 'TD04';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -20,6 +23,7 @@ class SupplierInvoice extends LogsModel
         'supplier_id',
         'invoice_number',
         'filename',
+        'document_type',
         'amount',
         'invoice_date',
         'ignored_at',
@@ -44,6 +48,11 @@ class SupplierInvoice extends LogsModel
 
     public function getSupplierLabelAttribute() : string {
         return $this->supplier->label;
+    }
+
+    public function isCreditNote(): bool
+    {
+        return $this->document_type === self::DOCUMENT_TYPE_CREDIT_NOTE;
     }
 
 

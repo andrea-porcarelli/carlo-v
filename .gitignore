@@ -29,3 +29,4 @@ Thumbs.db
 /bootstrap/cache
 /storage/*
 CLAUDE.md
+/docs/*

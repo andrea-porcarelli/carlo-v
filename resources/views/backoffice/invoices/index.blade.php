@@ -58,6 +58,7 @@
                                 @include('backoffice.components.form.input', ['label' => 'Da data', 'name' => 'date_from', 'col' => 2, 'class' => 'date_from', 'type' => 'date'])
                                 @include('backoffice.components.form.input', ['label' => 'A data', 'name' => 'date_to', 'col' => 2, 'class' => 'date_to', 'type' => 'date'])
                                 @include('backoffice.components.form.select', ['label' => 'Stato', 'name' => 'ignored', 'col' => 2, 'class' => 'ignored', 'options' => Utils::key_value(['' => 'Non ignorate', 'ignorate' => 'Solo ignorate']), 'hide_first' => false])
+                                @include('backoffice.components.form.select', ['label' => 'Tipo documento', 'name' => 'document_type', 'col' => 2, 'class' => 'document_type', 'options' => Utils::key_value(['' => 'Tutti', 'TD01' => 'Solo fatture', 'TD04' => 'Solo note di credito']), 'hide_first' => false])
                                 @include('backoffice.components.form.button', ['col' => 1, 'label' => 'Cerca', 'class' => 'btn-find'])
                             </div>
                             <div class="row m-b-sm">
@@ -332,7 +333,7 @@
                         {data: 'products', class: 'text-center', orderable: false},
                     ],
                     order: [[4, 'desc']],
-                    dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'ignored'],
+                    dataForm: ['invoice_number', 'supplier_id', 'date_from', 'date_to', 'ignored', 'document_type'],
                     serverSide: true,
                 }]);
             }, 500);

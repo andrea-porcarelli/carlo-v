@@ -42,6 +42,13 @@ class SupplierInvoiceRepository extends CrudRepository implements SupplierInvoic
             $builder->whereDate('invoice_date', '<=', $filters['date_to']);
         }
 
+        if (!empty($filters['document_type']) && in_array($filters['document_type'], [
+            SupplierInvoice::DOCUMENT_TYPE_INVOICE,
+            SupplierInvoice::DOCUMENT_TYPE_CREDIT_NOTE,
+        ], true)) {
+            $builder->where('document_type', $filters['document_type']);
+        }
+
         // 'da_effettuare' = ha almeno un prodotto senza materiale (e non ignorato)
         // 'effettuata'    = tutti i prodotti hanno materiale o sono ignorati
         if (!empty($filters['mapping'])) {
@@ -72,6 +79,12 @@ class SupplierInvoiceRepository extends CrudRepository implements SupplierInvoic
                         ->whereDoesntHave('stock');
                 });
             }
+        }
+
+        // Le note di credito non generano movimenti di magazzino: escludile dai flussi
+        // di "da mappare" e "da importare".
+        if (!empty($filters['mapping']) || !empty($filters['import'])) {
+            $builder->where('document_type', SupplierInvoice::DOCUMENT_TYPE_INVOICE);
         }
 
         return $builder;

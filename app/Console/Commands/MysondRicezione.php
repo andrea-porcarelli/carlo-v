@@ -377,12 +377,13 @@ class MysondRicezione extends Command
                 ->first();
             if (!$exist) {
                 $invoice = SupplierInvoice::create([
-                    'supplier_id' => $supplier->id,
+                    'supplier_id'    => $supplier->id,
                     'invoice_number' => $invoiceData['number'],
-                    'invoice_date' => $invoiceData['date'],
-                    'amount' => $invoiceData['total_amount'],
-                    'filename' => basename($path),
-                    'ignored_at' => $supplier->ignore_mapping ? now() : null,
+                    'invoice_date'   => $invoiceData['date'],
+                    'amount'         => $invoiceData['total_amount'],
+                    'filename'       => basename($path),
+                    'document_type'  => $invoiceData['document_type'] ?? SupplierInvoice::DOCUMENT_TYPE_INVOICE,
+                    'ignored_at'     => $supplier->ignore_mapping ? now() : null,
                 ]);
                 $invoice->load('supplier');
                 $createdInvoice = $invoice;

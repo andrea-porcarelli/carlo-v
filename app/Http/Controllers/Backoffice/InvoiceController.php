@@ -148,7 +148,10 @@ class InvoiceController extends BaseController
                    return Utils::price($item->amount);
                 })
                 ->addColumn('invoice_number', function ($item) {
-                   return $item->invoice_number . '<br /><small>' . $item->filename. '</small>';
+                    $badge = $item->isCreditNote()
+                        ? ' <span class="label label-warning" title="Nota di credito (TD04)">NC</span>'
+                        : '';
+                    return $item->invoice_number . $badge . '<br /><small>' . $item->filename . '</small>';
                 })
                 ->addColumn('invoice_date', function ($item) {
                    return Utils::data($item->invoice_date);
@@ -368,6 +371,7 @@ class InvoiceController extends BaseController
         $products = SupplierInvoiceProduct::whereHas('material')
             ->whereDoesntHave('stock')
             ->where('ignore_mapping', 0)
+            ->whereHas('invoice', fn($q) => $q->where('document_type', SupplierInvoice::DOCUMENT_TYPE_INVOICE))
             ->with(['invoice'])
             ->get();
 
@@ -539,6 +543,8 @@ class InvoiceController extends BaseController
     {
         $invoice = SupplierInvoice::with('supplier')->findOrFail($id);
 
+        abort_if($invoice->isCreditNote(), 422, 'Le note di credito non generano movimenti di magazzino: importazione giacenze non consentita.');
+
         $products = $invoice->products()
             ->where('ignore_mapping', 0)
             ->orderBy('id')
@@ -667,6 +673,8 @@ class InvoiceController extends BaseController
     public function loadInvoiceStocks(Request $request, int $id): JsonResponse
     {
         $invoice = SupplierInvoice::findOrFail($id);
+
+        abort_if($invoice->isCreditNote(), 422, 'Le note di credito non generano movimenti di magazzino: importazione giacenze non consentita.');
 
         $request->validate([
             'products'                       => 'required|array',
@@ -842,8 +850,9 @@ class InvoiceController extends BaseController
         $datiDocumento = $body->DatiGenerali->DatiGeneraliDocumento;
 
         $invoiceNumber = (string)$datiDocumento->Numero;
-        $invoiceDate = (string)$datiDocumento->Data;
-        $totalAmount = (float)($datiDocumento->ImportoTotaleDocumento ?? 0);
+        $invoiceDate   = (string)$datiDocumento->Data;
+        $totalAmount   = (float)($datiDocumento->ImportoTotaleDocumento ?? 0);
+        $documentType  = (string)($datiDocumento->TipoDocumento ?? SupplierInvoice::DOCUMENT_TYPE_INVOICE);
 
         // Verifica duplicato
         $existingInvoice = SupplierInvoice::where('supplier_id', $supplier->id)
@@ -855,12 +864,13 @@ class InvoiceController extends BaseController
         }
 
         return SupplierInvoice::create([
-            'supplier_id' => $supplier->id,
+            'supplier_id'    => $supplier->id,
             'invoice_number' => $invoiceNumber,
-            'filename' => $filename,
-            'amount' => $totalAmount,
-            'invoice_date' => $invoiceDate,
-            'ignored_at' => $supplier->ignore_mapping ? now() : null,
+            'filename'       => $filename,
+            'document_type'  => $documentType,
+            'amount'         => $totalAmount,
+            'invoice_date'   => $invoiceDate,
+            'ignored_at'     => $supplier->ignore_mapping ? now() : null,
         ]);
     }
 
@@ -872,12 +882,12 @@ class InvoiceController extends BaseController
         $count = 0;
 
         foreach ($dettaglioLinee as $linea) {
-            $quantity = (float)($linea->Quantita ?? 0);
-
-            // Salta righe descrittive
-            if ($quantity <= 0) {
+            // Salta righe puramente descrittive (senza tag Quantita o con quantità esattamente zero).
+            // NB: le note di credito (TD04) hanno righe con quantità negativa: vanno conservate.
+            if (!isset($linea->Quantita) || (float)$linea->Quantita == 0.0) {
                 continue;
             }
+            $quantity = (float)$linea->Quantita;
 
             $productName = (string)$linea->Descrizione;
             $defaultMultiplier = MappingProduct::where('supplier_id', $invoice->supplier_id)
