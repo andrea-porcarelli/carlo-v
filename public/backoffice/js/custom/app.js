@@ -840,6 +840,36 @@ const init = () => {
     $(document).on('click', '.btn-update-or-create-element', function () {
         update_or_create_element($(this));
     })
+
+    $(document).on('click', '.btn-toggle-ignore-invoice', function () {
+        const btn = $(this);
+        const isIgnored = btn.hasClass('btn-warning');
+        const msg = isIgnored
+            ? 'Ripristinare questa fattura? Tornerà visibile nella lista normale.'
+            : 'Ignorare questa fattura? Sarà nascosta dalla lista normale.';
+        if (!confirm(msg)) return;
+
+        const csrf = $('meta[name="csrf-token"]').attr('content')
+            || $('input[name="_token"]').first().val();
+
+        $.ajax({
+            url: btn.data('url'),
+            method: 'PATCH',
+            headers: csrf ? { 'X-CSRF-TOKEN': csrf } : {},
+            success: function () {
+                const $dt = btn.closest('.datatable_table');
+                if ($dt.length && $.fn.DataTable.isDataTable($dt)) {
+                    $dt.DataTable().ajax.reload(null, false);
+                } else {
+                    window.location.reload();
+                }
+            },
+            error: function (xhr) {
+                console.error('toggle-ignore failed', xhr.status, xhr.responseText);
+                alert('Errore durante l\'operazione.');
+            }
+        });
+    });
 };
 
 

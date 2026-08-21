@@ -205,34 +205,6 @@
             });
         });
 
-        $(document).ready(function() {
-            $(document).on('click', '.btn-toggle-ignore-invoice', function() {
-                var btn = $(this);
-                var isIgnored = btn.hasClass('btn-warning');
-                var msg = isIgnored
-                    ? 'Ripristinare questa fattura? Tornerà visibile nella lista normale.'
-                    : 'Ignorare questa fattura? Sarà nascosta dalla lista normale.';
-                if (!confirm(msg)) return;
-                $.ajax({
-                    url: btn.data('url'),
-                    method: 'PATCH',
-                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    success: function() {
-                        var $dt = $('.datatable_table');
-                        if ($dt.length && $.fn.DataTable.isDataTable($dt)) {
-                            $dt.DataTable().ajax.reload(null, false);
-                        } else {
-                            window.location.reload();
-                        }
-                    },
-                    error: function(xhr) {
-                        console.error('toggle-ignore failed', xhr.status, xhr.responseText);
-                        alert('Errore durante l\'operazione.');
-                    }
-                });
-            });
-        });
-
         $(document).on('click', '.btn-ignore-failed', function() {
             var btn = $(this);
             var url = btn.data('url');
