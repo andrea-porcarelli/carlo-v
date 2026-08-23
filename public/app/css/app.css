@@ -818,6 +818,12 @@ body {
 .action-btn-v { border:none; color:white; font-weight:600; padding:10px 4px; border-radius:4px; cursor:pointer; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.2px; display:flex; flex-direction:column; align-items:center; gap:4px; width:100%; line-height:1.2; }
 .action-btn-v i { font-size:1.1rem; }
 .action-btn-v:hover { filter:brightness(1.1); }
+.action-btn-v.pending-highlight { animation: pending-pulse 0.4s ease-in-out 3; box-shadow:0 0 0 3px rgba(255,193,7,0.6); }
+@keyframes pending-pulse {
+    0%   { transform: scale(1);    box-shadow: 0 0 0 0   rgba(255,193,7,0.9); }
+    50%  { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(255,193,7,0.4); }
+    100% { transform: scale(1);    box-shadow: 0 0 0 0   rgba(255,193,7,0);   }
+}
 
 /* Menu dishes grid in overlay: 5-6 per row */
 .overlay-col-menu .category-items {

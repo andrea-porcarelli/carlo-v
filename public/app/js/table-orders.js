@@ -921,11 +921,9 @@ class TableOrdersManager {
             const btn = document.getElementById(id);
             if (btn) btn.style.display = isBanco ? 'none' : '';
         });
-        // "Invia ordine" è visibile SOLO in modalità banco (l'ordine al banco resta
-        // aperto dopo l'invio in cucina; sui tavoli normali si usa "Marcia").
-        const btnInvia = document.getElementById('btnInviaOrdine');
-        if (btnInvia) btnInvia.style.display = isBanco ? '' : 'none';
-        // For banco: toggle close buttons based on whether items exist
+        // Visibilità di "Invia ordine" e dei bottoni di chiusura banco: gestite
+        // reattivamente da _updateBancoCloseButtons (chiamata anche a ogni
+        // modifica della sessione da updateModifyReceiptItems).
         this._updateBancoCloseButtons();
 
         // Update MARCIA button state based on last_marcia_at
@@ -1178,8 +1176,14 @@ class TableOrdersManager {
         const btnPreconto = document.getElementById('btnPreconto');
         const btnIncassa = document.getElementById('btnModifyPayBill');
         const btnChiudiConto = document.getElementById('btnModifyFreeTable');
+        const btnInvia = document.getElementById('btnInviaOrdine');
 
         const hasItems = (this.modifySession.items || []).some(i => !(i.segue && !i.dish_id));
+        const hasPending = this._hasPendingChanges();
+        // "Invia ordine" visibile in banco (sempre) e in tavolo normale solo con
+        // modifiche pendenti: dà all'operatore la via esplicita per persistere
+        // prima di incasso/preconto (che sono bloccati se pending).
+        if (btnInvia) btnInvia.style.display = (isBanco || hasPending) ? '' : 'none';
 
         if (isBanco) {
             if (closeBtn) closeBtn.style.display = hasItems ? 'none' : '';
@@ -3182,6 +3186,7 @@ class TableOrdersManager {
             this.showNotification('Nessun ordine attivo per questo tavolo', 'error');
             return;
         }
+        if (this._blockIfPendingChanges()) return;
         this.showPaymentMethodModal();
     }
 
@@ -3194,6 +3199,7 @@ class TableOrdersManager {
             this.showNotification('Nessun ordine attivo per questo tavolo', 'error');
             return;
         }
+        if (this._blockIfPendingChanges()) return;
         this.showPaymentMethodModal({ highlightSplitId: splitId });
     }
 
@@ -3808,6 +3814,7 @@ class TableOrdersManager {
 
     async chiudiContoContanti() {
         if (!this.currentTable) return;
+        if (this._blockIfPendingChanges()) return;
 
         // Operator auth
         let auth;
@@ -3902,6 +3909,7 @@ class TableOrdersManager {
 
     async chiudiTavoloVuoto() {
         if (!this.currentTable) return;
+        if (this._blockIfPendingChanges()) return;
 
         const hasItems = (this.modifySession.items || []).some(i => !(i.segue && !i.dish_id));
         if (hasItems) {
@@ -5033,6 +5041,36 @@ class TableOrdersManager {
     }
 
     /**
+     * True se la modifySession ha qualsiasi modifica non ancora persistita in DB.
+     * Serve a impedire i flussi di incasso/preconto quando la UI mostra piatti che
+     * non sono stati salvati: pagare in quello stato chiuderebbe l'ordine col
+     * totale DB (0€), perdendo gli item.
+     */
+    _hasPendingChanges() {
+        const s = this.modifySession || {};
+        return (s.pendingAdd?.length > 0)
+            || (s.pendingRemove?.length > 0)
+            || (Object.keys(s.pendingPartialRemove || {}).length > 0)
+            || (Object.keys(s.pendingUpdate || {}).length > 0)
+            || (s.pendingDishChange?.length > 0);
+    }
+
+    /**
+     * Se ci sono modifiche pendenti mostra un messaggio ed evidenzia il bottone
+     * "Invia ordine". Restituisce true (=blocca il chiamante) in quel caso.
+     */
+    _blockIfPendingChanges() {
+        if (!this._hasPendingChanges()) return false;
+        this.showNotification('Salva prima le modifiche con "Invia ordine"', 'error');
+        const btnInvia = document.getElementById('btnInviaOrdine');
+        if (btnInvia) {
+            btnInvia.classList.add('pending-highlight');
+            setTimeout(() => btnInvia.classList.remove('pending-highlight'), 2000);
+        }
+        return true;
+    }
+
+    /**
      * Submit all pending changes but keep the overlay open.
      * Used e.g. in banco mode to persist items before preconto/incasso.
      */
@@ -5360,6 +5398,7 @@ class TableOrdersManager {
             this.showNotification('Seleziona prima un tavolo con un ordine attivo', 'error');
             return;
         }
+        if (this._blockIfPendingChanges()) return;
 
         const modal = document.getElementById('precontoModal');
         const tableNumberEl = document.getElementById('precontoTableNumber');

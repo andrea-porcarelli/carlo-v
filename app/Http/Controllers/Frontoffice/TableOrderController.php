@@ -943,6 +943,11 @@ class TableOrderController extends Controller
         } else {
             // Pagamento del tavolo intero: comportamento originale.
             if ($wasOpen) {
+                // Traccia pagamento + chiusura anche nel fallback: senza queste due
+                // righe il closeLog non veniva creato e nella lista vendite si vedeva
+                // "Chiude: -" invece dell'operatore che ha ricevuto il pagamento.
+                $this->logger->logPayOrder($order, $paymentMethod, $operatorId);
+                $this->logger->logCloseOrder($order, $operatorId);
                 $order->close($paymentMethod);
             }
             $this->logger->logCashDrawerFailed($order, $operatorId);
