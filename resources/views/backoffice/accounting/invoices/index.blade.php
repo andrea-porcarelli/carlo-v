@@ -182,10 +182,15 @@
                                         </td>
                                         <td>
                                             @if (!empty($m->xml_content))
-                                                <a href="{{ route('accounting.mirrored.xml', $m) }}" target="_blank" class="btn btn-xs btn-info">XML</a>
+                                                <a href="{{ route('accounting.mirrored.xml', $m) }}" target="_blank" class="btn btn-xs btn-info" title="Apri XML"><i class="fa fa-file-code"></i> XML</a>
                                             @else
                                                 <span class="text-muted" title="Download XML lazy non ancora implementato">XML —</span>
                                             @endif
+                                            <a href="{{ route('accounting.credit-notes.create', ['source' => 'mirrored', 'id' => $m->id]) }}"
+                                               class="btn btn-xs btn-warning"
+                                               title="Emetti nota di credito da questa fattura esterna">
+                                                <i class="fa fa-file-invoice"></i> Nota di credito
+                                            </a>
                                         </td>
                                     </tr>
                                 @endforeach
