@@ -6,6 +6,7 @@ use App\Exceptions\PendingSdiRejectionsException;
 use App\Models\MirroredInvoice;
 use App\Models\Setting;
 use App\Models\TableOrderInvoice;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -66,6 +67,12 @@ class MysondInvoiceMirror
 
         $newRejections = [];
         $maxNumero = null;
+        // Cap idratazioni per sync: ogni download è 1 HTTP + eventuale
+        // unwrap p7m (SOAP), quindi con 100 fatture nuove diventa lentissimo.
+        // Bootstrap → skip totale (l'utente ha già i metadati; XML on-demand).
+        // Post-bootstrap → cap 10: le nuove arrivano poche per volta, e le
+        // vecchie senza xml si idratano al primo click "XML"/"Nota di credito".
+        $hydrateBudget = $bootstrap ? 0 : 10;
 
         foreach ($items as $item) {
             $fileName = (string) ($item->docName ?? $item->fileName ?? '');
@@ -99,6 +106,14 @@ class MysondInvoiceMirror
 
             if ($existing) {
                 $wasPendingRejection = $existing->isPendingAck();
+                // Preserva su update i campi arricchiti da XML (customer_name/vat/cf,
+                // mysond_total) quando il payload sync li ha nulli: docFeLink non
+                // li espone, quindi sovrascriverli azzererebbe i dati già idratati.
+                foreach (['customer_name', 'customer_vat', 'customer_cf', 'mysond_total'] as $k) {
+                    if (($payload[$k] ?? null) === null && $existing->{$k} !== null) {
+                        unset($payload[$k]);
+                    }
+                }
                 $existing->fill($payload)->save();
             } else {
                 $payload['first_synced_at'] = now();
@@ -113,6 +128,15 @@ class MysondInvoiceMirror
                     $newRejections[] = $existing;
                 }
                 $wasPendingRejection = false;
+            }
+
+            // Idratazione XML per le nuove entry: docFeLink espone solo
+            // metadati minimi (code/date/stato/link) — cliente e totale
+            // vengono estratti dall'XML scaricato via docDataLink.
+            if ($hydrateBudget > 0 && $existing->xml_content === null && !empty($item->docDataLink ?? null)) {
+                if ($this->downloadXmlAndHydrate($existing, $item)) {
+                    $hydrateBudget--;
+                }
             }
 
             // Riconcilia lo stato SDI sulla TableOrderInvoice locale, se esiste:
@@ -167,6 +191,172 @@ class MysondInvoiceMirror
         if ($pending->isNotEmpty()) {
             throw new PendingSdiRejectionsException($pending);
         }
+    }
+
+    /**
+     * Scarica l'XML della fattura via `docDataLink` (URL restituito da MySond
+     * in docFeLink), sbusta il .p7m se necessario e idrata mirrored_invoices
+     * con customer_name/vat/cf e mysond_total estratti dal FatturaElettronica.
+     *
+     * Fail-soft: se il download o il parsing fallisce, il record resta senza
+     * xml e ritentiamo al prossimo trigger. Ritorna true solo se abbiamo
+     * effettivamente scritto xml_content (utile al chiamante per rispettare
+     * un budget di idratazioni per run).
+     *
+     * @param \stdClass|null $item item docFeLink corrispondente (per evitare
+     *                             un secondo giro SOAP); se null, lo recupera.
+     */
+    public function downloadXmlAndHydrate(MirroredInvoice $mirrored, $item = null): bool
+    {
+        if (! $this->mysond->isConfigured()) {
+            return false;
+        }
+
+        if ($item === null) {
+            $year = $mirrored->mysond_date
+                ? (int) $mirrored->mysond_date->format('Y')
+                : (int) now()->format('Y');
+            try {
+                $records = $this->mysond->listInviateByFileName($mirrored->file_name, $year);
+            } catch (Throwable $e) {
+                Log::warning('MysondInvoiceMirror: listInviateByFileName failed', [
+                    'file_name' => $mirrored->file_name,
+                    'year'      => $year,
+                    'error'     => $e->getMessage(),
+                ]);
+                return false;
+            }
+            $item = $records[0] ?? null;
+        }
+
+        if ($item === null) {
+            return false;
+        }
+
+        $link    = (string) ($item->docDataLink ?? '');
+        $docName = (string) ($item->docName ?? '');
+        if ($link === '') {
+            return false;
+        }
+
+        try {
+            $response = Http::timeout(10)->get($link);
+            if (! $response->successful()) {
+                Log::warning('MysondInvoiceMirror: docDataLink HTTP not successful', [
+                    'file_name' => $mirrored->file_name,
+                    'status'    => $response->status(),
+                ]);
+                return false;
+            }
+            $body = (string) $response->body();
+        } catch (Throwable $e) {
+            Log::warning('MysondInvoiceMirror: docDataLink download failed', [
+                'file_name' => $mirrored->file_name,
+                'error'     => $e->getMessage(),
+            ]);
+            return false;
+        }
+
+        if ($body === '') {
+            return false;
+        }
+
+        $isP7m = str_ends_with(strtolower($docName), '.p7m')
+            || ! $this->looksLikeXml($body);
+
+        if ($isP7m) {
+            try {
+                $body = (string) $this->mysond->getXmlFromP7m($body);
+            } catch (Throwable $e) {
+                Log::warning('MysondInvoiceMirror: p7m unwrap failed', [
+                    'file_name' => $mirrored->file_name,
+                    'error'     => $e->getMessage(),
+                ]);
+                return false;
+            }
+            if (! $this->looksLikeXml($body)) {
+                return false;
+            }
+        }
+
+        $hydrated = ['xml_content' => $body, 'xml_fetched_at' => now()];
+        $hydrated = array_merge($hydrated, $this->extractInvoiceMetaFromXml($body));
+
+        // Non azzeriamo i campi già valorizzati (es. da tentativi precedenti
+        // o dal payload docFeLink) se il parser XML non li ha trovati.
+        foreach (['customer_name', 'customer_vat', 'customer_cf', 'mysond_total'] as $k) {
+            if (($hydrated[$k] ?? null) === null && $mirrored->{$k} !== null) {
+                unset($hydrated[$k]);
+            }
+        }
+
+        $mirrored->fill($hydrated)->save();
+        return true;
+    }
+
+    private function looksLikeXml(string $data): bool
+    {
+        $head = ltrim(substr($data, 0, 200));
+        return str_starts_with($head, '<?xml') || str_starts_with($head, '<');
+    }
+
+    /**
+     * Estrae denominazione cliente + P.IVA/CF + totale documento da un XML
+     * FatturaPA. Namespace-agnostico: strippa prefissi (`p:FatturaElettronica`
+     * → `FatturaElettronica`) e attributi xmlns per evitare i pattern rigidi
+     * di SimpleXML sui namespace default/prefixed.
+     *
+     * @return array{customer_name?: string|null, customer_vat?: string|null, customer_cf?: string|null, mysond_total?: float|null}
+     */
+    private function extractInvoiceMetaFromXml(string $xmlContent): array
+    {
+        $stripped = preg_replace('#(</?)[A-Za-z_][A-Za-z0-9_\-]*:#', '$1', $xmlContent);
+        $stripped = preg_replace('#\s+xmlns(:[A-Za-z0-9_\-]+)?\s*=\s*"[^"]*"#', '', $stripped);
+
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($stripped);
+        libxml_clear_errors();
+        if ($xml === false) {
+            return [];
+        }
+
+        $out = [];
+
+        $ces = $xml->FatturaElettronicaHeader->CessionarioCommittente ?? null;
+        if ($ces) {
+            $den   = trim((string) ($ces->DatiAnagrafici->Anagrafica->Denominazione ?? ''));
+            $nome  = trim((string) ($ces->DatiAnagrafici->Anagrafica->Nome ?? ''));
+            $cog   = trim((string) ($ces->DatiAnagrafici->Anagrafica->Cognome ?? ''));
+            $fullName = $den !== '' ? $den : trim($nome . ' ' . $cog);
+            if ($fullName !== '') {
+                $out['customer_name'] = $fullName;
+            }
+
+            $piva = trim((string) ($ces->DatiAnagrafici->IdFiscaleIVA->IdCodice ?? ''));
+            if ($piva !== '') {
+                $out['customer_vat'] = $piva;
+            }
+
+            $cf = trim((string) ($ces->DatiAnagrafici->CodiceFiscale ?? ''));
+            if ($cf !== '') {
+                $out['customer_cf'] = $cf;
+            }
+        }
+
+        // FatturaElettronicaBody può ripetersi (fatture riepilogative): sommiamo
+        // gli ImportoTotaleDocumento di ciascun body.
+        $total = null;
+        foreach ($xml->FatturaElettronicaBody ?? [] as $b) {
+            $imp = (string) ($b->DatiGenerali->DatiGeneraliDocumento->ImportoTotaleDocumento ?? '');
+            if ($imp !== '' && is_numeric($imp)) {
+                $total = ($total ?? 0.0) + (float) $imp;
+            }
+        }
+        if ($total !== null) {
+            $out['mysond_total'] = round($total, 2);
+        }
+
+        return $out;
     }
 
     private function syncCounter(?int $maxNumero): void

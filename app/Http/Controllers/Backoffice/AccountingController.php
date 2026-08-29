@@ -94,9 +94,14 @@ class AccountingController extends BaseController
         return back()->with('flash', 'Scartata riconosciuta. Emissioni nuovamente sbloccate (se non ce ne sono altre pendenti).');
     }
 
-    public function mirroredXml(MirroredInvoice $mirrored)
+    public function mirroredXml(MirroredInvoice $mirrored, MysondInvoiceMirror $mirror)
     {
-        abort_if(empty($mirrored->xml_content), 404, 'XML non ancora scaricato. Funzione lazy download da implementare.');
+        if (empty($mirrored->xml_content)) {
+            $mirror->downloadXmlAndHydrate($mirrored);
+            $mirrored->refresh();
+        }
+
+        abort_if(empty($mirrored->xml_content), 404, 'XML non disponibile su MySond.');
 
         return response($mirrored->xml_content, 200, [
             'Content-Type' => 'application/xml; charset=utf-8',
@@ -169,27 +174,8 @@ class AccountingController extends BaseController
             // estrarre righe e anagrafica cliente. Fail-soft: se il download
             // fallisce ripieghiamo su una riga forfait col totale mirroraro.
             if (empty($mirrored->xml_content)) {
-                try {
-                    $service = app(MysondFatturaService::class);
-                    $year    = $mirrored->mysond_date
-                        ? (int) $mirrored->mysond_date->format('Y')
-                        : (int) now()->format('Y');
-                    $records = $service->listInviateByFileName($mirrored->file_name, $year);
-                    foreach ($records as $rec) {
-                        if (!empty($rec->xmlContent ?? null) || !empty($rec->xml ?? null)) {
-                            $mirrored->update([
-                                'xml_content'    => (string) ($rec->xmlContent ?? $rec->xml),
-                                'xml_fetched_at' => now(),
-                            ]);
-                            break;
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning('mirrored xml lazy download failed', [
-                        'mirrored_id' => $mirrored->id,
-                        'error'       => $e->getMessage(),
-                    ]);
-                }
+                app(MysondInvoiceMirror::class)->downloadXmlAndHydrate($mirrored);
+                $mirrored->refresh();
             }
 
             $parentExternalRef = [
@@ -298,8 +284,15 @@ class AccountingController extends BaseController
             return $fallback;
         }
 
+        // Namespace-strip: gli XML FatturaPA usano il prefisso `p:` (o `ns2:`)
+        // sul root — SimpleXML `->FatturaElettronicaBody` non lo naviga senza
+        // registrazione esplicita del namespace. Meglio strippare prefissi e
+        // xmlns e lavorare su un albero senza namespace.
+        $stripped = preg_replace('#(</?)[A-Za-z_][A-Za-z0-9_\-]*:#', '$1', $mirrored->xml_content);
+        $stripped = preg_replace('#\s+xmlns(:[A-Za-z0-9_\-]+)?\s*=\s*"[^"]*"#', '', $stripped);
+
         libxml_use_internal_errors(true);
-        $xml = simplexml_load_string($mirrored->xml_content);
+        $xml = simplexml_load_string($stripped);
         if ($xml === false) {
             return $fallback;
         }
