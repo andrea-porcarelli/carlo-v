@@ -172,8 +172,11 @@ class AccountingController extends BaseController
 
             // Tentativo di scaricare l'XML lazy se non ancora presente, per
             // estrarre righe e anagrafica cliente. Fail-soft: se il download
-            // fallisce ripieghiamo su una riga forfait col totale mirroraro.
+            // fallisce ripieghiamo prima ai campi già presenti sulla mirrored
+            // (customer_name/vat/cf da idratazioni precedenti), poi al forfait.
+            $downloadAttempted = false;
             if (empty($mirrored->xml_content)) {
+                $downloadAttempted = true;
                 app(MysondInvoiceMirror::class)->downloadXmlAndHydrate($mirrored);
                 $mirrored->refresh();
             }
@@ -193,13 +196,32 @@ class AccountingController extends BaseController
 
             $prefillLines = $this->extractLinesFromMirroredXml($mirrored);
 
-            // Anagrafica cliente: la fattura esterna non è collegata a nessun
-            // Customer locale, ma il CessionarioCommittente dell'XML contiene
-            // denominazione/P.IVA/CF/sede. Se troviamo un Customer locale con
-            // stessa P.IVA o stesso CF lo riutilizziamo (id); altrimenti
-            // pre-popoliamo direttamente i campi del wizard (nuovo cliente
-            // creato in fase di submit).
+            // Anagrafica cliente: preferisci parsing XML (dati completi con
+            // sede + PEC + codice destinatario). Se l'XML non è disponibile o
+            // non parsabile, ripiega ai campi già stored sulla mirrored (da
+            // eventuali sync precedenti). Se pure quelli sono vuoti, il wizard
+            // resta con form da compilare a mano e mostriamo un avviso.
             $customerData = $this->extractCustomerFromMirroredXml($mirrored);
+            if (! $customerData
+                && ($mirrored->customer_name || $mirrored->customer_vat || $mirrored->customer_cf)) {
+                // Detection semplificata: senza XML sappiamo solo nome/PIVA/CF.
+                // Se c'è PIVA supponiamo azienda; altrimenti privato. L'operatore
+                // può correggere prima di procedere.
+                $customerData = [
+                    'user_type'           => $mirrored->customer_vat ? 'company' : 'private',
+                    'country'             => 'IT',
+                    'full_name'           => (string) ($mirrored->customer_name ?? ''),
+                    'fiscal_code'         => (string) ($mirrored->customer_cf ?? ''),
+                    'vat_number'          => (string) ($mirrored->customer_vat ?? ''),
+                    'address'             => '',
+                    'zip_code'            => '',
+                    'city'                => '',
+                    'province'            => '',
+                    'codice_destinatario' => $mirrored->customer_vat ? '' : '0000000',
+                    'pec_destinatario'    => '',
+                ];
+            }
+
             if ($customerData) {
                 $existingCustomer = null;
                 if (!empty($customerData['vat_number'])) {
@@ -211,6 +233,13 @@ class AccountingController extends BaseController
                 $prefillCustomer = $existingCustomer
                     ? ['id' => $existingCustomer->id]
                     : ['data' => $customerData];
+            } else {
+                session()->flash('warning', sprintf(
+                    'Nota di credito da fattura esterna %s: XML non disponibile su MySond%s. '
+                    . 'Compila i dati cliente manualmente prima di procedere.',
+                    $mirrored->mysond_code ?? $mirrored->file_name,
+                    $downloadAttempted ? ' (tentativo di download appena eseguito)' : ''
+                ));
             }
         } elseif ($source !== 'blank') {
             abort(422, 'Sorgente non valida.');
@@ -398,19 +427,63 @@ class AccountingController extends BaseController
         $codDest = trim((string) ($header->DatiTrasmissione->CodiceDestinatario ?? ''));
         $pec     = trim((string) ($header->DatiTrasmissione->PECDestinatario ?? ''));
 
-        // user_type inferito: PIVA presente → business, altrimenti privato.
-        $userType = $piva !== '' ? 'business' : 'private';
+        $nazione = trim((string) ($sede->Nazione ?? '')) ?: $paese;
+        $country = $nazione !== '' ? strtoupper($nazione) : 'IT';
+
+        // Detection user_type coerente con le opzioni del wizard
+        // (private, company, sole_trader, non_profit_entity, public_company, foreign).
+        // Regole:
+        //  - Nazione ≠ IT (o IdPaese ≠ IT) → foreign
+        //  - Denominazione + PIVA → company
+        //  - Denominazione + solo CF numerico 11 cifre → non_profit_entity
+        //  - Nome/Cognome + PIVA → sole_trader
+        //  - Nome/Cognome (solo CF 16 char o nessun ID) → private
+        //  - Fallback → private
+        $isForeign      = $country !== '' && $country !== 'IT';
+        $hasDenom       = $denominazione !== '';
+        $hasPersonName  = $nome !== '' || $cognome !== '';
+        $cfIsNumeric11  = $cf !== '' && preg_match('/^\d{11}$/', $cf) === 1;
+
+        if ($isForeign) {
+            $userType = 'foreign';
+        } elseif ($hasDenom && $piva !== '') {
+            $userType = 'company';
+        } elseif ($hasDenom && $piva === '' && $cfIsNumeric11) {
+            $userType = 'non_profit_entity';
+        } elseif ($hasPersonName && $piva !== '') {
+            $userType = 'sole_trader';
+        } else {
+            $userType = 'private';
+        }
+
+        // Codice destinatario: 'XXXXXXX' obbligatorio per esteri; '0000000'
+        // di default per privati/enti senza SdI; per aziende con PIVA italiane
+        // lasciamo il valore trovato (o vuoto se non presente — l'operatore
+        // può correggere prima di emettere).
+        if ($codDest === '') {
+            if ($userType === 'foreign') {
+                $codDest = 'XXXXXXX';
+            } elseif ($userType === 'private') {
+                $codDest = '0000000';
+            }
+        }
+
+        // Provincia: per esteri il wizard richiede "EE".
+        $provincia = trim((string) ($sede->Provincia ?? ''));
+        if ($userType === 'foreign' && ($provincia === '' || strtoupper($provincia) !== 'EE')) {
+            $provincia = 'EE';
+        }
 
         return [
             'user_type'           => $userType,
-            'country'             => $paese !== '' ? $paese : (trim((string) ($sede->Nazione ?? 'IT')) ?: 'IT'),
+            'country'             => $country ?: 'IT',
             'full_name'           => $fullName,
             'fiscal_code'         => $cf,
             'vat_number'          => $piva,
             'address'             => $indirizzo,
             'zip_code'            => trim((string) ($sede->CAP ?? '')),
             'city'                => trim((string) ($sede->Comune ?? '')),
-            'province'            => trim((string) ($sede->Provincia ?? '')),
+            'province'            => $provincia,
             'codice_destinatario' => $codDest,
             'pec_destinatario'    => $pec,
         ];
