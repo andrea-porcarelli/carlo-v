@@ -89,8 +89,16 @@ class QuickInvoiceWizard extends Component
         $this->parentExternalRef = $parentExternalRef;
         $this->parentSummary     = $parentSummary;
 
-        if (is_array($prefillCustomer) && !empty($prefillCustomer['id'])) {
-            $this->selectCustomer((int) $prefillCustomer['id']);
+        if (is_array($prefillCustomer)) {
+            if (!empty($prefillCustomer['id'])) {
+                $this->selectCustomer((int) $prefillCustomer['id']);
+            } elseif (!empty($prefillCustomer['data']) && is_array($prefillCustomer['data'])) {
+                // Nota di credito da fattura esterna: nessun Customer locale
+                // matching, popoliamo direttamente i campi del wizard con
+                // l'anagrafica estratta dal CessionarioCommittente dell'XML.
+                // Il submit creerà un nuovo Customer con questi dati.
+                $this->applyPrefillCustomerData($prefillCustomer['data']);
+            }
         }
 
         if (is_array($prefillLines) && count($prefillLines) > 0) {
@@ -199,6 +207,23 @@ class QuickInvoiceWizard extends Component
 
         $this->customerSearch = '';
         $this->customerSearchResults = [];
+    }
+
+    private function applyPrefillCustomerData(array $data): void
+    {
+        $this->selectedCustomerId     = null;
+        $this->storedCustomerSnapshot = null;
+        $this->userType               = (string) ($data['user_type'] ?? 'private');
+        $this->country                = (string) ($data['country'] ?? 'IT');
+        $this->fullName               = (string) ($data['full_name'] ?? '');
+        $this->fiscalCode             = (string) ($data['fiscal_code'] ?? '');
+        $this->vatNumber              = (string) ($data['vat_number'] ?? '');
+        $this->address                = (string) ($data['address'] ?? '');
+        $this->zipCode                = (string) ($data['zip_code'] ?? '');
+        $this->city                   = (string) ($data['city'] ?? '');
+        $this->province               = (string) ($data['province'] ?? '');
+        $this->codiceDestinatario     = (string) ($data['codice_destinatario'] ?? '');
+        $this->pecDestinatario        = (string) ($data['pec_destinatario'] ?? '');
     }
 
     public function clearCustomer(): void

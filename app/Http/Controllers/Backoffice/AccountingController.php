@@ -192,6 +192,26 @@ class AccountingController extends BaseController
             );
 
             $prefillLines = $this->extractLinesFromMirroredXml($mirrored);
+
+            // Anagrafica cliente: la fattura esterna non è collegata a nessun
+            // Customer locale, ma il CessionarioCommittente dell'XML contiene
+            // denominazione/P.IVA/CF/sede. Se troviamo un Customer locale con
+            // stessa P.IVA o stesso CF lo riutilizziamo (id); altrimenti
+            // pre-popoliamo direttamente i campi del wizard (nuovo cliente
+            // creato in fase di submit).
+            $customerData = $this->extractCustomerFromMirroredXml($mirrored);
+            if ($customerData) {
+                $existingCustomer = null;
+                if (!empty($customerData['vat_number'])) {
+                    $existingCustomer = Customer::where('vat_number', $customerData['vat_number'])->first();
+                }
+                if (!$existingCustomer && !empty($customerData['fiscal_code'])) {
+                    $existingCustomer = Customer::where('fiscal_code', $customerData['fiscal_code'])->first();
+                }
+                $prefillCustomer = $existingCustomer
+                    ? ['id' => $existingCustomer->id]
+                    : ['data' => $customerData];
+            }
         } elseif ($source !== 'blank') {
             abort(422, 'Sorgente non valida.');
         }
@@ -320,6 +340,80 @@ class AccountingController extends BaseController
         }
 
         return count($rows) > 0 ? $rows : $fallback;
+    }
+
+    /**
+     * Estrae anagrafica CessionarioCommittente + Sede + recapiti SDI dall'XML
+     * FatturaPA mirrored. Ritorna un payload compatibile con i campi pubblici
+     * di QuickInvoiceWizard (fullName, vatNumber, fiscalCode, address, ...).
+     * Ritorna null se l'XML manca, non è parsabile o non contiene nessun
+     * identificativo utile (nome/PIVA/CF).
+     *
+     * @return array<string, string>|null
+     */
+    private function extractCustomerFromMirroredXml(MirroredInvoice $mirrored): ?array
+    {
+        if (empty($mirrored->xml_content)) {
+            return null;
+        }
+
+        $stripped = preg_replace('#(</?)[A-Za-z_][A-Za-z0-9_\-]*:#', '$1', $mirrored->xml_content);
+        $stripped = preg_replace('#\s+xmlns(:[A-Za-z0-9_\-]+)?\s*=\s*"[^"]*"#', '', $stripped);
+
+        libxml_use_internal_errors(true);
+        $xml = simplexml_load_string($stripped);
+        if ($xml === false) {
+            return null;
+        }
+
+        $header = $xml->FatturaElettronicaHeader ?? null;
+        $ces    = $header?->CessionarioCommittente ?? null;
+        if (!$ces) {
+            return null;
+        }
+
+        $anag = $ces->DatiAnagrafici->Anagrafica ?? null;
+        $sede = $ces->Sede ?? null;
+
+        $denominazione = trim((string) ($anag->Denominazione ?? ''));
+        $nome          = trim((string) ($anag->Nome ?? ''));
+        $cognome       = trim((string) ($anag->Cognome ?? ''));
+        $fullName      = $denominazione !== '' ? $denominazione : trim($nome . ' ' . $cognome);
+
+        $piva  = trim((string) ($ces->DatiAnagrafici->IdFiscaleIVA->IdCodice ?? ''));
+        $paese = trim((string) ($ces->DatiAnagrafici->IdFiscaleIVA->IdPaese ?? ''));
+        $cf    = trim((string) ($ces->DatiAnagrafici->CodiceFiscale ?? ''));
+
+        if ($fullName === '' && $piva === '' && $cf === '') {
+            return null;
+        }
+
+        $indirizzo = trim((string) ($sede->Indirizzo ?? ''));
+        $numero    = trim((string) ($sede->NumeroCivico ?? ''));
+        if ($numero !== '') {
+            $indirizzo = $indirizzo !== '' ? $indirizzo . ', ' . $numero : $numero;
+        }
+
+        // Recapiti SDI dal DatiTrasmissione (posso essere assenti per B2C).
+        $codDest = trim((string) ($header->DatiTrasmissione->CodiceDestinatario ?? ''));
+        $pec     = trim((string) ($header->DatiTrasmissione->PECDestinatario ?? ''));
+
+        // user_type inferito: PIVA presente → business, altrimenti privato.
+        $userType = $piva !== '' ? 'business' : 'private';
+
+        return [
+            'user_type'           => $userType,
+            'country'             => $paese !== '' ? $paese : (trim((string) ($sede->Nazione ?? 'IT')) ?: 'IT'),
+            'full_name'           => $fullName,
+            'fiscal_code'         => $cf,
+            'vat_number'          => $piva,
+            'address'             => $indirizzo,
+            'zip_code'            => trim((string) ($sede->CAP ?? '')),
+            'city'                => trim((string) ($sede->Comune ?? '')),
+            'province'            => trim((string) ($sede->Provincia ?? '')),
+            'codice_destinatario' => $codDest,
+            'pec_destinatario'    => $pec,
+        ];
     }
 
     public function datatable(Request $request): JsonResponse

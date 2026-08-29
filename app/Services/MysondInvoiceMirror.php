@@ -130,13 +130,15 @@ class MysondInvoiceMirror
                 $wasPendingRejection = false;
             }
 
-            // Idratazione XML per le nuove entry: docFeLink espone solo
-            // metadati minimi (code/date/stato/link) — cliente e totale
-            // vengono estratti dall'XML scaricato via docDataLink.
+            // Idratazione XML: docFeLink espone solo metadati minimi
+            // (code/date/stato/link) — cliente e totale sono nel FatturaPA
+            // scaricato via docDataLink. Il budget conta i tentativi, non i
+            // successi: così una riga con link/p7m rotto non consuma tempo a
+            // ripetizione (verrà ritentata al refresh successivo — oppure
+            // idratata al volo dai bottoni XML/Nota di credito).
             if ($hydrateBudget > 0 && $existing->xml_content === null && !empty($item->docDataLink ?? null)) {
-                if ($this->downloadXmlAndHydrate($existing, $item)) {
-                    $hydrateBudget--;
-                }
+                $hydrateBudget--;
+                $this->downloadXmlAndHydrate($existing, $item);
             }
 
             // Riconcilia lo stato SDI sulla TableOrderInvoice locale, se esiste:
