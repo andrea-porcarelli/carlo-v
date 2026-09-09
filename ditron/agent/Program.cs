@@ -183,7 +183,7 @@ app.MapPost("/close-day", async (
 
     var command = builder.Build(request);
     var receiptNumber = allocator.Allocate();
-    var emitResponse = await writer.WriteAndAwaitAsync(receiptNumber, command, cancellationToken);
+    var emitResponse = await writer.WriteAndAwaitAsync(receiptNumber, command, cancellationToken, opt.Value.CloseDayTimeoutMs);
 
     var response = new CloseDayResponse
     {

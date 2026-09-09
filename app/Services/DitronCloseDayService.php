@@ -85,7 +85,9 @@ final class DitronCloseDayService
         ]);
 
         $token   = (string) Setting::get('ditron_agent_token', '');
-        $timeout = (int) Setting::get('ditron_agent_timeout_seconds', 30);
+        // Timeout HTTP dedicato per la Z: deve essere > CloseDayTimeoutMs dell'agent
+        // (default 60s lato agent) più margine per roundtrip.
+        $timeout = (int) Setting::get('ditron_agent_close_day_timeout_seconds', 90);
 
         $request = Http::timeout($timeout)->acceptJson();
         if ($token !== '') {

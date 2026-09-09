@@ -4,5 +4,5 @@ namespace DitronAgent.Services;
 
 public interface IScontriniWriter
 {
-    Task<EmitReceiptResponse> WriteAndAwaitAsync(int receiptNumber, string command, CancellationToken cancellationToken);
+    Task<EmitReceiptResponse> WriteAndAwaitAsync(int receiptNumber, string command, CancellationToken cancellationToken, int? timeoutMsOverride = null);
 }

@@ -18,9 +18,11 @@ public sealed class ScontriniWriter : IScontriniWriter
         _logger = logger;
     }
 
-    public async Task<EmitReceiptResponse> WriteAndAwaitAsync(int receiptNumber, string command, CancellationToken cancellationToken)
+    public async Task<EmitReceiptResponse> WriteAndAwaitAsync(int receiptNumber, string command, CancellationToken cancellationToken, int? timeoutMsOverride = null)
     {
         Directory.CreateDirectory(_options.ScontriniFolder);
+
+        var timeoutMs = timeoutMsOverride ?? _options.ErrPollingTimeoutMs;
 
         var nn = receiptNumber.ToString("D2", CultureInfo.InvariantCulture);
         var txtPath = Path.Combine(_options.ScontriniFolder, $"scontrino{nn}.txt");
@@ -34,9 +36,9 @@ public sealed class ScontriniWriter : IScontriniWriter
         var stopwatch = Stopwatch.StartNew();
 
         await File.WriteAllTextAsync(txtPath, command, new UTF8Encoding(false), cancellationToken);
-        _logger.LogInformation("Receipt {ReceiptNumber} written to {Path} ({Bytes} bytes)", receiptNumber, txtPath, command.Length);
+        _logger.LogInformation("Receipt {ReceiptNumber} written to {Path} ({Bytes} bytes, timeout={TimeoutMs}ms)", receiptNumber, txtPath, command.Length, timeoutMs);
 
-        var errContent = await WaitForErrAsync(txtPath, errPath, cancellationToken);
+        var errContent = await WaitForErrAsync(txtPath, errPath, timeoutMs, cancellationToken);
         stopwatch.Stop();
 
         var response = new EmitReceiptResponse
@@ -49,7 +51,7 @@ public sealed class ScontriniWriter : IScontriniWriter
         if (errContent is null)
         {
             response.Ok = false;
-            response.Error = $"Timeout: WinEcrCom did not produce {Path.GetFileName(errPath)} within {_options.ErrPollingTimeoutMs}ms";
+            response.Error = $"Timeout: WinEcrCom did not produce {Path.GetFileName(errPath)} within {timeoutMs}ms";
             _logger.LogWarning("Receipt {ReceiptNumber} timed out after {Elapsed}ms", receiptNumber, response.ElapsedMs);
             return response;
         }
@@ -85,9 +87,9 @@ public sealed class ScontriniWriter : IScontriniWriter
         return t.Length > 200 ? t.Substring(0, 200) + "…" : t;
     }
 
-    private async Task<string?> WaitForErrAsync(string txtPath, string errPath, CancellationToken cancellationToken)
+    private async Task<string?> WaitForErrAsync(string txtPath, string errPath, int timeoutMs, CancellationToken cancellationToken)
     {
-        var deadline = DateTime.UtcNow.AddMilliseconds(_options.ErrPollingTimeoutMs);
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();

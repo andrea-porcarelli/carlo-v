@@ -16,6 +16,14 @@ public sealed class DitronAgentOptions
 
     public int ErrPollingIntervalMs { get; set; } = 100;
 
+    /// <summary>
+    /// Timeout dedicato per la chiusura fiscale (opcode azzgio).
+    /// La Z è più lenta di uno scontrino normale perché azzera contatori,
+    /// stampa il report Z e aggiorna il DGFE: 15s non bastano quando la cassa
+    /// è idle da ore (tipico caso schedule 00:01).
+    /// </summary>
+    public int CloseDayTimeoutMs { get; set; } = 60000;
+
     public ReceiptDefaults Defaults { get; set; } = new();
 
     public ReceiptMode Mode { get; set; } = ReceiptMode.NonFiscal;

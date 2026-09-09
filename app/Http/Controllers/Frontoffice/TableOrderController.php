@@ -1468,96 +1468,12 @@ class TableOrderController extends Controller
         try {
             DB::beginTransaction();
 
-            $mySondFature = app(MysondFatturaService::class);
-            $ficResults   = [];
-
-            foreach ($validated['invoices'] as $invoiceData) {
-                $description = $invoiceData['description'] ?: 'Pasto completo';
-
-                // 1. Resolve or create Customer
-                if (!empty($invoiceData['customer_id'])) {
-                    $customer = Customer::find($invoiceData['customer_id']);
-                } elseif (!empty($invoiceData['save_customer'])) {
-                    $customer = Customer::create([
-                        'user_type'            => $invoiceData['user_type'] ?? 'private',
-                        'full_name'            => $invoiceData['customer_name'] ?? '',
-                        'fiscal_code'          => $invoiceData['customer_fiscal_code'] ?? null,
-                        'vat_number'           => $invoiceData['customer_vat_number'] ?? null,
-                        'address'              => $invoiceData['customer_address'] ?? null,
-                        'zip_code'             => $invoiceData['customer_zip_code'] ?? null,
-                        'city'                 => $invoiceData['customer_city'] ?? null,
-                        'province'             => $invoiceData['customer_province'] ?? null,
-                        'codice_destinatario'  => $invoiceData['customer_codice_destinatario'] ?? null,
-                        'pec_destinatario'     => $invoiceData['customer_pec_destinatario'] ?? null,
-                    ]);
-                } else {
-                    // Temporary in-memory customer (not persisted)
-                    $customer = new Customer([
-                        'user_type'            => $invoiceData['user_type'] ?? 'private',
-                        'full_name'            => $invoiceData['customer_name'] ?? '',
-                        'fiscal_code'          => $invoiceData['customer_fiscal_code'] ?? null,
-                        'vat_number'           => $invoiceData['customer_vat_number'] ?? null,
-                        'address'              => $invoiceData['customer_address'] ?? null,
-                        'zip_code'             => $invoiceData['customer_zip_code'] ?? null,
-                        'city'                 => $invoiceData['customer_city'] ?? null,
-                        'province'             => $invoiceData['customer_province'] ?? null,
-                        'codice_destinatario'  => $invoiceData['customer_codice_destinatario'] ?? null,
-                        'pec_destinatario'     => $invoiceData['customer_pec_destinatario'] ?? null,
-                    ]);
-                }
-
-                // 2. Generate invoice code and increment counter
-                $counter     = (int) Setting::get('invoice_counter', 0) + 1;
-                Setting::set('invoice_counter', $counter, 'integer');
-                $year        = now()->format('Y');
-                $invoiceCode = $year . '-' . str_pad($counter, 5, '0', STR_PAD_LEFT);
-                $invoiceName = TableOrderInvoice::toAlphanumeric($counter);
-
-                // 3. Calculate tax
-                $vatRate = (float) Setting::get('invoice_vat_rate', 10);
-                $imponibile = round((float) $invoiceData['amount'] / (1 + $vatRate / 100), 2);
-                $tax = round((float) $invoiceData['amount'] - $imponibile, 2);
-
-                // 4. Create TableOrderInvoice record
-                $tableOrderInvoice = TableOrderInvoice::create([
-                    'table_order_id'   => $order->id,
-                    'customer_id'      => $customer->id ?? null,
-                    'invoice_code'     => $invoiceCode,
-                    'invoice_name'     => $invoiceName,
-                    'amount'           => $invoiceData['amount'],
-                    'discount'         => 0,
-                    'tax'              => $tax,
-                    'description'      => $description,
-                    'payment_method'   => $validated['payment_method'] ?? 'fattura',
-                    'status'           => 'pending',
-                ]);
-
-                // Attach in-memory customer so InvoiceService can access $invoice->user
-                $tableOrderInvoice->setRelation('customer', $customer);
-
-                // 5. Generate XML and persist it — actual send is handled asynchronously by SendInvoiceToMysondJob
-                $result = $mySondFature->createInvoice($tableOrderInvoice);
-
-                InvoiceMysondLog::logCreateInvoice($tableOrderInvoice->id, $result);
-
-                $updateData = [
-                    'mysond_response' => is_array($result) ? json_encode($result) : (string) $result,
-                ];
-                if (($result['response'] ?? '') === 'success') {
-                    $updateData['xml_content'] = $result['content'] ?? null;
-                    $ficResults[] = $result;
-                } else {
-                    $updateData['status'] = 'error';
-                }
-                $tableOrderInvoice->update($updateData);
-
-                if (($result['response'] ?? '') === 'success') {
-                    \App\Jobs\SendInvoiceToMysondJob::dispatch($tableOrderInvoice->id);
-                }
-
-                // Log invoice creation including outcome
-                $this->logger->logCreateInvoice($order, $invoiceData, $operatorId, $result);
-            }
+            $ficSent = $this->createInvoicesForOrder(
+                $order,
+                $validated['invoices'],
+                $validated['payment_method'] ?? 'fattura',
+                $operatorId,
+            );
 
             $totalInvoiced = collect($validated['invoices'])->sum('amount');
             $remaining     = (float) $validated['remaining_amount'];
@@ -1584,7 +1500,7 @@ class TableOrderController extends Controller
                     'invoiced'      => $totalInvoiced,
                     'remaining'     => $remaining,
                     'invoice_count' => count($validated['invoices']),
-                    'fic_sent'      => count($ficResults),
+                    'fic_sent'      => $ficSent,
                 ],
             ]);
         } catch (\Exception $e) {
@@ -1595,6 +1511,100 @@ class TableOrderController extends Controller
                 'message' => 'Errore nel pagamento con fattura',
             ], 500);
         }
+    }
+
+    /**
+     * Crea i record TableOrderInvoice per un ordine, genera XML tramite Mysond e
+     * dispatcha il job di invio asincrono. Ritorna il numero di fatture per cui
+     * la generazione XML ha avuto successo (ficResults). Deve essere chiamato
+     * all'interno di una transazione.
+     */
+    private function createInvoicesForOrder(TableOrder $order, array $invoicesData, string $paymentMethod, ?int $operatorId): int
+    {
+        $mySondFature = app(MysondFatturaService::class);
+        $ficSent = 0;
+
+        foreach ($invoicesData as $invoiceData) {
+            $description = $invoiceData['description'] ?: 'Pasto completo';
+
+            if (!empty($invoiceData['customer_id'])) {
+                $customer = Customer::find($invoiceData['customer_id']);
+            } elseif (!empty($invoiceData['save_customer'])) {
+                $customer = Customer::create([
+                    'user_type'            => $invoiceData['user_type'] ?? 'private',
+                    'full_name'            => $invoiceData['customer_name'] ?? '',
+                    'fiscal_code'          => $invoiceData['customer_fiscal_code'] ?? null,
+                    'vat_number'           => $invoiceData['customer_vat_number'] ?? null,
+                    'address'              => $invoiceData['customer_address'] ?? null,
+                    'zip_code'             => $invoiceData['customer_zip_code'] ?? null,
+                    'city'                 => $invoiceData['customer_city'] ?? null,
+                    'province'             => $invoiceData['customer_province'] ?? null,
+                    'codice_destinatario'  => $invoiceData['customer_codice_destinatario'] ?? null,
+                    'pec_destinatario'     => $invoiceData['customer_pec_destinatario'] ?? null,
+                ]);
+            } else {
+                $customer = new Customer([
+                    'user_type'            => $invoiceData['user_type'] ?? 'private',
+                    'full_name'            => $invoiceData['customer_name'] ?? '',
+                    'fiscal_code'          => $invoiceData['customer_fiscal_code'] ?? null,
+                    'vat_number'           => $invoiceData['customer_vat_number'] ?? null,
+                    'address'              => $invoiceData['customer_address'] ?? null,
+                    'zip_code'             => $invoiceData['customer_zip_code'] ?? null,
+                    'city'                 => $invoiceData['customer_city'] ?? null,
+                    'province'             => $invoiceData['customer_province'] ?? null,
+                    'codice_destinatario'  => $invoiceData['customer_codice_destinatario'] ?? null,
+                    'pec_destinatario'     => $invoiceData['customer_pec_destinatario'] ?? null,
+                ]);
+            }
+
+            $counter     = (int) Setting::get('invoice_counter', 0) + 1;
+            Setting::set('invoice_counter', $counter, 'integer');
+            $year        = now()->format('Y');
+            $invoiceCode = $year . '-' . str_pad($counter, 5, '0', STR_PAD_LEFT);
+            $invoiceName = TableOrderInvoice::toAlphanumeric($counter);
+
+            $vatRate = (float) Setting::get('invoice_vat_rate', 10);
+            $imponibile = round((float) $invoiceData['amount'] / (1 + $vatRate / 100), 2);
+            $tax = round((float) $invoiceData['amount'] - $imponibile, 2);
+
+            $tableOrderInvoice = TableOrderInvoice::create([
+                'table_order_id'   => $order->id,
+                'customer_id'      => $customer->id ?? null,
+                'invoice_code'     => $invoiceCode,
+                'invoice_name'     => $invoiceName,
+                'amount'           => $invoiceData['amount'],
+                'discount'         => 0,
+                'tax'              => $tax,
+                'description'      => $description,
+                'payment_method'   => $paymentMethod,
+                'status'           => 'pending',
+            ]);
+
+            $tableOrderInvoice->setRelation('customer', $customer);
+
+            $result = $mySondFature->createInvoice($tableOrderInvoice);
+
+            InvoiceMysondLog::logCreateInvoice($tableOrderInvoice->id, $result);
+
+            $updateData = [
+                'mysond_response' => is_array($result) ? json_encode($result) : (string) $result,
+            ];
+            if (($result['response'] ?? '') === 'success') {
+                $updateData['xml_content'] = $result['content'] ?? null;
+                $ficSent++;
+            } else {
+                $updateData['status'] = 'error';
+            }
+            $tableOrderInvoice->update($updateData);
+
+            if (($result['response'] ?? '') === 'success') {
+                \App\Jobs\SendInvoiceToMysondJob::dispatch($tableOrderInvoice->id);
+            }
+
+            $this->logger->logCreateInvoice($order, $invoiceData, $operatorId, $result);
+        }
+
+        return $ficSent;
     }
 
     /**
@@ -1991,12 +2001,74 @@ class TableOrderController extends Controller
             $paymentMethod = 'pos';
         }
 
+        // Per i metodi di fatturazione servono i dati fattura: se mancano
+        // rifiutiamo l'operazione per evitare di chiudere lo split senza emettere
+        // (il bug in cui gli split fattura passavano dallo scontrino/whitelist).
+        $isInvoiceMethod = in_array($paymentMethod, ['fattura', 'fattura_contanti', 'fattura_pos', 'bonifico', 'assegno'], true);
+        $invoicesInput = $request->input('invoices');
+        if ($isInvoiceMethod) {
+            $validated = $request->validate([
+                'invoices'                                => 'required|array|min:1',
+                'invoices.*.amount'                       => 'required|numeric|min:0.01',
+                'invoices.*.description'                  => 'nullable|string|max:255',
+                'invoices.*.user_type'                    => 'nullable|string|in:private,company,public_company',
+                'invoices.*.customer_name'                => 'nullable|string|max:255',
+                'invoices.*.customer_fiscal_code'         => 'nullable|string|max:50',
+                'invoices.*.customer_vat_number'          => 'nullable|string|max:50',
+                'invoices.*.customer_address'             => 'nullable|string|max:255',
+                'invoices.*.customer_zip_code'            => 'nullable|string|max:10',
+                'invoices.*.customer_city'                => 'nullable|string|max:100',
+                'invoices.*.customer_province'            => 'nullable|string|max:5',
+                'invoices.*.customer_codice_destinatario' => 'nullable|string|max:7',
+                'invoices.*.customer_pec_destinatario'    => 'nullable|string|max:255',
+                'invoices.*.customer_id'                  => 'nullable|integer|exists:customers,id',
+                'invoices.*.save_customer'                => 'nullable|boolean',
+            ]);
+            $invoicesInput = $validated['invoices'];
+
+            $invoicedTotal = collect($invoicesInput)->sum('amount');
+            if (round($invoicedTotal - (float) $split->total, 2) !== 0.0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => sprintf(
+                        'La somma delle fatture (€%s) non coincide con il totale del preconto (€%s)',
+                        number_format($invoicedTotal, 2),
+                        number_format((float) $split->total, 2),
+                    ),
+                ], 422);
+            }
+
+            // Pre-emissione: blocca se ci sono fatture SDI scartate non riconosciute.
+            try {
+                app(\App\Services\MysondInvoiceMirror::class)->runOrThrow();
+            } catch (\App\Exceptions\PendingSdiRejectionsException $e) {
+                return response()->json([
+                    'success'    => false,
+                    'code'       => 'sdi_rejections_pending',
+                    'message'    => 'Emissione bloccata: ci sono fatture scartate dallo SDI da risolvere prima di poter emettere nuove fatture.',
+                    'rejections' => $e->rejections->map(fn ($r) => [
+                        'file_name'       => $r->file_name,
+                        'mysond_code'     => $r->mysond_code,
+                        'stato'           => $r->stato,
+                        'stato_label'     => $r->stato_label,
+                        'first_synced_at' => $r->first_synced_at?->toIso8601String(),
+                    ])->values(),
+                    'ack_url'    => route('accounting.invoices.index'),
+                ], 409);
+            }
+        }
+
         try {
             DB::beginTransaction();
 
             $order = $table->activeOrder;
             if (!$order || $split->table_order_id !== $order->id) {
                 return response()->json(['success' => false, 'message' => 'Split non valido per questo ordine'], 404);
+            }
+
+            $ficSent = 0;
+            if ($isInvoiceMethod) {
+                $ficSent = $this->createInvoicesForOrder($order, $invoicesInput, $paymentMethod, $operatorId);
             }
 
             $split->update(['status' => 'paid', 'payment_method' => $paymentMethod, 'paid_at' => now()]);
@@ -2045,6 +2117,7 @@ class TableOrderController extends Controller
                     'paid_split_total'  => (float) $split->total,
                     'paid_cover_amount' => round((int) $split->covers * $order->getCoverChargePerPerson(), 2),
                     'corrispettivo'     => $corrispettivoInfo,
+                    'fic_sent'          => $ficSent,
                 ],
             ]);
         } catch (\Exception $e) {

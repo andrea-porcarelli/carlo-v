@@ -3331,10 +3331,10 @@ class TableOrdersManager {
                 </div>
                 <div class="split-pay-btns" data-type="fattura-btns" style="display:none;">
                     <button class="split-back-btn" onclick="tableOrdersManager._splitBack(this)"><i class="fas fa-arrow-left"></i></button>
-                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'fattura_contanti')"><i class="fas fa-coins"></i> CONTANTI</button>
-                    <button class="split-pay-btn pos" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'fattura_pos')"><i class="fas fa-credit-card"></i> POS</button>
-                    <button class="split-pay-btn bonifico" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'bonifico')"><i class="fas fa-university"></i> BONIFICO</button>
-                    <button class="split-pay-btn assegno" onclick="tableOrdersManager.payPrecontoSplit(${s.id},'assegno')"><i class="fas fa-money-check"></i> ASSEGNO</button>
+                    <button class="split-pay-btn contanti" onclick="tableOrdersManager.openInvoiceModalForSplit(${s.id},'fattura_contanti')"><i class="fas fa-coins"></i> CONTANTI</button>
+                    <button class="split-pay-btn pos" onclick="tableOrdersManager.openInvoiceModalForSplit(${s.id},'fattura_pos')"><i class="fas fa-credit-card"></i> POS</button>
+                    <button class="split-pay-btn bonifico" onclick="tableOrdersManager.openInvoiceModalForSplit(${s.id},'bonifico')"><i class="fas fa-university"></i> BONIFICO</button>
+                    <button class="split-pay-btn assegno" onclick="tableOrdersManager.openInvoiceModalForSplit(${s.id},'assegno')"><i class="fas fa-money-check"></i> ASSEGNO</button>
                 </div>` : ''}
             </div>`;
         }).join('');
@@ -4395,6 +4395,7 @@ class TableOrdersManager {
         }
 
         this._pendingInvoicePaymentMethod = method;
+        this._invoiceContext = { type: 'order', splitId: null };
         this.closePaymentMethodModal();
 
         const modal = document.getElementById('invoiceModal');
@@ -4418,6 +4419,58 @@ class TableOrdersManager {
     }
 
     /**
+     * Open invoice modal per un preconto splittato. Il modal viene inizializzato
+     * col totale dello split (non del tavolo) e alla conferma chiama /pay-split.
+     * La UI del "resto" è nascosta perché la fattura deve coprire l'intero split.
+     */
+    openInvoiceModalForSplit(splitId, method = 'fattura_pos') {
+        if (!this.currentTable || !this.currentTable.order) return;
+
+        const perms = this.modifySession?.permissions ?? [];
+        if (!perms.includes('invoice_payment')) {
+            this.showNotification('Non hai il permesso di emettere fatture', 'error');
+            return;
+        }
+
+        const splitData = (this._splitsData || []).find(s => s.id === splitId);
+        if (!splitData) {
+            this.showNotification('Preconto non trovato', 'error');
+            return;
+        }
+
+        const total = parseFloat(splitData.total) || 0;
+        const covers = parseInt(splitData.covers) || 0;
+
+        this._pendingInvoicePaymentMethod = method;
+        this._invoiceContext = { type: 'split', splitId, total, covers };
+
+        const modal = document.getElementById('invoiceModal');
+        if (!modal) return;
+
+        document.getElementById('invoiceTableNumber').textContent = this.currentTable.table.table_number;
+        document.getElementById('invoiceTotalTable').textContent = `€${total.toFixed(2)}`;
+        document.getElementById('invoiceCoversCount').textContent = covers > 0 ? `${covers} cop.` : 'Preconto';
+
+        this._invoiceSplit = 1;
+        this._invoiceRowIndex = 0;
+        document.getElementById('invoiceSplitCount').textContent = '1';
+        this._rebuildInvoiceRows();
+
+        modal.style.display = 'flex';
+    }
+
+    /**
+     * Total attivo per il modal fattura: split.total se aperto per uno split,
+     * altrimenti order.total_amount.
+     */
+    _invoiceModalTotal() {
+        if (this._invoiceContext?.type === 'split') {
+            return parseFloat(this._invoiceContext.total) || 0;
+        }
+        return parseFloat(this.currentTable?.order?.total_amount) || 0;
+    }
+
+    /**
      * Close invoice modal
      */
     closeInvoiceModal() {
@@ -4430,8 +4483,10 @@ class TableOrdersManager {
      */
     _changeSplit(delta) {
         if (!this.currentTable || !this.currentTable.order) return;
-        const covers = this.currentTable.order.covers || 1;
-        const maxSplit = Math.max(covers, 20);
+        const contextCovers = this._invoiceContext?.type === 'split'
+            ? (this._invoiceContext.covers || 1)
+            : (this.currentTable.order.covers || 1);
+        const maxSplit = Math.max(contextCovers, 20);
         const next = Math.min(maxSplit, Math.max(1, (this._invoiceSplit || 1) + delta));
         if (next === this._invoiceSplit) return;
         this._invoiceSplit = next;
@@ -4446,7 +4501,7 @@ class TableOrdersManager {
     _rebuildInvoiceRows() {
         if (!this.currentTable || !this.currentTable.order) return;
 
-        const total  = parseFloat(this.currentTable.order.total_amount) || 0;
+        const total  = this._invoiceModalTotal();
         const n      = this._invoiceSplit || 1;
         const perRow = parseFloat((total / n).toFixed(2));
 
@@ -4730,7 +4785,7 @@ class TableOrdersManager {
     _updateInvoiceTotals() {
         if (!this.currentTable || !this.currentTable.order) return;
 
-        const total    = parseFloat(this.currentTable.order.total_amount) || 0;
+        const total    = this._invoiceModalTotal();
         let   invoiced = 0;
         document.querySelectorAll('.invoice-amount').forEach(input => {
             invoiced += parseFloat(input.value) || 0;
@@ -4747,7 +4802,10 @@ class TableOrdersManager {
             remainingEl.style.color  = remaining > 0.01 ? '#dc3545' : '#28a745';
         }
         if (remainingLabel)   remainingLabel.textContent                        = `€${remaining.toFixed(2)}`;
-        if (remainingSection) remainingSection.style.display = remaining > 0.01 ? 'block' : 'none';
+        // In modalità split la fattura deve coprire per intero il preconto
+        // (il backend rifiuta somme diverse): niente fallback POS/Contanti sul resto.
+        const allowRemainder = this._invoiceContext?.type !== 'split';
+        if (remainingSection) remainingSection.style.display = (allowRemainder && remaining > 0.01) ? 'block' : 'none';
     }
 
     /**
@@ -4841,10 +4899,20 @@ class TableOrdersManager {
             return;
         }
 
-        const total = parseFloat(this.currentTable.order.total_amount) || 0;
+        const isSplitContext = this._invoiceContext?.type === 'split';
+        const total = this._invoiceModalTotal();
         const invoiced = invoices.reduce((s, r) => s + r.amount, 0);
         const remaining = Math.max(0, total - invoiced);
         const remainingMethod = document.querySelector('input[name="remainingMethod"]:checked')?.value || 'pos';
+
+        // Sugli split la fattura deve coprire per intero il preconto (nessun resto).
+        if (isSplitContext && remaining > 0.01) {
+            this.showNotification(
+                `La somma delle fatture (€${invoiced.toFixed(2)}) non copre il totale del preconto (€${total.toFixed(2)})`,
+                'error'
+            );
+            return;
+        }
 
         // Request auth
         let auth;
@@ -4865,28 +4933,77 @@ class TableOrdersManager {
 
         this.closeInvoiceModal();
 
+        const paymentMethod = this._pendingInvoicePaymentMethod || 'fattura_pos';
+
         try {
-            const response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay-invoice`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
-                    'X-Operator-Token': auth.token
-                },
-                body: JSON.stringify({
-                    invoices: invoices,
-                    remaining_amount: remaining,
-                    remaining_method: remaining > 0.01 ? remainingMethod : null,
-                    payment_method: this._pendingInvoicePaymentMethod || 'fattura_pos',
-                })
-            });
+            let response;
+            if (isSplitContext) {
+                response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay-split/${this._invoiceContext.splitId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'X-Operator-Token': auth.token,
+                    },
+                    body: JSON.stringify({
+                        payment_method: paymentMethod,
+                        invoices: invoices,
+                    }),
+                });
+            } else {
+                response = await fetch(`${this.apiBase}/${this.currentTable.table.id}/pay-invoice`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                        'X-Operator-Token': auth.token,
+                    },
+                    body: JSON.stringify({
+                        invoices: invoices,
+                        remaining_amount: remaining,
+                        remaining_method: remaining > 0.01 ? remainingMethod : null,
+                        payment_method: paymentMethod,
+                    }),
+                });
+            }
 
             const result = await response.json();
 
             if (result.success) {
-                const ficInfo = result.data.fic_sent > 0 ? ` — ${result.data.fic_sent} fattura/e FIC inviata/e` : '';
-                this.showNotification(`Incassato: €${parseFloat(result.data.total_paid).toFixed(2)}${ficInfo}`);
-                this._afterPaymentSuccess();
+                const ficSent = result.data?.fic_sent ?? 0;
+                const ficInfo = ficSent > 0 ? ` — ${ficSent} fattura/e FIC inviata/e` : '';
+
+                if (isSplitContext) {
+                    const paidTotal = parseFloat(result.data?.paid_split_total ?? 0);
+                    this.showNotification(`Preconto fatturato: €${paidTotal.toFixed(2)}${ficInfo}`);
+
+                    if (result.data?.order_closed) {
+                        this._afterPaymentSuccess();
+                    } else {
+                        // Aggiorna sessione locale e ricarica vista split
+                        const paidItems = result.data?.paid_items ?? [];
+                        this.modifySession.paidSplitsTotal = (this.modifySession.paidSplitsTotal || 0) + paidTotal;
+                        this.modifySession.paidCoversTotal = (this.modifySession.paidCoversTotal || 0) + (result.data?.paid_cover_amount ?? 0);
+                        this.modifySession.pendingSplits = (this.modifySession.pendingSplits ?? []).filter(s => s.id !== this._invoiceContext.splitId);
+                        if (paidItems.length > 0) {
+                            this._applyPaidItemsToSession(paidItems);
+                        }
+                        try {
+                            const splitsResp = await fetch(`${this.apiBase}/${this.currentTable.table.id}/preconto-splits`, {
+                                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content }
+                            });
+                            const splitsData = await splitsResp.json();
+                            if (splitsData.success) {
+                                this._showSplitPaymentView(splitsData.data.splits, splitsData.data.remaining, splitsData.data.order_total);
+                            }
+                        } catch (e) {
+                            console.error('Error reloading splits after invoice payment:', e);
+                        }
+                    }
+                } else {
+                    this.showNotification(`Incassato: €${parseFloat(result.data.total_paid).toFixed(2)}${ficInfo}`);
+                    this._afterPaymentSuccess();
+                }
             } else {
                 this.showNotification(result.message || 'Errore nel pagamento con fattura', 'error');
             }
