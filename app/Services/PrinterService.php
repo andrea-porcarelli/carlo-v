@@ -2657,4 +2657,286 @@ class PrinterService implements PrinterServiceInterface
             return false;
         }
     }
+
+    public function printCookingBookingSlotChanged(Printer $printer, array $data): bool
+    {
+        $printerIp = $printer->ip;
+        $reference = (string) ($data['reference'] ?? '');
+
+        try {
+            if (! $this->isPrinterReachable($printerIp)) {
+                Log::warning('Cooking booking slot-changed: stampante non raggiungibile', [
+                    'ip' => $printerIp, 'reference' => $reference,
+                ]);
+
+                return false;
+            }
+
+            $connector = new NetworkPrintConnector($printerIp, 9100, 5);
+            $escpos = new EscposPrinter($connector);
+            $escpos->initialize();
+
+            // Intestazione
+            $escpos->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $escpos->setEmphasis(true);
+            $escpos->setTextSize(2, 2);
+            $escpos->text("MODIFICA DATA\nCOOKING CLASS\n");
+            $escpos->setTextSize(1, 1);
+            $escpos->setEmphasis(false);
+            $escpos->feed(1);
+
+            $classTitle = trim((string) ($data['class_title'] ?? ''));
+            if ($classTitle !== '') {
+                $escpos->text($classTitle."\n");
+            }
+
+            $escpos->text(str_repeat('-', 40)."\n");
+            $escpos->feed(1);
+
+            // Vecchio slot
+            $oldDateFmt = $this->formatIsoDate((string) ($data['old_date'] ?? ''));
+            $oldStart = (string) ($data['old_start'] ?? '');
+            $oldEnd = (string) ($data['old_end'] ?? '');
+
+            $escpos->setJustification(EscposPrinter::JUSTIFY_LEFT);
+            $escpos->setEmphasis(true);
+            $escpos->text("DA:\n");
+            $escpos->setEmphasis(false);
+            $oldLine = trim($oldDateFmt.($oldStart !== '' ? ' - '.$oldStart : '').($oldEnd !== '' ? '-'.$oldEnd : ''));
+            $escpos->text(($oldLine !== '' ? $oldLine : '-')."\n");
+
+            $escpos->feed(1);
+
+            // Nuovo slot
+            $newStart = $this->parseSlotDatetime($data['new_slot_start'] ?? null);
+            $newEnd = $this->parseSlotDatetime($data['new_slot_end'] ?? null);
+
+            $escpos->setEmphasis(true);
+            $escpos->text("A:\n");
+            $escpos->setEmphasis(false);
+
+            if ($newStart) {
+                $escpos->setEmphasis(true);
+                $escpos->setTextSize(1, 2);
+                $line = ucfirst($newStart->translatedFormat('D d M Y'));
+                $line .= ' - '.$newStart->format('H:i');
+                if ($newEnd) {
+                    $line .= '-'.$newEnd->format('H:i');
+                }
+                $escpos->text($line."\n");
+                $escpos->setTextSize(1, 1);
+                $escpos->setEmphasis(false);
+            } else {
+                $escpos->text("-\n");
+            }
+
+            $escpos->feed(1);
+
+            // Pax
+            $escpos->setTextSize(2, 2);
+            $escpos->setEmphasis(true);
+            $escpos->text('Pax: '.(int) ($data['pax'] ?? 0)."\n");
+            $escpos->setEmphasis(false);
+            $escpos->setTextSize(1, 1);
+
+            // Cliente
+            $customer = trim((string) ($data['customer_name'] ?? ''));
+            if ($customer !== '') {
+                $escpos->text($customer."\n");
+            }
+
+            // Contatti
+            $email = trim((string) ($data['email'] ?? ''));
+            if ($email !== '') {
+                $escpos->text('Email '.$email."\n");
+            }
+            $phone = trim((string) ($data['phone'] ?? ''));
+            if ($phone !== '') {
+                $escpos->text('Phone '.$phone."\n");
+            }
+
+            // Note
+            $notes = trim((string) ($data['notes'] ?? ''));
+            if ($notes !== '') {
+                $escpos->feed(1);
+                $escpos->setEmphasis(true);
+                $escpos->text("Note:\n");
+                $escpos->setEmphasis(false);
+                $escpos->text(wordwrap($notes, 42, "\n", true)."\n");
+            }
+
+            // Footer
+            $escpos->feed(1);
+            $escpos->text(str_repeat('-', 40)."\n");
+
+            if ($reference !== '') {
+                $escpos->feed(1);
+                $escpos->text('Rif: '.$reference."\n");
+            }
+            $escpos->text(now()->format('d/m/Y H:i')."\n");
+
+            $escpos->feed(3);
+            $escpos->cut();
+            $escpos->close();
+
+            Log::info('Cooking booking slot-changed: stampa OK', [
+                'reference' => $reference,
+                'printer' => $printer->label,
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Cooking booking slot-changed: errore stampa', [
+                'reference' => $reference,
+                'printer_ip' => $printerIp,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    public function printCookingBookingRefunded(Printer $printer, array $data): bool
+    {
+        $printerIp = $printer->ip;
+        $reference = (string) ($data['reference'] ?? '');
+
+        try {
+            if (! $this->isPrinterReachable($printerIp)) {
+                Log::warning('Cooking booking refunded: stampante non raggiungibile', [
+                    'ip' => $printerIp, 'reference' => $reference,
+                ]);
+
+                return false;
+            }
+
+            $connector = new NetworkPrintConnector($printerIp, 9100, 5);
+            $escpos = new EscposPrinter($connector);
+            $escpos->initialize();
+
+            // Intestazione
+            $escpos->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $escpos->setEmphasis(true);
+            $escpos->setTextSize(2, 2);
+            $escpos->text("RIMBORSO\nCOOKING CLASS\n");
+            $escpos->setTextSize(1, 1);
+            $escpos->setEmphasis(false);
+            $escpos->feed(1);
+
+            $classTitle = trim((string) ($data['class_title'] ?? ''));
+            if ($classTitle !== '') {
+                $escpos->text($classTitle."\n");
+            }
+
+            $escpos->text(str_repeat('-', 40)."\n");
+            $escpos->feed(1);
+
+            // Slot originario
+            $slotStart = $this->parseSlotDatetime($data['slot_start'] ?? null);
+            if ($slotStart) {
+                $escpos->setEmphasis(true);
+                $escpos->setTextSize(1, 2);
+                $line = ucfirst($slotStart->translatedFormat('D d M Y'));
+                $line .= ' - '.$slotStart->format('H:i');
+                $escpos->text($line."\n");
+                $escpos->setTextSize(1, 1);
+                $escpos->setEmphasis(false);
+            }
+
+            $escpos->feed(1);
+            $escpos->setJustification(EscposPrinter::JUSTIFY_LEFT);
+
+            // Pax
+            $escpos->setTextSize(2, 2);
+            $escpos->setEmphasis(true);
+            $escpos->text('Pax: '.(int) ($data['pax'] ?? 0)."\n");
+            $escpos->setEmphasis(false);
+            $escpos->setTextSize(1, 1);
+
+            // Cliente
+            $customer = trim((string) ($data['customer_name'] ?? ''));
+            if ($customer !== '') {
+                $escpos->text($customer."\n");
+            }
+
+            // Contatti
+            $email = trim((string) ($data['email'] ?? ''));
+            if ($email !== '') {
+                $escpos->text('Email '.$email."\n");
+            }
+            $phone = trim((string) ($data['phone'] ?? ''));
+            if ($phone !== '') {
+                $escpos->text('Phone '.$phone."\n");
+            }
+
+            // Note
+            $notes = trim((string) ($data['notes'] ?? ''));
+            if ($notes !== '') {
+                $escpos->feed(1);
+                $escpos->setEmphasis(true);
+                $escpos->text("Note:\n");
+                $escpos->setEmphasis(false);
+                $escpos->text(wordwrap($notes, 42, "\n", true)."\n");
+            }
+
+            // Importo rimborsato in evidenza
+            $escpos->feed(1);
+            $escpos->text(str_repeat('-', 40)."\n");
+            $totalCents = (int) ($data['total_cents'] ?? 0);
+            $currency = strtoupper((string) ($data['currency'] ?? 'EUR')) ?: 'EUR';
+            $escpos->setJustification(EscposPrinter::JUSTIFY_CENTER);
+            $escpos->setEmphasis(true);
+            $escpos->setTextSize(1, 2);
+            $escpos->text('Rimborsato: '.number_format($totalCents / 100, 2, ',', '.').' '.$currency."\n");
+            $escpos->setTextSize(1, 1);
+            $escpos->setEmphasis(false);
+            $escpos->setJustification(EscposPrinter::JUSTIFY_LEFT);
+
+            $provider = trim((string) ($data['payment_provider'] ?? ''));
+            if ($provider !== '') {
+                $escpos->text('Gateway: '.strtoupper($provider)."\n");
+            }
+
+            // Footer
+            $escpos->feed(1);
+            $escpos->text(str_repeat('-', 40)."\n");
+
+            if ($reference !== '') {
+                $escpos->feed(1);
+                $escpos->text('Rif: '.$reference."\n");
+            }
+            $escpos->text(now()->format('d/m/Y H:i')."\n");
+
+            $escpos->feed(3);
+            $escpos->cut();
+            $escpos->close();
+
+            Log::info('Cooking booking refunded: stampa OK', [
+                'reference' => $reference,
+                'printer' => $printer->label,
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Cooking booking refunded: errore stampa', [
+                'reference' => $reference,
+                'printer_ip' => $printerIp,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    private function formatIsoDate(string $raw): string
+    {
+        if ($raw === '') {
+            return '';
+        }
+        try {
+            return ucfirst(\Carbon\Carbon::parse($raw)->locale('it')->translatedFormat('D d M Y'));
+        } catch (\Throwable) {
+            return $raw;
+        }
+    }
 }

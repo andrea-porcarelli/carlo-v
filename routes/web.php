@@ -6,6 +6,8 @@ use App\Http\Controllers\Backoffice\ExternalInvoiceController;
 use App\Http\Controllers\Backoffice\MenuOptionController;
 use App\Http\Controllers\Backoffice\DeployController;
 use App\Http\Controllers\CookingBookingPrintController;
+use App\Http\Controllers\CookingBookingRefundedPrintController;
+use App\Http\Controllers\CookingBookingSlotChangedPrintController;
 use App\Http\Controllers\RevolutWebhookController;
 use App\Http\Controllers\TableReservationPrintController;
 use App\Http\Controllers\Backoffice\CategoryController;
@@ -43,6 +45,8 @@ Route::match(['GET', 'POST'], '/webhook/deploy', [DeployController::class, 'trig
 Route::match(['GET', 'POST'], '/webhook/migrate', [DeployController::class, 'migrate'])->name('webhook.migrate');
 Route::post('/webhook/revolut', [RevolutWebhookController::class, 'handle'])->name('webhook.revolut');
 Route::post('/webhook/cooking-booking-paid', [CookingBookingPrintController::class, 'handle'])->name('webhook.cookingBookingPaid');
+Route::post('/webhook/cooking-booking-slot-changed', [CookingBookingSlotChangedPrintController::class, 'handle'])->name('webhook.cookingBookingSlotChanged');
+Route::post('/webhook/cooking-booking-refunded', [CookingBookingRefundedPrintController::class, 'handle'])->name('webhook.cookingBookingRefunded');
 Route::post('/webhook/table-reservation', [TableReservationPrintController::class, 'handle'])->name('webhook.tableReservation');
 
 // API Routes for Operator Authentication

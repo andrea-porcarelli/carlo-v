@@ -152,4 +152,25 @@ interface PrinterServiceInterface
      *                                     email, phone, special_requests, country_code.
      */
     public function printTableReservation(Printer $printer, array $data): bool;
+
+    /**
+     * Stampa lo scontrino "MODIFICA DATA CORSO" quando l'admin di Misuraca
+     * sposta una booking su un altro slot.
+     *
+     * @param  array<string, mixed>  $data Campi attesi: reference, class_title,
+     *                                     old_date, old_start, old_end,
+     *                                     new_slot_start, new_slot_end, pax,
+     *                                     customer_name, email, phone, notes.
+     */
+    public function printCookingBookingSlotChanged(Printer $printer, array $data): bool;
+
+    /**
+     * Stampa lo scontrino "RIMBORSO CORSO" a rimborso avvenuto lato Misuraca.
+     *
+     * @param  array<string, mixed>  $data Campi attesi: reference, class_title,
+     *                                     slot_start, slot_end, pax, customer_name,
+     *                                     email, phone, notes, total_cents,
+     *                                     currency, payment_provider.
+     */
+    public function printCookingBookingRefunded(Printer $printer, array $data): bool;
 }
