@@ -105,6 +105,21 @@ class MysondInvoiceMirror
             $existing = MirroredInvoice::where('file_name', $fileName)->first();
 
             if ($existing) {
+                // Se l'admin ha già riconosciuto una scartata, congeliamo il record:
+                // il ciclo di vita SDI su MySond è considerato chiuso da parte nostra
+                // e nessuna mutazione (stato, XML, riconciliazione locale) deve più
+                // essere applicata. Aggiornare `last_synced_at` sarebbe pure innocuo
+                // ma preferiamo saltare tutto il blocco per uniformità con "leave alone".
+                if ($existing->acknowledged_at !== null && $existing->isRejected()) {
+                    // Traccia comunque il max numero per il sync contatore.
+                    if ($code !== null) {
+                        $n = $this->numeroToInt($code);
+                        if ($n !== null && ($maxNumero === null || $n > $maxNumero)) {
+                            $maxNumero = $n;
+                        }
+                    }
+                    continue;
+                }
                 $wasPendingRejection = $existing->isPendingAck();
                 // Preserva su update i campi arricchiti da XML (customer_name/vat/cf,
                 // mysond_total) quando il payload sync li ha nulli: docFeLink non

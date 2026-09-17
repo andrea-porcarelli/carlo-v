@@ -168,14 +168,27 @@
                                         <td>
                                             @if ($m->stato !== null)
                                                 @php
+                                                    $isRejectedAcked = in_array($m->stato, [1, 6, 10]) && $m->acknowledged_at !== null;
                                                     $cls = match(true) {
+                                                        $isRejectedAcked => 'label-default',
                                                         in_array($m->stato, [7, 9]) => 'label-success',
                                                         in_array($m->stato, [1, 6, 10]) => 'label-danger',
                                                         in_array($m->stato, [8, 11, 12]) => 'label-warning',
                                                         default => 'label-default',
                                                     };
+                                                    $ackTip = $isRejectedAcked
+                                                        ? trim(sprintf(
+                                                            "Riconosciuta il %s%s%s",
+                                                            $m->acknowledged_at->format('d/m/Y H:i'),
+                                                            $m->acknowledged_by ? ' da '.$m->acknowledged_by : '',
+                                                            $m->acknowledged_note ? "\nNota: ".$m->acknowledged_note : ''
+                                                        ))
+                                                        : '';
                                                 @endphp
                                                 <span class="label {{ $cls }}">{{ $m->stato_label ?? ('Stato '.$m->stato) }}</span>
+                                                @if ($isRejectedAcked)
+                                                    <span class="label label-success" title="{{ $ackTip }}">Risolta</span>
+                                                @endif
                                             @else
                                                 —
                                             @endif
