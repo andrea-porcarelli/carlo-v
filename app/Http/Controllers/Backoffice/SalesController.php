@@ -849,9 +849,17 @@ class SalesController extends BaseController
         }
 
         if ($split) {
-            $split->update(['cash_drawer_operation_id' => $opened['operation_id']]);
+            $splitUpdate = ['cash_drawer_operation_id' => $opened['operation_id']];
+            if ($split->payment_method === 'chiusura_conto') {
+                $splitUpdate['payment_method'] = 'contanti';
+            }
+            $split->update($splitUpdate);
         } else {
-            $order->update(['cash_drawer_operation_id' => $opened['operation_id']]);
+            $orderUpdate = ['cash_drawer_operation_id' => $opened['operation_id']];
+            if ($order->payment_method === 'chiusura_conto') {
+                $orderUpdate['payment_method'] = 'contanti';
+            }
+            $order->update($orderUpdate);
         }
 
         $logger->logCashDrawerRecovered($order, $amount, $opened['operation_id'], $split, (int) Auth::id());
