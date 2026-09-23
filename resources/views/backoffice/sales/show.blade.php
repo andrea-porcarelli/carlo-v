@@ -151,10 +151,15 @@ window._boSale = {
                                 $effectiveTotal    = $sale->hasDiscount() ? $sale->getDiscountedTotal() : (float) $sale->total_amount;
                                 $remainingTotal    = max(0, round($effectiveTotal - $paidSplitsTotal, 2));
                                 $isAdmin = auth()->user()?->role === 'admin';
+                                $vneErrorLogs = ($cashDrawerLogs ?? collect())->where('event_type', 'error');
+                                $hasVneError  = $vneErrorLogs->count() > 0;
+                                $cashLikeMethods = ['contanti', 'chiusura_conto'];
+                                $paidCashSplitsCount = $paidSplits->whereIn('payment_method', $cashLikeMethods)->count();
                                 $orderCashPending = $sale->status === 'paid'
-                                    && $sale->payment_method === 'contanti'
+                                    && in_array($sale->payment_method, $cashLikeMethods, true)
                                     && is_null($sale->cash_drawer_operation_id)
-                                    && $paidSplits->where('payment_method', 'contanti')->count() === 0;
+                                    && $paidCashSplitsCount === 0
+                                    && $hasVneError;
                             @endphp
                             @if($paidSplits->count() > 0 || $pendingSplits->count() > 0)
                             <tr>
@@ -170,7 +175,9 @@ window._boSale = {
                                         <tbody>
                                             @foreach($paidSplits as $split)
                                             @php
-                                                $splitCashPending = ($split->payment_method === 'contanti') && is_null($split->cash_drawer_operation_id);
+                                                $splitCashPending = in_array($split->payment_method, ['contanti', 'chiusura_conto'], true)
+                                                    && is_null($split->cash_drawer_operation_id)
+                                                    && $hasVneError;
                                             @endphp
                                             <tr>
                                                 <td style="padding:3px 8px;">
