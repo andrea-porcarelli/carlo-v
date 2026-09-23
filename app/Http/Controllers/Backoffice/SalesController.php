@@ -755,12 +755,12 @@ class SalesController extends BaseController
     }
 
     /**
-     * Ritenta l'apertura della cassa automatica VNE per una vendita chiusa in
-     * contanti il cui cassetto non si era aperto (cash_drawer_operation_id NULL).
-     * Azione riservata agli admin. Se OK, valorizza l'operation_id sul TableOrder;
-     * se KO non modifica nulla in DB (l'errore resta loggato su cash_drawer_logs).
+     * Avvia il retry apertura VNE per una vendita non-split. Non aggiorna DB:
+     * ritorna operation_id; il chiamante polla /poll finché payment_status=1,
+     * momento in cui l'endpoint di poll conferma l'operazione e valorizza
+     * cash_drawer_operation_id + payment_method.
      */
-    public function retryCashDrawer(int $id, PrinterService $printerService, TableOrderLoggerService $logger): JsonResponse
+    public function retryCashDrawer(int $id, PrinterService $printerService): JsonResponse
     {
         if (Auth::user()?->role !== 'admin') {
             return response()->json(['success' => false, 'message' => 'Operazione riservata agli amministratori.'], 403);
@@ -769,21 +769,16 @@ class SalesController extends BaseController
         $order = TableOrder::withTrashed()->findOrFail($id);
         $amount = (float) ($order->total_amount ?? 0);
 
-        return $this->executeCashDrawerRetry(
+        return $this->startCashDrawerRetry(
             printerService: $printerService,
-            logger: $logger,
             order: $order,
-            split: null,
+            splitId: null,
             amount: $amount,
             opNameSuffix: "sale:{$order->id}",
         );
     }
 
-    /**
-     * Ritenta l'apertura della cassa automatica per un singolo preconto split
-     * pagato in contanti con cassetto non aperto.
-     */
-    public function retryCashDrawerForSplit(int $id, int $splitId, PrinterService $printerService, TableOrderLoggerService $logger): JsonResponse
+    public function retryCashDrawerForSplit(int $id, int $splitId, PrinterService $printerService): JsonResponse
     {
         if (Auth::user()?->role !== 'admin') {
             return response()->json(['success' => false, 'message' => 'Operazione riservata agli amministratori.'], 403);
@@ -793,21 +788,124 @@ class SalesController extends BaseController
         $split = PrecontoSplit::where('table_order_id', $order->id)->findOrFail($splitId);
         $amount = (float) $split->total;
 
-        return $this->executeCashDrawerRetry(
+        return $this->startCashDrawerRetry(
             printerService: $printerService,
-            logger: $logger,
             order: $order,
-            split: $split,
+            splitId: $split->id,
             amount: $amount,
             opNameSuffix: "split:{$split->id}",
         );
     }
 
-    private function executeCashDrawerRetry(
+    /**
+     * Polling stato apertura cassetto per un retry admin in corso.
+     * Body: { operation_id, amount, preconto_split_id? }
+     * Se payment_status=1 (pagamento OK) conferma atomicamente:
+     * aggiorna cash_drawer_operation_id + eventuale switch payment_method e logga.
+     */
+    public function retryCashDrawerPoll(int $id, Request $request, PrinterService $printerService, TableOrderLoggerService $logger): JsonResponse
+    {
+        if (Auth::user()?->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Operazione riservata agli amministratori.'], 403);
+        }
+
+        $data = $request->validate([
+            'operation_id'      => ['required', 'string'],
+            'amount'            => ['required', 'numeric', 'min:0.01'],
+            'preconto_split_id' => ['nullable', 'integer'],
+        ]);
+
+        $ip = Setting::getCashDrawerIp();
+        if (!$ip) {
+            return response()->json(['success' => false, 'message' => 'IP cassa automatica non configurato.'], 422);
+        }
+
+        $order = TableOrder::withTrashed()->findOrFail($id);
+        $split = null;
+        if (!empty($data['preconto_split_id'])) {
+            $split = PrecontoSplit::where('table_order_id', $order->id)->findOrFail($data['preconto_split_id']);
+        }
+
+        $result = $printerService->pollCashDrawer($ip, $data['operation_id']);
+
+        if ((int) ($result['payment_status'] ?? 0) === 1) {
+            CashDrawerLog::create([
+                'table_order_id' => $order->id,
+                'operation_id'   => $data['operation_id'],
+                'event_type'     => 'completed',
+                'payload'        => array_merge($result, [
+                    'admin_retry'       => true,
+                    'admin_user_id'     => Auth::id(),
+                    'preconto_split_id' => $split?->id,
+                ]),
+            ]);
+
+            if ($split) {
+                $splitUpdate = ['cash_drawer_operation_id' => $data['operation_id']];
+                if ($split->payment_method === 'chiusura_conto') {
+                    $splitUpdate['payment_method'] = 'contanti';
+                }
+                $split->update($splitUpdate);
+            } else {
+                $orderUpdate = ['cash_drawer_operation_id' => $data['operation_id']];
+                if ($order->payment_method === 'chiusura_conto') {
+                    $orderUpdate['payment_method'] = 'contanti';
+                }
+                $order->update($orderUpdate);
+            }
+
+            $logger->logCashDrawerRecovered($order, (float) $data['amount'], $data['operation_id'], $split, (int) Auth::id());
+
+            return response()->json([
+                'success'        => true,
+                'completed'      => true,
+                'payment_status' => 1,
+                'message'        => 'Cassetto aperto. Incasso registrato correttamente.',
+            ]);
+        }
+
+        return response()->json([
+            'success'         => (bool) ($result['success'] ?? true),
+            'completed'       => false,
+            'payment_status'  => (int) ($result['payment_status'] ?? 0),
+            'payment_details' => $result['payment_details'] ?? null,
+        ]);
+    }
+
+    public function retryCashDrawerCancel(int $id, Request $request, PrinterService $printerService): JsonResponse
+    {
+        if (Auth::user()?->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Operazione riservata agli amministratori.'], 403);
+        }
+
+        $data = $request->validate([
+            'operation_id' => ['required', 'string'],
+        ]);
+
+        $ip = Setting::getCashDrawerIp();
+        if (!$ip) {
+            return response()->json(['success' => false, 'message' => 'IP cassa automatica non configurato.'], 422);
+        }
+
+        $result = $printerService->cancelCashDrawer($ip, $data['operation_id']);
+
+        CashDrawerLog::create([
+            'table_order_id' => $id,
+            'operation_id'   => $data['operation_id'],
+            'event_type'     => 'cancel',
+            'payload'        => array_merge((array) $result, [
+                'admin_retry'   => true,
+                'admin_user_id' => Auth::id(),
+            ]),
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Operazione annullata.']);
+    }
+
+    private function startCashDrawerRetry(
         PrinterService $printerService,
-        TableOrderLoggerService $logger,
         TableOrder $order,
-        ?PrecontoSplit $split,
+        ?int $splitId,
         float $amount,
         string $opNameSuffix,
     ): JsonResponse {
@@ -832,11 +930,11 @@ class SalesController extends BaseController
             'operation_id'   => $opened['operation_id'] ?? null,
             'event_type'     => $opened['response'] ? 'start' : 'error',
             'payload'        => [
-                'amount'             => $amount,
-                'response'           => $opened,
-                'preconto_split_id'  => $split?->id,
-                'admin_retry'        => true,
-                'admin_user_id'      => Auth::id(),
+                'amount'            => $amount,
+                'response'          => $opened,
+                'preconto_split_id' => $splitId,
+                'admin_retry'       => true,
+                'admin_user_id'     => Auth::id(),
             ],
         ]);
 
@@ -848,26 +946,11 @@ class SalesController extends BaseController
             ], 503);
         }
 
-        if ($split) {
-            $splitUpdate = ['cash_drawer_operation_id' => $opened['operation_id']];
-            if ($split->payment_method === 'chiusura_conto') {
-                $splitUpdate['payment_method'] = 'contanti';
-            }
-            $split->update($splitUpdate);
-        } else {
-            $orderUpdate = ['cash_drawer_operation_id' => $opened['operation_id']];
-            if ($order->payment_method === 'chiusura_conto') {
-                $orderUpdate['payment_method'] = 'contanti';
-            }
-            $order->update($orderUpdate);
-        }
-
-        $logger->logCashDrawerRecovered($order, $amount, $opened['operation_id'], $split, (int) Auth::id());
-
         return response()->json([
             'success'      => true,
             'operation_id' => $opened['operation_id'],
-            'message'      => 'Cassetto aperto. Incasso registrato correttamente.',
+            'amount'       => $amount,
+            'message'      => 'Apertura cassetto avviata. Attendo esito dalla cassa.',
         ]);
     }
 }

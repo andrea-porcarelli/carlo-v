@@ -407,6 +407,31 @@ window._boSale = {
                     </div>
                 </div>
             </div>
+
+            <!-- Overlay Retry Cassetto VNE (admin) -->
+            <div id="boCashDrawerOverlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.88); align-items:center; justify-content:center; flex-direction:column;">
+                <div style="background:#1a1a2e; border-radius:16px; padding:48px 40px; max-width:420px; width:90%; text-align:center; box-shadow:0 24px 80px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.08);">
+                    <div style="font-size:3rem; margin-bottom:24px;">💵</div>
+                    <h2 style="color:#fff; margin:0 0 8px 0; font-size:1.4rem; font-weight:700; letter-spacing:0.5px;">Apertura cassetto</h2>
+                    <p id="boCashDrawerAmount" style="color:#a0aec0; font-size:1.1rem; margin:0 0 32px 0;"></p>
+                    <div style="display:flex; justify-content:center; margin-bottom:28px;">
+                        <div style="width:48px; height:48px; border:4px solid rgba(255,255,255,0.15); border-top-color:#4299e1; border-radius:50%; animation:boCashDrawerSpin 0.8s linear infinite;"></div>
+                    </div>
+                    <p id="boCashDrawerStatus" style="color:#cbd5e0; font-size:0.95rem; margin:0 0 32px 0; min-height:1.4em;">Avvio comunicazione con la cassa automatica…</p>
+                    <button id="boCashDrawerCancelBtn" type="button"
+                            style="background:transparent; border:2px solid #e53e3e; color:#e53e3e; padding:12px 28px; border-radius:8px; font-size:0.95rem; font-weight:600; cursor:pointer; letter-spacing:0.3px; transition:all 0.15s;">
+                        Annulla transazione
+                    </button>
+                    <div id="boCashDrawerFallbackSection" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1);">
+                        <p style="color:#f6ad55; font-size:0.9rem; margin:0 0 14px 0; line-height:1.5;">
+                            ⚠️ La cassa automatica non risponde.<br>Verifica il collegamento di rete e riprova.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <style>
+                @keyframes boCashDrawerSpin { to { transform: rotate(360deg); } }
+            </style>
             @endif
 
             @if($isOpen)
@@ -2807,80 +2832,149 @@ window._boSale = {
             });
         })();
 
-        // --- Admin: retry apertura cassetto VNE (vendita non-split) ---
+        // --- Admin: retry apertura cassetto VNE (overlay + polling + annulla) ---
         (function() {
-            var btn = document.getElementById('btnRetryCashDrawer');
-            if (!btn) return;
-            btn.addEventListener('click', function() {
-                var total = btn.dataset.orderTotal || '';
-                if (!confirm('Riaprire il cassetto della cassa automatica per €' + total + ' e registrare l\'incasso?\n\nAssicurati che la cassa VNE sia raggiungibile.')) {
-                    return;
-                }
-                var original = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Apertura cassetto…';
-                fetch('/backoffice/restaurant/sales/{{ $sale->id }}/retry-cash-drawer', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(function(r) { return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
-                .then(function(res) {
-                    alert(res.data.message || (res.ok ? 'Incasso registrato.' : 'Operazione fallita.'));
-                    if (res.ok && res.data.success) {
-                        window.location.reload();
-                    } else {
-                        btn.disabled = false;
-                        btn.innerHTML = original;
-                    }
-                })
-                .catch(function() {
-                    alert('Errore di rete durante l\'apertura cassetto.');
-                    btn.disabled = false;
-                    btn.innerHTML = original;
-                });
-            });
-        })();
+            var overlay      = document.getElementById('boCashDrawerOverlay');
+            var amountEl     = document.getElementById('boCashDrawerAmount');
+            var statusEl     = document.getElementById('boCashDrawerStatus');
+            var cancelBtn    = document.getElementById('boCashDrawerCancelBtn');
+            var fallbackSec  = document.getElementById('boCashDrawerFallbackSection');
+            if (!overlay) return;
 
-        // --- Admin: retry apertura cassetto VNE per singolo preconto split ---
-        (function() {
-            document.querySelectorAll('.btn-retry-cash-drawer-split').forEach(function(btn) {
-                btn.addEventListener('click', function() {
-                    var splitId = btn.dataset.splitId;
-                    var splitLabel = btn.dataset.splitLabel || 'preconto';
-                    var splitTotal = btn.dataset.splitTotal || '';
-                    if (!confirm('Riaprire il cassetto per il preconto «' + splitLabel + '» (€' + splitTotal + ')?\n\nAssicurati che la cassa VNE sia raggiungibile.')) {
+            var state = {
+                operationId: null,
+                pollInterval: null,
+                pollErrors: 0,
+                splitId: null,
+                amount: 0,
+                originButton: null,
+                originButtonHtml: null,
+            };
+
+            var csrf = '{{ csrf_token() }}';
+            var saleId = {{ (int) $sale->id }};
+
+            function showOverlay(amountLabel) {
+                amountEl.textContent = '€' + amountLabel;
+                statusEl.textContent = 'Avvio comunicazione con la cassa automatica…';
+                fallbackSec.style.display = 'none';
+                cancelBtn.disabled = false;
+                overlay.style.display = 'flex';
+            }
+
+            function hideOverlay() {
+                overlay.style.display = 'none';
+                if (state.pollInterval) { clearInterval(state.pollInterval); state.pollInterval = null; }
+                state.operationId = null;
+                state.pollErrors = 0;
+                if (state.originButton) {
+                    state.originButton.disabled = false;
+                    if (state.originButtonHtml !== null) state.originButton.innerHTML = state.originButtonHtml;
+                }
+                state.originButton = null;
+                state.originButtonHtml = null;
+            }
+
+            function pollOnce() {
+                fetch('/backoffice/restaurant/sales/' + saleId + '/retry-cash-drawer/poll', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({
+                        operation_id: state.operationId,
+                        amount: state.amount,
+                        preconto_split_id: state.splitId,
+                    }),
+                })
+                .then(function(r){ return r.json(); })
+                .then(function(data){
+                    state.pollErrors = 0;
+                    if (data.completed) {
+                        clearInterval(state.pollInterval);
+                        state.pollInterval = null;
+                        statusEl.textContent = 'Cassetto aperto. Ricarico la pagina…';
+                        setTimeout(function(){ window.location.reload(); }, 700);
                         return;
                     }
-                    var original = btn.innerHTML;
-                    btn.disabled = true;
-                    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Apertura…';
-                    fetch('/backoffice/restaurant/sales/{{ $sale->id }}/preconto-splits/' + splitId + '/retry-cash-drawer', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        }
-                    })
-                    .then(function(r) { return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
-                    .then(function(res) {
-                        alert(res.data.message || (res.ok ? 'Incasso registrato.' : 'Operazione fallita.'));
-                        if (res.ok && res.data.success) {
-                            window.location.reload();
-                        } else {
-                            btn.disabled = false;
-                            btn.innerHTML = original;
-                        }
-                    })
-                    .catch(function() {
-                        alert('Errore di rete durante l\'apertura cassetto.');
-                        btn.disabled = false;
-                        btn.innerHTML = original;
-                    });
+                    statusEl.textContent = 'In attesa del pagamento dalla cassa automatica…';
+                })
+                .catch(function(){
+                    state.pollErrors += 1;
+                    statusEl.textContent = 'Errore di comunicazione, riprovo…';
+                    if (state.pollErrors >= 8) {
+                        fallbackSec.style.display = 'block';
+                    }
+                });
+            }
+
+            cancelBtn.addEventListener('click', function() {
+                if (!state.operationId) { hideOverlay(); return; }
+                cancelBtn.disabled = true;
+                if (state.pollInterval) { clearInterval(state.pollInterval); state.pollInterval = null; }
+                fetch('/backoffice/restaurant/sales/' + saleId + '/retry-cash-drawer/cancel', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ operation_id: state.operationId }),
+                })
+                .catch(function(){ /* ignore, chiudiamo overlay comunque */ })
+                .finally(function(){ hideOverlay(); });
+            });
+
+            function startRetry(url, splitId, amountLabel, sourceBtn) {
+                if (state.pollInterval) return; // già in corso
+                state.originButton = sourceBtn;
+                state.originButtonHtml = sourceBtn ? sourceBtn.innerHTML : null;
+                state.splitId = splitId;
+                if (sourceBtn) { sourceBtn.disabled = true; }
+                showOverlay(amountLabel);
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrf, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                })
+                .then(function(r){ return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
+                .then(function(res){
+                    if (!res.ok || !res.data.success) {
+                        alert(res.data.message || 'Cassa automatica non raggiungibile.');
+                        hideOverlay();
+                        return;
+                    }
+                    state.operationId = res.data.operation_id;
+                    state.amount = res.data.amount;
+                    statusEl.textContent = 'In attesa del pagamento dalla cassa automatica…';
+                    state.pollInterval = setInterval(pollOnce, 500);
+                })
+                .catch(function(){
+                    alert('Errore di rete durante l\'avvio del cassetto.');
+                    hideOverlay();
+                });
+            }
+
+            var btnOrder = document.getElementById('btnRetryCashDrawer');
+            if (btnOrder) {
+                btnOrder.addEventListener('click', function() {
+                    var total = btnOrder.dataset.orderTotal || '';
+                    if (!confirm('Aprire il cassetto della cassa automatica per €' + total + '?\n\nAssicurati che la cassa VNE sia raggiungibile e pronta a incassare.')) return;
+                    startRetry(
+                        '/backoffice/restaurant/sales/' + saleId + '/retry-cash-drawer',
+                        null,
+                        total,
+                        btnOrder
+                    );
+                });
+            }
+
+            document.querySelectorAll('.btn-retry-cash-drawer-split').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var splitId    = parseInt(btn.dataset.splitId, 10);
+                    var splitLabel = btn.dataset.splitLabel || 'preconto';
+                    var splitTotal = btn.dataset.splitTotal || '';
+                    if (!confirm('Aprire il cassetto per il preconto «' + splitLabel + '» (€' + splitTotal + ')?')) return;
+                    startRetry(
+                        '/backoffice/restaurant/sales/' + saleId + '/preconto-splits/' + splitId + '/retry-cash-drawer',
+                        splitId,
+                        splitTotal,
+                        btn
+                    );
                 });
             });
         })();

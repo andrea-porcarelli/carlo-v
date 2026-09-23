@@ -213,6 +213,8 @@ Route::group(['prefix' => '/backoffice'], function() {
                 Route::post('/{id}/emit-fiscal-receipt', [SalesController::class, 'emitFiscalReceipt'])->name('emit-fiscal-receipt');
                 Route::post('/{id}/retry-cash-drawer', [SalesController::class, 'retryCashDrawer'])->name('retry-cash-drawer');
                 Route::post('/{id}/preconto-splits/{splitId}/retry-cash-drawer', [SalesController::class, 'retryCashDrawerForSplit'])->name('retry-cash-drawer-split');
+                Route::post('/{id}/retry-cash-drawer/poll', [SalesController::class, 'retryCashDrawerPoll'])->name('retry-cash-drawer-poll');
+                Route::post('/{id}/retry-cash-drawer/cancel', [SalesController::class, 'retryCashDrawerCancel'])->name('retry-cash-drawer-cancel');
             });
 
             Route::group(['prefix' => '/table-order-invoices', 'as' => 'table-order-invoices.'], function() {
