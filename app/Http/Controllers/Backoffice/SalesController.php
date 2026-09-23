@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Backoffice;
 use App\Facades\Utils;
 use App\Models\CashDrawerLog;
 use App\Models\DitronReceipt;
+use App\Models\PrecontoSplit;
 use App\Models\PrintLog;
+use App\Models\Setting;
 use App\Models\TableOrder;
 use App\Models\TableOrderInvoice;
 use App\Models\TableOrderLog;
@@ -13,6 +15,7 @@ use App\Models\User;
 use App\Services\DishCostEstimatorService;
 use App\Services\DitronReceiptService;
 use App\Services\MysondFatturaService;
+use App\Services\PrinterService;
 use App\Services\TableOrderLoggerService;
 use App\Traits\DatatableTrait;
 use Carbon\Carbon;
@@ -749,5 +752,114 @@ class SalesController extends BaseController
                 ? 'Scontrino fiscale emesso con successo.'
                 : 'Emissione richiesta ma non conclusa (stato: ' . $dto->status . '). Controlla il log Ditron.',
         ], $isSent ? 200 : 202);
+    }
+
+    /**
+     * Ritenta l'apertura della cassa automatica VNE per una vendita chiusa in
+     * contanti il cui cassetto non si era aperto (cash_drawer_operation_id NULL).
+     * Azione riservata agli admin. Se OK, valorizza l'operation_id sul TableOrder;
+     * se KO non modifica nulla in DB (l'errore resta loggato su cash_drawer_logs).
+     */
+    public function retryCashDrawer(int $id, PrinterService $printerService, TableOrderLoggerService $logger): JsonResponse
+    {
+        if (Auth::user()?->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Operazione riservata agli amministratori.'], 403);
+        }
+
+        $order = TableOrder::withTrashed()->findOrFail($id);
+        $amount = (float) ($order->total_amount ?? 0);
+
+        return $this->executeCashDrawerRetry(
+            printerService: $printerService,
+            logger: $logger,
+            order: $order,
+            split: null,
+            amount: $amount,
+            opNameSuffix: "sale:{$order->id}",
+        );
+    }
+
+    /**
+     * Ritenta l'apertura della cassa automatica per un singolo preconto split
+     * pagato in contanti con cassetto non aperto.
+     */
+    public function retryCashDrawerForSplit(int $id, int $splitId, PrinterService $printerService, TableOrderLoggerService $logger): JsonResponse
+    {
+        if (Auth::user()?->role !== 'admin') {
+            return response()->json(['success' => false, 'message' => 'Operazione riservata agli amministratori.'], 403);
+        }
+
+        $order = TableOrder::withTrashed()->findOrFail($id);
+        $split = PrecontoSplit::where('table_order_id', $order->id)->findOrFail($splitId);
+        $amount = (float) $split->total;
+
+        return $this->executeCashDrawerRetry(
+            printerService: $printerService,
+            logger: $logger,
+            order: $order,
+            split: $split,
+            amount: $amount,
+            opNameSuffix: "split:{$split->id}",
+        );
+    }
+
+    private function executeCashDrawerRetry(
+        PrinterService $printerService,
+        TableOrderLoggerService $logger,
+        TableOrder $order,
+        ?PrecontoSplit $split,
+        float $amount,
+        string $opNameSuffix,
+    ): JsonResponse {
+        if (!Setting::isCashDrawerEnabled()) {
+            return response()->json(['success' => false, 'message' => 'Cassa automatica non attiva nelle impostazioni.'], 422);
+        }
+        $ip = Setting::getCashDrawerIp();
+        if (!$ip) {
+            return response()->json(['success' => false, 'message' => 'IP cassa automatica non configurato.'], 422);
+        }
+        if ($amount <= 0) {
+            return response()->json(['success' => false, 'message' => 'Importo non valido per apertura cassetto.'], 422);
+        }
+
+        $adminName = Auth::user()?->name ?? 'admin';
+        $opName = "admin_retry:{$adminName}:{$opNameSuffix}";
+
+        $opened = $printerService->openCashDrawer($ip, $amount, $opName);
+
+        CashDrawerLog::create([
+            'table_order_id' => $order->id,
+            'operation_id'   => $opened['operation_id'] ?? null,
+            'event_type'     => $opened['response'] ? 'start' : 'error',
+            'payload'        => [
+                'amount'             => $amount,
+                'response'           => $opened,
+                'preconto_split_id'  => $split?->id,
+                'admin_retry'        => true,
+                'admin_user_id'      => Auth::id(),
+            ],
+        ]);
+
+        if (!$opened['response']) {
+            $errorMsg = $opened['error']['code'] ?? 'Errore sconosciuto';
+            return response()->json([
+                'success' => false,
+                'message' => "Cassa automatica non raggiungibile ({$errorMsg}). Riprova o verifica lo stato della cassa.",
+            ], 503);
+        }
+
+        if ($split) {
+            $split->update(['cash_drawer_operation_id' => $opened['operation_id']]);
+        } else {
+            $order->update(['cash_drawer_operation_id' => $opened['operation_id']]);
+        }
+
+        $logger->logCashDrawerRecovered($order, $amount, $opened['operation_id'], $split, (int) Auth::id());
+
+        return response()->json([
+            'success'      => true,
+            'operation_id' => $opened['operation_id'],
+            'message'      => 'Cassetto aperto. Incasso registrato correttamente.',
+        ]);
     }
 }

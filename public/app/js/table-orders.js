@@ -3610,7 +3610,7 @@ class TableOrdersManager {
         try {
             initialResp = await fetch(`${this.apiBase}/open-cash-drawer`, {
                 method: 'POST',
-                body: JSON.stringify({ amount, table_order_id: tableOrderId }),
+                body: JSON.stringify({ amount, table_order_id: tableOrderId, preconto_split_id: splitId }),
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,

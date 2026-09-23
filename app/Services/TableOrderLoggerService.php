@@ -424,6 +424,29 @@ class TableOrderLoggerService
         );
     }
 
+    public function logCashDrawerRecovered(
+        TableOrder $order,
+        float $amount,
+        string $operationId,
+        ?\App\Models\PrecontoSplit $split = null,
+        int $operatorId = 0
+    ): TableOrderLog {
+        $scope = $split ? "split «{$split->label}»" : 'vendita completa';
+        return $this->log(
+            action: 'cash_drawer_recovered',
+            entityType: 'table_order',
+            entity: $order,
+            dataAfter: [
+                'amount'       => $amount,
+                'operation_id' => $operationId,
+                'split_id'     => $split?->id,
+                'split_label'  => $split?->label,
+            ],
+            notes: "Cassa automatica recuperata da backoffice per {$scope} — €" . number_format($amount, 2),
+            userId: $operatorId,
+        );
+    }
+
     public function logPayOrder(TableOrder $order, string $paymentMethod, int $operatorId = 0): TableOrderLog
     {
         $labels = ['pos' => 'POS', 'contanti' => 'Contanti', 'fattura' => 'Fattura', 'misto' => 'Misto (Fattura + altro)'];

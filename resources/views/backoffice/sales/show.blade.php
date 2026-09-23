@@ -150,6 +150,11 @@ window._boSale = {
                                 $paidSplitsTotal   = round((float) $paidSplits->sum('total'), 2);
                                 $effectiveTotal    = $sale->hasDiscount() ? $sale->getDiscountedTotal() : (float) $sale->total_amount;
                                 $remainingTotal    = max(0, round($effectiveTotal - $paidSplitsTotal, 2));
+                                $isAdmin = auth()->user()?->role === 'admin';
+                                $orderCashPending = $sale->status === 'paid'
+                                    && $sale->payment_method === 'contanti'
+                                    && is_null($sale->cash_drawer_operation_id)
+                                    && $paidSplits->where('payment_method', 'contanti')->count() === 0;
                             @endphp
                             @if($paidSplits->count() > 0 || $pendingSplits->count() > 0)
                             <tr>
@@ -164,10 +169,18 @@ window._boSale = {
                                         </thead>
                                         <tbody>
                                             @foreach($paidSplits as $split)
+                                            @php
+                                                $splitCashPending = ($split->payment_method === 'contanti') && is_null($split->cash_drawer_operation_id);
+                                            @endphp
                                             <tr>
                                                 <td style="padding:3px 8px;">
                                                     <i class="fas fa-check-circle text-success"></i>
                                                     {{ $split->label ?? 'Preconto' }}
+                                                    @if($splitCashPending)
+                                                        <span class="label label-warning" style="font-size:10px; margin-left:6px;" title="Il cassetto VNE non risulta aperto per questo preconto">
+                                                            <i class="fa fa-exclamation-triangle"></i> cassetto non aperto
+                                                        </span>
+                                                    @endif
                                                 </td>
                                                 <td style="padding:3px 8px; color:#666;">
                                                     {{ $split->paid_at ? $split->paid_at->format('H:i') : '' }}
@@ -179,6 +192,17 @@ window._boSale = {
                                                 </td>
                                                 <td style="padding:3px 8px; text-align:right; color:#d9534f;">
                                                     &minus;€{{ number_format($split->total, 2, ',', '.') }}
+                                                    @if($splitCashPending && $isAdmin)
+                                                        <br>
+                                                        <button type="button"
+                                                                class="btn btn-xs btn-warning btn-retry-cash-drawer-split"
+                                                                data-split-id="{{ $split->id }}"
+                                                                data-split-label="{{ $split->label ?? 'Preconto' }}"
+                                                                data-split-total="{{ number_format($split->total, 2, ',', '.') }}"
+                                                                style="margin-top:3px;">
+                                                            <i class="fas fa-cash-register"></i> Incassa contanti
+                                                        </button>
+                                                    @endif
                                                 </td>
                                                 @if($isOpen)<td></td>@endif
                                             </tr>
@@ -248,7 +272,6 @@ window._boSale = {
                 </div>
             </div>
             @php
-                $isAdmin = auth()->user()?->role === 'admin';
                 $isPaid  = $sale->status === 'paid';
                 $activeDitronSale = $isPaid
                     ? ($sale->ditronReceipts ?? collect())
@@ -287,6 +310,20 @@ window._boSale = {
                                 <i class="fas fa-exchange-alt"></i> Cambia metodo di pagamento
                             </button>
                         </div>
+                        @if($orderCashPending)
+                        <div class="col-xs-12" style="padding: 3px;">
+                            <button type="button"
+                                    class="btn btn-warning btn-block btn-sm"
+                                    id="btnRetryCashDrawer"
+                                    data-order-total="{{ number_format($sale->total_amount, 2, ',', '.') }}">
+                                <i class="fas fa-cash-register"></i> Incassa contanti (cassetto non aperto)
+                            </button>
+                            <small class="text-muted" style="display:block; margin-top:4px; font-size:11px;">
+                                <i class="fa fa-info-circle"></i>
+                                Il cassetto VNE non si era aperto alla chiusura del tavolo. Ritenta l'apertura per registrare l'incasso.
+                            </small>
+                        </div>
+                        @endif
                         <div class="col-xs-12" style="padding: 3px;">
                             <button type="button"
                                     class="btn btn-primary btn-block btn-sm"
@@ -2759,6 +2796,84 @@ window._boSale = {
                     alert('Errore di rete durante l\'emissione.');
                     btn.disabled = false;
                     btn.innerHTML = original;
+                });
+            });
+        })();
+
+        // --- Admin: retry apertura cassetto VNE (vendita non-split) ---
+        (function() {
+            var btn = document.getElementById('btnRetryCashDrawer');
+            if (!btn) return;
+            btn.addEventListener('click', function() {
+                var total = btn.dataset.orderTotal || '';
+                if (!confirm('Riaprire il cassetto della cassa automatica per €' + total + ' e registrare l\'incasso?\n\nAssicurati che la cassa VNE sia raggiungibile.')) {
+                    return;
+                }
+                var original = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Apertura cassetto…';
+                fetch('/backoffice/restaurant/sales/{{ $sale->id }}/retry-cash-drawer', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(function(r) { return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
+                .then(function(res) {
+                    alert(res.data.message || (res.ok ? 'Incasso registrato.' : 'Operazione fallita.'));
+                    if (res.ok && res.data.success) {
+                        window.location.reload();
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    }
+                })
+                .catch(function() {
+                    alert('Errore di rete durante l\'apertura cassetto.');
+                    btn.disabled = false;
+                    btn.innerHTML = original;
+                });
+            });
+        })();
+
+        // --- Admin: retry apertura cassetto VNE per singolo preconto split ---
+        (function() {
+            document.querySelectorAll('.btn-retry-cash-drawer-split').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var splitId = btn.dataset.splitId;
+                    var splitLabel = btn.dataset.splitLabel || 'preconto';
+                    var splitTotal = btn.dataset.splitTotal || '';
+                    if (!confirm('Riaprire il cassetto per il preconto «' + splitLabel + '» (€' + splitTotal + ')?\n\nAssicurati che la cassa VNE sia raggiungibile.')) {
+                        return;
+                    }
+                    var original = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Apertura…';
+                    fetch('/backoffice/restaurant/sales/{{ $sale->id }}/preconto-splits/' + splitId + '/retry-cash-drawer', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(function(r) { return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
+                    .then(function(res) {
+                        alert(res.data.message || (res.ok ? 'Incasso registrato.' : 'Operazione fallita.'));
+                        if (res.ok && res.data.success) {
+                            window.location.reload();
+                        } else {
+                            btn.disabled = false;
+                            btn.innerHTML = original;
+                        }
+                    })
+                    .catch(function() {
+                        alert('Errore di rete durante l\'apertura cassetto.');
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    });
                 });
             });
         })();

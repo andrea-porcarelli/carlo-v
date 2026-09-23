@@ -2345,6 +2345,7 @@ class TableOrderController extends Controller
 
         $amount = $request->input('amount');
         $table_order_id = $request->input('table_order_id');
+        $preconto_split_id = $request->input('preconto_split_id');
         $ip = Setting::getCashDrawerIp();
         if (!$ip) {
             return response()->json(['success' => false, 'message' => 'Nessun IP cassa automatica configurato'], 422);
@@ -2357,11 +2358,16 @@ class TableOrderController extends Controller
             'table_order_id' => $table_order_id ?: null,
             'operation_id'   => $opened['operation_id'] ?? null,
             'event_type'     => $opened['response'] ? 'start' : 'error',
-            'payload'        => ['amount' => $amount, 'response' => $opened],
+            'payload'        => ['amount' => $amount, 'response' => $opened, 'preconto_split_id' => $preconto_split_id],
         ]);
 
         if ($opened['response'] && $table_order_id) {
             TableOrder::where('id', $table_order_id)
+                ->update(['cash_drawer_operation_id' => $opened['operation_id']]);
+        }
+
+        if ($opened['response'] && $preconto_split_id) {
+            PrecontoSplit::where('id', $preconto_split_id)
                 ->update(['cash_drawer_operation_id' => $opened['operation_id']]);
         }
 

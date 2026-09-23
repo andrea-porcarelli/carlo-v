@@ -23,6 +23,7 @@ class PrecontoSplit extends Model
         'status',
         'payment_method',
         'paid_at',
+        'cash_drawer_operation_id',
     ];
 
     protected $casts = [
