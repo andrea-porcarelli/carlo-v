@@ -54,7 +54,8 @@ class SalesController extends BaseController
             $filters = $request->get('filters') ?? [];
 
             // Get only paid orders (completed sales)
-            $query = TableOrder::with(['restaurantTable', 'items.dish', 'waiter', 'ditronReceipts', 'closeLog.user'])
+            $query = TableOrder::with(['restaurantTable', 'waiter', 'ditronReceipts', 'closeLog.user'])
+                ->withCount('items')
                 ->where('status', 'paid')
                 ->orderBy('updated_at', 'desc');
 
@@ -87,7 +88,7 @@ class SalesController extends BaseController
                     return '<strong>' . $table . '</strong><br><small>' . $date . '</small>';
                 })
                 ->addColumn('items_count', function ($item) {
-                    return $item->items->count() . ' prodotti';
+                    return $item->items_count . ' prodotti';
                 })
                 ->addColumn('total', function ($item) {
                     if ($item->hasDiscount()) {
@@ -156,7 +157,8 @@ class SalesController extends BaseController
                 ->rawColumns(['sale_info', 'total', 'payment', 'waiter', 'action'])
                 ->make(true);
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            \Log::error('Sales datatable error: ' . $e->getMessage(), ['exception' => $e]);
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
