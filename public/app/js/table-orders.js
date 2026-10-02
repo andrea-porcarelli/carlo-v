@@ -4564,7 +4564,7 @@ class TableOrdersManager {
         const province           = data.province           || '';
         const codiceDestinatario = data.codiceDestinatario || '';
         const pecDestinatario    = data.pecDestinatario    || '';
-        const saveCustomer       = data.saveCustomer       || false;
+        const saveCustomer       = data.saveCustomer ?? true;
 
         const isCompany = userType === 'company' || userType === 'public_company';
         const companyDisplay = isCompany ? 'grid' : 'none';
