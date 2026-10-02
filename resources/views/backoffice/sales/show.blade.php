@@ -256,12 +256,15 @@ window._boSale = {
                                 <td>
                                     @php
                                         $pmLabels = [
-                                            'pos'            => ['label' => 'POS',             'icon' => 'fa-credit-card',  'class' => 'success'],
-                                            'contanti'       => ['label' => 'Contanti',         'icon' => 'fa-coins',        'class' => 'info'],
-                                            'fattura'        => ['label' => 'Fattura',          'icon' => 'fa-file-invoice', 'class' => 'primary'],
-                                            'misto'          => ['label' => 'Misto',            'icon' => 'fa-layer-group',  'class' => 'warning'],
-                                            'chiusura_conto' => ['label' => 'Chiusura conto',   'icon' => 'fa-times-circle', 'class' => 'default'],
-                                            'fattura_pos' => ['label' => 'Pos con fattura',   'icon' => 'fa-credit-card', 'class' => 'success'],
+                                            'pos'              => ['label' => 'POS',                 'icon' => 'fa-credit-card',  'class' => 'success'],
+                                            'contanti'         => ['label' => 'Contanti',            'icon' => 'fa-coins',        'class' => 'info'],
+                                            'fattura'          => ['label' => 'Fattura',             'icon' => 'fa-file-invoice', 'class' => 'primary'],
+                                            'fattura_contanti' => ['label' => 'Fattura + Contanti',  'icon' => 'fa-file-invoice', 'class' => 'primary'],
+                                            'fattura_pos'      => ['label' => 'Fattura + POS',       'icon' => 'fa-file-invoice', 'class' => 'primary'],
+                                            'bonifico'         => ['label' => 'Bonifico',            'icon' => 'fa-university',   'class' => 'primary'],
+                                            'assegno'          => ['label' => 'Assegno',             'icon' => 'fa-money-check',  'class' => 'primary'],
+                                            'misto'            => ['label' => 'Misto',               'icon' => 'fa-layer-group',  'class' => 'warning'],
+                                            'chiusura_conto'   => ['label' => 'Chiusura conto',      'icon' => 'fa-times-circle', 'class' => 'default'],
                                         ];
                                         $pm = $pmLabels[$sale->payment_method] ?? null;
                                     @endphp
