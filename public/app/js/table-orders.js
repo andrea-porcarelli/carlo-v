@@ -4402,7 +4402,7 @@ class TableOrdersManager {
         if (!modal) return;
 
         const order = this.currentTable.order;
-        const total = parseFloat(order.total_amount);
+        const total = parseFloat(order.discounted_total ?? order.total_amount);
         const covers = order.covers || 1;
 
         document.getElementById('invoiceTableNumber').textContent = this.currentTable.table.table_number;
@@ -4461,13 +4461,14 @@ class TableOrdersManager {
 
     /**
      * Total attivo per il modal fattura: split.total se aperto per uno split,
-     * altrimenti order.total_amount.
+     * altrimenti totale scontato del tavolo (discounted_total), con fallback a total_amount.
      */
     _invoiceModalTotal() {
         if (this._invoiceContext?.type === 'split') {
             return parseFloat(this._invoiceContext.total) || 0;
         }
-        return parseFloat(this.currentTable?.order?.total_amount) || 0;
+        const order = this.currentTable?.order;
+        return parseFloat(order?.discounted_total ?? order?.total_amount) || 0;
     }
 
     /**

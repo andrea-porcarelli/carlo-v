@@ -190,7 +190,9 @@ class InvoiceService
     {
         $map = [
             'contanti'           => ModalitaPagamento::Contanti,
+            'fattura_contanti'   => ModalitaPagamento::Contanti,
             'pos'                => ModalitaPagamento::CartaDiPagamento,
+            'fattura_pos'        => ModalitaPagamento::CartaDiPagamento,
             'carta'              => ModalitaPagamento::CartaDiPagamento,
             'bancomat'           => ModalitaPagamento::CartaDiPagamento,
             'bonifico'           => ModalitaPagamento::Bonifico,
