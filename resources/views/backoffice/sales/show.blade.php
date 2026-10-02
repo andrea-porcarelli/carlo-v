@@ -1041,7 +1041,8 @@ window._boSale = {
                         $totalInvoiced = $hasInvoices
                             ? $tableOrderInvoices->sum('amount')
                             : $invoiceLogs->sum(fn($l) => (float)($l->data_after['amount'] ?? 0));
-                        $remaining = round((float) $sale->total_amount - $totalInvoiced, 2);
+                        $invoiceReferenceTotal = $sale->hasDiscount() ? $sale->getDiscountedTotal() : (float) $sale->total_amount;
+                        $remaining = round($invoiceReferenceTotal - $totalInvoiced, 2);
                     @endphp
                     <div style="text-align: right;">
                         <small class="text-muted">Totale fatturato:</small>
