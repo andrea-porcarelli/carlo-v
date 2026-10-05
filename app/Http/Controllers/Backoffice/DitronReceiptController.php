@@ -194,17 +194,18 @@ class DitronReceiptController extends Controller
         return back()->with('error', 'Retry eseguito ma l\'invio non è riuscito: ' . ($updated->last_error ?? 'errore sconosciuto'));
     }
 
-    public function cancel(Request $request, DitronReceipt $receipt): RedirectResponse
+    public function cancel(Request $request, DitronReceipt $receipt)
     {
         $admin = $this->assertAdmin();
+        $wantsJson = $request->expectsJson();
 
         $reason = trim((string) $request->input('reason', ''));
         if ($reason === '') {
-            return back()->with('error', 'La motivazione dell\'annullo è obbligatoria.');
+            return $this->cancelResponse($wantsJson, false, 'La motivazione dell\'annullo è obbligatoria.', 422);
         }
 
         if (!$receipt->isCancellable()) {
-            return back()->with('error', "Scontrino #{$receipt->id} non è annullabile in questo momento.");
+            return $this->cancelResponse($wantsJson, false, "Scontrino #{$receipt->id} non è annullabile in questo momento.", 409);
         }
 
         Log::channel('corrispettivi')->info('Richiesta annullo DOCANNULLO Ditron da backoffice', [
@@ -216,17 +217,24 @@ class DitronReceiptController extends Controller
         try {
             $cancel = $this->service->emitCancel($receipt, $admin, $reason);
         } catch (Throwable $e) {
-            return back()->with('error', 'Errore nell\'emissione dell\'annullo: ' . $e->getMessage());
+            return $this->cancelResponse($wantsJson, false, 'Errore nell\'emissione dell\'annullo: ' . $e->getMessage(), 500);
         }
 
-        // Log traccia visibile su TableOrderLog anche se il tavolo non cambia stato.
         $this->logger->logDitronCancelEmitted($receipt->refresh(), $cancel, $reason, $admin->id);
 
         if ($cancel->isSent()) {
-            return back()->with('success', "Annullo emesso. Nuovo fiscal_number: {$cancel->fiscal_number}");
+            return $this->cancelResponse($wantsJson, true, "Annullo emesso. Nuovo fiscal_number: {$cancel->fiscal_number}", 200);
         }
 
-        return back()->with('error', 'Invio annullo alla cassa fallito: ' . ($cancel->last_error ?? 'errore sconosciuto'));
+        return $this->cancelResponse($wantsJson, false, 'Invio annullo alla cassa fallito: ' . ($cancel->last_error ?? 'errore sconosciuto'), 502);
+    }
+
+    private function cancelResponse(bool $wantsJson, bool $success, string $message, int $jsonStatus)
+    {
+        if ($wantsJson) {
+            return response()->json(['success' => $success, 'message' => $message], $jsonStatus);
+        }
+        return back()->with($success ? 'success' : 'error', $message);
     }
 
     private function assertAdmin(): \App\Models\User

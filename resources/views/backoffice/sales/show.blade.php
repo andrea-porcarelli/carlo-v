@@ -358,9 +358,72 @@ window._boSale = {
                                 </small>
                             @endif
                         </div>
+                        @if($activeDitronSale && $activeDitronSale->isCancellable())
+                        <div class="col-xs-12" style="padding: 3px;">
+                            <button type="button"
+                                    class="btn btn-danger btn-block btn-sm"
+                                    onclick="toggleModal('modalCancelDitronReceipt')">
+                                <i class="fas fa-ban"></i> Emetti annullo scontrino fiscale
+                            </button>
+                            @php
+                                $cancelPreview = $activeDitronSale->buildCancelPayload();
+                            @endphp
+                            <small class="text-muted" style="display:block; margin-top:4px; font-size:11px;">
+                                <i class="fa fa-info-circle"></i>
+                                DOCANNULLO di <strong>{{ $activeDitronSale->fiscal_number }}</strong>
+                                (Z {{ $cancelPreview['z_number'] }} · N° {{ $cancelPreview['fiscal_number'] }}
+                                del {{ \Carbon\Carbon::parse($cancelPreview['fiscal_date'])->format('d/m/Y') }}).
+                            </small>
+                        </div>
+                        @endif
                     </div>
                 </div>
             </div>
+
+            @if($activeDitronSale && $activeDitronSale->isCancellable())
+            <!-- Modal: Emissione DOCANNULLO Ditron (admin) -->
+            <div id="modalCancelDitronReceipt" class="log-modal" onclick="if(event.target===this)toggleModal('modalCancelDitronReceipt')">
+                <div class="log-modal-content" style="max-width:520px;">
+                    <div class="log-modal-header" style="background:#d9534f;">
+                        <h5><i class="fas fa-ban"></i> Emetti annullo scontrino fiscale</h5>
+                        <button type="button" onclick="toggleModal('modalCancelDitronReceipt')" class="log-modal-close">&times;</button>
+                    </div>
+                    <div class="log-modal-body">
+                        <div class="alert alert-danger" style="display:block; padding:10px 12px;">
+                            <strong><i class="fa fa-exclamation-triangle"></i> Operazione irreversibile.</strong><br>
+                            Stai emettendo un <strong>DOCANNULLO</strong> (opcode 124) sulla cassa Ditron.
+                            L'originale resterà registrato ma marchiato come annullato;
+                            il tavolo rimane chiuso/pagato, nessuna cascata sul <em>TableOrder</em>.
+                        </div>
+                        <div class="form-group">
+                            <label><strong>Scontrino da annullare:</strong></label>
+                            <div style="font-size:13px; line-height:1.6; background:#f7f7f9; padding:8px 10px; border-radius:4px;">
+                                #{{ $activeDitronSale->id }} — <strong>{{ $activeDitronSale->fiscal_number }}</strong>
+                                del {{ \Carbon\Carbon::parse($cancelPreview['fiscal_date'])->format('d/m/Y') }}<br>
+                                <small>
+                                    NUMSCO={{ $cancelPreview['fiscal_number'] }} ·
+                                    ZNUMBER={{ $cancelPreview['z_number'] }} ·
+                                    MATRICOLA={{ $cancelPreview['matricola'] }}
+                                </small>
+                            </div>
+                        </div>
+                        <form id="formCancelDitronReceipt" data-receipt-id="{{ $activeDitronSale->id }}">
+                            <div class="form-group">
+                                <label for="inputCancelDitronReason"><strong>Motivazione annullo <span class="text-danger">*</span></strong></label>
+                                <textarea id="inputCancelDitronReason" class="form-control" rows="3" maxlength="500" required
+                                          placeholder="Es. errore battitura, scontrino duplicato, cliente ha annullato ordine…"></textarea>
+                            </div>
+                            <div style="display:flex; gap:10px; margin-top:15px;">
+                                <button type="button" class="btn btn-default" style="flex:1" onclick="toggleModal('modalCancelDitronReceipt')">Chiudi</button>
+                                <button type="submit" class="btn btn-danger" style="flex:2" id="btnConfirmCancelDitron">
+                                    <i class="fa fa-ban"></i> Emetti annullo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            @endif
 
             <!-- Modal: Cambio Metodo di Pagamento (admin) -->
             <div id="modalChangePaymentMethod" class="log-modal" onclick="if(event.target===this)toggleModal('modalChangePaymentMethod')">
@@ -2830,6 +2893,53 @@ window._boSale = {
                 })
                 .catch(function() {
                     alert('Errore di rete durante l\'emissione.');
+                    btn.disabled = false;
+                    btn.innerHTML = original;
+                });
+            });
+        })();
+
+        // --- Admin: emissione DOCANNULLO Ditron ---
+        (function() {
+            var form = document.getElementById('formCancelDitronReceipt');
+            if (!form) return;
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                var reasonEl = document.getElementById('inputCancelDitronReason');
+                var reason = (reasonEl.value || '').trim();
+                if (reason === '') {
+                    alert('La motivazione dell\'annullo è obbligatoria.');
+                    reasonEl.focus();
+                    return;
+                }
+                if (!confirm('Confermi l\'emissione del DOCANNULLO sulla cassa Ditron?\n\nATTENZIONE: azione IRREVERSIBILE. Verrà emesso un documento di annullamento fiscale per lo scontrino #' + form.dataset.receiptId + '.\n\nMotivazione: ' + reason)) {
+                    return;
+                }
+                var btn = document.getElementById('btnConfirmCancelDitron');
+                var original = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Emissione annullo…';
+                fetch('/backoffice/ditron/receipts/' + form.dataset.receiptId + '/cancel', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ reason: reason })
+                })
+                .then(function(r) { return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
+                .then(function(res) {
+                    alert(res.data.message || (res.ok ? 'Annullo emesso.' : 'Operazione fallita.'));
+                    if (res.ok && res.data.success) {
+                        window.location.reload();
+                    } else {
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    }
+                })
+                .catch(function() {
+                    alert('Errore di rete durante l\'emissione dell\'annullo.');
                     btn.disabled = false;
                     btn.innerHTML = original;
                 });

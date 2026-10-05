@@ -572,11 +572,7 @@ final class DitronReceiptService implements ReceiptIssuerInterface
 
         $payload = [
             'idempotency_key' => 'cancel:' . $sale->id . ':' . now()->timestamp,
-            'fiscal_number'   => $sale->fiscal_number,
-            'fiscal_date'     => optional($sale->fiscal_date)->toDateString(),
-            'z_number'        => $sale->z_number,
-            'matricola'       => $sale->matricola,
-        ];
+        ] + $sale->buildCancelPayload();
 
         $cancel = DitronReceipt::create([
             'table_order_id'     => $sale->table_order_id,
@@ -595,7 +591,8 @@ final class DitronReceiptService implements ReceiptIssuerInterface
 
         $this->log('info', 'Inizio emissione DOCANNULLO Ditron', $cancel->getLogContext() + [
             'sale_receipt_id' => $sale->id,
-            'sale_fiscal'     => "{$sale->fiscal_number} del " . optional($sale->fiscal_date)->toDateString(),
+            'sale_fiscal'     => "{$sale->fiscal_number} del " . $sale->created_at->toDateString(),
+            'cancel_payload'  => array_diff_key($payload, ['idempotency_key' => true]),
             'admin_user_id'   => $admin->id,
             'reason'          => $reason,
         ]);
@@ -621,8 +618,8 @@ final class DitronReceiptService implements ReceiptIssuerInterface
         if (!$sale->isSent()) return "status={$sale->status}, ci si aspetta 'sent'";
         if ($sale->isCancelled()) return "già annullato il " . $sale->cancelled_at?->toDateTimeString();
         if (!filled($sale->fiscal_number)) return 'manca fiscal_number (non arrivato dalla cassa)';
-        if (!filled($sale->fiscal_date)) return 'manca fiscal_date';
-        if (!filled($sale->z_number)) return 'manca z_number';
+        if (!ctype_digit((string) $sale->fiscal_number)) return "fiscal_number non numerico: {$sale->fiscal_number}";
+        if (strlen((string) $sale->fiscal_number) < 5) return "fiscal_number troppo corto per scomporre Z+NUMSCO: {$sale->fiscal_number}";
         if (!filled($sale->matricola)) return 'manca matricola';
         return 'motivo sconosciuto';
     }
